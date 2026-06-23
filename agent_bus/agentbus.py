@@ -452,8 +452,21 @@ def _wait_core(role, timeout, include_approval=False):
     try:
         t = _oldest_claimable(inbox, include_approval)  # 启动 observer 后再查一次,消除竞态
         if not t:
-            ev.wait(timeout=timeout)
-            t = _oldest_claimable(inbox, include_approval)
+            # 循环等到截止时间:被【无关/竞态】文件事件唤醒但无可领取任务时,清标志继续等
+            # 剩余时间,而非直接返回 idle。否则一次 spurious 事件就让 wait 提前空返 →
+            # 自醒会话被白白唤起(daemon 只多空转一圈,但协调位自醒每次唤起都费 token)。
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break                       # 真超时,无任务 → idle
+                woke = ev.wait(timeout=remaining)
+                t = _oldest_claimable(inbox, include_approval)
+                if t:
+                    break                       # 有可领取任务
+                if not woke:
+                    break                       # ev.wait 超时返回(非事件)→ idle
+                ev.clear()                      # 被事件唤醒但没抢到(竞态/无关)→ 继续等剩余
     finally:
         obs.stop(); obs.join()
 
