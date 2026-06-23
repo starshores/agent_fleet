@@ -270,6 +270,82 @@ def _local_day_start(epoch):
     return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, lt.tm_wday, lt.tm_yday, -1))
 
 
+def _ev_epoch(ts):
+    """events.jsonl 的 '%Y-%m-%dT%H:%M:%S'(本地时区写入)→ epoch 秒。解析不出返回 None。"""
+    try:
+        return time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%S"))
+    except Exception:
+        return None
+
+
+def _is_test_role(r):
+    return (not r) or r.startswith("__") or r.startswith("zz") or r in ("?",)
+
+
+def build_activity():
+    """从 events.jsonl 重建【任务活动历史】(全程,无 token/成本)。
+    token/成本只有埋点后的前向真实数据,历史无从恢复,故活动单列、不混入消耗 BI。
+    claim→done 按 id 配对算时长;过滤 __*/zz* 等测试角色。"""
+    ev = BUS / "events.jsonl"
+    if not ev.exists():
+        return {"roles": [], "total": 0, "span": None}
+    try:
+        lines = ev.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return {"roles": [], "total": 0, "span": None}
+    recs = []
+    for ln in lines:
+        ln = ln.strip()
+        if ln:
+            try:
+                recs.append(json.loads(ln))
+            except Exception:
+                pass
+    claim_ts = {}
+    for r in recs:
+        if r.get("event") == "claim" and r.get("id"):
+            claim_ts[r["id"]] = _ev_epoch(r.get("ts", ""))
+    now = time.time()
+    h24 = now - 86400
+    per = {}
+    for r in recs:
+        if r.get("event") not in ("done", "dispatch_done"):
+            continue
+        role = r.get("role", "?")
+        if _is_test_role(role):
+            continue
+        dt = _ev_epoch(r.get("ts", ""))
+        d = per.setdefault(role, {"role": role, "tasks": 0, "ok": 0, "err": 0,
+                                  "tasks24": 0, "_durs": [], "_last": None})
+        d["tasks"] += 1
+        if r.get("status") == "error":
+            d["err"] += 1
+        else:
+            d["ok"] += 1
+        if dt and dt >= h24:
+            d["tasks24"] += 1
+        ct = claim_ts.get(r.get("id"))
+        if ct and dt and dt >= ct:
+            d["_durs"].append(dt - ct)
+        if dt and (d["_last"] is None or dt > d["_last"]):
+            d["_last"] = dt
+    out = []
+    for d in per.values():
+        durs = d.pop("_durs")
+        last = d.pop("_last")
+        d["avg_dur_s"] = round(sum(durs) / len(durs), 1) if durs else 0
+        d["last_active"] = time.strftime("%m-%d %H:%M", time.localtime(last)) if last else "-"
+        out.append(d)
+    out.sort(key=lambda x: -x["tasks"])
+    span = None
+    done_ts = [_ev_epoch(r.get("ts", "")) for r in recs if r.get("event") in ("done", "dispatch_done")]
+    done_ts = [t for t in done_ts if t]
+    if done_ts:
+        span = {"from": time.strftime("%m-%d %H:%M", time.localtime(min(done_ts))),
+                "to": time.strftime("%m-%d %H:%M", time.localtime(max(done_ts)))}
+    return {"roles": out, "total": sum(x["tasks"] for x in out), "span": span}
+
+
 def _agg_metrics(rows):
     d = {"tasks": 0, "tok_in": 0, "tok_out": 0, "cache_read": 0, "cost": 0.0, "dur_ms": 0, "errors": 0}
     for r in rows:
@@ -340,6 +416,7 @@ def build_bi():
         "running": running,
         "total_records": len(recs),
         "psutil": ab.psutil is not None,
+        "activity": build_activity(),
     }
 
 
@@ -1038,9 +1115,15 @@ table.bi-tbl td.num{text-align:right;font-family:ui-monospace,monospace}
     <div class="sec-b">
       <div class="bi-kpis" id="biKpis"></div>
       <div id="biRunning" style="padding:0 16px 8px"></div>
+      <div class="sub" style="padding:2px 16px 0">消耗(近24h · token/成本 = 埋点后前向真实)</div>
       <table class="bi-tbl">
         <thead><tr><th>角色</th><th>任务<span class="sub" style="font-weight:400">(近24h)</span></th><th>token in</th><th>token out</th><th>cache读</th><th>成本 $</th><th>平均耗时</th><th>CPU%</th><th>内存MB</th></tr></thead>
         <tbody id="biBody"></tbody>
+      </table>
+      <div class="sub" style="padding:12px 16px 0">📜 任务活动历史 <span style="font-weight:400">— 全程(<span class="mono">events.jsonl</span>)· <b id="actSpan">–</b> · 仅活动量,无 token/成本(历史无从恢复)</span></div>
+      <table class="bi-tbl">
+        <thead><tr><th>角色</th><th>累计任务</th><th>近24h</th><th>ok</th><th>err</th><th>平均耗时</th><th>最近活跃</th></tr></thead>
+        <tbody id="actBody"></tbody>
       </table>
     </div>
   </section>
@@ -1503,6 +1586,19 @@ function renderBI(bi){
       <td class="num">${r.tasks?fmtDur(r.avg_dur_s):'–'}</td>
       <td class="num">${s?s.cpu:'–'}</td>
       <td class="num">${s?s.rss_mb:'–'}</td></tr>`; }).join('');
+  // 任务活动历史(events.jsonl)
+  const act=bi.activity||{roles:[],span:null};
+  document.getElementById('actSpan').textContent=act.span?(act.span.from+' → '+act.span.to+' · 共 '+act.total+' 任务'):'无历史';
+  const ab_=document.getElementById('actBody');
+  if(!act.roles.length){ ab_.innerHTML='<tr><td colspan="7" class="muted" style="padding:10px 16px">无历史活动</td></tr>'; }
+  else{ ab_.innerHTML=act.roles.map(r=>`<tr>
+      <td><b>${esc(r.role)}</b></td>
+      <td class="num">${r.tasks}</td>
+      <td class="num">${r.tasks24||0}</td>
+      <td class="num">${r.ok}</td>
+      <td class="num">${r.err?'<span style="color:var(--dead)">'+r.err+'</span>':'0'}</td>
+      <td class="num">${r.avg_dur_s?fmtDur(r.avg_dur_s):'–'}</td>
+      <td class="num" style="color:var(--dim)">${esc(r.last_active)}</td></tr>`).join(''); }
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
