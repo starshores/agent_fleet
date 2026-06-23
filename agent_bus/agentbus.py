@@ -116,6 +116,63 @@ def _audit(event, **fields):
         pass
 
 
+# ---------------- BI 资源消耗指标(token / 成本 / 耗时)----------------
+# 每个任务跑完(daemon / dispatch)往 BUS/metrics.jsonl 追一行,WebUI BI 模块按角色/全队聚合。
+METRICS = BUS / "metrics.jsonl"
+
+
+def record_metric(role, task_id, title, status, meta, kind="daemon"):
+    """任务完成后记一条资源消耗。meta 来自 claude_run.run_streaming 的第三个返回值。
+    best-effort,绝不影响主流程(埋点失败不能让任务回填失败)。"""
+    try:
+        meta = meta or {}
+        rec = {
+            "t": time.time(),                       # epoch 秒(给 BI 做时间窗聚合)
+            "ts": _now(),                           # 可读本地时间
+            "role": role,
+            "task_id": task_id,
+            "title": (title or "")[:80],            # 标题截断;私有 tab 不走 daemon 任务,不会入账
+            "status": status,
+            "kind": kind,                           # daemon / dispatch
+            "tokens_in": int(meta.get("tokens_in", 0) or 0),
+            "tokens_out": int(meta.get("tokens_out", 0) or 0),
+            "cache_read": int(meta.get("cache_read", 0) or 0),
+            "cache_creation": int(meta.get("cache_creation", 0) or 0),
+            "cost_usd": float(meta.get("cost_usd", 0) or 0),
+            "duration_ms": int(meta.get("duration_ms", 0) or 0),
+            "num_turns": int(meta.get("num_turns", 0) or 0),
+        }
+        line = json.dumps(rec, ensure_ascii=False) + "\n"
+        # O_APPEND 原子追加单行,避免并发 daemon 收尾时互相截断
+        fd = os.open(str(METRICS), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
+        try:
+            os.write(fd, line.encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
+
+
+def read_metrics(limit=8000):
+    """读 metrics.jsonl(尾部 limit 行),返回 dict 列表。文件不在/坏行跳过。"""
+    if not METRICS.exists():
+        return []
+    try:
+        lines = METRICS.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return []
+    out = []
+    for ln in lines[-limit:]:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            out.append(json.loads(ln))
+        except Exception:
+            continue
+    return out
+
+
 def _oldest(folder):
     files = sorted([p for p in folder.glob("*.json")])
     return files[0] if files else None

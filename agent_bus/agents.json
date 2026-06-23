@@ -14,5 +14,9 @@
  "MasterAgent": {
   "registered": "2026-06-22T15:47:39",
   "desc": "基础设施层(对 Master 自身的 Master):演进 agent bus / WebUI / daemon / 通知机制 / 记忆备份;协调层,不 loop。"
+ },
+ "GIT管理": {
+  "registered": "2026-06-23T16:55:55",
+  "desc": "你是【GIT管理】,专责仓库的 git 操作与版本卫生:分支/提交/合并、暂存区盘点、未提交文档与代码分类整理推送(文档需用户明确说\"提交\"才提,代码可推)、commit message 规范、PR、.gitignore 维护、清理临时探查文件。cwd 为仓库根目录。"
  }
 }

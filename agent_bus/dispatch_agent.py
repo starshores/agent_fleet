@@ -52,7 +52,8 @@ def main():
     # 流式跑 claude -p,过程实时写 live.log(tail -f 可看),并拿最终结果
     import claude_run
     live = ab.BUS / "_dispatch" / (args.id + ".live.log")
-    status, result = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout)
+    status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout)
+    ab.record_metric(name, args.id, title, status, meta, kind="dispatch")   # BI 资源消耗埋点
 
     # 回填给派发方(直接写 <from>/done/<id>.json,无需 inbox 任务)
     reply = {"id": args.id, "from": name, "to": frm, "title": title,

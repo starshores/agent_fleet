@@ -224,6 +224,125 @@ def compute_fleet_cached():
         return data
 
 
+# =============================================================
+#  BI 资源消耗模块 —— token / 成本(metrics.jsonl)+ 系统资源(psutil)
+# =============================================================
+_proc_cache = {}   # pid -> psutil.Process(复用,使 cpu_percent 能算两次调用间增量)
+
+
+def _proc_tree_usage(root_pid):
+    """取一个根 pid 整棵进程树(自身+递归子)的 CPU% 与 RSS 之和。
+    daemon_pid 是常驻 python(多空闲),它跑任务时 fork 的 claude -p 子进程才吃资源 → 算整树更真实。
+    cpu_percent(None) 非阻塞:返回自【上次对该对象调用】以来的占用,首次见到的进程返回 0。"""
+    if ab.psutil is None or not root_pid:
+        return None
+    try:
+        root = _proc_cache.get(root_pid)
+        if root is None or not root.is_running():
+            root = ab.psutil.Process(root_pid)
+            _proc_cache[root_pid] = root
+        procs = [root]
+        try:
+            procs += root.children(recursive=True)
+        except Exception:
+            pass
+        cpu = 0.0
+        rss = 0
+        n = 0
+        for p in procs:
+            try:
+                cp = _proc_cache.get(p.pid)
+                if cp is None:
+                    cp = p
+                    _proc_cache[p.pid] = p
+                cpu += cp.cpu_percent(None)
+                rss += cp.memory_info().rss
+                n += 1
+            except Exception:
+                continue
+        return {"cpu": round(cpu, 1), "rss_mb": round(rss / 1048576, 1), "nproc": n}
+    except Exception:
+        return None
+
+
+def _local_day_start(epoch):
+    lt = time.localtime(epoch)
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, lt.tm_wday, lt.tm_yday, -1))
+
+
+def _agg_metrics(rows):
+    d = {"tasks": 0, "tok_in": 0, "tok_out": 0, "cache_read": 0, "cost": 0.0, "dur_ms": 0, "errors": 0}
+    for r in rows:
+        d["tasks"] += 1
+        d["tok_in"] += r.get("tokens_in", 0) or 0
+        d["tok_out"] += r.get("tokens_out", 0) or 0
+        d["cache_read"] += r.get("cache_read", 0) or 0
+        d["cost"] += r.get("cost_usd", 0) or 0
+        d["dur_ms"] += r.get("duration_ms", 0) or 0
+        if r.get("status") == "error":
+            d["errors"] += 1
+    d["cost"] = round(d["cost"], 4)
+    d["tok_total"] = d["tok_in"] + d["tok_out"]
+    d["avg_dur_s"] = round(d["dur_ms"] / 1000.0 / d["tasks"], 1) if d["tasks"] else 0
+    return d
+
+
+def build_bi():
+    """运营总览口径:今日/近24h 全队总消耗 + 各角色排名(近24h)+ 当前在跑 + 系统资源快照。"""
+    now = time.time()
+    day0 = _local_day_start(now)
+    h24 = now - 86400
+    recs = ab.read_metrics()
+    today = [r for r in recs if r.get("t", 0) >= day0]
+    last24 = [r for r in recs if r.get("t", 0) >= h24]
+
+    per = {}
+    for r in last24:
+        per.setdefault(r.get("role", "?"), []).append(r)
+
+    per_role = []
+    for role in sorted(set(list(per.keys()) + _roles())):
+        a = _agg_metrics(per.get(role, []))
+        sysu = None
+        pf = BUS / role / "presence.json"
+        if pf.exists():
+            try:
+                pr = json.loads(pf.read_text(encoding="utf-8"))
+                pid = pr.get("daemon_pid") if pr.get("mode") == "daemon" else pr.get("claude_pid")
+                sysu = _proc_tree_usage(pid)
+            except Exception:
+                pass
+        if a["tasks"] == 0 and not sysu:
+            continue                      # 既无近24h活动、又无活进程 → 减噪不列
+        a["role"] = role
+        a["sys"] = sysu
+        per_role.append(a)
+    per_role.sort(key=lambda x: (-x["cost"], -x["tok_total"]))
+
+    running = []
+    for role in _roles():
+        pf = BUS / role / "presence.json"
+        if not pf.exists():
+            continue
+        try:
+            pr = json.loads(pf.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if pr.get("current_task"):
+            running.append({"role": role, "task": pr.get("current_task"),
+                            "title": pr.get("current_title") or ""})
+
+    return {
+        "now": time.strftime("%H:%M:%S", time.localtime(now)),
+        "today": _agg_metrics(today),
+        "last24": _agg_metrics(last24),
+        "per_role": per_role,
+        "running": running,
+        "total_records": len(recs),
+        "psutil": ab.psutil is not None,
+    }
+
+
 def read_replies(role="Master"):
     d = BUS / role / "done"
     out = []
@@ -870,6 +989,15 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--idle);display:inline-block}
 .live-dot.on{background:var(--live);box-shadow:0 0 6px var(--live);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.bi-kpis{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px 6px}
+.bi-kpi{background:var(--card,#1a1d24);border:1px solid var(--line);border-radius:8px;padding:9px 14px;min-width:118px}
+.bi-kpi .k{font-size:11px;color:var(--dim);margin-bottom:3px}
+.bi-kpi .v{font-size:19px;font-weight:700;color:var(--txt)}
+.bi-kpi .v small{font-size:11px;font-weight:400;color:var(--dim);margin-left:3px}
+.bi-kpi.warn .v{color:var(--warn,#e6a23c)}
+.bi-run{display:inline-flex;align-items:center;gap:6px;background:rgba(80,200,120,.12);border:1px solid var(--live);border-radius:6px;padding:3px 9px;margin:3px 6px 3px 0;font-size:12px}
+table.bi-tbl td,table.bi-tbl th{font-variant-numeric:tabular-nums}
+table.bi-tbl td.num{text-align:right;font-family:ui-monospace,monospace}
 </style></head>
 <body>
 <header>
@@ -900,6 +1028,21 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
       </table>
     </div>
     <div class="foot" id="procFoot"></div>
+  </section>
+
+  <section>
+    <div class="sec-h">📊 BI · 资源消耗 <span class="sub">舰队 token / 成本 / 系统资源 · 运营总览 — 数据自埋点上线起累积(<span class="mono">metrics.jsonl</span>)</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="pill muted" id="biUpd">–</span>
+    </div>
+    <div class="sec-b">
+      <div class="bi-kpis" id="biKpis"></div>
+      <div id="biRunning" style="padding:0 16px 8px"></div>
+      <table class="bi-tbl">
+        <thead><tr><th>角色</th><th>任务<span class="sub" style="font-weight:400">(近24h)</span></th><th>token in</th><th>token out</th><th>cache读</th><th>成本 $</th><th>平均耗时</th><th>CPU%</th><th>内存MB</th></tr></thead>
+        <tbody id="biBody"></tbody>
+      </table>
+    </div>
   </section>
 
   <section>
@@ -1218,7 +1361,7 @@ async function load(role){
   try{
     const rr=role||document.getElementById('replyRole').value||'Master';
     const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr));
-    state=await res.json(); render();
+    state=await res.json(); render(); loadBI();
     document.getElementById('updT').classList.remove('flash');void document.getElementById('updT').offsetWidth;
     document.getElementById('updT').classList.add('flash');
   }catch(e){ console.error(e); }
@@ -1327,7 +1470,43 @@ document.getElementById('filtHideDone').onchange=renderTodos;
 document.getElementById('liveRole').onchange=setLivePoll;
 document.getElementById('liveBottom').onclick=()=>{const b=document.getElementById('liveBox');b.scrollTop=b.scrollHeight;};
 
-load(); connectSSE(); setPoll();
+// ===== BI · 资源消耗 =====
+function fmtN(n){ n=n||0; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'k'; return ''+n; }
+function fmtDur(s){ s=s||0; if(s>=60){const m=Math.floor(s/60);return m+'m'+Math.round(s%60)+'s';} return s+'s'; }
+function renderBI(bi){
+  if(!bi) return;
+  document.getElementById('biUpd').textContent=bi.now+(bi.psutil?'':' · 无psutil(系统资源不可用)');
+  const td=bi.today, h=bi.last24;
+  const kpi=[
+    ['今日任务', td.tasks, td.errors?('含 err '+td.errors):'', td.errors>0],
+    ['今日 token', fmtN(td.tok_total), 'in '+fmtN(td.tok_in)+' / out '+fmtN(td.tok_out), false],
+    ['今日成本', '$'+td.cost.toFixed(3), '', false],
+    ['近24h token', fmtN(h.tok_total), h.tasks+' 任务', false],
+    ['近24h 成本', '$'+h.cost.toFixed(3), '', false],
+    ['在跑任务', bi.running.length, '', false]
+  ];
+  document.getElementById('biKpis').innerHTML=kpi.map(k=>
+    `<div class="bi-kpi${k[3]?' warn':''}"><div class="k">${esc(k[0])}</div><div class="v">${k[1]}${k[2]?'<small>'+esc(k[2])+'</small>':''}</div></div>`).join('');
+  const rb=document.getElementById('biRunning');
+  rb.innerHTML=bi.running.length? bi.running.map(r=>
+    `<span class="bi-run"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
+    : '<span class="muted" style="font-size:12px">当前无在跑任务</span>';
+  const tb=document.getElementById('biBody');
+  if(!bi.per_role.length){ tb.innerHTML='<tr><td colspan="9" class="muted" style="padding:10px 16px">暂无消耗数据 — 埋点已上线,daemon/dispatch 跑完任务即开始累积</td></tr>'; return; }
+  tb.innerHTML=bi.per_role.map(r=>{ const s=r.sys; return `<tr>
+      <td><b>${esc(r.role)}</b></td>
+      <td class="num">${r.tasks}${r.errors?' <span style="color:var(--dead)">('+r.errors+'e)</span>':''}</td>
+      <td class="num">${fmtN(r.tok_in)}</td>
+      <td class="num">${fmtN(r.tok_out)}</td>
+      <td class="num">${fmtN(r.cache_read)}</td>
+      <td class="num">$${r.cost.toFixed(4)}</td>
+      <td class="num">${r.tasks?fmtDur(r.avg_dur_s):'–'}</td>
+      <td class="num">${s?s.cpu:'–'}</td>
+      <td class="num">${s?s.rss_mb:'–'}</td></tr>`; }).join('');
+}
+async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
+
+load(); connectSSE(); setPoll(); loadBI(); setInterval(loadBI, 10000);
 </script>
 </body></html>"""
 
@@ -1380,6 +1559,8 @@ class Handler(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             self._send(200, read_live(role=(q.get("role", [None])[0]),
                                       dispatch_id=(q.get("id", [None])[0])))
+        elif path == "/api/bi":
+            self._send(200, build_bi())
         else:
             self._send(404, {"error": "not found"})
 

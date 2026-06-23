@@ -34,7 +34,7 @@ def touch(role, mode, timeout):
 
 
 def run_task(role, cwd, task):
-    """临时拉起 claude -p 执行任务,返回 (status, result_text)。"""
+    """临时拉起 claude -p 执行任务,返回 (status, result_text, meta)。"""
     instr = task.get("task", "")
     title = task.get("title", "")
     # 注入角色身份 + 专责(从 agents.json 的 desc 读),让 daemon 真正"扮演"该角色而非通用 worker
@@ -95,7 +95,8 @@ def main():
             log(role, "任务 %s requires_approval → daemon 拒绝执行,已 held + 报错回发起方" % tid)
             continue
         log(role, "领到任务 %s 《%s》→ 拉起 claude -p" % (tid, title))
-        status, result = run_task(role, cwd, task)
+        status, result, meta = run_task(role, cwd, task)
+        ab.record_metric(role, tid, title, status, meta, kind="daemon")   # BI 资源消耗埋点
         # 回填(走 agentbus done,自动归档 + 路由给发起方)
         try:
             subprocess.run([sys.executable, str(Path(__file__).parent / "agentbus.py"),

@@ -15,7 +15,10 @@ def _now():
 
 
 def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600):
-    """返回 (status, result_text)。过程实时写 live_log。"""
+    """返回 (status, result_text, meta)。过程实时写 live_log。
+    meta = {tokens_in, tokens_out, cache_read, cache_creation, cost_usd, duration_ms, num_turns}
+    (从 stream-json 的 result 事件抓,供 BI 资源消耗统计;抓不到则为空 dict。)"""
+    meta = {}
     cmd = [claude_bin, "-p", "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions"]
     try:
@@ -72,16 +75,27 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600):
                 got_result = True
                 final = ev.get("result")
                 is_err = bool(ev.get("is_error"))
-                w("[%s] ■ 完成 is_error=%s" % (_now(), is_err))
+                u = ev.get("usage") or {}
+                meta = {
+                    "tokens_in": u.get("input_tokens", 0) or 0,
+                    "tokens_out": u.get("output_tokens", 0) or 0,
+                    "cache_read": u.get("cache_read_input_tokens", 0) or 0,
+                    "cache_creation": u.get("cache_creation_input_tokens", 0) or 0,
+                    "cost_usd": ev.get("total_cost_usd", 0) or 0,
+                    "duration_ms": ev.get("duration_ms", 0) or 0,
+                    "num_turns": ev.get("num_turns", 0) or 0,
+                }
+                w("[%s] ■ 完成 is_error=%s tok=%s/%s $%.4f" % (
+                    _now(), is_err, meta["tokens_in"], meta["tokens_out"], meta["cost_usd"]))
         p.wait()
         timer.cancel()
         if killed["v"]:
-            return "error", "claude -p 超时(>%ss),已 kill" % timeout
+            return "error", "claude -p 超时(>%ss),已 kill" % timeout, meta
         if got_result:
-            return ("error" if is_err else "ok"), ((final or "(无输出)")[:4000])
-        return ("ok" if p.returncode == 0 else "error"), "(无 result 事件,returncode=%s)" % p.returncode
+            return ("error" if is_err else "ok"), ((final or "(无输出)")[:4000]), meta
+        return ("ok" if p.returncode == 0 else "error"), "(无 result 事件,returncode=%s)" % p.returncode, meta
     except Exception as e:
-        return "error", "拉起 claude -p 失败:%s" % e
+        return "error", "拉起 claude -p 失败:%s" % e, meta
     finally:
         if lf:
             try:
