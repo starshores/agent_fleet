@@ -586,12 +586,12 @@ def cmd_done(args):
     p = _find_task(role, tid)
     sender = "unknown"; title = ""
     real_id = tid
-    reply_mode = None
+    reply_mode = None; task_kind = None
     if p:
         try:
             obj = json.loads(p.read_text(encoding="utf-8"))
             sender = obj.get("from", "unknown"); title = obj.get("title", ""); real_id = obj.get("id", tid)
-            reply_mode = obj.get("reply_mode")
+            reply_mode = obj.get("reply_mode"); task_kind = obj.get("kind")
         except Exception:
             pass
     result = {
@@ -611,6 +611,26 @@ def cmd_done(args):
     _set_current_task(role, None, None)  # A3:完成后清"当前在做"
     _audit("done", id=real_id, role=role, to=sender, status=args.status)
     _maybe_toast(sender, args.status, title, args.result, args.notify, reply_mode)  # best-effort,不影响 done 结果
+    # v1.1: 完成通知触发发起方【自醒】—— 若 sender 是自醒在岗的协调位,往其 inbox 投一条轻量 notice,
+    # 触发其后台 wait 自醒(它醒来读 <sender>/done/<id> 取完整结果)。sync 应答/never 不投;只对协调位(防环)。
+    # 防环铁律:done 一个 notice 不再生 notice(否则协调位↔协调位 done 各自的 notice 会乒乓无限循环——实测踩过)
+    if reply_mode != "sync" and task_kind != "notice" and args.notify != "never" and sender in HUMAN_ATTENDED:
+        try:
+            if _self_wake_state(sender)[0] == "armed":
+                nid = "notice-" + real_id
+                notice = {
+                    "id": nid, "from": role, "to": sender, "kind": "notice",
+                    "title": "✅ 完成:" + (title or real_id),
+                    "task": ("[完成通知·读完即弃、勿当任务执行] %s 完成了你派的《%s》(status=%s)。"
+                             "完整结果在 %s/done/%s.json;读完直接 done 本通知即可。"
+                             % (role, title or real_id, args.status, sender, real_id)),
+                    "notice_of": real_id, "notice_status": args.status,
+                    "created": _now(), "status": "pending",
+                }
+                _write_json(BUS / sender / "inbox" / (nid + ".json"), notice)
+                _audit("notify_wake", id=real_id, to=sender)
+        except Exception:
+            pass
     print("done -> %s (status=%s)" % (sender, args.status))
 
 

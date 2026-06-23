@@ -116,6 +116,8 @@ ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一
 - **兜底**:用户开口唤起时也先 `peek` 自己 inbox(防后台 wait 恰好在 idle-timeout 间隙)。
 - **协调位之间用 `send`(异步),不用 `request`**(对方的 wait 会领走应答路由,或不在)。
 - 注意:后台 `wait` 会 claim 进来的消息(移到 processing),处理完按需 `done`;高风险任务(requires_approval)wait 默认跳过、留 inbox。
+- **完成通知触发自醒(v1.1)**:`done` 回填给一个【自醒在岗的协调位】(Master/MasterAgent)时,会中心化地往其 inbox 投一条 `kind:"notice"` 轻量完成通知 → 触发其后台 wait 自醒 → 它醒来读 `<self>/done/<id>` 取完整结果。于是"派活→worker 干完→发起方自动被唤起"闭环,不用人盯 done。worker 无需改(集中在 `agentbus.done`)。防环/防噪:只对自醒协调位投、`sync` request 应答不投、`--notify never` 不投、notice 的 done 因 from=worker 不再触发 notice。
+- **收到 `kind:"notice"` 的处理协议**:读 `notice_of` 指向的 `<self>/done/<id>.json` 取完整结果 → `done` 掉该 notice → **别把它当普通任务执行、别回灌**。
 
 ## 责任边界
 worker 自动执行收到的任务。**高风险(写库/外发)** 派给"先审后做"的 tab,或在 task 里要求 worker 先 EXPLAIN/确认;SQL 写库仍走 sql_agent 审批协议。
