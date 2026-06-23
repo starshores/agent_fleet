@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""dispatch_agent.py — 一次性 ad-hoc agent:执行单条临时任务、有总线沟通能力、干完即逝。
+
+与持久 role daemon(worker_daemon.py)的区别:
+  - 不监听队列、不注册 role、不起 loop/serve —— 只做派来的这一件临时任务即退出。
+  - 有总线沟通能力(prompt 里教它用 agentbus request/send 跟别的 agent 协作 + 回填)。
+  - 失败可重新 dispatch(无状态、可丢弃)。
+
+由 `agentbus dispatch` 以 detached 进程派发;读 BUS/_dispatch/<id>.json,跑 claude -p,
+把结果回填到派发方 <from>/done/<id>.json,然后清掉派发记录、退出。
+"""
+import sys, os, json, subprocess, argparse
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import agentbus as ab
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--id", required=True)
+    args = ap.parse_args()
+
+    rec_path = ab.BUS / "_dispatch" / (args.id + ".json")
+    try:
+        rec = json.loads(rec_path.read_text(encoding="utf-8"))
+    except Exception:
+        return  # 没记录就退
+
+    frm = rec.get("from", "unknown")
+    name = rec.get("name") or "adhoc"
+    title = rec.get("title", "")
+    task = rec.get("task", "")
+    cwd = rec.get("cwd") or ab.cfg("default_worker_cwd", os.getcwd())
+    timeout = rec.get("timeout", 3600)
+    claude = os.environ.get("CLAUDE_BIN") or ab.cfg("claude_bin", str(Path.home() / "AppData" / "Roaming" / "npm" / "claude.cmd"))
+    agentbus_py = str(ab.BUS / "agentbus.py")
+
+    prompt = (
+        "你是【一次性 ad-hoc agent】(代号:%s)。只完成下面这一件临时任务即结束——"
+        "**不监听任何队列、不取别的任务、不起 loop/serve/wait、不把自己当持久 worker**。\n"
+        "你有【总线沟通能力】:\n"
+        "  - 需要别的 agent 协助 → 运行:python \"%s\" request --to <角色> --from %s --task \"...\"(发子任务并阻塞等应答)\n"
+        "  - 要报进度/留言 → python \"%s\" send --to <角色> --from %s --title \"...\" --task \"...\"\n"
+        "完成后用一段简洁中文回复最终结果/产物路径(你的最终回复会被原样回填给派发方 %s)。\n\n"
+        "【临时任务标题】%s\n【内容】\n%s" % (
+            name, agentbus_py, name, agentbus_py, name, frm, title, task)
+    )
+
+    # 流式跑 claude -p,过程实时写 live.log(tail -f 可看),并拿最终结果
+    import claude_run
+    live = ab.BUS / "_dispatch" / (args.id + ".live.log")
+    status, result = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout)
+
+    # 回填给派发方(直接写 <from>/done/<id>.json,无需 inbox 任务)
+    reply = {"id": args.id, "from": name, "to": frm, "title": title,
+             "status": status, "result": result[:4000], "finished": ab._now(), "kind": "adhoc"}
+    try:
+        ab._role_dir(frm)
+        ab._write_json(ab.BUS / frm / "done" / (args.id + ".json"), reply)
+        ab._audit("dispatch_done", id=args.id, to=frm, status=status, name=name)
+    except Exception:
+        pass
+    # 清掉派发记录(一次性,干完即逝)
+    try:
+        rec_path.unlink()
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    main()

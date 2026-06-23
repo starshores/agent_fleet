@@ -1,0 +1,12 @@
+# 构建产物 / 本地运行态
+__pycache__/
+*.pyc
+*.tmp
+.last_toast
+.claude/
+.idea/
+
+# memory/ 是业务记忆的硬链镜像(业务知识、易变、属另一项目),不纳入本架构仓。
+# 架构知识已在 CLAUDE.md / AGENTS.md / CAPABILITIES.md / ARCHITECTURE_REVIEW.md / ARCHITECTURE_SOURCE_MAP.md 中。
+# 如需把记忆也纳入版本,删掉下面这行。
+memory/

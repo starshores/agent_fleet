@@ -1,0 +1,18 @@
+{
+ "SQLAGent": {
+  "registered": "2026-06-22T10:39:35",
+  "desc": "维护 sql_agent 代理(server.py)那个 cli 本身,不是通用查库 worker;别给它派查询活。"
+ },
+ "Master": {
+  "registered": "2026-06-22T11:27:43",
+  "desc": "业务总控:处理其他事务,把业务任务外派给各业务 agent 并收结果。协调层,不 loop。"
+ },
+ "MasterUI": {
+  "registered": "2026-06-22T11:39:32",
+  "desc": "agent bus 可视化 WebUI(127.0.0.1:8799)的开发与维护专责。"
+ },
+ "MasterAgent": {
+  "registered": "2026-06-22T15:47:39",
+  "desc": "基础设施层(对 Master 自身的 Master):演进 agent bus / WebUI / daemon / 通知机制 / 记忆备份;协调层,不 loop。"
+ }
+}
