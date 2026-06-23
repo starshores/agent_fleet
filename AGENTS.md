@@ -56,6 +56,8 @@ ab reap [--role X] [--ttl 4000 --grace 120 --dry-run]   # 孤儿回收:owner 进
 ab supervise [--dry-run]                         # daemon 自愈:读 fleet.json 重启已死 daemon(WebUI 每 90s 自动跑)
 ab prune [--dry-run]                             # 清空的遗留 role 目录(无 presence 且队列全空)
 ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一次性 ad-hoc agent】:有总线沟通(request/send)、不监听队列、干完即逝、可重派;结果回填 <from>/done(replies 收)
+ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}
+ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
 ```
 
 ### 两类执行体(2026-06-23)
@@ -65,6 +67,7 @@ ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一
 - **request**(worker↔worker 协作):daemon 模式下 B 的 claude -p 执行中可直接 shell 调 `ab request --to C --from B --chain "<我任务里的 chain 逗号拼接>"` 去问 C 并等。一个 worker 阻塞在 request 期间不再 serve 自己 inbox(要么做活含等子结果、要么在听)。
 - **requires_approval(统一闸)**:写库/外发等高风险任务,Master 派活时加 `--requires-approval`。闸在【领取路径 `_wait_core`】统一实现——所有自动监听者(tab `serve` / daemon / 普通 `wait`)都不会自动领取,任务留在 inbox(`who`/`peek`/WebUI 可见)等人工处理。有人值守的 tab 用 `wait --include-approval` 显式领取执行。**对 tab worker 和 daemon 一致生效,无需重启 worker(都 shell 最新 agentbus.py)。**
 - **完成通知**:done 默认 `--notify auto` → error 必弹 toast、Master 完成弹(45s 节流);嫌吵用 `--notify never`。
+- **edge-lock(Edge/CDP 焦点互斥,2026-06-23,v1.2)**:同一时刻只能一个 CDP 客户端操作 Edge(抢焦点会串台)。**铁律**:凡要操作 Edge/云文档(复制/点击/粘贴/编辑)的活,包成 `edge-acquire --who <自己>` → `connect_over_cdp 操作` → `edge-release --who <自己>`。抢不到(timeout)就稍候重试或回报忙;务必 release(或靠 ttl 兜底)。机制:`bus/edge.lock`(`O_EXCL` 原子抢),stale 回收=持有者进程死 **或** 锁超 ttl(默认 300s)→ 下一个抢的人自动偷锁、不死锁;`who`/`recover` 末尾显示当前持锁者。worker_daemon / dispatch 的任务 prompt 已内置这条(碰 Edge/云文档才抢,daemon 下次重启生效)。**只解决①串行有序止血**;②独立 9223 profile、④官方 API 治本未做(按需排期)。
 - **审计**:所有 send/claim/done 自动记一行到 `agent_bus/events.jsonl`(全链路可追溯,clear replies 后仍留痕)。
 
 > `who` 判据:`mode=listening`(来自 wait)且心跳没超 wait 周期(+60s)→ `✓ worker在听`;

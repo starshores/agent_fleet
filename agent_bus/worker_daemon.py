@@ -42,16 +42,20 @@ def run_task(role, cwd, task):
         desc = (ab._load_agents().get(role, {}) or {}).get("desc", "") or ""
     except Exception:
         desc = ""
+    abpy = str(ab.BUS / "agentbus.py")
     ident = "你是 agent bus 上的【%s】角色执行体。\n" % role
     if desc:
         ident += "你的专责领域:%s\n" % desc
     prompt = (
         ident +
         "下面是已经分配给你的一项具体任务,请【以该角色的专责视角,直接执行这项任务本身】并完成它。\n"
-        "重要:任务内容已在下面给全;**不要**去 agent bus 取任务、**不要**运行 agentbus、"
-        "**不要**起任何 loop/serve/wait、**不要**把自己当成轮询 worker。只做下面这件事。\n"
+        "重要:任务内容已在下面给全;**不要**去 agent bus 取任务、**不要**起 loop/serve/wait、"
+        "**不要**把自己当成轮询 worker。只做下面这件事。\n"
+        "【若本任务要操作 Edge/云文档(复制/点击/粘贴/编辑)】:先抢 Edge 互斥锁再操作、用完释放——\n"
+        "  python \"%s\" edge-acquire --who %s  →  (connect_over_cdp 编辑)  →  python \"%s\" edge-release --who %s\n"
+        "  抢不到(timeout)就稍候重试或回报忙;不碰 Edge/云文档的任务忽略此条。\n"
         "完成后用一段简洁中文回复结果/产物路径(你的最终回复会被原样作为回填内容)。\n\n"
-        "【任务标题】%s\n【任务内容】\n%s" % (title, instr)
+        "【任务标题】%s\n【任务内容】\n%s" % (abpy, role, abpy, role, title, instr)
     )
     # 流式跑 claude -p:过程实时写 <role>/live.log(tail -f 可看),并拿最终结果。
     # (prompt 经 stdin 传,避免 claude.cmd 批处理 shim 在首换行截断多行 argv。)

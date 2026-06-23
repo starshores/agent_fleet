@@ -767,6 +767,10 @@ def cmd_who(args):
             len(alive), len(claimed), len(tagged), len(unknown), unknown if unknown else ""))
     else:
         print("(psutil 不可用,无法核对进程;仅凭心跳)")
+    h = _edge_holder()
+    if h:
+        age = _age_seconds(h.get("acquired_at", ""))
+        print("Edge 锁: %s 持有(%ss%s)" % (h.get("who"), age, "·疑似陈旧" if (age and age > 300) else ""))
 
 
 def cmd_list(args):
@@ -987,6 +991,115 @@ def cmd_dispatch(args):
     print(tid)
 
 
+# ---------------- Edge 操作互斥锁(CDP 焦点冲突止血,v1.2)----------------
+# 多 agent 挂同一 Edge 操作云文档时 OS 焦点独占→串台。约定:Edge/CDP 操作前 edge-acquire、用完 edge-release。
+# bus 放 edge.lock(O_EXCL 原子抢);抢不到 watchdog 等释放(不轮询);stale 回收(持锁者进程死/超 ttl 强制抢)。
+def _edge_lock_path():
+    return BUS / "edge.lock"
+
+
+def _edge_holder():
+    p = _edge_lock_path()
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"who": "?", "acquired_at": ""}
+
+
+def _role_proc_alive(role):
+    """持锁 role 是否还有活进程(daemon_pid 或 claude_pid 存在)——死了则锁可被回收。"""
+    pf = BUS / role / "presence.json"
+    if not pf.exists():
+        return False
+    try:
+        pr = json.loads(pf.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if psutil is None:
+        return True  # 没 psutil 不敢判死
+    for k in ("daemon_pid", "claude_pid"):
+        pid = pr.get(k)
+        if pid and psutil.pid_exists(pid):
+            return True
+    return False
+
+
+def _edge_stale(holder, ttl):
+    if not holder:
+        return False
+    age = _age_seconds(holder.get("acquired_at", ""))
+    if age is not None and age > ttl:
+        return True
+    return not _role_proc_alive(holder.get("who", ""))
+
+
+def _wait_file_gone(path, timeout):
+    if not path.exists():
+        return
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    ev = threading.Event(); name = path.name
+
+    class H(FileSystemEventHandler):
+        def on_deleted(self, e):
+            if str(e.src_path).endswith(name):
+                ev.set()
+        def on_moved(self, e):
+            if str(getattr(e, "src_path", "")).endswith(name):
+                ev.set()
+
+    obs = Observer(); obs.schedule(H(), str(path.parent), recursive=False); obs.start()
+    try:
+        if not path.exists():
+            return
+        ev.wait(timeout=timeout)
+    finally:
+        obs.stop(); obs.join()
+
+
+def cmd_edge_acquire(args):
+    who = args.who or _resolve_self_role() or os.environ.get("AGENTBUS_ROLE", "unknown")
+    lp = _edge_lock_path()
+    deadline = time.time() + args.timeout
+    while True:
+        try:
+            fd = os.open(str(lp), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, json.dumps({"who": who, "acquired_at": _now(), "host": socket.gethostname()},
+                                    ensure_ascii=False).encode("utf-8"))
+            os.close(fd)
+            _audit("edge_acquire", who=who)
+            print(json.dumps({"acquired": True, "who": who}, ensure_ascii=False)); return
+        except FileExistsError:
+            holder = _edge_holder()
+            if _edge_stale(holder, args.ttl):
+                try: lp.unlink()
+                except Exception: pass
+                _audit("edge_steal", who=who, victim=(holder or {}).get("who"))
+                continue  # 抢占陈旧锁后重试
+            if time.time() >= deadline:
+                print(json.dumps({"acquired": False, "timeout": True,
+                                  "holder": (holder or {}).get("who")}, ensure_ascii=False)); return
+            _wait_file_gone(lp, min(max(deadline - time.time(), 0.1), 10))  # 等释放(事件),最多 10s 再探
+        except Exception as e:
+            print(json.dumps({"acquired": False, "error": str(e)}, ensure_ascii=False)); return
+
+
+def cmd_edge_release(args):
+    who = args.who or _resolve_self_role() or os.environ.get("AGENTBUS_ROLE", "unknown")
+    lp = _edge_lock_path()
+    holder = _edge_holder()
+    if not holder:
+        print(json.dumps({"released": False, "reason": "无锁"}, ensure_ascii=False)); return
+    if not args.force and holder.get("who") != who:
+        print(json.dumps({"released": False, "reason": "锁在 %s 手里(--force 可强释)" % holder.get("who")}, ensure_ascii=False)); return
+    try: lp.unlink()
+    except Exception: pass
+    _audit("edge_release", who=who)
+    print(json.dumps({"released": True, "by": who}, ensure_ascii=False))
+
+
 def main():
     ap = argparse.ArgumentParser(prog="agentbus")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1007,6 +1120,8 @@ def main():
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
+    p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
+    p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)
 
     args = ap.parse_args()

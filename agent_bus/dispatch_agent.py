@@ -43,9 +43,10 @@ def main():
         "你有【总线沟通能力】:\n"
         "  - 需要别的 agent 协助 → 运行:python \"%s\" request --to <角色> --from %s --task \"...\"(发子任务并阻塞等应答)\n"
         "  - 要报进度/留言 → python \"%s\" send --to <角色> --from %s --title \"...\" --task \"...\"\n"
+        "  - 若要操作 Edge/云文档 → 先 python \"%s\" edge-acquire --who %s 抢锁,操作完 edge-release --who %s(抢不到稍候重试,防串台)。\n"
         "完成后用一段简洁中文回复最终结果/产物路径(你的最终回复会被原样回填给派发方 %s)。\n\n"
         "【临时任务标题】%s\n【内容】\n%s" % (
-            name, agentbus_py, name, agentbus_py, name, frm, title, task)
+            name, agentbus_py, name, agentbus_py, name, agentbus_py, name, name, frm, title, task)
     )
 
     # 流式跑 claude -p,过程实时写 live.log(tail -f 可看),并拿最终结果
