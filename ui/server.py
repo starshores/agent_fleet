@@ -1151,6 +1151,17 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .ctrl select{width:auto;margin:0;padding:4px 8px}
 .flash{animation:flash 1s ease}
 @keyframes flash{0%{background:rgba(91,157,255,.25)}100%{background:transparent}}
+/* tab 分页 */
+.tabbar{position:sticky;top:0;z-index:9;display:flex;gap:6px;padding:9px 18px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tab{background:var(--panel2);color:var(--dim);border:1px solid var(--line);border-radius:8px;
+  padding:7px 16px;font:13px/1 "Segoe UI",system-ui,sans-serif;cursor:pointer;font-weight:500}
+.tab:hover{color:var(--txt);border-color:#3a4150}
+.tab.active{background:var(--accent);color:#06112a;border-color:var(--accent);font-weight:700}
+.tabhide{display:none !important}
+.gconfirm{font-size:12px;font-weight:700;padding:3px 11px;border-radius:8px;cursor:pointer;
+  background:rgba(154,123,255,.2);color:#c9b3ff;border:1px solid rgba(154,123,255,.6)}
+.gconfirm:hover{background:rgba(154,123,255,.34)}
 /* 历史用量 BI */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 16px}
 .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
@@ -1238,6 +1249,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   <h1>🛰 Agent Bus 控制台</h1>
   <span class="pill"><span id="connDot" class="dot"></span><span id="connTxt">连接中…</span></span>
   <span class="pill">在跑 claude <b id="aliveN" style="color:var(--txt)">–</b> · fleet <b id="fleetN" style="color:var(--txt)">–</b></span>
+  <span id="gConfirm" class="gconfirm" style="display:none" title="点击跳到待办池查看待确认">🙋 <b>0</b> 项待确认</span>
   <span class="spacer"></span>
   <span class="ctrl">兜底轮询
     <select id="pollSel">
@@ -1251,9 +1263,17 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   <button class="btn ghost" id="refreshBtn" style="margin:0;padding:6px 14px">手动刷新</button>
   <span class="pill muted" id="updT">–</span>
 </header>
+<nav class="tabbar" id="tabbar">
+  <button class="tab" data-t="fleet">🛰 舰队/运维</button>
+  <button class="tab" data-t="bi">📊 BI/分析</button>
+  <button class="tab" data-t="tasks">📋 任务/协作</button>
+  <button class="tab" data-t="live">🔴 实时</button>
+  <span class="spacer" style="flex:1"></span>
+  <span class="muted" style="font-size:11.5px;align-self:center" id="tabHint"></span>
+</nav>
 
 <main>
-  <section>
+  <section data-tab="fleet">
     <div class="sec-h">A · 舰队总览 <span class="sub">role 身份 / 心跳 / 队列(同 <span class="mono">who</span>+<span class="mono">list</span>)— 点行展开任务</span></div>
     <div class="sec-b">
       <table>
@@ -1264,7 +1284,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="foot" id="procFoot"></div>
   </section>
 
-  <section style="scroll-margin-top:64px">
+  <section data-tab="bi" style="scroll-margin-top:64px">
     <div class="sec-h">📊 BI · 资源消耗 <span class="sub">舰队 token / 成本 / 系统资源 · 运营总览 — 数据自埋点上线起累积(<span class="mono">metrics.jsonl</span>)</span>
       <span class="spacer" style="flex:1"></span>
       <span class="pill muted" id="biUpd">–</span>
@@ -1285,7 +1305,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     </div>
   </section>
 
-  <section>
+  <section data-tab="tasks">
     <div class="sec-h">B · 待办池 TODO Pool <span class="sub">待确认 + 待办统一队列 · 存 <span class="mono">agent_bus/todos.json</span></span>
       <span id="confirmAlert" class="confirm-alert" style="display:none"></span>
       <span class="spacer" style="flex:1"></span>
@@ -1311,7 +1331,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div id="todoBox" style="padding:4px 0"></div>
   </section>
 
-  <div class="grid2">
+  <div class="grid2" data-tab="fleet">
     <section>
       <div class="sec-h">F · daemon 自愈 <span class="sub">fleet.json 纳管的 daemon × 存活(复用 <span class="mono">supervise</span>)</span>
         <span class="spacer" style="flex:1"></span>
@@ -1329,12 +1349,12 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     </section>
   </div>
 
-  <section>
+  <section data-tab="fleet">
     <div class="sec-h">H · 最近事件 <span class="sub">审计流 <span class="mono">events.jsonl</span> 末 40 行 · 倒序(send/claim/done)</span></div>
     <div id="eventBox" style="max-height:300px;overflow:auto"></div>
   </section>
 
-  <div class="grid2">
+  <div class="grid2" data-tab="tasks">
     <section>
       <div class="sec-h">C · 派活 <span class="sub">复用 <span class="mono">agentbus send</span> · from=Master</span></div>
       <label>派给(to role)</label>
@@ -1364,7 +1384,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     </section>
   </div>
 
-  <section>
+  <section data-tab="live">
     <div class="sec-h">I · 实时视图 <span class="mono">live.log</span> <span class="sub">看 headless daemon/dispatch 实时执行流(🔧工具 / 💬回复 / ■完成)— 选 role 后每 1.5s 轮询</span>
       <span class="spacer" style="flex:1"></span>
       <span class="filt">role
@@ -1377,7 +1397,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   </section>
 
   <!-- 历史用量 BI (P0) -->
-  <section>
+  <section data-tab="bi">
     <div class="sec-h">📊 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · API 等价成本 · Shanghai 日</span>
       <span class="spacer" style="flex:1"></span>
       <span id="usageMeta" class="muted" style="font-size:11.5px"></span>
@@ -1400,7 +1420,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   </section>
 
   <!-- 可恢复会话 (resume) -->
-  <section>
+  <section data-tab="fleet">
     <div class="sec-h">🗂 可恢复会话 <span class="sub">Claude Code 历史会话 · <span class="mono">ab sessions</span> · 仅元数据</span>
       <span class="spacer" style="flex:1"></span>
       <label class="chk" style="margin:0"><input type="checkbox" id="sessAll"> 显示全部(含个人会话)</label>
@@ -1588,6 +1608,8 @@ function renderTodos(){
   document.getElementById('tcountHistory').textContent=doneAll.length;
   const ca=document.getElementById('confirmAlert');
   if(pendN){ ca.style.display=''; ca.textContent='🙋 '+pendN+' 项待你确认'; } else { ca.style.display='none'; }
+  const gc=document.getElementById('gConfirm');   // 全局角标(跨 tab 常驻 header)
+  if(gc){ if(pendN){ gc.style.display=''; gc.innerHTML='🙋 <b>'+pendN+'</b> 项待确认'; } else { gc.style.display='none'; } }
   document.getElementById('tviewActive').classList.toggle('active',todoView==='active');
   document.getElementById('tviewHistory').classList.toggle('active',todoView==='history');
 
@@ -1954,6 +1976,25 @@ async function loadSessions(){
 document.getElementById('usageRefresh').onclick=()=>loadUsage(true);
 document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
+
+// ===== tab 分页 =====
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 BI/分析',tasks:'📋 任务/协作',live:'🔴 实时'};
+let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
+if(!TAB_NAMES[curTab]) curTab='fleet';
+function showTab(t){
+  if(!TAB_NAMES[t]) t='fleet';
+  curTab=t; try{ localStorage.setItem('busTab',t); }catch(e){}
+  document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
+  window.scrollTo({top:0});
+}
+function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
+document.querySelectorAll('#tabbar .tab').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+document.getElementById('gConfirm').onclick=()=>{ showTab('tasks');
+  const tp=[...document.querySelectorAll('main > [data-tab="tasks"]')].find(x=>x.querySelector('#todoBox'));
+  if(tp) setTimeout(()=>tp.scrollIntoView({behavior:'smooth',block:'start'}),60); };
+window.addEventListener('resize',syncTabTop);
+syncTabTop(); showTab(curTab);
 
 // 首屏顺序很关键:/api/bi 与 /api/state 都吃 psutil 进程扫,ThreadingHTTPServer 在 GIL 下
 // 无法真正并行跑这两段 CPU 密集逻辑 —— 若并发,/api/state 的冷启全进程扫(~2s,机器忙时更久)
