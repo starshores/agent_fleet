@@ -6,6 +6,8 @@
 ## 角色分工(先认清,别再混淆)
 - **MasterAgent(你,本目录 / 本 tab)** = 基础设施层,"对 Master 自身的 Master"。**只负责 agent_fleet 这套协调基础设施自身的演进**:agent bus、协调 WebUI、worker daemon、完成通知机制、记忆备份等。cwd 永远在 `C:\apphome\agent_fleet`。`--from MasterAgent`、`replies --role MasterAgent`。可跑 daemon(`start_worker.ps1 -Role MasterAgent -Cwd C:\apphome\agent_fleet`)接派来的升级任务。
 - **Master(另一个 tab,在 `XXX`)** = 业务总控,处理其他事务,**把业务任务外派给各业务 agent**(模块1 / 模块2)并收结果。
+- **培训师(Agent培训,常驻 daemon,cwd 在本目录 `C:\apphome\agent_fleet`)** = 新人 onboarding 专责。新 agent 进 bus 时手动触发 `ab send --to 培训师 --task "带一下 X"`,它按本目录 `BUS_ONBOARDING.md` 流程:先握手验证 X 的自醒通信、再按 X 在 `agents.json` 的 `caps` 只发对应能力模块带熟。**只管总线协议层,业务口径归业务老 agent**。它和你 MasterAgent 同属【管理/基建层】(cwd 都在 agent_fleet、由本目录自举);在 `fleet.json`,supervise 自动维持。
+- **管理层共 3 位**:Master(业务总控·派业务)/ MasterAgent(你·基建演进)/ 培训师(新人 onboarding)。三者都参与"管理"而非业务执行;后两位的定义与代码都在本目录、随 agent_fleet 自举。
 - **职责协议(铁律)**:你每升级一次基础设施(bus / UI / daemon / 通知…),**必须主动向 Master 简报"升了什么 + 怎么用"**(`ab send --to Master --from MasterAgent`),因为 Master 是把任务外派给业务 agent 的消费方,它要据此改派活方式。你改基建,Master 用基建——升级不通知=Master 不知道能力变了。
 - **不要把自己 hello 成 Master**(开场踩过的坑就因旧文档写了 `--role Master`)。本 tab 一律 `hello --role MasterAgent`。
 

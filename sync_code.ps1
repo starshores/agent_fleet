@@ -8,9 +8,9 @@ $src = Join-Path $env:USERPROFILE ".claude\agent_bus"
 $dst = "C:\apphome\agent_fleet\agent_bus"
 New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
-$files = @("agentbus.py","worker_daemon.py","dispatch_agent.py","claude_run.py",
+$files = @("agentbus.py","worker_daemon.py","dispatch_agent.py","claude_run.py","external_msg.py",
            "start_worker.ps1","stop_worker.ps1","config.json","fleet.json","agents.json",
-           "ab.cmd","README.md")
+           "capabilities.json","ab.cmd","README.md")
 $n = 0
 foreach ($f in $files) {
   $s = Join-Path $src $f
