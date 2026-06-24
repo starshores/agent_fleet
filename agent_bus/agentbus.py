@@ -648,6 +648,34 @@ def _maybe_toast(sender, status, title, result, notify, reply_mode=None):
     _fire_toast(head, body)
 
 
+def _emit_completion_notice(sender, notifier_role, ref_id, status, title, result_loc=None):
+    """若 sender 是【自醒在岗的协调位】,往其 inbox 投一条 kind:notice 轻量完成通知,触发其后台 wait 自醒。
+    cmd_done 与 dispatch_agent 收尾共用(dispatch 直接写 done 不走 cmd_done,故此前不触发自醒——本函数补齐)。
+    防环铁律:notice 自身完成不要调本函数(调用方负责对 kind=notice 不调);只对 HUMAN_ATTENDED 协调位投。
+    best-effort,绝不影响主流程。返回是否投了 notice。"""
+    try:
+        if sender not in HUMAN_ATTENDED:
+            return False
+        if _self_wake_state(sender)[0] != "armed":
+            return False
+        loc = result_loc or ("%s/done/%s.json" % (sender, ref_id))
+        nid = "notice-" + ref_id
+        notice = {
+            "id": nid, "from": notifier_role, "to": sender, "kind": "notice",
+            "title": "✅ 完成:" + (title or ref_id),
+            "task": ("[完成通知·读完即弃、勿当任务执行] %s 完成了你派的《%s》(status=%s)。"
+                     "完整结果在 %s;读完直接 done 本通知即可。"
+                     % (notifier_role, title or ref_id, status, loc)),
+            "notice_of": ref_id, "notice_status": status,
+            "created": _now(), "status": "pending",
+        }
+        _write_json(BUS / sender / "inbox" / (nid + ".json"), notice)
+        _audit("notify_wake", id=ref_id, to=sender)
+        return True
+    except Exception:
+        return False
+
+
 def cmd_done(args):
     role = args.role or _resolve_self_role()
     if not role:
@@ -684,23 +712,8 @@ def cmd_done(args):
     # v1.1: 完成通知触发发起方【自醒】—— 若 sender 是自醒在岗的协调位,往其 inbox 投一条轻量 notice,
     # 触发其后台 wait 自醒(它醒来读 <sender>/done/<id> 取完整结果)。sync 应答/never 不投;只对协调位(防环)。
     # 防环铁律:done 一个 notice 不再生 notice(否则协调位↔协调位 done 各自的 notice 会乒乓无限循环——实测踩过)
-    if reply_mode != "sync" and task_kind != "notice" and args.notify != "never" and sender in HUMAN_ATTENDED:
-        try:
-            if _self_wake_state(sender)[0] == "armed":
-                nid = "notice-" + real_id
-                notice = {
-                    "id": nid, "from": role, "to": sender, "kind": "notice",
-                    "title": "✅ 完成:" + (title or real_id),
-                    "task": ("[完成通知·读完即弃、勿当任务执行] %s 完成了你派的《%s》(status=%s)。"
-                             "完整结果在 %s/done/%s.json;读完直接 done 本通知即可。"
-                             % (role, title or real_id, args.status, sender, real_id)),
-                    "notice_of": real_id, "notice_status": args.status,
-                    "created": _now(), "status": "pending",
-                }
-                _write_json(BUS / sender / "inbox" / (nid + ".json"), notice)
-                _audit("notify_wake", id=real_id, to=sender)
-        except Exception:
-            pass
+    if reply_mode != "sync" and task_kind != "notice" and args.notify != "never":
+        _emit_completion_notice(sender, role, real_id, args.status, title)
     print("done -> %s (status=%s)" % (sender, args.status))
 
 

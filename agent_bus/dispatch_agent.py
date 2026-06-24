@@ -64,6 +64,9 @@ def main():
         ab._audit("dispatch_done", id=args.id, to=frm, status=status, name=name)
     except Exception:
         pass
+    # 触发派发方自醒:dispatch 直接写 done 不走 cmd_done,故复用 _emit_completion_notice
+    # 给【自醒在岗的协调位】投 notice → 其后台 wait 醒来读 <frm>/done/<id>.json 取本结果。
+    ab._emit_completion_notice(frm, name, args.id, status, title)
     # 清掉派发记录(一次性,干完即逝)
     try:
         rec_path.unlink()
