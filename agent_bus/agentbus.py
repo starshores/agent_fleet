@@ -1022,6 +1022,62 @@ def _orphan_daemon_pids(fleet_roles):
     return out
 
 
+def _stale_webui_pids(port=8799, min_age=30):
+    """重复/陈旧 WebUI = 在跑 server.py 但【没占住 port】的 python 进程(如 31468:旧实例没占端口却还跑 supervisor)。
+    安全铁律:只在【确实有一个 server.py 进程占住 port】时,才认定其余没占端口的为陈旧;否则一个不动(可能正在启动)。
+    再加 min_age 秒龄保护(太年轻可能在 bind 中,跳过)。返回 [(pid, age_s), ...]。绝不返回占端口的那个。"""
+    if psutil is None:
+        return []
+    webui = {}
+    for p in psutil.process_iter(["name", "cmdline", "create_time"]):
+        try:
+            if "python" not in (p.info.get("name") or "").lower():
+                continue
+            if any("server.py" in str(x) for x in (p.cmdline() or [])):
+                webui[p.pid] = p.info.get("create_time")
+        except Exception:
+            continue
+    if len(webui) <= 1:
+        return []
+    owner = None
+    try:
+        for c in psutil.net_connections(kind="inet"):
+            if c.status == "LISTEN" and c.laddr and c.laddr.port == port and c.pid:
+                owner = c.pid
+                break
+    except Exception:
+        return []                      # 拿不到端口归属 → 不动(安全)
+    if owner is None or owner not in webui:
+        return []                      # 没有明确占端口的 server.py → 不动(可能在启动/已切到非 server.py)
+    now = time.time()
+    stale = []
+    for pid, ct in webui.items():
+        if pid == owner:
+            continue                   # 占端口的=在岗,绝不杀
+        age = now - (ct or now)
+        if age < min_age:
+            continue                   # 太年轻,可能在 bind,跳过
+        stale.append((pid, int(age)))
+    return stale
+
+
+def cmd_webui_guard(args):
+    """重复 WebUI 守卫:清掉没占端口的陈旧 server.py 实例(防 31468 那类流氓 supervisor + 省 CPU)。
+    只杀【不占 port 且 >min_age】的;占端口的在岗实例绝不动;拿不到端口归属时一个不动。"""
+    stale = _stale_webui_pids(args.port, args.min_age)
+    if not stale:
+        print("WebUI 守卫:无重复/陈旧实例(或无法确认端口归属 → 未动)"); return
+    for pid, age in stale:
+        if args.dry_run:
+            print("[陈旧 WebUI 将清(dry-run)] pid=%s age=%ss" % (pid, age)); continue
+        try:
+            psutil.Process(pid).kill()
+            _audit("reap_stale_webui", pid=pid, age=age)
+            print("[陈旧 WebUI 已清] pid=%s age=%ss" % (pid, age))
+        except Exception as e:
+            print("[清陈旧 WebUI 失败] pid=%s: %s" % (pid, e))
+
+
 def cmd_supervise(args):
     """daemon 自愈 + 期望态对账:读 agent_bus/fleet.json 的期望 daemon 清单,重启其中【已死】的(存活跳过),
     并【回收孤儿 daemon】(worker_daemon 进程但 role 已不在 fleet —— 从 fleet 摘角色后的残留)。
@@ -1064,8 +1120,18 @@ def cmd_supervise(args):
             actions.append(("孤儿daemon已回收(pid=%s,role不在fleet)" % pid, role))
         except Exception as e:
             actions.append(("孤儿daemon回收失败(pid=%s):%s" % (pid, e), role))
+    # 重复 WebUI 守卫:清掉没占 8799 的陈旧 server.py 实例(31468 那类)。安全:只在能确认端口归属时动、不杀在岗的。
+    for pid, age in _stale_webui_pids(8799, 30):
+        if args.dry_run:
+            actions.append(("陈旧WebUI将清(dry-run,pid=%s,age=%ss)" % (pid, age), "WebUI")); continue
+        try:
+            psutil.Process(pid).kill()
+            _audit("reap_stale_webui", pid=pid, age=age)
+            actions.append(("陈旧WebUI已清(pid=%s,age=%ss,未占8799)" % (pid, age), "WebUI"))
+        except Exception as e:
+            actions.append(("陈旧WebUI清理失败(pid=%s):%s" % (pid, e), "WebUI"))
     if not actions:
-        print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon"); return
+        print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon / 陈旧 WebUI"); return
     for a, r in actions:
         print("[%s] %s" % (a, r))
 
@@ -1418,6 +1484,7 @@ def main():
     p = sub.add_parser("list"); p.set_defaults(fn=cmd_list)
     p = sub.add_parser("reap"); p.add_argument("--role", default=None); p.add_argument("--ttl", type=float, default=4000.0); p.add_argument("--grace", type=float, default=120.0); p.add_argument("--max-requeue", type=int, default=3, dest="max_requeue"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_reap)
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
+    p = sub.add_parser("webui-guard"); p.add_argument("--port", type=int, default=8799); p.add_argument("--min-age", type=float, default=30.0, dest="min_age"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_webui_guard)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)

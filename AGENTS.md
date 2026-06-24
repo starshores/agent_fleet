@@ -53,7 +53,8 @@ ab request --to B --from A --task "..." [--chain "..." --timeout 300]  # 发子�
 ab send ... --requires-approval                 # 标高风险:任何自动监听者(tab serve/daemon/wait)都不会自动领取,留 inbox 待审
 ab wait --role X --include-approval             # 有人值守的 tab 显式领取高风险任务(审过后执行)
 ab reap [--role X] [--ttl 4000 --grace 120 --dry-run]   # 孤儿回收:owner 进程已退/超期仍卡 processing 的任务退回 inbox
-ab supervise [--dry-run]                         # daemon 期望态对账:读 fleet.json 重启已死 daemon + 回收孤儿 daemon(worker_daemon 进程但 role 已不在 fleet);只杀 worker_daemon,前台 CLI/dispatch 不碰。WebUI 每 90s 自动跑 → 从 fleet 摘角色即自动清其残留 daemon
+ab supervise [--dry-run]                         # daemon 期望态对账:启 fleet 缺的 + 回收孤儿 daemon(role 不在 fleet)+ 清陈旧重复 WebUI(没占 8799 的 server.py 实例);只杀 worker_daemon / 非在岗 WebUI,前台 CLI/dispatch 与占端口的在岗 WebUI 不碰。WebUI 每 90s 自动跑
+ab webui-guard [--port 8799 --min-age 30 --dry-run]  # 单独跑:清没占端口的陈旧 server.py 实例(防 31468 那类流氓 supervisor);只在能确认端口归属时动、不杀在岗的
 ab prune [--dry-run]                             # 清空的遗留 role 目录(无 presence 且队列全空)
 ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一次性 ad-hoc agent】:有总线沟通(request/send)、不监听队列、干完即逝、可重派;结果回填 <from>/done(replies 收)
 ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}
