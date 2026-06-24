@@ -1228,6 +1228,36 @@ def cmd_edge_release(args):
     print(json.dumps({"released": True, "by": who}, ensure_ascii=False))
 
 
+def _load_caps_pool():
+    f = BUS / "capabilities.json"
+    if f.exists():
+        try:
+            return json.loads(f.read_text(encoding="utf-8")).get("capabilities", {})
+        except Exception:
+            return {}
+    return {}
+
+
+def cmd_caps(args):
+    """能力池查询:`caps` 看全池+谁持有;`caps --role X` 看某角色被分配的能力。"""
+    pool = _load_caps_pool()
+    agents = _load_agents()
+    if args.role:
+        caps = (agents.get(args.role) or {}).get("caps") or []
+        print("【%s】的能力(caps,最小授权):" % args.role)
+        if not caps:
+            print("  (未分配 caps,或角色不存在)"); return
+        for c in caps:
+            print("  - %-16s %s" % (c, pool.get(c, {}).get("desc", "(未在能力池登记)")))
+        return
+    print("能力池(capabilities.json)+ 现持有者:")
+    for name, info in pool.items():
+        holders = [r for r, v in agents.items() if name in ((v or {}).get("caps") or [])]
+        print("  %-16s %s" % (name, info.get("desc", "")))
+        print("       默认给: %s" % info.get("default_for", "-"))
+        print("       现持有(%d): %s" % (len(holders), ", ".join(holders) if holders else "无"))
+
+
 def main():
     ap = argparse.ArgumentParser(prog="agentbus")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1248,6 +1278,7 @@ def main():
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
+    p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)

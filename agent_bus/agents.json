@@ -1,22 +1,32 @@
 {
  "SQLAGent": {
   "registered": "2026-06-22T10:39:35",
-  "desc": "维护 sql_agent 代理(server.py)那个 cli 本身,不是通用查库 worker;别给它派查询活。"
+  "desc": "维护 sql_agent 代理(server.py)那个 cli 本身,不是通用查库 worker;别给它派查询活。",
+  "caps": ["bus-comms", "confidentiality"]
  },
  "Master": {
   "registered": "2026-06-22T11:27:43",
-  "desc": "业务总控:处理其他事务,把业务任务外派给各业务 agent 并收结果。协调层,不 loop。"
+  "desc": "业务总控:处理其他事务,把业务任务外派给各业务 agent 并收结果。协调层,不 loop。",
+  "caps": ["bus-comms", "self-wake", "confidentiality"]
  },
  "MasterUI": {
   "registered": "2026-06-22T11:39:32",
-  "desc": "agent bus 可视化 WebUI(127.0.0.1:8799)的开发与维护专责。"
+  "desc": "agent bus 可视化 WebUI(127.0.0.1:8799)的开发与维护专责。",
+  "caps": ["bus-comms", "confidentiality"]
  },
  "MasterAgent": {
   "registered": "2026-06-22T15:47:39",
-  "desc": "基础设施层(对 Master 自身的 Master):演进 agent bus / WebUI / daemon / 通知机制 / 记忆备份;协调层,不 loop。"
+  "desc": "基础设施层(对 Master 自身的 Master):演进 agent bus / WebUI / daemon / 通知机制 / 记忆备份;协调层,不 loop。",
+  "caps": ["bus-comms", "self-wake", "confidentiality"]
  },
  "GIT管理": {
   "registered": "2026-06-23T16:55:55",
-  "desc": "你是【GIT管理】,专责仓库的 git 操作与版本卫生:分支/提交/合并、暂存区盘点、未提交文档与代码分类整理推送(文档需用户明确说\"提交\"才提,代码可推)、commit message 规范、PR、.gitignore 维护、清理临时探查文件。cwd 为仓库根目录。"
+  "desc": "你是【GIT管理】,专责仓库的 git 操作与版本卫生:分支/提交/合并、暂存区盘点、未提交文档与代码分类整理推送(文档需用户明确说\"提交\"才提,代码可推)、commit message 规范、PR、.gitignore 维护、清理临时探查文件。cwd 为仓库根目录。",
+  "caps": ["bus-comms", "confidentiality"]
+ },
+ "培训师": {
+  "registered": "2026-06-24T10:30:00",
+  "desc": "新人培训师:把新加入 bus 的 agent 带熟(只管总线协议层,不碰业务口径)。手动触发——收到「带一下 X」任务时,读 agent_fleet/BUS_ONBOARDING.md 按流程:① 握手验证 X 的自醒通信;② 按 X 在 agents.json 的 caps 只发对应能力模块并逐项确认;③ 回报掌握情况。",
+  "caps": ["bus-comms", "self-wake", "confidentiality"]
  }
 }

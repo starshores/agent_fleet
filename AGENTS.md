@@ -58,6 +58,7 @@ ab prune [--dry-run]                             # 清空的遗留 role 目录(�
 ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一次性 ad-hoc agent】:有总线沟通(request/send)、不监听队列、干完即逝、可重派;结果回填 <from>/done(replies 收)
 ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}
 ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
+ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
 ```
 
 ### 两类执行体(2026-06-23)
@@ -68,6 +69,7 @@ ab edge-release --who X [--force]                   # 释放(默认只释放自�
 - **requires_approval(统一闸)**:写库/外发等高风险任务,Master 派活时加 `--requires-approval`。闸在【领取路径 `_wait_core`】统一实现——所有自动监听者(tab `serve` / daemon / 普通 `wait`)都不会自动领取,任务留在 inbox(`who`/`peek`/WebUI 可见)等人工处理。有人值守的 tab 用 `wait --include-approval` 显式领取执行。**对 tab worker 和 daemon 一致生效,无需重启 worker(都 shell 最新 agentbus.py)。**
 - **完成通知**:done 默认 `--notify auto` → error 必弹 toast、Master 完成弹(45s 节流);嫌吵用 `--notify never`。
 - **BI 资源消耗模块(WebUI,2026-06-23,v1.3)**:WebUI 顶部「📊 BI · 资源消耗」面板,运营总览口径看全舰队 LLM 开销 + 系统资源。**埋点**:claude_run 从 claude -p 的 `result` 事件抓 `usage`(token in/out/cache)+ `total_cost_usd` + `duration_ms`,daemon/dispatch 任务完成后 `ab.record_metric()` 追一行到 `bus/metrics.jsonl`(append-only,O_APPEND 原子)。**聚合**:`/api/bi`(server.build_bi)按角色/全队聚合今日 + 近24h 的任务数/token/成本/平均耗时,叠加 psutil 进程树 CPU%/内存快照(daemon_pid 整树,含其 fork 的 claude -p 子进程)+ 当前在跑任务。前端每 10s 刷。**数据自埋点上线起累积,无历史**;`metrics.jsonl` 只本机。改了 claude_run/daemon 须重启 daemon 才生效(`supervise`)。**任务活动历史(v1.4)**:token/成本无法回填(以前没测过),故另列「📜 任务活动历史」——`server.build_activity()` 从 `events.jsonl` 配对 claim→done 实时重建各角色全程 任务数/近24h/ok·err/平均耗时/最近活跃(过滤 `__*`/`zz*` 测试角色),诚实区分"消耗"(token/$,前向)与"活动"(计数,全程)。同在 `/api/bi` 返回(`activity` 键)。
+- **能力池 + 新人 onboarding(2026-06-24,v1.5)**:agent 按专项【最小授权】。能力池 = `agent_bus/capabilities.json`(bus-comms / self-wake / confidentiality / external-tool-edge / sql-fetch / high-risk);每个 role 在 `agents.json` 有 `caps:[...]` 只列它需要的能力(`ab caps [--role X]` 查)。**铁律:external-tool-edge 只给【对外 agent】,业务 agent 不直接操作云文档——要外发就把内容交给对外 agent**(对外 agent 待建;届时 Edge 只它一个碰,edge-lock 争用基本消失)。**新人 onboarding**:① `hello` 输出自带自醒说明(v1.4.6);② 专设常驻 **`培训师`** role(在 fleet,手动触发)——`ab send --to 培训师 --task "带一下 X"`,它按 `agent_fleet/BUS_ONBOARDING.md` 流程:先握手验证 X 自醒通信、再按 X 的 caps **只发对应能力模块**、回报。培训师只管总线协议层,业务口径归业务老 agent。
 - **edge-lock(Edge/CDP 焦点互斥,2026-06-23,v1.2)**:同一时刻只能一个 CDP 客户端操作 Edge(抢焦点会串台)。**铁律**:凡要操作 Edge/云文档(复制/点击/粘贴/编辑)的活,包成 `edge-acquire --who <自己>` → `connect_over_cdp 操作` → `edge-release --who <自己>`。抢不到(timeout)就稍候重试或回报忙;务必 release(或靠 ttl 兜底)。机制:`bus/edge.lock`(`O_EXCL` 原子抢),stale 回收=持有者进程死 **或** 锁超 ttl(默认 300s)→ 下一个抢的人自动偷锁、不死锁;`who`/`recover` 末尾显示当前持锁者。worker_daemon / dispatch 的任务 prompt 已内置这条(碰 Edge/云文档才抢,daemon 下次重启生效)。**只解决①串行有序止血**;②独立 9223 profile、④官方 API 治本未做(按需排期)。
 - **审计**:所有 send/claim/done 自动记一行到 `agent_bus/events.jsonl`(全链路可追溯,clear replies 后仍留痕)。
 
