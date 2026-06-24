@@ -91,6 +91,7 @@ def compute_fleet():
     """舰队总览 —— 复刻 cmd_who 的判据(presence 心跳 × 实际 claude 进程)。"""
     psutil_ok = ab.psutil is not None
     alive = ab._alive_claude_pids() if psutil_ok else set()
+    sw_roles = ab._wait_proc_roles() if psutil_ok else set()   # 一次性预扫"有 wait 进程的 role"
     tags = ab._load_pidtags()
     roles = _roles()
     rows = []
@@ -98,7 +99,7 @@ def compute_fleet():
 
     for r in roles:
         pf = BUS / r / "presence.json"
-        _sw = ab._self_wake_state(r, alive)    # 自醒检测(传入已算好的 alive 集合,免每 role 重扫)
+        _sw = ab._self_wake_state(r, alive, sw_roles)    # 自醒检测(传入预扫集合,免每 role 全扫)
         row = {
             "role": r,
             "inbox": _count(r, "inbox"),

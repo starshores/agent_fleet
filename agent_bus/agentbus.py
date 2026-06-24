@@ -985,11 +985,36 @@ def cmd_supervise(args):
         print("[%s] %s" % (a, r))
 
 
-def _self_wake_state(role, alive_pids=None):
+def _wait_proc_roles():
+    """扫一次进程,返回【有活的 `agentbus wait --role X` 进程】的 role 集合。
+    协调位(Master/MasterAgent…)的事件自醒是独立的 `python agentbus.py wait` 后台进程,
+    它【不刷新 presence 心跳】——故自醒在不在岗只能按【进程是否活】判,不能靠心跳(会误报掉线)。
+    只认真正的 python 进程,排除 bash -c 壳(壳的 cmdline 也含 agentbus wait 串,且退出后可能残留)。"""
+    out = set()
+    if psutil is None:
+        return out
+    for p in psutil.process_iter(["name", "cmdline"]):
+        try:
+            name = (p.info.get("name") or "").lower()
+            if "python" not in name:          # 排除 bash 壳/其它,只认 python wait 本体
+                continue
+            cl = p.info.get("cmdline") or []
+            if "wait" not in cl or not any("agentbus" in str(c) for c in cl):
+                continue
+            for i, c in enumerate(cl):
+                if c == "--role" and i + 1 < len(cl):
+                    out.add(cl[i + 1])
+                    break
+        except Exception:
+            continue
+    return out
+
+
+def _self_wake_state(role, alive_pids=None, wait_roles=None):
     """判一个 role 的事件自醒在不在岗。返回 (state, detail)。
-    armed=在岗(daemon 进程活 / 会话 listening 且进程活且心跳没超 wait 周期);
-    stale=掉线(曾自醒但进程退 / 心跳超期没重挂);off=未自醒(idle/无 presence)。
-    判活一律用 psutil.pid_exists(单 pid,便宜),不做全进程扫描;alive_pids 参数保留兼容、不再需要。"""
+    armed=在岗;stale=掉线(曾自醒但进程退/没重挂);off=未自醒(idle/无 presence)。
+    daemon 按 daemon_pid 判活;协调位/会话按【有无活的 wait 进程】判活(wait 不刷心跳,不能靠心跳)。
+    wait_roles:预扫好的"有 wait 进程的 role 集合"(循环调用务必传入,免每 role 全扫);None 则现扫一次。"""
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return ("off", "无 presence")
@@ -1006,13 +1031,18 @@ def _self_wake_state(role, alive_pids=None):
         if psutil is not None and dp and psutil.pid_exists(dp):
             return ("armed", "daemon 自醒(watchdog 阻塞)")
         return ("stale", "daemon 已退,自醒掉线")
+    # 非 daemon:协调位/会话自醒 = 独立 wait 进程(不刷心跳)→ 优先按进程判活
+    if wait_roles is None:
+        wait_roles = _wait_proc_roles()
+    if role in wait_roles:
+        return ("armed", "会话自醒(后台 wait 进程在跑)")
     if mode == "listening":
         pid = pr.get("claude_pid")
-        alive = bool(psutil is not None and pid and psutil.pid_exists(pid))  # 单 pid 便宜判活,不全扫
+        alive = bool(psutil is not None and pid and psutil.pid_exists(pid))
         if alive and fresh:
-            return ("armed", "会话自醒(后台 wait/loop,心跳 %ss)" % age)
+            return ("armed", "会话自醒(tab /loop serve,心跳 %ss)" % age)
         if alive:
-            return ("stale", "会话在但心跳超期 %ss——自醒可能掉线(没重挂 wait?)" % age)
+            return ("stale", "会话在但无 wait 进程、心跳超期 %ss——自醒掉线(没重挂?)" % age)
         return ("stale", "进程已退,自醒掉线")
     return ("off", "未自醒(mode=%s)" % mode)
 
@@ -1020,10 +1050,11 @@ def _self_wake_state(role, alive_pids=None):
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
     armed = stale = off = 0
+    wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
     print("%-14s %-8s %s" % ("role", "自醒", "说明"))
     print("-" * 78)
     for role in _list_roles():
-        st, detail = _self_wake_state(role)
+        st, detail = _self_wake_state(role, wait_roles=wait_roles)
         mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}[st]
         print("%-14s %-8s %s" % (role, mark, detail))
         armed += st == "armed"; stale += st == "stale"; off += st == "off"
