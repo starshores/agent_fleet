@@ -44,6 +44,7 @@
 - ③ 把 `agent_bus\*` 放回新机 `~/.claude/agent_bus\`(总线运行的规范路径)。
 - ④ 编辑 `agent_bus\config.json` 6 路径改成新机实际值(或设 `AGENTBUS_*` 环境变量);尤其 `claude_bin` 指向新机的 claude.cmd(daemon/dispatch 起 claude -p 要用)。
 - ⑤ 跑 `recover.py` 自检;`agentbus selfwake` 看自醒;按需 `start_worker.ps1` / fleet.json 拉起 daemon。
+- ⑥ **发版自动 snapshot 钩子**:`git config core.hooksPath githooks`(打 vX tag 时 `githooks/reference-transaction` 自动 zip 一份到同级 `agent_fleet_releases/`)。若整目录连 `.git` 一起复制则该 config 已随 `.git/config` 带过来;重新 clone 才需手动设。**注**:钩子里 tar 路径 `/c/Windows/System32/tar.exe` 是 Windows bsdtar,换非 Windows 机要改。
 - (WebUI 另需:`ui\start_ui.ps1` 拉起常驻控制台。)
 
 > 注:总线**运行**仍从规范路径 `~/.claude/agent_bus\` 跑;`agent_fleet\agent_bus\` 是同 inode 的可迁移快照,不是第二份运行实例。

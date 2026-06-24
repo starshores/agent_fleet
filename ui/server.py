@@ -209,20 +209,42 @@ def compute_fleet():
 # compute_fleet 每次跑 ab._alive_claude_pids()(全进程扫描),本机进程多 ~4s。
 # SSE/轮询频繁打 /api/state → 卡。加短 TTL(3s)内存缓存:窗口内直接返回上次结果,
 # 全进程扫描最多每 3s 一次。compute 放锁内 → 同一窗口的并发请求只扫一次,其余等到后拿新缓存。
-_FLEET_TTL = 3.0
+# 全进程扫描 ab._alive_claude_pids() 在本机 0.1~17s 剧烈波动(进程多)。绝不能在请求里同步阻塞,
+# 也不能持锁现算(否则一次冷扫把所有 /api/state 卡死 17s)。
+# 用 stale-while-revalidate:永远秒回缓存,过期就后台线程刷新,不阻塞任何请求。
+_FLEET_TTL = 30.0
 _fleet_cache = {"ts": 0.0, "data": None}
 _fleet_lock = threading.Lock()
+_fleet_refreshing = {"v": False}
 
 
-def compute_fleet_cached():
-    with _fleet_lock:
-        c = _fleet_cache
-        if c["data"] is not None and (time.time() - c["ts"]) < _FLEET_TTL:
-            return c["data"]
+def _refresh_fleet():
+    try:
         data = compute_fleet()
-        c["data"] = data
-        c["ts"] = time.time()
+        with _fleet_lock:
+            _fleet_cache["data"] = data
+            _fleet_cache["ts"] = time.time()
+    except Exception:
+        pass
+    finally:
+        _fleet_refreshing["v"] = False
+
+
+def compute_fleet_cached(force=False):
+    with _fleet_lock:
+        data = _fleet_cache["data"]
+        age = time.time() - _fleet_cache["ts"]
+    if data is None:
+        # 首次无缓存:只能同步算一次(启动时已 prewarm,正常用户请求不会走到这)
+        data = compute_fleet()
+        with _fleet_lock:
+            _fleet_cache["data"] = data
+            _fleet_cache["ts"] = time.time()
         return data
+    if (force or age >= _FLEET_TTL) and not _fleet_refreshing["v"]:
+        _fleet_refreshing["v"] = True
+        threading.Thread(target=_refresh_fleet, daemon=True).start()
+    return data  # 立即返回(可能 stale ≤TTL+扫描耗时),后台刷新,绝不阻塞
 
 
 # =============================================================
@@ -518,8 +540,8 @@ def run_supervise(dry_run=False):
     return {"ok": r.returncode == 0, "error": (r.stderr or "").strip() or None, "lines": lines}
 
 
-def build_state(reply_role="Master"):
-    fleet = compute_fleet_cached()  # 3s TTL 缓存,避免每次 /api/state 全进程扫描
+def build_state(reply_role="Master", fresh=False):
+    fleet = compute_fleet_cached(force=fresh)  # 缓存兜住轮询;fresh=SSE/手动刷新强制新算
     # 给每个 role 附带可点开的任务明细(inbox/processing/held/failed 任一非空就读)
     for row in fleet["roles"]:
         if row["inbox"] or row["processing"] or row["held"] or row["failed"]:
@@ -1037,6 +1059,14 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .todo-card.pri-mid{border-left-color:var(--warn)}
 .todo-card.pri-lo{border-left-color:var(--idle)}
 .todo-card.is-done{opacity:.6}
+/* 待确认:agent 在等用户拍板,醒目区分 */
+.todo-card.pending-confirm{border-left-color:#9a7bff !important;background:rgba(154,123,255,.10);box-shadow:0 0 0 1px rgba(154,123,255,.4)}
+.badge.confirm{background:rgba(154,123,255,.20);color:#c9b3ff;border:1px solid rgba(154,123,255,.55)}
+.confirm-who{color:#c9b3ff;font-weight:600}
+/* 待办池视图切换 tab */
+.tview-btn{margin:0;padding:3px 11px;font-size:12px}
+.tview-btn.active{background:var(--accent);color:#06112a;border-color:var(--accent);font-weight:600}
+.confirm-alert{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:5px;background:rgba(154,123,255,.18);color:#c9b3ff;border:1px solid rgba(154,123,255,.5)}
 .todo-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .todo-title{font-weight:600;font-size:13.5px}
 .todo-detail{color:#cdd4e0;font-size:12.5px;margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
@@ -1088,8 +1118,8 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <select id="pollSel">
       <option value="0">关(仅事件)</option>
       <option value="3000">3s</option>
-      <option value="5000" selected>5s</option>
-      <option value="10000">10s</option>
+      <option value="5000">5s</option>
+      <option value="10000" selected>10s</option>
       <option value="30000">30s</option>
     </select>
   </span>
@@ -1131,13 +1161,17 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   </section>
 
   <section>
-    <div class="sec-h">B · 待办池 TODO Pool <span class="sub">集中管理待办 · 存 <span class="mono">agent_bus/todos.json</span> · 可一键【派活】成 bus 任务</span>
+    <div class="sec-h">B · 待办池 TODO Pool <span class="sub">待确认 + 待办统一队列 · 存 <span class="mono">agent_bus/todos.json</span></span>
+      <span id="confirmAlert" class="confirm-alert" style="display:none"></span>
       <span class="spacer" style="flex:1"></span>
-      <span class="filt">优先级
+      <span class="filt">
+        <button class="btn ghost tview-btn active" id="tviewActive" data-view="active">待办池 <b id="tcountActive">0</b></button>
+        <button class="btn ghost tview-btn" id="tviewHistory" data-view="history">历史 <b id="tcountHistory">0</b></button>
+        <span style="width:8px;display:inline-block"></span>
+        优先级
         <select id="filtPri"><option value="">全部</option><option>高</option><option>中</option><option>低</option></select>
         状态
         <select id="filtStatus"><option value="">全部</option><option>待办</option><option>进行中</option><option>搁置</option><option>完成</option></select>
-        <label class="chk" style="margin:0"><input type="checkbox" id="filtHideDone"> 隐藏已完成</label>
       </span>
     </div>
     <div class="todo-add">
@@ -1378,26 +1412,55 @@ function isOverdue(t){
   if(isNaN(d)) return false;
   return d.getTime() < Date.now();
 }
+let todoView='active';   // active=待办池(未完成) | history=已完成历史
+// 待确认:agent 通过 ask-user 投池、在等用户拍板的项(source 以「确认·」开头 或 带 confirm_from,且 status=待办)
+function isPendingConfirm(t){
+  return t.status==='待办' && (t.confirm_from || (t.source||'').indexOf('确认·')===0);
+}
 function renderTodos(){
   const box=document.getElementById('todoBox'); if(!box) return;
-  let items=(state.todos||[]).slice();
+  const all=(state.todos||[]);
+  // tab 计数(基于全量,不受筛选影响)
+  const activeAll=all.filter(t=>t.status!=='完成');
+  const doneAll=all.filter(t=>t.status==='完成');
+  const pendN=activeAll.filter(isPendingConfirm).length;
+  document.getElementById('tcountActive').textContent=activeAll.length;
+  document.getElementById('tcountHistory').textContent=doneAll.length;
+  const ca=document.getElementById('confirmAlert');
+  if(pendN){ ca.style.display=''; ca.textContent='🙋 '+pendN+' 项待你确认'; } else { ca.style.display='none'; }
+  document.getElementById('tviewActive').classList.toggle('active',todoView==='active');
+  document.getElementById('tviewHistory').classList.toggle('active',todoView==='history');
+
+  let items=(todoView==='history'?doneAll:activeAll).slice();
   const fp=document.getElementById('filtPri').value;
   const fs=document.getElementById('filtStatus').value;
-  const hideDone=document.getElementById('filtHideDone').checked;
   if(fp) items=items.filter(t=>t.priority===fp);
   if(fs) items=items.filter(t=>t.status===fs);
-  if(hideDone) items=items.filter(t=>t.status!=='完成');
-  if(!items.length){ box.innerHTML='<div class="muted" style="padding:8px 16px">（无待办,或被筛选）</div>'; return; }
+  // 待办池视图:待确认项置顶;历史视图:按更新时间倒序
+  if(todoView==='active'){
+    items.sort((a,b)=>(isPendingConfirm(b)?1:0)-(isPendingConfirm(a)?1:0));
+  }else{
+    items.sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||'')));
+  }
+  if(!items.length){
+    const msg=todoView==='history'?'（暂无已完成）':'（无未完成待办,或被筛选）';
+    box.innerHTML='<div class="muted" style="padding:8px 16px">'+msg+'</div>'; return;
+  }
   const roleOpts=state.all_roles.map(r=>`<option>${esc(r)}</option>`).join('');
   box.innerHTML=items.map(t=>{
     const od=isOverdue(t);
+    const pc=isPendingConfirm(t);
     const stSel=['待办','进行中','搁置','完成'].map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('');
     const link=t.task_id?`<span class="linkpill" title="已派给 ${esc(t.dispatched_to||'')}">🔗 ${esc(t.dispatched_to||'')} · ${esc(t.task_id)}</span>`:'';
-    return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${t.status==='完成'?'is-done':''}">
+    const confirmBadge=pc?`<span class="badge confirm">🙋 待确认</span>`:'';
+    const confirmWho=pc&&t.confirm_from?`<span class="confirm-who">等 ${esc(t.confirm_from)} 拍板</span>`:'';
+    return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${pc?'pending-confirm':''} ${t.status==='完成'?'is-done':''}">
       <div class="todo-h">
+        ${confirmBadge}
         <span class="badge ${PRI_CLS[t.priority]||'p-mid'}">${esc(t.priority)}</span>
         <span class="badge ${ST_CLS[t.status]||'s-todo'}">${esc(t.status)}</span>
         <span class="todo-title">${esc(t.title)}</span>
+        ${confirmWho}
         ${link}
       </div>
       ${t.detail?`<div class="todo-detail">${esc(t.detail)}</div>`:''}
@@ -1405,6 +1468,7 @@ function renderTodos(){
         ${t.source?`<span>来源:${esc(t.source)}</span>`:''}
         ${t.deadline?`<span class="${od?'overdue':''}">截止:${esc(t.deadline)}${od?' ⚠逾期':''}</span>`:''}
         <span>建:${esc(t.created)}</span>
+        ${t.updated&&todoView==='history'?`<span>完成/更新:${esc(t.updated)}</span>`:''}
       </div>
       <div class="todo-acts">
         <span class="muted">状态</span>
@@ -1442,10 +1506,10 @@ function tEdit(id){
   tPost('/api/todos/update',{id,title,detail,source,deadline,priority}).then(j=>{toast(j.ok?'已保存':'保存失败:'+(j.error||'?'),!j.ok);load();});
 }
 
-async function load(role){
+async function load(role, fresh){
   try{
     const rr=role||document.getElementById('replyRole').value||'Master';
-    const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr));
+    const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr)+(fresh?'&fresh=1':''));
     state=await res.json(); render();
     document.getElementById('updT').classList.remove('flash');void document.getElementById('updT').offsetWidth;
     document.getElementById('updT').classList.add('flash');
@@ -1463,7 +1527,7 @@ function connectSSE(){
   try{
     const es=new EventSource('/api/events');
     es.onopen=()=>setConn(true);
-    es.onmessage=()=>load();
+    es.onmessage=()=>load(null,true);   // 真事件(任务/完成)→ 强制新算,不吃缓存延迟
     es.onerror=()=>{setConn(false); es.close(); setTimeout(connectSSE,3000);};
   }catch(e){ setConn(false); }
 }
@@ -1475,7 +1539,7 @@ async function clearOne(file){
   toast('已清除 '+file); load();
 }
 
-document.getElementById('refreshBtn').onclick=()=>load();
+document.getElementById('refreshBtn').onclick=()=>load(null,true);
 document.getElementById('pollSel').onchange=setPoll;
 document.getElementById('replyRole').onchange=()=>load(document.getElementById('replyRole').value);
 document.getElementById('clearAllBtn').onclick=async()=>{
@@ -1549,7 +1613,8 @@ document.getElementById('tAddBtn').onclick=async()=>{
 };
 document.getElementById('filtPri').onchange=renderTodos;
 document.getElementById('filtStatus').onchange=renderTodos;
-document.getElementById('filtHideDone').onchange=renderTodos;
+document.getElementById('tviewActive').onclick=()=>{todoView='active';renderTodos();};
+document.getElementById('tviewHistory').onclick=()=>{todoView='history';renderTodos();};
 
 // 实时视图 live.log
 document.getElementById('liveRole').onchange=setLivePoll;
@@ -1651,7 +1716,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/state":
             q = parse_qs(u.query)
             role = (q.get("reply_role", ["Master"])[0]) or "Master"
-            self._send(200, build_state(role))
+            fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
+            self._send(200, build_state(role, fresh=fresh))
         elif path == "/api/events":
             self._sse()
         elif path == "/api/reap":
