@@ -10,3 +10,6 @@ __pycache__/
 # 架构知识已在 CLAUDE.md / AGENTS.md / CAPABILITIES.md / ARCHITECTURE_REVIEW.md / ARCHITECTURE_SOURCE_MAP.md 中。
 # 如需把记忆也纳入版本,删掉下面这行。
 memory/
+
+# BI 视觉验证截图(临时产物,不入仓)
+ui/bi_*.png

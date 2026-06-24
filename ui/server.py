@@ -1071,11 +1071,12 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .bi-kpi{background:var(--card,#1a1d24);border:1px solid var(--line);border-radius:8px;padding:9px 14px;min-width:118px}
 .bi-kpi .k{font-size:11px;color:var(--dim);margin-bottom:3px}
 .bi-kpi .v{font-size:19px;font-weight:700;color:var(--txt)}
-.bi-kpi .v small{font-size:11px;font-weight:400;color:var(--dim);margin-left:3px}
+.bi-kpi .v small{display:block;font-size:11px;font-weight:400;color:var(--dim);margin-top:3px;margin-left:0}
 .bi-kpi.warn .v{color:var(--warn,#e6a23c)}
 .bi-run{display:inline-flex;align-items:center;gap:6px;background:rgba(80,200,120,.12);border:1px solid var(--live);border-radius:6px;padding:3px 9px;margin:3px 6px 3px 0;font-size:12px}
 table.bi-tbl td,table.bi-tbl th{font-variant-numeric:tabular-nums}
-table.bi-tbl td.num{text-align:right;font-family:ui-monospace,monospace}
+table.bi-tbl td.num,table.bi-tbl thead th:not(:first-child){text-align:right}
+table.bi-tbl td.num{font-family:ui-monospace,monospace}
 </style></head>
 <body>
 <header>
@@ -1108,7 +1109,7 @@ table.bi-tbl td.num{text-align:right;font-family:ui-monospace,monospace}
     <div class="foot" id="procFoot"></div>
   </section>
 
-  <section>
+  <section style="scroll-margin-top:64px">
     <div class="sec-h">📊 BI · 资源消耗 <span class="sub">舰队 token / 成本 / 系统资源 · 运营总览 — 数据自埋点上线起累积(<span class="mono">metrics.jsonl</span>)</span>
       <span class="spacer" style="flex:1"></span>
       <span class="pill muted" id="biUpd">–</span>
