@@ -60,6 +60,7 @@ ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互
 ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
 ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
 ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
+ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code 会话(~/.claude/projects/*.jsonl:cwd/aiTitle/最近/大小);给 UI"可恢复会话"视图用;真 resume 在终端 claude --resume <id>
 ```
 
 ### 两类执行体(2026-06-23)
