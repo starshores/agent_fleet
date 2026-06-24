@@ -996,8 +996,35 @@ def _daemon_alive(role):
     return bool(psutil is not None and psutil.pid_exists(dpid))
 
 
+def _orphan_daemon_pids(fleet_roles):
+    """【孤儿 daemon】= 还在跑 worker_daemon.py --role X、但 X 不在 fleet 清单里的进程(从 fleet 摘角色后的残留)。
+    只认真正 python 跑 worker_daemon 的进程(排除 bash -c 壳);前台 CLI(非 worker_daemon)/ dispatch_agent 不算,绝不误杀。
+    返回 [(pid, role), ...]。"""
+    out = []
+    if psutil is None:
+        return out
+    for p in psutil.process_iter(["name", "cmdline"]):
+        try:
+            if "python" not in (p.info.get("name") or "").lower():
+                continue
+            cl = p.cmdline()
+            if not any("worker_daemon" in str(x) for x in cl):
+                continue
+            role = None
+            for i, x in enumerate(cl):
+                if x == "--role" and i + 1 < len(cl):
+                    role = cl[i + 1]
+                    break
+            if role and role not in fleet_roles:
+                out.append((p.pid, role))
+        except Exception:
+            continue
+    return out
+
+
 def cmd_supervise(args):
-    """daemon 自愈:读 agent_bus/fleet.json 的期望 daemon 清单,重启其中【已死】的(存活跳过)。
+    """daemon 自愈 + 期望态对账:读 agent_bus/fleet.json 的期望 daemon 清单,重启其中【已死】的(存活跳过),
+    并【回收孤儿 daemon】(worker_daemon 进程但 role 已不在 fleet —— 从 fleet 摘角色后的残留)。
     只管清单里列出的 role(不列的不动)。靠 start_worker.ps1 拉起(幂等 + tab/daemon 互斥)。
     单次执行;周期化由常驻 WebUI 的 supervisor 线程或计划任务调用本命令。"""
     try:
@@ -1025,8 +1052,20 @@ def cmd_supervise(args):
             actions.append(("已拉起" if "STARTED" in out else ("被拒/跳过:" + out), role))
         except Exception as e:
             actions.append(("重启失败:%s" % e, role))
+    # 期望态对账:回收【孤儿 daemon】——worker_daemon 进程但 role 已不在 fleet(从 fleet 摘角色后残留的)。
+    # 只杀 python worker_daemon 进程;前台 CLI(非 worker_daemon)/dispatch_agent 一律不碰。
+    fleet_roles = {d.get("role") for d in daemons if d.get("role")}
+    for pid, role in _orphan_daemon_pids(fleet_roles):
+        if args.dry_run:
+            actions.append(("孤儿daemon将回收(dry-run,pid=%s)" % pid, role)); continue
+        try:
+            psutil.Process(pid).kill()
+            _audit("reap_orphan_daemon", role=role, pid=pid)
+            actions.append(("孤儿daemon已回收(pid=%s,role不在fleet)" % pid, role))
+        except Exception as e:
+            actions.append(("孤儿daemon回收失败(pid=%s):%s" % (pid, e), role))
     if not actions:
-        print("supervise: fleet.json 无 daemon 条目"); return
+        print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon"); return
     for a, r in actions:
         print("[%s] %s" % (a, r))
 
@@ -1228,6 +1267,75 @@ def cmd_edge_release(args):
     print(json.dumps({"released": True, "by": who}, ensure_ascii=False))
 
 
+def cmd_sessions(args):
+    """列【可恢复的 Claude Code 会话】(~/.claude/projects/<cwd编码>/<session-id>.jsonl)。
+    给 UI 的"可恢复会话"视图提供数据;只读每个会话头部 ~80 行取元数据(cwd/aiTitle/首条/时间),不读全文。
+    注:UI 无法替用户跑交互式 resume,只能展示 + 给 `claude --resume <id>` 命令;真正 resume 在终端。"""
+    import datetime
+    root = Path.home() / ".claude" / "projects"
+    out = []
+    if root.exists():
+        for pdir in sorted(root.iterdir()):
+            if not pdir.is_dir():
+                continue
+            if args.project and args.project.lower() not in pdir.name.lower():
+                continue
+            for f in pdir.glob("*.jsonl"):
+                try:
+                    st = f.stat()
+                except Exception:
+                    continue
+                cwd = title = label = None
+                try:
+                    with open(f, encoding="utf-8", errors="replace") as fh:
+                        for i, ln in enumerate(fh):
+                            if i > 80:
+                                break
+                            ln = ln.strip()
+                            if not ln:
+                                continue
+                            try:
+                                r = json.loads(ln)
+                            except Exception:
+                                continue
+                            if not cwd and r.get("cwd"):
+                                cwd = r.get("cwd")
+                            if not title and r.get("type") == "ai-title":
+                                title = r.get("aiTitle")
+                            if not label and r.get("type") == "user":
+                                m = r.get("message", {})
+                                c = m.get("content") if isinstance(m, dict) else None
+                                if isinstance(c, str):
+                                    label = c
+                                elif isinstance(c, list):
+                                    label = " ".join(b.get("text", "") for b in c
+                                                      if isinstance(b, dict) and b.get("type") == "text")
+                            if cwd and title and label:
+                                break
+                except Exception:
+                    pass
+                out.append({
+                    "id": f.stem,
+                    "project": pdir.name,
+                    "cwd": cwd or "",
+                    "title": ((title or label or "").strip() or "(无标题)")[:70],
+                    "last": datetime.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    "last_epoch": st.st_mtime,
+                    "size_kb": round(st.st_size / 1024, 1),
+                })
+    out.sort(key=lambda x: -x["last_epoch"])
+    if args.limit and args.limit > 0:
+        out = out[:args.limit]
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False))
+        return
+    print("可恢复会话(~/.claude/projects/,按最近活动倒序,共 %d):" % len(out))
+    print("%-11s %-30s %-38s %s" % ("最近", "项目(cwd编码)", "会话id", "标题"))
+    for s in out:
+        print("%-11s %-30s %-38s %s" % (s["last"][5:], s["project"][:30], s["id"], s["title"]))
+    print("\n恢复:在对应 cwd 跑  claude --resume <会话id>(UI 只能看+给命令,交互 resume 在终端)")
+
+
 def cmd_ask_user(args):
     """agent 把一条【待用户确认】项投进 UI 待办池(todos.json),不滚走。capture-only,无自动回路。
     结构与 WebUI todo_add 对齐(todos.json 是 list;status 用合法值"待办"让用户照常能在 UI 标完成);
@@ -1314,6 +1422,7 @@ def main():
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
+    p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)

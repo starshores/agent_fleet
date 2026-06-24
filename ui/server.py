@@ -947,6 +947,104 @@ def read_live(role=None, dispatch_id=None):
 
 
 # =============================================================
+#  历史用量 BI (P0)—— 使用分析 token_stats.py --json(全扫 ~3s)
+#  口径:已按 message.id 去重、Shanghai 日、cost=API 等价。stale-while-revalidate 缓存 5min,
+#  绝不阻塞请求(后台线程跑那 ~3s 全扫)。
+# =============================================================
+TOKEN_STATS = str(Path.home() / ".claude" / "projects" / "token_stats.py")
+_USAGE_TTL = 300.0
+_usage_cache = {"ts": 0.0, "data": None}
+_usage_lock = threading.Lock()
+_usage_refreshing = {"v": False}
+
+
+def _run_token_stats():
+    r = subprocess.run([sys.executable, TOKEN_STATS, "--json"],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300] or "token_stats 失败")
+    return json.loads(r.stdout.decode("utf-8", "replace"))
+
+
+def _refresh_usage():
+    try:
+        data = _run_token_stats()
+        with _usage_lock:
+            _usage_cache["data"] = data
+            _usage_cache["ts"] = time.time()
+    except Exception as e:
+        with _usage_lock:
+            if _usage_cache["data"] is None:
+                _usage_cache["data"] = {"error": str(e)}
+                _usage_cache["ts"] = time.time()
+    finally:
+        _usage_refreshing["v"] = False
+
+
+def get_usage(force=False):
+    with _usage_lock:
+        data = _usage_cache["data"]
+        age = time.time() - _usage_cache["ts"]
+    if data is None:
+        # 首次:同步跑一次(~3s);之后都走缓存 + 后台刷新
+        try:
+            data = _run_token_stats()
+        except Exception as e:
+            data = {"error": str(e)}
+        with _usage_lock:
+            _usage_cache["data"] = data
+            _usage_cache["ts"] = time.time()
+        return data
+    if (force or age >= _USAGE_TTL) and not _usage_refreshing["v"]:
+        _usage_refreshing["v"] = True
+        threading.Thread(target=_refresh_usage, daemon=True).start()
+    return data
+
+
+# =============================================================
+#  可恢复会话 (resume 看板)—— ab sessions --json(只读 jsonl 头部,轻量)
+#  只展示元数据(标题/项目/时间/id/大小),绝不读会话正文。缓存 60s。
+# =============================================================
+_SESS_TTL = 60.0
+_sess_cache = {"ts": 0.0, "data": None}
+_sess_lock = threading.Lock()
+# agent 相关 cwd 片段
+_AGENT_CWD_HINTS = ("agent_fleet",)
+
+
+def read_sessions():
+    with _sess_lock:
+        if _sess_cache["data"] is not None and (time.time() - _sess_cache["ts"]) < _SESS_TTL:
+            return _sess_cache["data"]
+    try:
+        r = subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "sessions", "--json"],
+                           capture_output=True, timeout=30)
+        raw = r.stdout.decode("utf-8", "replace")  # 防孤 surrogate:replace 落地为 U+FFFD
+        rows = json.loads(raw) if raw.strip() else []
+    except Exception as e:
+        return {"ok": False, "error": str(e), "sessions": []}
+    out = []
+    for s in rows:
+        cwd = s.get("cwd") or ""
+        proj = s.get("project") or ""
+        is_agent = any(h in cwd or h in proj for h in _AGENT_CWD_HINTS)
+        out.append({
+            "id": s.get("id"),
+            "project": proj,
+            "cwd": cwd,
+            "title": s.get("title") or "",
+            "last": s.get("last") or "",
+            "size_kb": s.get("size_kb"),
+            "is_agent": is_agent,
+        })
+    res = {"ok": True, "sessions": out, "agent_count": sum(1 for x in out if x["is_agent"]), "total": len(out)}
+    with _sess_lock:
+        _sess_cache["data"] = res
+        _sess_cache["ts"] = time.time()
+    return res
+
+
+# =============================================================
 #  HTTP
 # =============================================================
 INDEX_HTML = r"""<!doctype html>
@@ -1053,6 +1151,33 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .ctrl select{width:auto;margin:0;padding:4px 8px}
 .flash{animation:flash 1s ease}
 @keyframes flash{0%{background:rgba(91,157,255,.25)}100%{background:transparent}}
+/* 历史用量 BI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 16px}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.kpi .k{font-size:11px;color:var(--dim)}
+.kpi .v{font-size:20px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .v.good{color:var(--live)} .kpi .v.acc{color:var(--accent)} .kpi .v.warn{color:var(--warn)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 4px}
+@media(max-width:880px){.grid2{grid-template-columns:1fr}}
+.uchart-cap{font-size:12px;color:var(--dim);padding:4px 16px 8px;font-weight:600}
+canvas{display:block;width:100%}
+.bars{padding:2px 16px 12px}
+.bar-row{display:grid;grid-template-columns:130px 1fr 96px;gap:10px;align-items:center;margin:7px 0;font-size:12.5px}
+.bar-row .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{height:15px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#3b6fb0,var(--accent))}
+.bar-row .num{text-align:right;font-family:var(--mono);font-size:12px;color:var(--dim)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);padding:6px 16px 14px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+/* 可恢复会话 */
+.sess-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:6px 16px;padding:9px 12px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.sess-row.agent{border-left:3px solid var(--accent)}
+.sess-main{min-width:0}
+.sess-title{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess-meta{font-size:11.5px;color:var(--dim);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap}
+.sess-meta .mono{font-size:11px}
+.sess-row .copy{white-space:nowrap}
 /* 待办池 TODO Pool */
 .todo-card{margin:8px 16px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;border-left:3px solid var(--line)}
 .todo-card.pri-hi{border-left-color:var(--dead)}
@@ -1249,6 +1374,41 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     </div>
     <div class="live-meta"><span id="liveDot" class="live-dot"></span><span id="liveStat">未选 role</span></div>
     <pre id="liveBox" class="livebox">（选一个 role 看它的 live.log）</pre>
+  </section>
+
+  <!-- 历史用量 BI (P0) -->
+  <section>
+    <div class="sec-h">📊 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · API 等价成本 · Shanghai 日</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="usageMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="usageRefresh">刷新</button>
+    </div>
+    <div class="kpis" id="usageKpis"></div>
+    <div class="grid2">
+      <div>
+        <div class="uchart-cap">日 cost 趋势 <span class="muted" id="trendPeak"></span></div>
+        <canvas id="uTrend" height="220"></canvas>
+      </div>
+      <div>
+        <div class="uchart-cap">项目费用 Top N <span class="muted">(全历史)</span></div>
+        <div class="bars" id="uProj"></div>
+      </div>
+    </div>
+    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">模型迁移进度 <span class="muted">(按月堆叠 · 标 4.8 占比)</span></div>
+    <canvas id="uModels" height="200"></canvas>
+    <div class="legend" id="uModelLegend"></div>
+  </section>
+
+  <!-- 可恢复会话 (resume) -->
+  <section>
+    <div class="sec-h">🗂 可恢复会话 <span class="sub">Claude Code 历史会话 · <span class="mono">ab sessions</span> · 仅元数据</span>
+      <span class="spacer" style="flex:1"></span>
+      <label class="chk" style="margin:0"><input type="checkbox" id="sessAll"> 显示全部(含个人会话)</label>
+      <button class="btn ghost mini" id="sessRefresh">刷新</button>
+    </div>
+    <div class="hint" style="padding:8px 16px 0;color:var(--dim)">⚠ WebUI 跑不了交互式 resume。点【复制】拿到 <span class="mono">claude --resume &lt;id&gt;</span>,到终端里执行才能续会话。</div>
+    <div id="sessCount" class="muted" style="font-size:11.5px;padding:6px 16px 0"></div>
+    <div id="sessBox" style="padding:8px 0;max-height:560px;overflow:auto"></div>
   </section>
 </main>
 
@@ -1669,6 +1829,132 @@ function renderBI(bi){
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
+// ===== 历史用量 BI (P0) =====
+function _fit(cv,cssH){
+  const dpr=window.devicePixelRatio||1;
+  const cssW=cv.clientWidth||(cv.parentElement&&cv.parentElement.clientWidth)||600;
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr); cv.style.height=cssH+'px';
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w:cssW,h:cssH};
+}
+const UC={bg:'#0f1115',line:'#2a2f3a',dim:'#9aa3b2',acc:'#5b9dff',live:'#3ecf8e',warn:'#f5a623',dead:'#ff5d5d',idle:'#7d8aa0',none:'#5a6172'};
+function usd(n){ return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function modelColor(m){ if(m.indexOf('opus-4-8')>=0)return UC.acc; if(m.indexOf('opus-4-7')>=0)return UC.idle; if(m.indexOf('haiku')>=0)return UC.live; return UC.none; }
+function modelShort(m){ return m.replace('claude-','').replace('-20251001',''); }
+function projShort(p){ return p ? p.replace(/^([A-Za-z])--/, '$1:/').replace(/-/g, '/') : ''; }
+
+function renderUsage(d){
+  const kp=document.getElementById('usageKpis');
+  if(!d || d.error){ kp.innerHTML='<div class="muted" style="padding:6px 12px">用量数据读取失败:'+esc(d&&d.error||'?')+'</div>'; return; }
+  const t=d.totals||{};
+  document.getElementById('usageMeta').textContent='刷新于 '+esc(d.as_of||'')+' · 扫描 '+(d.meta?d.meta.files_seen:'?')+' 文件 / '+(d.scan_seconds||'?')+'s';
+  kp.innerHTML=[
+    ['API 等价成本',usd(t.cost_usd),''],
+    ['API calls(去重)',fmtN(t.calls),'acc'],
+    ['cache 命中', t.cache_read&&t.output?Math.round(t.cache_read/(t.cache_read+t.input+t.output)*100)+'%':'–','good'],
+    ['去重剔除', d.meta&&d.meta.msgs_with_usage?Math.round(d.meta.dup_skipped/d.meta.msgs_with_usage*100)+'%':'–','warn'],
+    ['活跃天(30d)', (d.daily||[]).length,''],
+    ['项目数', (d.by_project||[]).length,''],
+  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+
+  // 日 cost 趋势
+  drawTrend(d.daily||[]);
+  // 项目 Top N
+  const projs=(d.by_project||[]).slice(0,8); const max=projs.length?projs[0].cost_usd:1;
+  document.getElementById('uProj').innerHTML=projs.map(p=>{
+    const pct=Math.max(2,p.cost_usd/max*100).toFixed(1);
+    return `<div class="bar-row"><span class="lbl" title="${esc(p.project)}">${esc(projShort(p.project))}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
+      <span class="num">${usd(p.cost_usd)}</span></div>`;
+  }).join('')||'<div class="muted" style="padding:6px 0">无数据</div>';
+  // 模型迁移
+  drawModels(d.by_month_model||[]);
+}
+function drawTrend(daily){
+  const cv=document.getElementById('uTrend'); const f=_fit(cv,220); const ctx=f.ctx,w=f.w,h=f.h;
+  const pts=daily.filter(x=>x.cost_usd!=null);
+  const padL=48,padR=14,padT=14,padB=22, gw=w-padL-padR, gh=h-padT-padB;
+  if(!pts.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); return; }
+  const maxV=Math.max.apply(null,pts.map(p=>p.cost_usd))*1.12||1;
+  const X=i=>padL+gw*(pts.length<2?0.5:i/(pts.length-1)), Y=v=>padT+gh*(1-v/maxV);
+  ctx.strokeStyle=UC.line;ctx.fillStyle=UC.dim;ctx.lineWidth=1;ctx.font='10px Consolas';
+  for(let g=0;g<=4;g++){const gv=maxV*g/4,yy=Y(gv);ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(w-padR,yy);ctx.stroke();ctx.fillText('$'+Math.round(gv),4,yy+3);}
+  // 面积+线
+  const grad=ctx.createLinearGradient(0,padT,0,padT+gh);grad.addColorStop(0,'rgba(91,157,255,.28)');grad.addColorStop(1,'rgba(91,157,255,0)');
+  ctx.beginPath();ctx.moveTo(X(0),Y(pts[0].cost_usd));pts.forEach((p,i)=>ctx.lineTo(X(i),Y(p.cost_usd)));
+  ctx.lineTo(X(pts.length-1),padT+gh);ctx.lineTo(X(0),padT+gh);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.moveTo(X(0),Y(pts[0].cost_usd));pts.forEach((p,i)=>ctx.lineTo(X(i),Y(p.cost_usd)));
+  ctx.strokeStyle=UC.acc;ctx.lineWidth=2;ctx.stroke();
+  // 峰值标注
+  let pk=0;pts.forEach((p,i)=>{if(p.cost_usd>pts[pk].cost_usd)pk=i;});
+  pts.forEach((p,i)=>{ctx.beginPath();ctx.arc(X(i),Y(p.cost_usd),i===pk?4:2,0,7);ctx.fillStyle=i===pk?UC.dead:UC.acc;ctx.fill();});
+  ctx.fillStyle=UC.dim;ctx.fillText(pts[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(pts[pts.length-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
+  document.getElementById('trendPeak').textContent='峰值 '+usd(pts[pk].cost_usd)+' · '+pts[pk].date.slice(5);
+}
+function drawModels(bmm){
+  const cv=document.getElementById('uModels'); const f=_fit(cv,200); const ctx=f.ctx,w=f.w,h=f.h;
+  const rows=bmm.filter(r=>r.model.indexOf('synthetic')<0);
+  const months=[...new Set(rows.map(r=>r.month))].sort();
+  const models=[...new Set(rows.map(r=>r.model))];
+  if(!months.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',20,30); return; }
+  const padL=18,padR=14,padT=14,padB=26, gw=w-padL-padR, gh=h-padT-padB;
+  const byMM={}; rows.forEach(r=>{byMM[r.month+'|'+r.model]=r.calls;});
+  const tot=months.map(m=>models.reduce((s,md)=>s+(byMM[m+'|'+md]||0),0));
+  const maxV=Math.max.apply(null,tot)*1.12||1; const bw=gw/months.length*0.5;
+  ctx.font='10px Consolas';ctx.textAlign='center';
+  months.forEach((m,mi)=>{
+    const cx=padL+gw*(mi+0.5)/months.length-bw/2; let yCur=padT+gh; let t=tot[mi];
+    models.forEach(md=>{const v=byMM[m+'|'+md]||0; if(!v)return; const bh=gh*v/maxV; yCur-=bh; ctx.fillStyle=modelColor(md); ctx.fillRect(cx,yCur,bw,bh);});
+    ctx.fillStyle=UC.dim;ctx.fillText(m.slice(2),cx+bw/2,h-10);
+    const v48=models.filter(md=>md.indexOf('opus-4-8')>=0).reduce((s,md)=>s+(byMM[m+'|'+md]||0),0);
+    if(t){ctx.fillStyle=UC.acc;ctx.font='bold 10px Consolas';ctx.fillText(Math.round(v48/t*100)+'%',cx+bw/2,yCur-5);ctx.font='10px Consolas';}
+  });
+  ctx.textAlign='left';
+  document.getElementById('uModelLegend').innerHTML=models.map(md=>`<span><i style="background:${modelColor(md)}"></i>${esc(modelShort(md))}</span>`).join('');
+}
+async function loadUsage(force){
+  const kp=document.getElementById('usageKpis'); if(!kp.innerHTML) kp.innerHTML='<div class="muted" style="padding:6px 12px">加载中（全扫 ~3s）…</div>';
+  try{ const r=await fetch('/api/usage'+(force?'?fresh=1':'')); renderUsage(await r.json()); }
+  catch(e){ kp.innerHTML='<div class="muted" style="padding:6px 12px">加载失败:'+esc(e)+'</div>'; }
+}
+
+// ===== 可恢复会话 =====
+let _sessData=null;
+function renderSessions(){
+  const box=document.getElementById('sessBox'); if(!_sessData) return;
+  if(!_sessData.ok){ box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(_sessData.error||'?')+'</div>'; return; }
+  const all=document.getElementById('sessAll').checked;
+  let list=_sessData.sessions.slice(); if(!all) list=list.filter(s=>s.is_agent);
+  document.getElementById('sessCount').textContent='显示 '+list.length+' 条'+(all?'(全部)':' · agent 相关 '+_sessData.agent_count+' / 共 '+_sessData.total);
+  if(!list.length){ box.innerHTML='<div class="muted" style="padding:8px 16px">'+(all?'（无会话）':'（无 agent 相关会话,勾选「显示全部」看个人会话 '+_sessData.total+' 条）')+'</div>'; return; }
+  box.innerHTML=list.map(s=>`<div class="sess-row ${s.is_agent?'agent':''}">
+    <div class="sess-main">
+      <div class="sess-title" title="${esc(s.title)}">${esc(s.title||'(无标题)')}</div>
+      <div class="sess-meta">
+        <span title="${esc(s.cwd)}">${esc(projShort(s.project||s.cwd))}</span>
+        <span>最近 ${esc(s.last)}</span>
+        ${s.size_kb!=null?`<span>${esc(''+s.size_kb)}KB</span>`:''}
+        <span class="mono">${esc((s.id||'').slice(0,8))}…</span>
+      </div>
+    </div>
+    <button class="btn mini copy" onclick="copyResume('${esc(s.id)}',this)">复制 resume</button>
+  </div>`).join('');
+}
+function copyResume(id,btn){
+  const cmd='claude --resume '+id;
+  const done=()=>{const o=btn.textContent;btn.textContent='已复制✓';setTimeout(()=>btn.textContent=o,1500);toast('已复制:'+cmd);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(cmd).then(done,()=>fallback()); }
+  else fallback();
+  function fallback(){const ta=document.createElement('textarea');ta.value=cmd;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(e){toast('复制失败,手动复制:'+cmd,true);}document.body.removeChild(ta);}
+}
+async function loadSessions(){
+  const box=document.getElementById('sessBox'); if(!box.innerHTML) box.innerHTML='<div class="muted" style="padding:8px 16px">加载中…</div>';
+  try{ const r=await fetch('/api/sessions'); _sessData=await r.json(); renderSessions(); }
+  catch(e){ box.innerHTML='<div class="muted" style="padding:8px 16px">加载失败:'+esc(e)+'</div>'; }
+}
+document.getElementById('usageRefresh').onclick=()=>loadUsage(true);
+document.getElementById('sessRefresh').onclick=()=>loadSessions();
+document.getElementById('sessAll').onchange=renderSessions;
+
 // 首屏顺序很关键:/api/bi 与 /api/state 都吃 psutil 进程扫,ThreadingHTTPServer 在 GIL 下
 // 无法真正并行跑这两段 CPU 密集逻辑 —— 若并发,/api/state 的冷启全进程扫(~2s,机器忙时更久)
 // 会把本应 ~220ms 的 /api/bi 一起拖到数秒。故【先让 /api/bi 跑完再发 /api/state】:
@@ -1676,6 +1962,8 @@ async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.j
 // 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
 // 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
 loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
+// 历史用量(全扫 ~3s,缓存5min)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
+setTimeout(loadUsage, 800); setTimeout(loadSessions, 1200);
 </script>
 </body></html>"""
 
@@ -1731,6 +2019,12 @@ class Handler(BaseHTTPRequestHandler):
                                       dispatch_id=(q.get("id", [None])[0])))
         elif path == "/api/bi":
             self._send(200, build_bi())
+        elif path == "/api/usage":
+            q = parse_qs(u.query)
+            fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
+            self._send(200, get_usage(force=fresh))
+        elif path == "/api/sessions":
+            self._send(200, read_sessions())
         else:
             self._send(404, {"error": "not found"})
 
