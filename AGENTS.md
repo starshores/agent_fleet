@@ -59,6 +59,7 @@ ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一
 ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}
 ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
 ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
+ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
 ```
 
 ### 两类执行体(2026-06-23)

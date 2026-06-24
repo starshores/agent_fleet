@@ -31,6 +31,7 @@
 - 发消息 / 派子任务:`send --to Y --from X`;要**阻塞等应答**用 `request`。
 - 回填:`done --id <id> --role X --result "..." [--status ok|error]`。
 - **notice**:收到 `kind="notice"` 是别人给你的**完成通知**——读它 `notice_of` 指向的 `<X>/done/<id>.json` 取完整结果,然后 `done` 掉该 notice(读完即弃,**勿当任务执行**)。
+- **要用户确认/拍板的事**:别只在对话里说(会滚走漏掉)——用 `ab ask-user --from X --title "<问题>" --detail "<上下文/选项>"` 投进 UI 待办池,用户在那儿统一处理。
 
 ### cap:self-wake — 事件自醒(交互会话/协调位)
 - 挂后台 `wait --role X --timeout 3600`:有人发消息/派活 → 它完成 → 你被唤起处理 → **处理完必须【再挂一个】**。不重挂 = 掉线。

@@ -1228,6 +1228,40 @@ def cmd_edge_release(args):
     print(json.dumps({"released": True, "by": who}, ensure_ascii=False))
 
 
+def cmd_ask_user(args):
+    """agent 把一条【待用户确认】项投进 UI 待办池(todos.json),不滚走。capture-only,无自动回路。
+    结构与 WebUI todo_add 对齐(todos.json 是 list;status 用合法值"待办"让用户照常能在 UI 标完成);
+    额外带 confirm_from/ref 供将来回路。source 标"确认·<谁问的>"便于 UI 筛选。"""
+    f = BUS / "todos.json"
+    try:
+        items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    tid = "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex())
+    prio = args.priority if args.priority in ("高", "中", "低") else "中"
+    item = {
+        "id": tid,
+        "title": (args.title or "").strip() or "(待确认·无标题)",
+        "detail": (args.detail or "").strip(),
+        "source": "确认·" + frm,
+        "priority": prio,
+        "status": "待办",
+        "deadline": (args.deadline or "").strip(),
+        "created": _now(), "updated": _now(),
+        "task_id": None, "dispatched_to": None,
+        "confirm_from": frm, "ref": args.ref or None,
+    }
+    items.append(item)
+    tmp = f.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, f)
+    _audit("ask_user", id=tid, frm=frm, title=item["title"][:40])
+    print("已投入待办池(待用户确认):《%s》[%s] from %s" % (item["title"], tid, frm))
+
+
 def _load_caps_pool():
     f = BUS / "capabilities.json"
     if f.exists():
@@ -1279,6 +1313,7 @@ def main():
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
+    p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)
