@@ -1446,7 +1446,7 @@ async function load(role){
   try{
     const rr=role||document.getElementById('replyRole').value||'Master';
     const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr));
-    state=await res.json(); render(); loadBI();
+    state=await res.json(); render();
     document.getElementById('updT').classList.remove('flash');void document.getElementById('updT').offsetWidth;
     document.getElementById('updT').classList.add('flash');
   }catch(e){ console.error(e); }
@@ -1604,7 +1604,13 @@ function renderBI(bi){
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
-load(); connectSSE(); setPoll(); loadBI(); setInterval(loadBI, 10000);
+// 首屏顺序很关键:/api/bi 与 /api/state 都吃 psutil 进程扫,ThreadingHTTPServer 在 GIL 下
+// 无法真正并行跑这两段 CPU 密集逻辑 —— 若并发,/api/state 的冷启全进程扫(~2s,机器忙时更久)
+// 会把本应 ~220ms 的 /api/bi 一起拖到数秒。故【先让 /api/bi 跑完再发 /api/state】:
+// BI 表格先出(首屏快),随后 /api/state 慢扫只影响舰队表(本就慢,晚 ~220ms 无感)。
+// 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
+// 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
+loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
 </script>
 </body></html>"""
 
@@ -1763,6 +1769,20 @@ def main():
     start_status_pusher(5)            # daemon→agent 定时通信:5s 刷新 fleet_status.json
     if not args.no_supervise:
         start_supervisor()
+    # 预热缓存(后台线程,不阻塞启动):
+    #  · build_bi() 跑一遍 → 填充 _proc_cache(psutil.Process 对象 + cpu_percent 基线),
+    #    使【首个真实 /api/bi】~220ms 而非冷启 ~4.5s(_proc_cache 无 TTL,长期受益,首屏 BI 关键)。
+    #  · compute_fleet_cached() → 首个 /api/state 若在 3s TTL 内命中热缓存(快速重连时受益)。
+    def _prewarm():
+        try:
+            build_bi()
+        except Exception:
+            pass
+        try:
+            compute_fleet_cached()
+        except Exception:
+            pass
+    threading.Thread(target=_prewarm, daemon=True).start()
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     srv.daemon_threads = True
     url = "http://%s:%d/" % (args.host, args.port)

@@ -798,7 +798,8 @@ def cmd_tag(args):
 
 
 def cmd_hello(args):
-    """会话自报身份:在本 tab 里跑一次,声明"我是 role X"。"""
+    """会话自报身份:在本 tab 里跑一次,声明"我是 role X"。
+    顺带打印【事件自醒 onboarding】——新 agent 一注册就知道怎么挂自醒,不必去翻 MasterAgent 的 AGENTS.md。"""
     role = args.role
     _role_dir(role)
     a = _load_agents()
@@ -807,6 +808,13 @@ def cmd_hello(args):
     _touch_presence(role, "idle")
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
+    abpy = os.path.abspath(__file__)
+    print("\n—— 事件自醒 onboarding(可对话又不漏消息;交互 tab 建议挂上)——")
+    print("把下面这条当【后台任务】跑(别前台阻塞):有人给你发消息/派活时它就完成 → 你的会话被自动唤起去处理:")
+    print('  python "%s" wait --role %s --timeout 3600' % (abpy, role))
+    print("【铁律】每次被唤起、处理完,必须【再挂一个】同样的 wait —— 不重挂就掉线,之后的消息收不到。")
+    print('收到 kind="notice" 的完成通知:读它 notice_of 指向的 %s/done/<id>.json 取完整结果,再 done 掉该 notice(读完即弃,勿当任务执行)。' % role)
+    print("不挂也行(那只在你主动 wait/serve 时收消息);挂了才能边干别的边自动收,无需 /loop 锁死对话。详见 agent_fleet/AGENTS.md。")
 
 
 def cmd_who(args):
