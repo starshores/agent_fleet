@@ -306,6 +306,50 @@ def start_fleet_refresher(interval=20):
 
 
 # =============================================================
+#  bus 健康徽标 —— 吃 `agentbus health --json`(内部 psutil 全扫 ~1-2s)。
+#  同 fleet:绝不在请求线程现扫 —— 后台线程跑子进程刷新缓存,/api/health 只读缓存。
+# =============================================================
+_health_cache = {"ts": 0.0, "data": None}
+_health_lock = threading.Lock()
+
+
+def _refresh_health():
+    try:
+        r = subprocess.run([_PYEXE, str(ABDIR / "agentbus.py"), "health", "--json"],
+                           capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+        out = r.stdout.decode("utf-8", "replace").strip()
+        if r.returncode == 0 and out:
+            data = json.loads(out)
+            with _health_lock:
+                _health_cache["data"] = data
+                _health_cache["ts"] = time.time()
+    except Exception:
+        pass   # 失败保留上次缓存,下个 tick 再试(绝不退回请求线程现扫)
+
+
+def get_health():
+    with _health_lock:
+        return _health_cache["data"]
+
+
+def start_health_refresher(interval=25):
+    """唯一的健康刷新者:后台线程每 interval 秒跑一次子进程 `health --json` 刷新缓存。
+    健康态不需秒级,25s 足够;子进程独立 GIL,不饿死请求。首轮立即跑。"""
+    stop = threading.Event()
+
+    def loop():
+        while True:
+            _refresh_health()
+            if stop.wait(interval):
+                break
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print("[health] 后台健康刷新线程已启动,间隔 %ds(子进程 health --json,请求零扫描)" % interval)
+    return t
+
+
+# =============================================================
 #  BI 资源消耗模块 —— token / 成本(metrics.jsonl)+ 系统资源(psutil)
 # =============================================================
 _proc_cache = {}   # pid -> psutil.Process(复用,使 cpu_percent 能算两次调用间增量)
@@ -1377,6 +1421,21 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .gconfirm{font-size:12px;font-weight:700;padding:3px 11px;border-radius:8px;cursor:pointer;
   background:rgba(154,123,255,.2);color:#c9b3ff;border:1px solid rgba(154,123,255,.6)}
 .gconfirm:hover{background:rgba(154,123,255,.34)}
+/* bus 健康徽标 */
+.hwrap{position:relative;display:inline-block}
+.hbadge{font-size:12px;font-weight:700;padding:3px 11px;border-radius:8px;cursor:pointer;border:1px solid;white-space:nowrap}
+.hbadge.ok{background:rgba(60,200,120,.16);color:#7ee0a6;border-color:rgba(60,200,120,.55)}
+.hbadge.warn{background:rgba(240,190,70,.16);color:#f0cf7a;border-color:rgba(240,190,70,.6)}
+.hbadge.loading{background:var(--bg);color:var(--muted);border-color:var(--line)}
+.hpanel{position:absolute;top:30px;left:0;z-index:30;width:360px;max-height:70vh;overflow:auto;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  box-shadow:0 10px 34px rgba(0,0,0,.5);font-size:12px;line-height:1.5;cursor:default}
+.hpanel h4{margin:0 0 6px;font-size:12px;color:var(--txt)}
+.hpanel .hwarn{color:#f0cf7a;background:rgba(240,190,70,.1);border-radius:5px;padding:3px 8px;margin:3px 0}
+.hpanel .hblk{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line)}
+.hpanel .hblk b{color:var(--txt);font-weight:600}
+.hpanel .hk{color:var(--muted)}
+.hpanel .hbad{color:var(--dead)} .hpanel .hgood{color:#7ee0a6}
 /* 历史用量 BI */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 16px}
 .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
@@ -1490,6 +1549,10 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   <span class="pill"><span id="connDot" class="dot"></span><span id="connTxt">连接中…</span></span>
   <span class="pill">在跑 claude <b id="aliveN" style="color:var(--txt)">–</b> · fleet <b id="fleetN" style="color:var(--txt)">–</b></span>
   <span id="gConfirm" class="gconfirm" style="display:none" title="点击跳到待办池查看待确认">🙋 <b>0</b> 项待确认</span>
+  <span id="healthWrap" class="hwrap">
+    <span id="healthBadge" class="hbadge loading" title="bus 健康(点击展开)">🩺 …</span>
+    <div id="healthPanel" class="hpanel" style="display:none"></div>
+  </span>
   <span class="spacer"></span>
   <span class="ctrl">兜底轮询
     <select id="pollSel">
@@ -2462,6 +2525,48 @@ document.querySelectorAll('#tabbar .tab').forEach(b=>b.onclick=()=>showTab(b.dat
 document.getElementById('gConfirm').onclick=()=>{ showTab('tasks');
   const tp=[...document.querySelectorAll('main > [data-tab="tasks"]')].find(x=>x.querySelector('#todoBox'));
   if(tp) setTimeout(()=>tp.scrollIntoView({behavior:'smooth',block:'start'}),60); };
+
+// 🩺 bus 健康徽标 —— 吃 /api/health(后台子进程刷新的缓存,请求零扫描),25s 轮询一次
+let _health=null;
+function hRow(k,v,bad){ return '<div class="hblk"><span class="hk">'+k+'</span><b class="'+(bad?'hbad':'')+'">'+v+'</b></div>'; }
+function renderHealth(){
+  const b=document.getElementById('healthBadge'); const pn=document.getElementById('healthPanel'); if(!b) return;
+  const d=_health;
+  if(!d || d.loading){ b.className='hbadge loading'; b.textContent='🩺 …'; b.title='健康数据加载中（后台扫描）'; return; }
+  const warns=d.warns||[];
+  if(d.healthy){ b.className='hbadge ok'; b.textContent='🩺 健康'; b.title='bus 全绿'; }
+  else{ b.className='hbadge warn'; b.textContent='🩺 ⚠ '+warns.length+' 项'; b.title=warns.join(' / '); }
+  // 展开明细(六块)
+  const sw=d.selfwake||{}, q=d.queues||{}, ls=d.loss||{}, fl=d.fleet||{}, w=d.webui||{};
+  const el=d.edge_lock;
+  let h='<h4>🩺 bus 健康 · '+esc(d.as_of||'')+'</h4>';
+  h+= warns.length? warns.map(x=>'<div class="hwarn">⚠ '+esc(x)+'</div>').join('')
+                  : '<div class="hblk hgood"><b>✓ 全绿,无警告</b></div>';
+  h+=hRow('自醒 armed/stale/off', (sw.armed||0)+' / '+(sw.stale||0)+' / '+(sw.off||0), (sw.stale||0)>0)
+    + ((sw.stale_roles&&sw.stale_roles.length)?'<div class="hk" style="padding-left:8px">掉线:'+esc(sw.stale_roles.join('、'))+'</div>':'');
+  h+=hRow('队列 in/proc/held/failed', (q.inbox||0)+' / '+(q.processing||0)+' / '+(q.held||0)+' / '+(q.failed||0), (q.held||0)+(q.failed||0)>0);
+  h+=hRow('消息丢失 孤儿/卡死/久滞', (ls.orphans||0)+' / '+((ls.stuck||[]).length)+' / '+((ls.stale_inbox||[]).length), ((ls.orphans||0)+(ls.stuck||[]).length+(ls.stale_inbox||[]).length)>0);
+  (ls.stuck||[]).forEach(s=>{ h+='<div class="hk" style="padding-left:8px">卡死 '+esc(s.role)+' · '+esc(s.title||s.id||'')+' ('+esc(''+s.age_min)+'min)</div>'; });
+  (ls.stale_inbox||[]).forEach(s=>{ h+='<div class="hk" style="padding-left:8px">久滞 '+esc(s.role)+' ('+esc(''+s.age_min)+'min)</div>'; });
+  h+=hRow('daemon 期望/在跑', (fl.alive||0)+' / '+(fl.expected||0), (fl.dead&&fl.dead.length)>0 || (fl.orphans&&fl.orphans.length)>0);
+  if(fl.dead&&fl.dead.length) h+='<div class="hk hbad" style="padding-left:8px">已死:'+esc(fl.dead.join('、'))+'</div>';
+  h+=hRow('WebUI owner pid / 陈旧实例', (w.owner_pid||'?')+' / '+(w.stale_dupes||0), (w.stale_dupes||0)>0);
+  h+=hRow('Edge 调试锁', el?('被占:'+esc(el.who||'?')):'空闲', !!el);
+  pn.innerHTML=h;
+}
+async function loadHealth(){
+  try{ const r=await fetch('/api/health'); _health=await r.json(); }catch(e){ /* 保留上次 */ }
+  renderHealth();
+}
+document.getElementById('healthBadge').onclick=(e)=>{
+  e.stopPropagation();
+  const pn=document.getElementById('healthPanel');
+  pn.style.display = pn.style.display==='none' ? 'block' : 'none';
+};
+document.addEventListener('click',(e)=>{ // 点外部收起
+  const wrap=document.getElementById('healthWrap');
+  if(wrap && !wrap.contains(e.target)) document.getElementById('healthPanel').style.display='none';
+});
 window.addEventListener('resize',syncTabTop);
 syncTabTop(); showTab(curTab);
 
@@ -2474,6 +2579,7 @@ syncTabTop(); showTab(curTab);
 loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
 // 历史用量(全扫 ~3s,缓存5min)+ 派工效率(metrics.jsonl 轻量,缓存20s)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
 setTimeout(loadUsage, 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
+loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 </script>
 </body></html>"""
 
@@ -2518,6 +2624,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, build_state(role, fresh=fresh))
         elif path == "/api/events":
             self._sse()
+        elif path == "/api/health":
+            # 只读后台缓存(子进程刷新);冷启未就绪回 loading 占位,绝不现扫
+            d = get_health()
+            self._send(200, d if d is not None else {"loading": True})
         elif path == "/api/reap":
             # 孤儿巡检:只读 dry-run,复用 agentbus reap --dry-run
             self._send(200, reap_dryrun())
@@ -2641,6 +2751,7 @@ def main():
 
     start_watcher()
     start_fleet_refresher(20)         # 唯一舰队刷新者:20s 子进程扫描刷新 _fleet_cache(请求路径零扫描)
+    start_health_refresher(25)        # 唯一健康刷新者:25s 子进程 health --json 刷新 _health_cache(请求路径零扫描)
     start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()
