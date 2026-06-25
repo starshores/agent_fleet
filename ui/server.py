@@ -203,6 +203,8 @@ def compute_fleet():
         "unknown": unknown,
         "alive_count": len(alive),
         "fleet_count": len(claimed),
+        # 原始扫描结果随缓存带出:让 fleet_status 推送复用,避免它在主进程内再扫一次(GIL)。
+        "_scan": {"alive": sorted(alive), "wait_roles": sorted(sw_roles)},
     }
 
 
@@ -218,9 +220,49 @@ _fleet_lock = threading.Lock()
 _fleet_refreshing = {"v": False}
 
 
+# 把 ~2s 的全进程扫描搬到【子进程】跑(独立 GIL)——否则它在 server 进程内的后台线程里
+# 霸占 GIL 2s,正在服务的 /api/state 请求线程被饿死 → 偶发 2-4s → 前端超时空白。
+# 子进程 import 本模块(main() 在 __main__ 卫下,import 不会起服务),调 compute_fleet 输出 JSON。
+_FLEET_SUBPROC = (
+    "import sys,json;"
+    "sys.path.insert(0, r'%s');"
+    "sys.stdout.reconfigure(encoding='utf-8', errors='replace');"
+    "import server;"
+    "print(json.dumps(server.compute_fleet(), ensure_ascii=False))"
+) % os.path.dirname(os.path.abspath(__file__))
+
+# 关键:server 由 pythonw.exe 启动(WMI 常驻),pythonw 丢弃 stdout → 子进程 print 抓不到 →
+# 误判失败 → 退回线程内同步扫描 → 2s GIL 饿死请求(就是 /api/state 冷/过期时卡 2-5s 的真因)。
+# 故子进程显式用 python.exe(有 stdout 管道),不要用 sys.executable(可能是 pythonw)。
+_PYEXE = os.path.join(os.path.dirname(sys.executable), "python.exe")
+if not os.path.exists(_PYEXE):
+    _PYEXE = sys.executable
+
+# Windows:用 python.exe(有 stdout 管道)起子进程会弹控制台窗口 → 刷屏用户。
+# CREATE_NO_WINDOW 隐藏控制台,stdout 仍走 capture_output 的管道(两者兼得)。
+# 非 Windows 无此标志 → getattr 兜底为 0(无影响)。所有 subprocess 统一带上。
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _refresh_fleet():
     try:
-        data = compute_fleet()
+        data = None
+        try:
+            r = subprocess.run([_PYEXE, "-c", _FLEET_SUBPROC],
+                               capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+            out = r.stdout.decode("utf-8", "replace").strip()
+            if r.returncode == 0 and out:
+                data = json.loads(out)
+        except Exception:
+            data = None
+        # 子进程失败:只有【缓存还完全空】时才退回线程内算一次(否则保留 stale、下个 tick 再试),
+        # 避免在请求繁忙期反复在主进程做 2s 扫描而饿死请求线程。
+        if data is None:
+            with _fleet_lock:
+                have = _fleet_cache["data"] is not None
+            if have:
+                return   # 保留上次 stale,不在主进程扫
+            data = compute_fleet()   # 冷启且子进程失败的最后兜底(极少)
         with _fleet_lock:
             _fleet_cache["data"] = data
             _fleet_cache["ts"] = time.time()
@@ -231,20 +273,36 @@ def _refresh_fleet():
 
 
 def compute_fleet_cached(force=False):
+    # 请求线程【只读缓存,永不触发刷新】——连 force 也不触发。
+    # 关键教训:即便刷新走子进程,发起刷新的【那条请求线程】后续在 build_state 里的磁盘读
+    # 会和子进程启动(import server + 2s 扫描的 CPU)抢资源 → 那一条冷请求被拖到 ~1.7s。
+    # 故保活完全交给 _fleet_refresher 后台线程(它阻塞 ~4s 不影响任何请求);请求路径零扫描、零 spawn。
     with _fleet_lock:
         data = _fleet_cache["data"]
-        age = time.time() - _fleet_cache["ts"]
     if data is None:
-        # 首次无缓存:只能同步算一次(启动时已 prewarm,正常用户请求不会走到这)
-        data = compute_fleet()
-        with _fleet_lock:
-            _fleet_cache["data"] = data
-            _fleet_cache["ts"] = time.time()
-        return data
-    if (force or age >= _FLEET_TTL) and not _fleet_refreshing["v"]:
-        _fleet_refreshing["v"] = True
-        threading.Thread(target=_refresh_fleet, daemon=True).start()
-    return data  # 立即返回(可能 stale ≤TTL+扫描耗时),后台刷新,绝不阻塞
+        # 冷启:刷新线程还没填上 → 立即回 loading 占位(前端保留上次/显示加载中),不阻塞
+        return {"psutil": ab.psutil is not None, "roles": [], "tagged": [],
+                "unknown": [], "alive_count": 0, "fleet_count": 0, "loading": True}
+    return data  # 立即返回缓存(刷新线程保证 ≤interval 新鲜),绝不阻塞
+
+
+def start_fleet_refresher(interval=20):
+    """唯一的舰队刷新者:后台线程,每 interval 秒跑一次子进程扫描刷新 _fleet_cache。
+    - 子进程扫描在独立 GIL,本线程阻塞 ~4s 完全不影响 HTTP 请求线程。
+    - interval(20s) < _FLEET_TTL(30s):请求永远命中尚未过期的缓存,无需自行刷新。
+    - 首轮立即跑 → 启动 ~4s 后缓存就绪(替代原 prewarm 的 compute_fleet_cached)。"""
+    stop = threading.Event()
+
+    def loop():
+        while True:
+            _refresh_fleet()
+            if stop.wait(interval):
+                break
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print("[fleet] 后台舰队刷新线程已启动,间隔 %ds(子进程扫描,主进程/请求零扫描)" % interval)
+    return t
 
 
 # =============================================================
@@ -443,6 +501,114 @@ def build_bi():
     }
 
 
+# =============================================================
+#  派工/协作效率面板 —— bus 自动化派工埋点(metrics.jsonl)
+#  口径铁律:仅覆盖【自动化派工】(后台 daemon + dispatch 一次性任务),
+#  绝不含交互式 tab 会话 —— 实测同期它只占真实总成本 ≈0.5%。
+#  故此面板【绝不是总账】;总成本看「历史用量」(token_stats)。两块各司其职。
+#  数据 = ab.read_metrics()(metrics.jsonl 尾部,坏行已跳过),只读;短 TTL 缓存仿 /api/usage。
+# =============================================================
+_DISPATCH_TTL = 20.0
+_dispatch_cache = {"ts": 0.0, "data": None}
+_dispatch_lock = threading.Lock()
+
+
+def _build_dispatch_metrics():
+    """聚合自动化派工埋点:总账 KPI + 各 role + daemon/dispatch 拆分 + Top 耗时任务。"""
+    def num(r, k):
+        return r.get(k, 0) or 0
+
+    recs = ab.read_metrics()
+    total = {"tasks": 0, "cost": 0.0, "turns": 0, "dur_ms": 0,
+             "tok_in": 0, "tok_out": 0, "errors": 0, "daemon": 0, "dispatch": 0}
+    per_role = {}
+    by_kind = {"daemon": {"kind": "daemon", "tasks": 0, "cost": 0.0, "turns": 0, "dur_ms": 0},
+               "dispatch": {"kind": "dispatch", "tasks": 0, "cost": 0.0, "turns": 0, "dur_ms": 0}}
+    tasks = []
+    span_min = span_max = None
+
+    for r in recs:
+        kind = r.get("kind") or "daemon"
+        if kind not in by_kind:
+            kind = "daemon"
+        role = r.get("role") or "?"
+        cost = float(num(r, "cost_usd"))
+        turns = int(num(r, "num_turns"))
+        dur = int(num(r, "duration_ms"))
+
+        total["tasks"] += 1
+        total["cost"] += cost
+        total["turns"] += turns
+        total["dur_ms"] += dur
+        total["tok_in"] += int(num(r, "tokens_in"))
+        total["tok_out"] += int(num(r, "tokens_out"))
+        total[kind] += 1
+        if r.get("status") == "error":
+            total["errors"] += 1
+
+        d = per_role.setdefault(role, {"role": role, "tasks": 0, "cost": 0.0,
+                                       "turns": 0, "dur_ms": 0, "daemon": 0, "dispatch": 0})
+        d["tasks"] += 1; d["cost"] += cost; d["turns"] += turns; d["dur_ms"] += dur; d[kind] += 1
+
+        k = by_kind[kind]
+        k["tasks"] += 1; k["cost"] += cost; k["turns"] += turns; k["dur_ms"] += dur
+
+        t = r.get("t") or 0
+        if t:
+            span_min = t if span_min is None else min(span_min, t)
+            span_max = t if span_max is None else max(span_max, t)
+
+        tasks.append({"role": role, "title": r.get("title") or "", "kind": kind,
+                      "dur_ms": dur, "cost": round(cost, 4), "turns": turns,
+                      "status": r.get("status"), "ts": r.get("ts")})
+
+    roles = []
+    for d in per_role.values():
+        d["cost"] = round(d["cost"], 4)
+        d["per_turn"] = round(d["cost"] / d["turns"], 4) if d["turns"] else 0
+        d["avg_dur_s"] = round(d["dur_ms"] / 1000.0 / d["tasks"], 1) if d["tasks"] else 0
+        roles.append(d)
+    roles.sort(key=lambda x: -x["cost"])
+
+    for k in by_kind.values():
+        k["cost"] = round(k["cost"], 4)
+        k["per_task"] = round(k["cost"] / k["tasks"], 4) if k["tasks"] else 0
+        k["avg_dur_s"] = round(k["dur_ms"] / 1000.0 / k["tasks"], 1) if k["tasks"] else 0
+
+    top_dur = sorted(tasks, key=lambda x: -x["dur_ms"])[:10]
+    total["cost"] = round(total["cost"], 4)
+    total["avg_cost"] = round(total["cost"] / total["tasks"], 4) if total["tasks"] else 0
+    total["avg_dur_s"] = round(total["dur_ms"] / 1000.0 / total["tasks"], 1) if total["tasks"] else 0
+
+    span = None
+    if span_min and span_max:
+        span = {"from": time.strftime("%m-%d %H:%M", time.localtime(span_min)),
+                "to": time.strftime("%m-%d %H:%M", time.localtime(span_max))}
+
+    return {
+        "now": time.strftime("%H:%M:%S", time.localtime(time.time())),
+        "total": total,
+        "per_role": roles,
+        "by_kind": by_kind,
+        "top_dur": top_dur,
+        "span": span,
+    }
+
+
+def get_dispatch_metrics(force=False):
+    """短 TTL 缓存(同步算,聚合很轻 —— 只读小 jsonl)。force=手动刷新强制新算。"""
+    with _dispatch_lock:
+        data = _dispatch_cache["data"]
+        age = time.time() - _dispatch_cache["ts"]
+    if data is not None and not force and age < _DISPATCH_TTL:
+        return data
+    data = _build_dispatch_metrics()
+    with _dispatch_lock:
+        _dispatch_cache["data"] = data
+        _dispatch_cache["ts"] = time.time()
+    return data
+
+
 def read_replies(role="Master"):
     d = BUS / role / "done"
     out = []
@@ -517,7 +683,7 @@ def reap_dryrun():
     dry-run 绝不改动队列,只报告哪些 processing 任务 owner 已死/超期。"""
     cmd = [sys.executable, str(ABDIR / "agentbus.py"), "reap", "--dry-run"]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=40)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=40, creationflags=_NO_WINDOW)
     except Exception as e:
         return {"ok": False, "error": str(e), "lines": []}
     out = (r.stdout or "").strip()
@@ -532,7 +698,7 @@ def run_supervise(dry_run=False):
     if dry_run:
         cmd.append("--dry-run")
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=60)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=60, creationflags=_NO_WINDOW)
     except Exception as e:
         return {"ok": False, "error": str(e), "lines": []}
     out = (r.stdout or "").strip()
@@ -633,6 +799,14 @@ FLEET_STATUS = ABDIR / "fleet_status.json"
 
 
 def _build_fleet_status():
+    # 复用刷新线程算好的扫描结果(_fleet_cache._scan),绝不在本(推送)线程里再做 _proc_scan。
+    # 原先 _self_wake_state(r) 不带 wait_roles → 触发 _proc_scan(主进程 2s GIL 占用,每 15s 一次,
+    # 会饿死正在服务的 /api/state 请求线程)。现传入预扫的 wait_roles 集合 → 零进程扫。
+    with _fleet_lock:
+        _cache = _fleet_cache["data"]
+    _scan = (_cache or {}).get("_scan") or {}
+    _wait_roles = set(_scan.get("wait_roles") or [])
+    _has_scan = _cache is not None
     roles = []
     for r in ab._list_roles():
         pf = BUS / r / "presence.json"
@@ -649,7 +823,9 @@ def _build_fleet_status():
                     cp = pr.get("claude_pid"); alive = bool(cp and ab.psutil and ab.psutil.pid_exists(cp))
             except Exception:
                 pass
-        _sw = ab._self_wake_state(r)   # 自醒检测(pid_exists 便宜判活)
+        # 传入预扫 wait_roles → _self_wake_state 内部不再 _wait_proc_roles() 全扫;pid_exists 便宜判活。
+        # 缓存未就绪(冷启 ~4s 窗口)时降级标 off,避免回退到现扫。
+        _sw = ab._self_wake_state(r, None, _wait_roles) if _has_scan else ("off", "缓存预热中")
         roles.append({
             "role": r, "mode": mode, "alive": alive,
             "current_task": cur, "current_title": curt,
@@ -739,7 +915,7 @@ def send_task(to, title, task, requires_approval=False, notify="auto"):
            "--to", to, "--from", "Master", "--title", title or "", "--task", task]
     if requires_approval:
         cmd.append("--requires-approval")
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", creationflags=_NO_WINDOW)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip() or "send 失败")
     tid = r.stdout.strip()  # task id
@@ -818,8 +994,31 @@ def _save_todos(items):
     os.replace(tmp, TODOS)
 
 
+def _sync_dispatched(items):
+    """派活闭环:进行中的待办若其 task_id 已在 Master/done 落了结果,自动标✓完成并附结果摘要。
+    只 stat 派过活的项(便宜),仅有变更才写盘。返回是否有变更。"""
+    changed = False
+    for o in items:
+        if o.get("status") == "进行中" and o.get("task_id") and not o.get("dispatch_result"):
+            dp = BUS / "Master" / "done" / ("%s.json" % o["task_id"])
+            if dp.exists():
+                try:
+                    r = json.loads(dp.read_text(encoding="utf-8"))
+                    res = (r.get("result") or "")[:500]
+                    o["status"] = "完成"
+                    o["dispatch_result"] = res
+                    o["dispatch_result_status"] = r.get("status", "ok")
+                    o["updated"] = ab._now()
+                    changed = True
+                except Exception:
+                    pass
+    return changed
+
+
 def _sorted_todos():
     items = _load_todos()
+    if _sync_dispatched(items):
+        _save_todos(items)
     items.sort(key=lambda t: (STATUS_ORDER.get(t.get("status"), 9),
                               PRIORITY_ORDER.get(t.get("priority"), 9),
                               t.get("deadline") or "9999"))
@@ -828,11 +1027,15 @@ def _sorted_todos():
 
 def todo_add(b):
     items = _load_todos()
+    src = (b.get("source") or "").strip()
+    # 「谁发的」:UI 手动加的来源空就默认「用户」(或用户填的名)
+    creator = (b.get("creator") or "").strip() or src or "用户"
     o = {
         "id": _todo_id(),
         "title": (b.get("title") or "").strip() or "(无标题)",
         "detail": (b.get("detail") or "").strip(),
-        "source": (b.get("source") or "").strip(),
+        "source": src,
+        "creator": creator,
         "priority": b.get("priority") if b.get("priority") in _VALID_PRIORITY else "中",
         "status": b.get("status") if b.get("status") in _VALID_STATUS else "待办",
         "deadline": (b.get("deadline") or "").strip(),
@@ -849,13 +1052,15 @@ def todo_update(b):
     items = _load_todos()
     for o in items:
         if o.get("id") == tid:
-            for f in ("title", "detail", "source", "deadline"):
+            for f in ("title", "detail", "source", "deadline", "note"):
                 if f in b and b[f] is not None:
-                    o[f] = str(b[f]).strip()
+                    o[f] = str(b[f]).strip()   # note = 用户常驻补充说明(与 detail 原文、dispatch_note 一次性 区分)
             if b.get("priority") in _VALID_PRIORITY:
                 o["priority"] = b["priority"]
             if b.get("status") in _VALID_STATUS:
                 o["status"] = b["status"]
+            if "ignored" in b:
+                o["ignored"] = bool(b["ignored"])   # 忽略/了结标记(向后兼容,可选字段)
             o["updated"] = ab._now()
             _save_todos(items)
             return {"ok": True}
@@ -875,6 +1080,7 @@ def todo_dispatch(b):
     """把一条待办派成 bus 任务(复用 send_task,from=Master),回写 task_id 闭环追踪。"""
     tid = b.get("id")
     to = (b.get("to") or "").strip()
+    note = (b.get("note") or "").strip()   # 派活当场补的附加说明(可空)
     if not to:
         return {"ok": False, "error": "未选 to role"}
     items = _load_todos()
@@ -886,6 +1092,8 @@ def todo_dispatch(b):
                 parts.append("\n来源:%s" % o["source"])
             if o.get("deadline"):
                 parts.append("\n截止:%s" % o["deadline"])
+            if note:
+                parts.append("\n\n附加说明(用户 via WebUI @ %s):%s" % (ab._now(), note))
             parts.append("\n(由 WebUI 待办池派发,todo id=%s)" % tid)
             task_text = "".join(p for p in parts if p).strip() or title
             try:
@@ -896,6 +1104,10 @@ def todo_dispatch(b):
                 return {"ok": False, "error": str(e)}
             o["task_id"] = task_id
             o["dispatched_to"] = to
+            if note:  # 记下附加说明 + 谁/何时加的
+                o["dispatch_note"] = note
+                o["dispatch_note_by"] = "用户(WebUI)"
+                o["dispatch_note_at"] = ab._now()
             if o.get("status") == "待办":
                 o["status"] = "进行中"
             o["updated"] = ab._now()
@@ -960,7 +1172,7 @@ _usage_refreshing = {"v": False}
 
 def _run_token_stats():
     r = subprocess.run([sys.executable, TOKEN_STATS, "--json"],
-                       capture_output=True, timeout=60)
+                       capture_output=True, timeout=60, creationflags=_NO_WINDOW)
     if r.returncode != 0:
         raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300] or "token_stats 失败")
     return json.loads(r.stdout.decode("utf-8", "replace"))
@@ -1018,7 +1230,7 @@ def read_sessions():
             return _sess_cache["data"]
     try:
         r = subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "sessions", "--json"],
-                           capture_output=True, timeout=30)
+                           capture_output=True, timeout=30, creationflags=_NO_WINDOW)
         raw = r.stdout.decode("utf-8", "replace")  # 防孤 surrogate:replace 落地为 U+FFFD
         rows = json.loads(raw) if raw.strip() else []
     except Exception as e:
@@ -1180,6 +1392,24 @@ canvas{display:block;width:100%}
 .bar-row .num{text-align:right;font-family:var(--mono);font-size:12px;color:var(--dim)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);padding:6px 16px 14px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+/* 历史用量:范围切换 + 趋势 hover + 项目下钻 */
+.urange{display:inline-flex;gap:2px;margin-left:8px;vertical-align:middle}
+.urange button{background:var(--panel2);color:var(--dim);border:1px solid var(--line);font:600 11px Consolas,monospace;padding:2px 8px;border-radius:4px;cursor:pointer}
+.urange button:hover{color:var(--txt)}
+.urange button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.uchart-wrap{position:relative}
+.uchart-tip{position:absolute;pointer-events:none;display:none;background:rgba(10,12,16,.96);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font:11px Consolas,monospace;color:#e6ebf2;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.uproj-row{cursor:pointer}
+.uproj-row:hover .lbl{color:var(--accent)}
+.uproj-raw{padding:3px 0 7px 10px;margin:-2px 0 5px;border-left:2px solid var(--line)}
+.uproj-raw .bar-row{margin:5px 0;font-size:11.5px}
+/* 派工/协作效率(仅自动化派工口径)*/
+.dm-note{margin:0 16px 4px;padding:8px 12px;font-size:12px;line-height:1.5;color:#f0d9a0;
+  background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.4);border-radius:8px}
+.dm-note b{color:var(--warn)}
+.kind-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:1px;margin-right:4px}
+.kind-tag.daemon{background:rgba(91,157,255,.16);color:var(--accent)}
+.kind-tag.dispatch{background:rgba(245,166,35,.16);color:var(--warn)}
 /* 可恢复会话 */
 .sess-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:6px 16px;padding:9px 12px;
   background:var(--panel2);border:1px solid var(--line);border-radius:8px}
@@ -1207,6 +1437,13 @@ canvas{display:block;width:100%}
 .todo-title{font-weight:600;font-size:13.5px}
 .todo-detail{color:#cdd4e0;font-size:12.5px;margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
 .todo-meta{color:var(--dim);font-size:11.5px;margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.who-pill{background:var(--accent2);color:#cfe0ff;padding:1px 8px;border-radius:5px;font-weight:600}
+.dnote{color:#cdd4e0;background:var(--bg);padding:1px 7px;border-radius:5px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-area{margin-top:7px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.unote{color:#cdd4e0;background:var(--bg);padding:2px 9px;border-radius:5px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-width:560px}
+.nbtn{margin:0;padding:2px 9px;font-size:11px}
+.note-edit{width:100%;min-height:48px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:12px/1.45 inherit;resize:vertical}
+.note-btns{display:flex;gap:6px;margin-top:5px}
 .todo-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .todo-acts select,.todo-acts input{width:auto;margin:0;padding:3px 7px;font-size:12px}
 .badge.p-hi{background:rgba(255,93,93,.16);color:var(--dead)}
@@ -1406,8 +1643,13 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="kpis" id="usageKpis"></div>
     <div class="grid2">
       <div>
-        <div class="uchart-cap">日 cost 趋势 <span class="muted" id="trendPeak"></span></div>
-        <canvas id="uTrend" height="220"></canvas>
+        <div class="uchart-cap">日 cost 趋势
+          <span class="urange" id="uRange">
+            <button type="button" data-r="7">7d</button><button type="button" data-r="30" class="on">30d</button><button type="button" data-r="90">90d</button><button type="button" data-r="0">全部</button>
+          </span>
+          <span class="muted" id="trendPeak"></span>
+        </div>
+        <div class="uchart-wrap" id="uTrendWrap"><canvas id="uTrend" height="220"></canvas><div class="uchart-tip" id="uTrendTip"></div></div>
       </div>
       <div>
         <div class="uchart-cap">项目费用 Top N <span class="muted">(全历史)</span></div>
@@ -1417,6 +1659,30 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">模型迁移进度 <span class="muted">(按月堆叠 · 标 4.8 占比)</span></div>
     <canvas id="uModels" height="200"></canvas>
     <div class="legend" id="uModelLegend"></div>
+  </section>
+
+  <!-- 派工/协作效率(metrics.jsonl · 仅自动化派工口径)-->
+  <section data-tab="bi">
+    <div class="sec-h">🤝 派工/协作效率
+      <span class="sub">仅自动化派工口径(<span class="mono">daemon/dispatch</span> 埋点 · <span class="mono">metrics.jsonl</span>)— <b style="color:var(--warn)">非总账</b>,总账见上方「历史用量」</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="dmMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="dmRefresh">刷新</button>
+    </div>
+    <div class="dm-note">⚠ 此口径仅覆盖 bus <b>自动化派工</b>(后台 daemon + dispatch 一次性任务),<b>不含交互式 tab 会话</b> —— 实测同期它只占真实总成本 ≈0.5%。要看全量成本请用上方「历史用量」。</div>
+    <div class="kpis" id="dmKpis"></div>
+    <div class="grid2">
+      <div>
+        <div class="uchart-cap">各角色派工成本 <span class="muted">(降序 · 标 $/turn 效率)</span></div>
+        <div class="bars" id="dmRoles"></div>
+      </div>
+      <div>
+        <div class="uchart-cap">daemon vs dispatch <span class="muted">(dispatch 多为大开发任务·单价高)</span></div>
+        <div class="bars" id="dmKind"></div>
+      </div>
+    </div>
+    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">Top 耗时任务 <span class="muted">(按 duration · title 标注)</span></div>
+    <div id="dmTop" class="bars"></div>
   </section>
 
   <!-- 可恢复会话 (resume) -->
@@ -1435,6 +1701,9 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
 <div id="toast" class="toast"></div>
 
 <script>
+/* ===== morphdom 2.7.4 (inlined · CSP-safe · 增量DOM diff,替代innerHTML整体重建) ===== */
+(function(global,factory){typeof exports==="object"&&typeof module!=="undefined"?module.exports=factory():typeof define==="function"&&define.amd?define(factory):(global=global||self,global.morphdom=factory())})(this,function(){"use strict";var DOCUMENT_FRAGMENT_NODE=11;function morphAttrs(fromNode,toNode){var toNodeAttrs=toNode.attributes;var attr;var attrName;var attrNamespaceURI;var attrValue;var fromValue;if(toNode.nodeType===DOCUMENT_FRAGMENT_NODE||fromNode.nodeType===DOCUMENT_FRAGMENT_NODE){return}for(var i=toNodeAttrs.length-1;i>=0;i--){attr=toNodeAttrs[i];attrName=attr.name;attrNamespaceURI=attr.namespaceURI;attrValue=attr.value;if(attrNamespaceURI){attrName=attr.localName||attrName;fromValue=fromNode.getAttributeNS(attrNamespaceURI,attrName);if(fromValue!==attrValue){if(attr.prefix==="xmlns"){attrName=attr.name}fromNode.setAttributeNS(attrNamespaceURI,attrName,attrValue)}}else{fromValue=fromNode.getAttribute(attrName);if(fromValue!==attrValue){fromNode.setAttribute(attrName,attrValue)}}}var fromNodeAttrs=fromNode.attributes;for(var d=fromNodeAttrs.length-1;d>=0;d--){attr=fromNodeAttrs[d];attrName=attr.name;attrNamespaceURI=attr.namespaceURI;if(attrNamespaceURI){attrName=attr.localName||attrName;if(!toNode.hasAttributeNS(attrNamespaceURI,attrName)){fromNode.removeAttributeNS(attrNamespaceURI,attrName)}}else{if(!toNode.hasAttribute(attrName)){fromNode.removeAttribute(attrName)}}}}var range;var NS_XHTML="http://www.w3.org/1999/xhtml";var doc=typeof document==="undefined"?undefined:document;var HAS_TEMPLATE_SUPPORT=!!doc&&"content"in doc.createElement("template");var HAS_RANGE_SUPPORT=!!doc&&doc.createRange&&"createContextualFragment"in doc.createRange();function createFragmentFromTemplate(str){var template=doc.createElement("template");template.innerHTML=str;return template.content.childNodes[0]}function createFragmentFromRange(str){if(!range){range=doc.createRange();range.selectNode(doc.body)}var fragment=range.createContextualFragment(str);return fragment.childNodes[0]}function createFragmentFromWrap(str){var fragment=doc.createElement("body");fragment.innerHTML=str;return fragment.childNodes[0]}function toElement(str){str=str.trim();if(HAS_TEMPLATE_SUPPORT){return createFragmentFromTemplate(str)}else if(HAS_RANGE_SUPPORT){return createFragmentFromRange(str)}return createFragmentFromWrap(str)}function compareNodeNames(fromEl,toEl){var fromNodeName=fromEl.nodeName;var toNodeName=toEl.nodeName;var fromCodeStart,toCodeStart;if(fromNodeName===toNodeName){return true}fromCodeStart=fromNodeName.charCodeAt(0);toCodeStart=toNodeName.charCodeAt(0);if(fromCodeStart<=90&&toCodeStart>=97){return fromNodeName===toNodeName.toUpperCase()}else if(toCodeStart<=90&&fromCodeStart>=97){return toNodeName===fromNodeName.toUpperCase()}else{return false}}function createElementNS(name,namespaceURI){return!namespaceURI||namespaceURI===NS_XHTML?doc.createElement(name):doc.createElementNS(namespaceURI,name)}function moveChildren(fromEl,toEl){var curChild=fromEl.firstChild;while(curChild){var nextChild=curChild.nextSibling;toEl.appendChild(curChild);curChild=nextChild}return toEl}function syncBooleanAttrProp(fromEl,toEl,name){if(fromEl[name]!==toEl[name]){fromEl[name]=toEl[name];if(fromEl[name]){fromEl.setAttribute(name,"")}else{fromEl.removeAttribute(name)}}}var specialElHandlers={OPTION:function(fromEl,toEl){var parentNode=fromEl.parentNode;if(parentNode){var parentName=parentNode.nodeName.toUpperCase();if(parentName==="OPTGROUP"){parentNode=parentNode.parentNode;parentName=parentNode&&parentNode.nodeName.toUpperCase()}if(parentName==="SELECT"&&!parentNode.hasAttribute("multiple")){if(fromEl.hasAttribute("selected")&&!toEl.selected){fromEl.setAttribute("selected","selected");fromEl.removeAttribute("selected")}parentNode.selectedIndex=-1}}syncBooleanAttrProp(fromEl,toEl,"selected")},INPUT:function(fromEl,toEl){syncBooleanAttrProp(fromEl,toEl,"checked");syncBooleanAttrProp(fromEl,toEl,"disabled");if(fromEl.value!==toEl.value){fromEl.value=toEl.value}if(!toEl.hasAttribute("value")){fromEl.removeAttribute("value")}},TEXTAREA:function(fromEl,toEl){var newValue=toEl.value;if(fromEl.value!==newValue){fromEl.value=newValue}var firstChild=fromEl.firstChild;if(firstChild){var oldValue=firstChild.nodeValue;if(oldValue==newValue||!newValue&&oldValue==fromEl.placeholder){return}firstChild.nodeValue=newValue}},SELECT:function(fromEl,toEl){if(!toEl.hasAttribute("multiple")){var selectedIndex=-1;var i=0;var curChild=fromEl.firstChild;var optgroup;var nodeName;while(curChild){nodeName=curChild.nodeName&&curChild.nodeName.toUpperCase();if(nodeName==="OPTGROUP"){optgroup=curChild;curChild=optgroup.firstChild}else{if(nodeName==="OPTION"){if(curChild.hasAttribute("selected")){selectedIndex=i;break}i++}curChild=curChild.nextSibling;if(!curChild&&optgroup){curChild=optgroup.nextSibling;optgroup=null}}}fromEl.selectedIndex=selectedIndex}}};var ELEMENT_NODE=1;var DOCUMENT_FRAGMENT_NODE$1=11;var TEXT_NODE=3;var COMMENT_NODE=8;function noop(){}function defaultGetNodeKey(node){if(node){return node.getAttribute&&node.getAttribute("id")||node.id}}function morphdomFactory(morphAttrs){return function morphdom(fromNode,toNode,options){if(!options){options={}}if(typeof toNode==="string"){if(fromNode.nodeName==="#document"||fromNode.nodeName==="HTML"||fromNode.nodeName==="BODY"){var toNodeHtml=toNode;toNode=doc.createElement("html");toNode.innerHTML=toNodeHtml}else{toNode=toElement(toNode)}}else if(toNode.nodeType===DOCUMENT_FRAGMENT_NODE$1){toNode=toNode.firstElementChild}var getNodeKey=options.getNodeKey||defaultGetNodeKey;var onBeforeNodeAdded=options.onBeforeNodeAdded||noop;var onNodeAdded=options.onNodeAdded||noop;var onBeforeElUpdated=options.onBeforeElUpdated||noop;var onElUpdated=options.onElUpdated||noop;var onBeforeNodeDiscarded=options.onBeforeNodeDiscarded||noop;var onNodeDiscarded=options.onNodeDiscarded||noop;var onBeforeElChildrenUpdated=options.onBeforeElChildrenUpdated||noop;var skipFromChildren=options.skipFromChildren||noop;var addChild=options.addChild||function(parent,child){return parent.appendChild(child)};var childrenOnly=options.childrenOnly===true;var fromNodesLookup=Object.create(null);var keyedRemovalList=[];function addKeyedRemoval(key){keyedRemovalList.push(key)}function walkDiscardedChildNodes(node,skipKeyedNodes){if(node.nodeType===ELEMENT_NODE){var curChild=node.firstChild;while(curChild){var key=undefined;if(skipKeyedNodes&&(key=getNodeKey(curChild))){addKeyedRemoval(key)}else{onNodeDiscarded(curChild);if(curChild.firstChild){walkDiscardedChildNodes(curChild,skipKeyedNodes)}}curChild=curChild.nextSibling}}}function removeNode(node,parentNode,skipKeyedNodes){if(onBeforeNodeDiscarded(node)===false){return}if(parentNode){parentNode.removeChild(node)}onNodeDiscarded(node);walkDiscardedChildNodes(node,skipKeyedNodes)}function indexTree(node){if(node.nodeType===ELEMENT_NODE||node.nodeType===DOCUMENT_FRAGMENT_NODE$1){var curChild=node.firstChild;while(curChild){var key=getNodeKey(curChild);if(key){fromNodesLookup[key]=curChild}indexTree(curChild);curChild=curChild.nextSibling}}}indexTree(fromNode);function handleNodeAdded(el){onNodeAdded(el);var curChild=el.firstChild;while(curChild){var nextSibling=curChild.nextSibling;var key=getNodeKey(curChild);if(key){var unmatchedFromEl=fromNodesLookup[key];if(unmatchedFromEl&&compareNodeNames(curChild,unmatchedFromEl)){curChild.parentNode.replaceChild(unmatchedFromEl,curChild);morphEl(unmatchedFromEl,curChild)}else{handleNodeAdded(curChild)}}else{handleNodeAdded(curChild)}curChild=nextSibling}}function cleanupFromEl(fromEl,curFromNodeChild,curFromNodeKey){while(curFromNodeChild){var fromNextSibling=curFromNodeChild.nextSibling;if(curFromNodeKey=getNodeKey(curFromNodeChild)){addKeyedRemoval(curFromNodeKey)}else{removeNode(curFromNodeChild,fromEl,true)}curFromNodeChild=fromNextSibling}}function morphEl(fromEl,toEl,childrenOnly){var toElKey=getNodeKey(toEl);if(toElKey){delete fromNodesLookup[toElKey]}if(!childrenOnly){var beforeUpdateResult=onBeforeElUpdated(fromEl,toEl);if(beforeUpdateResult===false){return}else if(beforeUpdateResult instanceof HTMLElement){fromEl=beforeUpdateResult;indexTree(fromEl)}morphAttrs(fromEl,toEl);onElUpdated(fromEl);if(onBeforeElChildrenUpdated(fromEl,toEl)===false){return}}if(fromEl.nodeName!=="TEXTAREA"){morphChildren(fromEl,toEl)}else{specialElHandlers.TEXTAREA(fromEl,toEl)}}function morphChildren(fromEl,toEl){var skipFrom=skipFromChildren(fromEl,toEl);var curToNodeChild=toEl.firstChild;var curFromNodeChild=fromEl.firstChild;var curToNodeKey;var curFromNodeKey;var fromNextSibling;var toNextSibling;var matchingFromEl;outer:while(curToNodeChild){toNextSibling=curToNodeChild.nextSibling;curToNodeKey=getNodeKey(curToNodeChild);while(!skipFrom&&curFromNodeChild){fromNextSibling=curFromNodeChild.nextSibling;if(curToNodeChild.isSameNode&&curToNodeChild.isSameNode(curFromNodeChild)){curToNodeChild=toNextSibling;curFromNodeChild=fromNextSibling;continue outer}curFromNodeKey=getNodeKey(curFromNodeChild);var curFromNodeType=curFromNodeChild.nodeType;var isCompatible=undefined;if(curFromNodeType===curToNodeChild.nodeType){if(curFromNodeType===ELEMENT_NODE){if(curToNodeKey){if(curToNodeKey!==curFromNodeKey){if(matchingFromEl=fromNodesLookup[curToNodeKey]){if(fromNextSibling===matchingFromEl){isCompatible=false}else{fromEl.insertBefore(matchingFromEl,curFromNodeChild);if(curFromNodeKey){addKeyedRemoval(curFromNodeKey)}else{removeNode(curFromNodeChild,fromEl,true)}curFromNodeChild=matchingFromEl;curFromNodeKey=getNodeKey(curFromNodeChild)}}else{isCompatible=false}}}else if(curFromNodeKey){isCompatible=false}isCompatible=isCompatible!==false&&compareNodeNames(curFromNodeChild,curToNodeChild);if(isCompatible){morphEl(curFromNodeChild,curToNodeChild)}}else if(curFromNodeType===TEXT_NODE||curFromNodeType==COMMENT_NODE){isCompatible=true;if(curFromNodeChild.nodeValue!==curToNodeChild.nodeValue){curFromNodeChild.nodeValue=curToNodeChild.nodeValue}}}if(isCompatible){curToNodeChild=toNextSibling;curFromNodeChild=fromNextSibling;continue outer}if(curFromNodeKey){addKeyedRemoval(curFromNodeKey)}else{removeNode(curFromNodeChild,fromEl,true)}curFromNodeChild=fromNextSibling}if(curToNodeKey&&(matchingFromEl=fromNodesLookup[curToNodeKey])&&compareNodeNames(matchingFromEl,curToNodeChild)){if(!skipFrom){addChild(fromEl,matchingFromEl)}morphEl(matchingFromEl,curToNodeChild)}else{var onBeforeNodeAddedResult=onBeforeNodeAdded(curToNodeChild);if(onBeforeNodeAddedResult!==false){if(onBeforeNodeAddedResult){curToNodeChild=onBeforeNodeAddedResult}if(curToNodeChild.actualize){curToNodeChild=curToNodeChild.actualize(fromEl.ownerDocument||doc)}addChild(fromEl,curToNodeChild);handleNodeAdded(curToNodeChild)}}curToNodeChild=toNextSibling;curFromNodeChild=fromNextSibling}cleanupFromEl(fromEl,curFromNodeChild,curFromNodeKey);var specialElHandler=specialElHandlers[fromEl.nodeName];if(specialElHandler){specialElHandler(fromEl,toEl)}}var morphedNode=fromNode;var morphedNodeType=morphedNode.nodeType;var toNodeType=toNode.nodeType;if(!childrenOnly){if(morphedNodeType===ELEMENT_NODE){if(toNodeType===ELEMENT_NODE){if(!compareNodeNames(fromNode,toNode)){onNodeDiscarded(fromNode);morphedNode=moveChildren(fromNode,createElementNS(toNode.nodeName,toNode.namespaceURI))}}else{morphedNode=toNode}}else if(morphedNodeType===TEXT_NODE||morphedNodeType===COMMENT_NODE){if(toNodeType===morphedNodeType){if(morphedNode.nodeValue!==toNode.nodeValue){morphedNode.nodeValue=toNode.nodeValue}return morphedNode}else{morphedNode=toNode}}}if(morphedNode===toNode){onNodeDiscarded(fromNode)}else{if(toNode.isSameNode&&toNode.isSameNode(morphedNode)){return}morphEl(morphedNode,toNode,childrenOnly);if(keyedRemovalList){for(var i=0,len=keyedRemovalList.length;i<len;i++){var elToRemove=fromNodesLookup[keyedRemovalList[i]];if(elToRemove){removeNode(elToRemove,elToRemove.parentNode,false)}}}}if(!childrenOnly&&morphedNode!==fromNode&&fromNode.parentNode){if(morphedNode.actualize){morphedNode=morphedNode.actualize(fromNode.ownerDocument||doc)}fromNode.parentNode.replaceChild(morphedNode,fromNode)}return morphedNode}}var morphdom=morphdomFactory(morphAttrs);return morphdom});
+/* ===== end morphdom ===== */
 let state=null, pollTimer=null, lastTasksOpen=new Set();
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
@@ -1593,50 +1862,34 @@ function isOverdue(t){
   return d.getTime() < Date.now();
 }
 let todoView='active';   // active=待办池(未完成) | history=已完成历史
+const roleSel={};        // todoId → 用户为该卡选的「派给」role;重渲染后回填,防自动刷新冲掉选择(误派根因)
+function roleOptsFor(t){
+  const sel=roleSel[t.id]||'';
+  let h='<option value="" '+(sel?'':'selected')+' disabled>派给…</option>';
+  (state.all_roles||[]).forEach(r=>{ h+='<option value="'+esc(r)+'" '+(sel===r?'selected':'')+'>'+esc(r)+'</option>'; });
+  return h;
+}
+// 响应式重构(morphdom):卡内【临时 UI 态】全部存 JS、由 cardHtml 渲染出来 → morphdom 增量 patch DOM 与之对齐,
+// 刷新时天然不丢(不再靠 dirtyCards 手工保护整卡)。临时态有两处:
+//   · roleSel[id]  —— 用户为该卡选的「派给」role(下拉选择)。
+//   · openEditors[id] —— 该卡的补充说明编辑器草稿文本(打开中);undefined=未打开。
+const openEditors={};
 // 待确认:agent 通过 ask-user 投池、在等用户拍板的项(source 以「确认·」开头 或 带 confirm_from,且 status=待办)
 function isPendingConfirm(t){
   return t.status==='待办' && (t.confirm_from || (t.source||'').indexOf('确认·')===0);
 }
-function renderTodos(){
-  const box=document.getElementById('todoBox'); if(!box) return;
-  const all=(state.todos||[]);
-  // tab 计数(基于全量,不受筛选影响)
-  const activeAll=all.filter(t=>t.status!=='完成');
-  const doneAll=all.filter(t=>t.status==='完成');
-  const pendN=activeAll.filter(isPendingConfirm).length;
-  document.getElementById('tcountActive').textContent=activeAll.length;
-  document.getElementById('tcountHistory').textContent=doneAll.length;
-  const ca=document.getElementById('confirmAlert');
-  if(pendN){ ca.style.display=''; ca.textContent='🙋 '+pendN+' 项待你确认'; } else { ca.style.display='none'; }
-  const gc=document.getElementById('gConfirm');   // 全局角标(跨 tab 常驻 header)
-  if(gc){ if(pendN){ gc.style.display=''; gc.innerHTML='🙋 <b>'+pendN+'</b> 项待确认'; } else { gc.style.display='none'; } }
-  document.getElementById('tviewActive').classList.toggle('active',todoView==='active');
-  document.getElementById('tviewHistory').classList.toggle('active',todoView==='history');
-
-  let items=(todoView==='history'?doneAll:activeAll).slice();
-  const fp=document.getElementById('filtPri').value;
-  const fs=document.getElementById('filtStatus').value;
-  if(fp) items=items.filter(t=>t.priority===fp);
-  if(fs) items=items.filter(t=>t.status===fs);
-  // 待办池视图:待确认项置顶;历史视图:按更新时间倒序
-  if(todoView==='active'){
-    items.sort((a,b)=>(isPendingConfirm(b)?1:0)-(isPendingConfirm(a)?1:0));
-  }else{
-    items.sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||'')));
-  }
-  if(!items.length){
-    const msg=todoView==='history'?'（暂无已完成）':'（无未完成待办,或被筛选）';
-    box.innerHTML='<div class="muted" style="padding:8px 16px">'+msg+'</div>'; return;
-  }
-  const roleOpts=state.all_roles.map(r=>`<option>${esc(r)}</option>`).join('');
-  box.innerHTML=items.map(t=>{
-    const od=isOverdue(t);
-    const pc=isPendingConfirm(t);
-    const stSel=['待办','进行中','搁置','完成'].map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('');
-    const link=t.task_id?`<span class="linkpill" title="已派给 ${esc(t.dispatched_to||'')}">🔗 ${esc(t.dispatched_to||'')} · ${esc(t.task_id)}</span>`:'';
-    const confirmBadge=pc?`<span class="badge confirm">🙋 待确认</span>`:'';
-    const confirmWho=pc&&t.confirm_from?`<span class="confirm-who">等 ${esc(t.confirm_from)} 拍板</span>`:'';
-    return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${pc?'pending-confirm':''} ${t.status==='完成'?'is-done':''}">
+function cardHtml(t){
+  const od=isOverdue(t);
+  const pc=isPendingConfirm(t);
+  const stSel=['待办','进行中','搁置','完成'].map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('');
+  const link=t.task_id?`<span class="linkpill" title="已派给 ${esc(t.dispatched_to||'')}">🔗 ${esc(t.dispatched_to||'')} · ${esc(t.task_id)}</span>`:'';
+  const confirmBadge=pc?`<span class="badge confirm">🙋 待确认</span>`:'';
+  const confirmWho=pc&&t.confirm_from?`<span class="confirm-who">等 ${esc(t.confirm_from)} 拍板</span>`:'';
+  const who=t.confirm_from||t.creator||t.source||'用户';   // 谁发的(创建者/来源)
+  const noteHtml=t.note
+    ? `<span class="unote">💬 补充:${esc(t.note)}</span><button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">改</button>`
+    : `<button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">+ 补充说明</button>`;
+  return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${pc?'pending-confirm':''} ${t.status==='完成'?'is-done':''}" data-id="${t.id}">
       <div class="todo-h">
         ${confirmBadge}
         <span class="badge ${PRI_CLS[t.priority]||'p-mid'}">${esc(t.priority)}</span>
@@ -1647,22 +1900,70 @@ function renderTodos(){
       </div>
       ${t.detail?`<div class="todo-detail">${esc(t.detail)}</div>`:''}
       <div class="todo-meta">
-        ${t.source?`<span>来源:${esc(t.source)}</span>`:''}
+        <span class="who-pill" title="谁发的(创建者/来源)">👤 ${esc(who)}</span>
+        ${t.source&&t.source!==who?`<span>来源:${esc(t.source)}</span>`:''}
         ${t.deadline?`<span class="${od?'overdue':''}">截止:${esc(t.deadline)}${od?' ⚠逾期':''}</span>`:''}
         <span>建:${esc(t.created)}</span>
+        ${t.dispatch_note?`<span class="dnote" title="${esc(t.dispatch_note_by||'')} @ ${esc(t.dispatch_note_at||'')}">📝 附加:${esc(t.dispatch_note)}</span>`:''}
+        ${t.ignored?`<span class="badge failed">🚫 已忽略</span>`:''}
+        ${t.dispatch_result?`<span class="dnote" title="派活结果 status=${esc(t.dispatch_result_status||'')}">✅ 结果:${esc(t.dispatch_result)}</span>`:''}
         ${t.updated&&todoView==='history'?`<span>完成/更新:${esc(t.updated)}</span>`:''}
       </div>
+      <div class="note-area" id="na-${t.id}">${noteHtml}</div>
       <div class="todo-acts">
         <span class="muted">状态</span>
         <select onchange="tStatus('${t.id}',this.value)">${stSel}</select>
         <span class="muted" style="margin-left:6px">派给</span>
-        <select id="trole-${t.id}">${roleOpts}</select>
+        <select id="trole-${t.id}" onchange="roleSel['${t.id}']=this.value;markDirty('${t.id}')">${roleOptsFor(t)}</select>
         <button class="btn mini" onclick="tDispatch('${t.id}')">派活</button>
+        ${t.status!=='完成'?`<button class="btn mini ghost" onclick="tIgnore('${t.id}')" title="标记了结:不派活、不发任何 bus 任务">忽略</button>`:''}
         <button class="btn mini ghost" onclick="tEdit('${t.id}')">编辑</button>
         <button class="btn mini danger" onclick="tDelete('${t.id}')">删除</button>
       </div>
     </div>`;
-  }).join('');
+}
+function renderTodos(){
+  const box=document.getElementById('todoBox'); if(!box) return;
+  const all=(state.todos||[]);
+  // 计数/角标/tab 高亮 —— 始终更新(不碰卡片 DOM,不受脏卡影响)
+  const activeAll=all.filter(t=>t.status!=='完成');
+  const doneAll=all.filter(t=>t.status==='完成');
+  const pendN=activeAll.filter(isPendingConfirm).length;
+  document.getElementById('tcountActive').textContent=activeAll.length;
+  document.getElementById('tcountHistory').textContent=doneAll.length;
+  const ca=document.getElementById('confirmAlert');
+  if(pendN){ ca.style.display=''; ca.textContent='🙋 '+pendN+' 项待你确认'; } else { ca.style.display='none'; }
+  const gc=document.getElementById('gConfirm');
+  if(gc){ if(pendN){ gc.style.display=''; gc.innerHTML='🙋 <b>'+pendN+'</b> 项待确认'; } else { gc.style.display='none'; } }
+  document.getElementById('tviewActive').classList.toggle('active',todoView==='active');
+  document.getElementById('tviewHistory').classList.toggle('active',todoView==='history');
+
+  let items=(todoView==='history'?doneAll:activeAll).slice();
+  const fp=document.getElementById('filtPri').value;
+  const fs=document.getElementById('filtStatus').value;
+  if(fp) items=items.filter(t=>t.priority===fp);
+  if(fs) items=items.filter(t=>t.status===fs);
+  if(todoView==='active'){ items.sort((a,b)=>(isPendingConfirm(b)?1:0)-(isPendingConfirm(a)?1:0)); }
+  else{ items.sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||''))); }
+
+  if(!items.length){
+    if(dirtyCards.size===0){ const msg=todoView==='history'?'（暂无已完成）':'（无未完成待办,或被筛选）';
+      box.innerHTML='<div class="muted" style="padding:8px 16px">'+msg+'</div>'; }
+    return;   // 有脏卡时别清空(理论上不会走到,稳妥)
+  }
+  // 记焦点(脏卡里正在输入的编辑器),重建后恢复
+  const ae=document.activeElement; const focId=ae&&ae.id; let ss=null,se=null;
+  if(ae&&(ae.tagName==='TEXTAREA'||ae.tagName==='INPUT')){ try{ss=ae.selectionStart;se=ae.selectionEnd;}catch(e){} }
+  // 收集现有卡 DOM(按 id),脏卡整卡复用、非脏卡按数据重建
+  const existing={}; box.querySelectorAll('.todo-card[data-id]').forEach(n=>{existing[n.getAttribute('data-id')]=n;});
+  const frag=document.createDocumentFragment();
+  items.forEach(t=>{
+    const ex=existing[t.id];
+    if(dirtyCards.has(t.id) && ex){ frag.appendChild(ex); }   // 脏卡:复用现有节点,保住输入/选择/打开的编辑器
+    else{ const tpl=document.createElement('template'); tpl.innerHTML=cardHtml(t).trim(); frag.appendChild(tpl.content.firstElementChild); }
+  });
+  box.replaceChildren(frag);
+  if(focId){ const el=document.getElementById(focId); if(el){ try{ el.focus(); if(ss!=null&&el.setSelectionRange) el.setSelectionRange(ss,se); }catch(e){} } }
 }
 
 async function tPost(url,body){
@@ -1673,11 +1974,40 @@ async function tStatus(id,val){ const j=await tPost('/api/todos/update',{id,stat
 async function tDelete(id){ if(!confirm('删除这条待办?')) return; const j=await tPost('/api/todos/delete',{id}); toast(j.ok?'已删除':'删除失败',!j.ok); load(); }
 async function tDispatch(id){
   const to=document.getElementById('trole-'+id).value;
-  if(!confirm('把这条待办派给 '+to+' (from=Master)?')) return;
-  const j=await tPost('/api/todos/dispatch',{id,to});
-  if(j.ok){toast('✅ 已派给 '+to+' · task '+j.task_id);}else{toast('派活失败:'+(j.error||'?'),true);}
+  if(!to){ toast('先选「派给…」要发给哪个 role',true); return; }   // 占位未选 → 不派,防误触
+  // 先明确确认派活(发 bus 任务),再问可选附加说明 —— 别让随手点确定=派活
+  if(!confirm('确定把这条待办【派活】给 '+to+'?\n会给 '+to+' 发一个 bus 任务。\n(只想了结不处理→点取消,改用「忽略」)')){ clearDirty(id); return; }
+  const note=prompt('附加说明(可空)。点【确定】即派给 '+to+';点【取消】则不派:','');
+  if(note===null){ clearDirty(id); return; }   // 取消 = 不派
+  const j=await tPost('/api/todos/dispatch',{id,to,note:note.trim()});
+  clearDirty(id);
+  if(j.ok){delete roleSel[id];toast('✅ 已派给 '+to+(note.trim()?'(含附加说明)':'')+' · task '+j.task_id);}else{toast('派活失败:'+(j.error||'?'),true);}
   load();
 }
+async function tIgnore(id){
+  if(!confirm('忽略这条?将标记为【已了结】(状态置完成+已忽略),不派活、不发任何任务,移入历史。')) return;
+  clearDirty(id);
+  const j=await tPost('/api/todos/update',{id,status:'完成',ignored:true});
+  toast(j.ok?'已忽略(移入历史)':'操作失败:'+(j.error||'?'),!j.ok); load();
+}
+// 常驻可编辑【补充说明】(note):inline 点击编辑,保存写回 todos.json。打开即标脏,统一机制保护不被自动刷新冲掉。
+function tNoteEdit(id){
+  const t=(state.todos||[]).find(x=>x.id===id); const na=document.getElementById('na-'+id); if(!t||!na) return;
+  markDirty(id);   // 该卡进入未提交交互态 → 自动刷新时整卡复用、不重建
+  na.innerHTML='<textarea class="note-edit" id="ne-'+id+'" placeholder="给这条待办加补充说明/上下文(随时改)"></textarea>'
+    +'<div class="note-btns"><button class="btn mini" onclick="tNoteSave(\''+id+'\')">保存</button>'
+    +'<button class="btn mini ghost" onclick="tNoteCancel(\''+id+'\')">取消</button></div>';
+  const ta=document.getElementById('ne-'+id); ta.value=t.note||''; ta.focus();
+}
+async function tNoteSave(id){
+  const ta=document.getElementById('ne-'+id); if(!ta){ clearDirty(id); return; }
+  const val=ta.value.trim();
+  let j; try{ j=await tPost('/api/todos/update',{id,note:val}); }catch(e){ toast('保存失败:'+e,true); return; }
+  clearDirty(id);   // 提交完成 → 清脏,该卡恢复正常刷新
+  toast(j&&j.ok?'补充说明已保存':'保存失败:'+((j&&j.error)||'?'),!(j&&j.ok));
+  load();
+}
+function tNoteCancel(id){ clearDirty(id); load(); }
 function tEdit(id){
   const t=(state.todos||[]).find(x=>x.id===id); if(!t) return;
   const title=prompt('标题',t.title); if(title===null) return;
@@ -1688,14 +2018,28 @@ function tEdit(id){
   tPost('/api/todos/update',{id,title,detail,source,deadline,priority}).then(j=>{toast(j.ok?'已保存':'保存失败:'+(j.error||'?'),!j.ok);load();});
 }
 
+let _loadFails=0;
 async function load(role, fresh){
+  const rr=role||document.getElementById('replyRole').value||'Master';
+  const ctrl=new AbortController(); const tid=setTimeout(()=>ctrl.abort(),15000);  // 15s 超时,防卡死
   try{
-    const rr=role||document.getElementById('replyRole').value||'Master';
-    const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr)+(fresh?'&fresh=1':''));
-    state=await res.json(); render();
-    document.getElementById('updT').classList.remove('flash');void document.getElementById('updT').offsetWidth;
-    document.getElementById('updT').classList.add('flash');
-  }catch(e){ console.error(e); }
+    const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr)+(fresh?'&fresh=1':''),{signal:ctrl.signal});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
+    if(!d || typeof d!=='object' || !d.fleet) throw new Error('payload 不完整');  // 半截/空响应不覆盖
+    // 舰队还在后台子进程算(冷启/刷新中)→ 用上次的舰队数据,别闪空表(其余区照常用新数据)
+    if(d.fleet.loading && state && state.fleet && !state.fleet.loading && state.fleet.roles && state.fleet.roles.length){
+      d.fleet=state.fleet;
+    }
+    state=d; _loadFails=0; render();
+    const ut=document.getElementById('updT'); ut.classList.remove('flash');void ut.offsetWidth; ut.classList.add('flash');
+  }catch(e){
+    // 韧性:后端偶发慢/超时/半截 —— 【绝不清空页面】,保留上次 state 与已渲染 DOM,标记重试;下次轮询/SSE 自动再拉
+    _loadFails++;
+    console.warn('load 失败(保留上次看板,自动重试):',e&&e.message);
+    const ut=document.getElementById('updT'); if(ut) ut.textContent='⚠ 刷新慢/重试中('+_loadFails+')· 显示上次数据';
+    if(_loadFails<=2){ setTimeout(()=>load(role,fresh), 1500); }   // 轻量自动重试两次
+  }finally{ clearTimeout(tid); }
 }
 
 function setPoll(){
@@ -1864,38 +2208,70 @@ function modelColor(m){ if(m.indexOf('opus-4-8')>=0)return UC.acc; if(m.indexOf(
 function modelShort(m){ return m.replace('claude-','').replace('-20251001',''); }
 function projShort(p){ return p ? p.replace(/^([A-Za-z])--/, '$1:/').replace(/-/g, '/') : ''; }
 
+let _usageData=null, _uRange=30, _trendPts=[];
+function sliceDaily(daily,r){
+  // 按"日历范围"切片(以数据最后一天为锚,非系统今天 — 与数据对齐、免时区抖动)
+  if(!r||!daily||!daily.length) return (daily||[]).slice();
+  const last=daily[daily.length-1].date;
+  const d=new Date(last+'T00:00:00'); d.setDate(d.getDate()-(r-1));
+  const y=d.getFullYear(), m=('0'+(d.getMonth()+1)).slice(-2), dd=('0'+d.getDate()).slice(-2);
+  const cut=y+'-'+m+'-'+dd;
+  return daily.filter(x=>x.date>=cut);
+}
 function renderUsage(d){
   const kp=document.getElementById('usageKpis');
   if(!d || d.error){ kp.innerHTML='<div class="muted" style="padding:6px 12px">用量数据读取失败:'+esc(d&&d.error||'?')+'</div>'; return; }
-  const t=d.totals||{};
-  document.getElementById('usageMeta').textContent='刷新于 '+esc(d.as_of||'')+' · 扫描 '+(d.meta?d.meta.files_seen:'?')+' 文件 / '+(d.scan_seconds||'?')+'s';
-  kp.innerHTML=[
-    ['API 等价成本',usd(t.cost_usd),''],
-    ['API calls(去重)',fmtN(t.calls),'acc'],
-    ['cache 命中', t.cache_read&&t.output?Math.round(t.cache_read/(t.cache_read+t.input+t.output)*100)+'%':'–','good'],
-    ['去重剔除', d.meta&&d.meta.msgs_with_usage?Math.round(d.meta.dup_skipped/d.meta.msgs_with_usage*100)+'%':'–','warn'],
-    ['活跃天(30d)', (d.daily||[]).length,''],
-    ['项目数', (d.by_project||[]).length,''],
-  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
-
-  // 日 cost 趋势
-  drawTrend(d.daily||[]);
-  // 项目 Top N
+  _usageData=d;
+  const mt=d.meta||{};
+  const cfg=mt.config_active||{alias_count:mt.alias_count,merge_groups:mt.merge_groups,ignore_projects:mt.ignore_projects};
+  document.getElementById('usageMeta').textContent='刷新于 '+esc(d.as_of||'')
+    +' · 跟踪 '+(mt.tracked_jsonl_files!=null?mt.tracked_jsonl_files:'?')+' jsonl'
+    +(cfg?(' · alias '+(cfg.alias_count||0)+'/merge '+(cfg.merge_groups||0)+'/ignore '+(cfg.ignore_projects||0)):'');
+  // 范围相关 KPI + 趋势:交给 applyRange;范围按钮绑定一次
+  const rg=document.getElementById('uRange');
+  if(rg && !rg._bound){ rg._bound=1; rg.querySelectorAll('button').forEach(b=>b.onclick=()=>applyRange(+b.dataset.r)); }
+  _bindTrendHover();
+  applyRange(_uRange);
+  // 项目 Top N(已套 alias 的 logical 名,直接用,不再 projShort)
   const projs=(d.by_project||[]).slice(0,8); const max=projs.length?projs[0].cost_usd:1;
-  document.getElementById('uProj').innerHTML=projs.map(p=>{
+  document.getElementById('uProj').innerHTML=projs.map((p,i)=>{
     const pct=Math.max(2,p.cost_usd/max*100).toFixed(1);
-    return `<div class="bar-row"><span class="lbl" title="${esc(p.project)}">${esc(projShort(p.project))}</span>
+    return `<div class="bar-row uproj-row" data-proj="${esc(p.project)}" title="点击展开原始目录构成">
+      <span class="lbl">${esc(p.project)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
-      <span class="num">${usd(p.cost_usd)}</span></div>`;
+      <span class="num">${usd(p.cost_usd)}</span></div>
+      <div class="uproj-raw" id="uraw-${i}" style="display:none"></div>`;
   }).join('')||'<div class="muted" style="padding:6px 0">无数据</div>';
+  bindProjDrill();
   // 模型迁移
   drawModels(d.by_month_model||[]);
+}
+function applyRange(r){
+  _uRange=r;
+  const rg=document.getElementById('uRange');
+  if(rg) rg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));
+  const d=_usageData; if(!d) return;
+  const daily=sliceDaily(d.daily||[],r);
+  const t=d.totals||{};
+  const rangeCost=daily.reduce((s,x)=>s+(x.cost_usd||0),0);
+  const rl=r?(r+'d'):'全历史';
+  const denom=(t.cache_read||0)+(t.input||0)+(t.output||0);
+  document.getElementById('usageKpis').innerHTML=[
+    ['API 等价成本(全历史)',usd(t.cost_usd),''],
+    ['API calls(去重)',fmtN(t.calls),'acc'],
+    ['cache 命中', denom?Math.round((t.cache_read||0)/denom*100)+'%':'–','good'],
+    ['范围 cost('+rl+')', usd(rangeCost),'warn'],
+    ['活跃天('+rl+')', daily.length,''],
+    ['项目数', (d.by_project||[]).length,''],
+  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  drawTrend(daily);
 }
 function drawTrend(daily){
   const cv=document.getElementById('uTrend'); const f=_fit(cv,220); const ctx=f.ctx,w=f.w,h=f.h;
   const pts=daily.filter(x=>x.cost_usd!=null);
+  _trendPts=[]; const tip=document.getElementById('uTrendTip'); if(tip)tip.style.display='none';
   const padL=48,padR=14,padT=14,padB=22, gw=w-padL-padR, gh=h-padT-padB;
-  if(!pts.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); return; }
+  if(!pts.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); document.getElementById('trendPeak').textContent=''; return; }
   const maxV=Math.max.apply(null,pts.map(p=>p.cost_usd))*1.12||1;
   const X=i=>padL+gw*(pts.length<2?0.5:i/(pts.length-1)), Y=v=>padT+gh*(1-v/maxV);
   ctx.strokeStyle=UC.line;ctx.fillStyle=UC.dim;ctx.lineWidth=1;ctx.font='10px Consolas';
@@ -1906,11 +2282,50 @@ function drawTrend(daily){
   ctx.lineTo(X(pts.length-1),padT+gh);ctx.lineTo(X(0),padT+gh);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
   ctx.beginPath();ctx.moveTo(X(0),Y(pts[0].cost_usd));pts.forEach((p,i)=>ctx.lineTo(X(i),Y(p.cost_usd)));
   ctx.strokeStyle=UC.acc;ctx.lineWidth=2;ctx.stroke();
-  // 峰值标注
+  // 峰值标注 + 存点供 hover
   let pk=0;pts.forEach((p,i)=>{if(p.cost_usd>pts[pk].cost_usd)pk=i;});
-  pts.forEach((p,i)=>{ctx.beginPath();ctx.arc(X(i),Y(p.cost_usd),i===pk?4:2,0,7);ctx.fillStyle=i===pk?UC.dead:UC.acc;ctx.fill();});
+  pts.forEach((p,i)=>{const px=X(i),py=Y(p.cost_usd);ctx.beginPath();ctx.arc(px,py,i===pk?4:2,0,7);ctx.fillStyle=i===pk?UC.dead:UC.acc;ctx.fill();
+    _trendPts.push({x:px,y:py,date:p.date,cost:p.cost_usd,calls:p.calls});});
   ctx.fillStyle=UC.dim;ctx.fillText(pts[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(pts[pts.length-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
-  document.getElementById('trendPeak').textContent='峰值 '+usd(pts[pk].cost_usd)+' · '+pts[pk].date.slice(5);
+  document.getElementById('trendPeak').textContent='峰值 '+usd(pts[pk].cost_usd)+' · '+pts[pk].date.slice(5)+' · '+pts.length+'天';
+}
+function _bindTrendHover(){
+  const cv=document.getElementById('uTrend'); if(!cv||cv._hov)return; cv._hov=1;
+  const tip=document.getElementById('uTrendTip');
+  cv.addEventListener('mousemove',e=>{
+    if(!_trendPts.length||!tip){if(tip)tip.style.display='none';return;}
+    const rect=cv.getBoundingClientRect(); const mx=e.clientX-rect.left;
+    let best=_trendPts[0],bd=1e9;
+    _trendPts.forEach(p=>{const dd=Math.abs(p.x-mx); if(dd<bd){bd=dd;best=p;}});
+    tip.innerHTML='<b>'+esc(best.date)+'</b><br>'+usd(best.cost)+' · '+fmtN(best.calls)+' calls';
+    tip.style.display='block';
+    let lx=best.x+10; if(lx>rect.width-130)lx=best.x-122;
+    tip.style.left=Math.max(2,lx)+'px'; tip.style.top=Math.max(2,best.y-36)+'px';
+  });
+  cv.addEventListener('mouseleave',()=>{if(tip)tip.style.display='none';});
+}
+function rawFor(logical){
+  // 启发式把 by_project_raw 归到 logical(alias 多为同名;merge 组无法纯前端映射 → 由调用方兜底)
+  const raws=(_usageData&&_usageData.by_project_raw)||[];
+  const norm=s=>projShort(String(s)).toLowerCase().replace(/[^a-z0-9]/g,'');
+  const l=String(logical).toLowerCase().replace(/[^a-z0-9]/g,'');
+  return raws.filter(r=>{const n=norm(r.project); return n===l||(n&&l&&(n.indexOf(l)>=0||l.indexOf(n)>=0));});
+}
+function bindProjDrill(){
+  const up=document.getElementById('uProj'); if(!up)return;
+  up.querySelectorAll('.uproj-row').forEach((row,i)=>{
+    row.onclick=()=>{
+      const box=document.getElementById('uraw-'+i); if(!box)return;
+      if(box.style.display!=='none'){ box.style.display='none'; return; }
+      let raws=rawFor(row.dataset.proj), note='';
+      if(!raws.length){ raws=((_usageData&&_usageData.by_project_raw)||[]).slice(0,12); note='<div class="muted" style="font-size:11px;padding:1px 0 3px">未能自动映射,列出全部原始目录:</div>'; }
+      const rmax=raws.length?Math.max.apply(null,raws.map(x=>x.cost_usd))||1:1;
+      box.innerHTML=note+raws.map(rr=>{const pct=Math.max(2,rr.cost_usd/rmax*100).toFixed(1);
+        return `<div class="bar-row" style="grid-template-columns:150px 1fr 90px"><span class="lbl" title="${esc(rr.project)}">${esc(projShort(rr.project))}</span><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:var(--idle)"></span></span><span class="num">${usd(rr.cost_usd)} · ${fmtN(rr.calls)}</span></div>`;
+      }).join('')||'<div class="muted" style="font-size:11px;padding:2px 0">无</div>';
+      box.style.display='block';
+    };
+  });
 }
 function drawModels(bmm){
   const cv=document.getElementById('uModels'); const f=_fit(cv,200); const ctx=f.ctx,w=f.w,h=f.h;
@@ -1938,6 +2353,54 @@ async function loadUsage(force){
   try{ const r=await fetch('/api/usage'+(force?'?fresh=1':'')); renderUsage(await r.json()); }
   catch(e){ kp.innerHTML='<div class="muted" style="padding:6px 12px">加载失败:'+esc(e)+'</div>'; }
 }
+
+// ===== 派工/协作效率(metrics.jsonl · 仅自动化派工口径,非总账)=====
+function renderDispatch(d){
+  if(!d) return;
+  const t=d.total||{};
+  document.getElementById('dmMeta').textContent='刷新于 '+esc(d.now||'')+(d.span?(' · '+esc(d.span.from)+'→'+esc(d.span.to)):'');
+  const ratio=(t.daemon||0)+':'+(t.dispatch||0);
+  document.getElementById('dmKpis').innerHTML=[
+    ['派工总成本', usd(t.cost), 'acc'],
+    ['任务数', fmtN(t.tasks)+(t.errors?' ('+t.errors+'e)':''), ''],
+    ['总 turns', fmtN(t.turns), ''],
+    ['平均 $/任务', usd(t.avg_cost), ''],
+    ['平均时长', fmtDur(t.avg_dur_s), ''],
+    ['daemon:dispatch', ratio, 'warn'],
+  ].map(k=>`<div class="kpi"><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  // 各角色成本(降序条形 + $/turn 效率)
+  const roles=d.per_role||[]; const rmax=roles.length?(roles[0].cost||1):1;
+  document.getElementById('dmRoles').innerHTML=roles.map(r=>{
+    const pct=Math.max(2,(r.cost/(rmax||1))*100).toFixed(1);
+    return `<div class="bar-row" style="grid-template-columns:120px 1fr auto"><span class="lbl" title="${esc(r.role)}">${esc(r.role)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
+      <span class="num">${usd(r.cost)} <span style="color:var(--dim)">· ${r.tasks}任务 · $${(r.per_turn||0).toFixed(3)}/t</span></span></div>`;
+  }).join('')||'<div class="muted" style="padding:6px 16px">无数据</div>';
+  // daemon vs dispatch 拆分
+  const bk=d.by_kind||{}; const kinds=[['daemon',bk.daemon],['dispatch',bk.dispatch]];
+  const kmax=Math.max(1,...kinds.map(k=>k[1]?(k[1].cost||0):0));
+  document.getElementById('dmKind').innerHTML=kinds.map(([name,k])=>{
+    k=k||{tasks:0,cost:0,per_task:0,avg_dur_s:0};
+    const pct=Math.max(2,((k.cost||0)/kmax)*100).toFixed(1);
+    const col=name==='dispatch'?'var(--warn)':'var(--accent)';
+    return `<div class="bar-row" style="grid-template-columns:90px 1fr auto"><span class="lbl"><span class="kind-tag ${name}">${name}</span></span>
+      <span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${col}"></span></span>
+      <span class="num">${usd(k.cost)} <span style="color:var(--dim)">· ${k.tasks}任务 · ${usd(k.per_task)}/任务 · ${fmtDur(k.avg_dur_s)}</span></span></div>`;
+  }).join('');
+  // Top 耗时任务(title 标注)
+  const top=d.top_dur||[];
+  document.getElementById('dmTop').innerHTML=top.length? top.map(x=>{
+    const secs=Math.round((x.dur_ms||0)/1000);
+    const err=x.status==='error'?' <span style="color:var(--dead)">err</span>':'';
+    return `<div class="bar-row" style="grid-template-columns:1fr auto"><span class="lbl" title="${esc(x.title||'(无标题)')}"><span class="kind-tag ${esc(x.kind)}">${esc(x.kind)}</span>${esc(x.role)} · ${esc(x.title||'(无标题)')}${err}</span>
+      <span class="num">${fmtDur(secs)} · ${x.turns}t · ${usd(x.cost)}</span></div>`;
+  }).join(''):'<div class="muted" style="padding:6px 16px">无数据</div>';
+}
+async function loadDispatch(force){
+  try{ const r=await fetch('/api/dispatch_metrics'+(force?'?fresh=1':'')); renderDispatch(await r.json()); }
+  catch(e){}
+}
+document.getElementById('dmRefresh').onclick=()=>loadDispatch(true);
 
 // ===== 可恢复会话 =====
 let _sessData=null;
@@ -2003,8 +2466,8 @@ syncTabTop(); showTab(curTab);
 // 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
 // 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
 loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
-// 历史用量(全扫 ~3s,缓存5min)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
-setTimeout(loadUsage, 800); setTimeout(loadSessions, 1200);
+// 历史用量(全扫 ~3s,缓存5min)+ 派工效率(metrics.jsonl 轻量,缓存20s)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
+setTimeout(loadUsage, 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
 </script>
 </body></html>"""
 
@@ -2064,6 +2527,10 @@ class Handler(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
             self._send(200, get_usage(force=fresh))
+        elif path == "/api/dispatch_metrics":
+            q = parse_qs(u.query)
+            fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
+            self._send(200, get_dispatch_metrics(force=fresh))
         elif path == "/api/sessions":
             self._send(200, read_sessions())
         else:
@@ -2145,7 +2612,7 @@ def start_supervisor(interval=90):
         while not stop.wait(interval):
             try:
                 subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "supervise"],
-                               capture_output=True, text=True, timeout=60)
+                               capture_output=True, text=True, timeout=60, creationflags=_NO_WINDOW)
             except Exception:
                 pass
 
@@ -2167,20 +2634,18 @@ def main():
         sys.exit(2)
 
     start_watcher()
-    start_status_pusher(5)            # daemon→agent 定时通信:5s 刷新 fleet_status.json
+    start_fleet_refresher(20)         # 唯一舰队刷新者:20s 子进程扫描刷新 _fleet_cache(请求路径零扫描)
+    start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()
     # 预热缓存(后台线程,不阻塞启动):
     #  · build_bi() 跑一遍 → 填充 _proc_cache(psutil.Process 对象 + cpu_percent 基线),
     #    使【首个真实 /api/bi】~220ms 而非冷启 ~4.5s(_proc_cache 无 TTL,长期受益,首屏 BI 关键)。
     #  · compute_fleet_cached() → 首个 /api/state 若在 3s TTL 内命中热缓存(快速重连时受益)。
+    #  · 舰队缓存由 start_fleet_refresher 首轮立即填充(~4s),无需在此预热。
     def _prewarm():
         try:
             build_bi()
-        except Exception:
-            pass
-        try:
-            compute_fleet_cached()
         except Exception:
             pass
     threading.Thread(target=_prewarm, daemon=True).start()
