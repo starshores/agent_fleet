@@ -1109,6 +1109,120 @@ def cmd_webui_guard(args):
             print("[清陈旧 WebUI 失败] pid=%s: %s" % (pid, e))
 
 
+# ── 系统级 bus 健康巡检(push 补 pull 盲区:丢失/卡死的消息没有 agent 会自报)──────────
+# Master 定调(2026-06-25):能自动追回的先自动修(孤儿回执→推断 owner 自动重路由),
+# 修不了/需人定的才投🙋待办池,去重、别让巡检变噪音源。
+_MGMT_OWNER = {"MasterUI": "MasterAgent", "培训师": "MasterAgent"}
+
+def _infer_orphan_owner(reply):
+    """从孤儿回执推断原请求方:管理位(MasterUI/培训师)的活多来自 MasterAgent;
+    其余已登记角色(协调位自身除外)默认由总控 Master 兜底。推不出返回 None(→需人定,投待办)。"""
+    frm = reply.get("from")
+    if not frm or frm == "unknown" or frm in ("Master", "MasterAgent"):
+        return None
+    if frm in _MGMT_OWNER:
+        return _MGMT_OWNER[frm]
+    if frm in _load_agents():
+        return "Master"
+    return None
+
+def _health_anomalies(stuck_min=90):
+    """纯检测无副作用。orphans=回执丢进 unknown/(没 owner 会自报);
+    stuck=认领后久未完成的 processing(>stuck_min,worker 可能死/卡——阈值取大避免误报正常长任务)。"""
+    now = time.time()
+    orphans, stuck = [], []
+    for sub in ("inbox", "done"):
+        d = BUS / "unknown" / sub
+        if not d.exists():
+            continue
+        for p in d.glob("*.json"):
+            try:
+                o = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            orphans.append({"path": str(p), "id": p.stem, "from": o.get("from"),
+                            "title": o.get("title") or "", "owner": _infer_orphan_owner(o), "obj": o})
+    for d in BUS.iterdir():
+        if not d.is_dir() or d.name.startswith((".", "_")) or d.name == "unknown":
+            continue
+        pd = d / "processing"
+        if not pd.exists():
+            continue
+        for p in pd.glob("*.json"):
+            age = (now - p.stat().st_mtime) / 60
+            if age < stuck_min:
+                continue
+            try:
+                o = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            stuck.append({"role": d.name, "id": p.stem, "age_min": int(age),
+                          "from": o.get("from"), "title": o.get("title") or ""})
+    return {"orphans": orphans, "stuck": stuck}
+
+def _health_sweep_core(stuck_min=90, apply=False):
+    """检测 + 处置。apply=False 只报(dry-run)。返回处置报告。去重:已在 todos.json 的 ref 不重投。"""
+    a = _health_anomalies(stuck_min)
+    tf = BUS / "todos.json"
+    try:
+        todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
+        if not isinstance(todos, list):
+            todos = []
+    except Exception:
+        todos = []
+    seen = {t.get("ref") for t in todos if t.get("ref")}
+    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0}
+
+    def _add_todo(title, detail, ref):
+        if ref in seen:
+            rep["skipped_dup"] += 1
+            return False
+        todos.append({"id": "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex()),
+                      "title": title, "detail": detail, "source": "确认·bus健康", "priority": "中",
+                      "status": "待办", "deadline": "", "created": _now(), "updated": _now(),
+                      "task_id": None, "dispatched_to": None, "confirm_from": "bus健康", "ref": ref})
+        seen.add(ref)
+        return True
+
+    for o in a["orphans"]:
+        if o["owner"]:                       # 可自动追回:重路由到推断的 owner/done
+            if apply:
+                obj = o["obj"]
+                obj["recovered_from_unknown"] = True
+                obj["recovered_orig_to"] = obj.get("to")
+                dest = BUS / o["owner"] / "done"
+                dest.mkdir(parents=True, exist_ok=True)
+                _write_json(dest / (o["id"] + ".json"), obj)
+                try:
+                    os.remove(o["path"])     # 移出 unknown/=天然去重,下轮不再检出
+                except Exception:
+                    pass
+                _audit("health_reroute_orphan", id=o["id"], frm=o["from"], owner=o["owner"])
+            rep["orphans_rerouted"].append({"id": o["id"], "from": o["from"], "owner": o["owner"]})
+        else:                                # 推不出 owner:需人定,投待办
+            if apply:
+                _add_todo("孤儿回执需认领:from %s" % o["from"],
+                          "回执丢进 unknown/、原请求方不可考。标题「%s」。要不要指认 owner/重投?" % o["title"][:80],
+                          "health:orphan:" + o["id"])
+            rep["orphans_to_todo"].append({"id": o["id"], "from": o["from"]})
+
+    for s in a["stuck"]:                     # 卡死任务:需人定(重派/催/判死),不自动杀
+        if apply:
+            _add_todo("任务卡死:%s 的 processing 已 %dmin" % (s["role"], s["age_min"]),
+                      "任务 from=%s「%s」认领后久未完成,worker 可能死/卡。要不要重派/催/判死?" % (s["from"], s["title"][:80]),
+                      "health:stuck:" + s["id"])
+        rep["stuck_to_todo"].append({"role": s["role"], "id": s["id"], "age_min": s["age_min"]})
+
+    if apply and (rep["orphans_rerouted"] or rep["orphans_to_todo"] or rep["stuck_to_todo"]):
+        _write_json(tf, todos)               # 复用鲁棒落地(含 os.replace 重试)
+    return rep
+
+def cmd_health_sweep(args):
+    """系统级 bus 健康巡检:孤儿回执自动追回、卡死任务投待办需人定。--apply 才动手,默认 dry-run。"""
+    rep = _health_sweep_core(stuck_min=getattr(args, "stuck_min", 90) or 90, apply=getattr(args, "apply", False))
+    print(json.dumps(rep, ensure_ascii=False, indent=1))
+
+
 def cmd_supervise(args):
     """daemon 自愈 + 期望态对账:读 agent_bus/fleet.json 的期望 daemon 清单,重启其中【已死】的(存活跳过),
     并【回收孤儿 daemon】(worker_daemon 进程但 role 已不在 fleet —— 从 fleet 摘角色后的残留)。
@@ -1161,8 +1275,22 @@ def cmd_supervise(args):
             actions.append(("陈旧WebUI已清(pid=%s,age=%ss,未占8799)" % (pid, age), "WebUI"))
         except Exception as e:
             actions.append(("陈旧WebUI清理失败(pid=%s):%s" % (pid, e), "WebUI"))
+    # bus 健康巡检(孤儿回执自动追回 / 卡死任务投待办):节奏比 supervise(90s)长——加 600s 时间闸,避免噪音/空耗。
+    try:
+        marker = BUS / ".health_sweep_last"
+        last = marker.stat().st_mtime if marker.exists() else 0
+        if time.time() - last >= 600:
+            rep = _health_sweep_core(stuck_min=90, apply=not args.dry_run)
+            if not args.dry_run:
+                marker.write_text(_now(), encoding="utf-8")
+            nfix = len(rep["orphans_rerouted"]); ntodo = len(rep["orphans_to_todo"]) + len(rep["stuck_to_todo"])
+            if nfix or ntodo:
+                actions.append(("健康巡检:追回孤儿回执 %d、投待办 %d%s" % (
+                    nfix, ntodo, "(dry-run)" if args.dry_run else ""), "bus健康"))
+    except Exception as e:
+        actions.append(("健康巡检异常:%s" % e, "bus健康"))
     if not actions:
-        print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon / 陈旧 WebUI"); return
+        print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon / 陈旧 WebUI / 健康异常"); return
     for a, r in actions:
         print("[%s] %s" % (a, r))
 
@@ -1543,6 +1671,7 @@ def main():
     p = sub.add_parser("reap"); p.add_argument("--role", default=None); p.add_argument("--ttl", type=float, default=4000.0); p.add_argument("--grace", type=float, default=120.0); p.add_argument("--max-requeue", type=int, default=3, dest="max_requeue"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_reap)
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("webui-guard"); p.add_argument("--port", type=int, default=8799); p.add_argument("--min-age", type=float, default=30.0, dest="min_age"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_webui_guard)
+    p = sub.add_parser("health-sweep"); p.add_argument("--apply", action="store_true"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.set_defaults(fn=cmd_health_sweep)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)

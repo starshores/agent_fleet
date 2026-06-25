@@ -1080,7 +1080,7 @@ def todo_dispatch(b):
     """把一条待办派成 bus 任务(复用 send_task,from=Master),回写 task_id 闭环追踪。"""
     tid = b.get("id")
     to = (b.get("to") or "").strip()
-    note = (b.get("note") or "").strip()   # 派活当场补的附加说明(可空)
+    note = (b.get("note") or "").strip()   # 派活当场补的【额外】说明(可空,只为派活当下的额外话)
     if not to:
         return {"ok": False, "error": "未选 to role"}
     items = _load_todos()
@@ -1088,12 +1088,15 @@ def todo_dispatch(b):
         if o.get("id") == tid:
             title = o.get("title") or "(待办)"
             parts = [o.get("detail") or ""]
+            todo_note = (o.get("note") or "").strip()   # 待办常驻💬补充说明 → 派活【自动带上】,用户不必重写
+            if todo_note:
+                parts.append("\n\n补充说明:%s" % todo_note)
             if o.get("source"):
                 parts.append("\n来源:%s" % o["source"])
             if o.get("deadline"):
                 parts.append("\n截止:%s" % o["deadline"])
             if note:
-                parts.append("\n\n附加说明(用户 via WebUI @ %s):%s" % (ab._now(), note))
+                parts.append("\n\n派活额外说明(用户 via WebUI @ %s):%s" % (ab._now(), note))
             parts.append("\n(由 WebUI 待办池派发,todo id=%s)" % tid)
             task_text = "".join(p for p in parts if p).strip() or title
             try:
@@ -1979,11 +1982,15 @@ async function tDispatch(id){
   const to=document.getElementById('trole-'+id).value;
   if(!to){ toast('先选「派给…」要发给哪个 role',true); return; }   // 占位未选 → 不派,防误触
   // 先明确确认派活(发 bus 任务),再问可选附加说明 —— 别让随手点确定=派活
-  if(!confirm('确定把这条待办【派活】给 '+to+'?\n会给 '+to+' 发一个 bus 任务。\n(只想了结不处理→点取消,改用「忽略」)')){ return; }
-  const note=prompt('附加说明(可空)。点【确定】即派给 '+to+';点【取消】则不派:','');
-  if(note===null){ return; }   // 取消 = 不派
-  const j=await tPost('/api/todos/dispatch',{id,to,note:note.trim()});
-  if(j.ok){delete roleSel[id];toast('✅ 已派给 '+to+(note.trim()?'(含附加说明)':'')+' · task '+j.task_id);}else{toast('派活失败:'+(j.error||'?'),true);}
+  const t=(state.todos||[]).find(x=>x.id===id);
+  const hasNote=!!(t&&t.note&&t.note.trim());
+  const carry=hasNote?'\n这条待办的 💬补充说明 会【自动带给】'+to+',无需重写。':'';
+  if(!confirm('确定把这条待办【派活】给 '+to+'?\n会给 '+to+' 发一个 bus 任务。'+carry+'\n(只想了结不处理→点取消,改用「忽略」)')){ return; }
+  // 派活额外说明 = 只填派活当下的额外话;待办常驻💬补充说明由后端自动带上,不在此重复
+  const extra=prompt((hasNote?'💬补充说明已自动带上。':'')+'【派活额外说明】(可空)——只填派活当下要补的额外话,不用重复补充说明。\n点【确定】即派给 '+to+';点【取消】则不派:','');
+  if(extra===null){ return; }   // 取消 = 不派
+  const j=await tPost('/api/todos/dispatch',{id,to,note:extra.trim()});
+  if(j.ok){delete roleSel[id];toast('✅ 已派给 '+to+(hasNote?'(补充说明已带上)':'')+(extra.trim()?'(+额外说明)':'')+' · task '+j.task_id);}else{toast('派活失败:'+(j.error||'?'),true);}
   load();
 }
 async function tIgnore(id){
