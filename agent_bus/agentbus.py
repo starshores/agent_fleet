@@ -101,7 +101,19 @@ def _gen_id(role):
 def _write_json(path, obj):
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, path)  # 原子落地,避免 watcher 读到半截
+    # 原子落地,避免 watcher 读到半截。os.replace 在 Windows 下若目标被 watcher/AV/另一 waiter
+    # 瞬时占用会抛 PermissionError(WinError 5)——短 backoff 重试,绝不让瞬时锁把调用方崩掉
+    # (尤其自醒 wait 进程:Master 报过 _claim 改写时撞 WinError 5 → wait exit 1 → 协调位掉线漏消息)。
+    for attempt in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except OSError:
+            if attempt == 4:
+                try: tmp.unlink()           # 持久失败:清掉孤儿 .tmp 再抛
+                except Exception: pass
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def _audit(event, **fields):
@@ -366,6 +378,10 @@ def cmd_send(args):
     role = args.to
     _role_dir(role)
     frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    if frm == "unknown":
+        sys.stderr.write(
+            "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
+            "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
     tid = _gen_id(role)
     task = {
         "id": tid, "from": frm, "to": role,
@@ -404,7 +420,12 @@ def _claim(role, taskpath):
         return {"error": "bad task file: %s" % e}
     obj["status"] = "processing"
     obj["claimed"] = _now()
-    _write_json(proc, obj)
+    try:
+        _write_json(proc, obj)   # 更新 status/claimed 供 who/WebUI 看
+    except Exception as e:
+        # 任务已原子移入 processing(上面 os.replace 成功),状态改写只是尽力而为——
+        # 写失败(瞬时锁等持久化失败)绝不能崩 wait,否则协调位自醒掉线漏消息(Master 报的惨案)。
+        _audit("claim_write_warn", id=obj.get("id", taskpath.stem), role=role, err=str(e)[:80])
     _audit("claim", id=obj.get("id", taskpath.stem), role=role, frm=obj.get("from"))
     _set_current_task(role, obj.get("id", taskpath.stem), obj.get("title"))  # A3:presence 记"当前在做",who/WebUI 可见
     return obj
