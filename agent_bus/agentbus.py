@@ -79,6 +79,15 @@ def _list_roles():
                    if p.is_dir() and not p.name.startswith((".", "_"))])
 
 
+def _retired_roles():
+    """已退役 role 集合(agents.json 里 retired 字段为真)。退役语义:不再派活/onboarding、
+    不当"掉线/缺失"误报、supervise 不拉起、留痕不删(贡献档案在记忆)。succeeded_by 记接替者。"""
+    try:
+        return {r for r, v in _load_agents().items() if isinstance(v, dict) and v.get("retired")}
+    except Exception:
+        return set()
+
+
 def _load_agents():
     f = _agents_file()
     if f.exists():
@@ -848,10 +857,13 @@ def cmd_who(args):
     fresh = args.max_age
     alive = _alive_claude_pids()
     roles = _list_roles()
+    retired_set = _retired_roles()
     claimed = set()
     print("%-14s %-22s %-9s %8s  %s" % ("role", "verdict", "claude_pid", "心跳age", "cwd"))
     print("-" * 88)
     for r in roles:
+        if r in retired_set:        # 退役:标注、不当残留/异常(进程退是应该的)
+            print("%-14s %-22s" % (r, "⊘ 退役")); continue
         pf = BUS / r / "presence.json"
         if not pf.exists():
             print("%-14s %-22s" % (r, "未声明(无 presence)"))
@@ -1231,17 +1243,20 @@ def _collect_health(stale_min=30, stuck_min=90):
     role_dirs = [d for d in sorted(BUS.iterdir())
                  if d.is_dir() and not d.name.startswith((".", "_")) and d.name != "unknown"]
     h = {"as_of": _now(), "warns": []}
-    # 1) 自醒
+    # 1) 自醒(退役 role 跳过——不计掉线,否则误报)
     wr = _wait_proc_roles()
-    armed = stale = off = 0; stale_roles = []
+    retired_set = _retired_roles()
+    armed = stale = off = retired_n = 0; stale_roles = []
     for d in role_dirs:
+        if d.name in retired_set:
+            retired_n += 1; continue
         if not (d / "presence.json").exists():
             continue
         stt, _ = _self_wake_state(d.name, wait_roles=wr)
         if stt == "armed": armed += 1
         elif stt == "stale": stale += 1; stale_roles.append(d.name)
         else: off += 1
-    h["selfwake"] = {"armed": armed, "stale": stale, "off": off, "stale_roles": stale_roles}
+    h["selfwake"] = {"armed": armed, "stale": stale, "off": off, "retired": retired_n, "stale_roles": stale_roles}
     if stale_roles: h["warns"].append("自醒掉线 %d(%s)" % (stale, ",".join(stale_roles)))
     # 2) 队列
     q = {"inbox": 0, "processing": 0, "held": 0, "failed": 0}
@@ -1308,7 +1323,7 @@ def cmd_health(args):
         print(json.dumps(h, ensure_ascii=False, indent=1)); return
     L = ["=== Bus 健康检查 (as of %s) ===" % h["as_of"]]
     sw = h["selfwake"]
-    L.append("\n[自醒]   在岗 %d / 掉线 %d / 未醒 %d" % (sw["armed"], sw["stale"], sw["off"]))
+    L.append("\n[自醒]   在岗 %d / 掉线 %d / 未醒 %d / 退役 %d" % (sw["armed"], sw["stale"], sw["off"], sw.get("retired", 0)))
     if sw["stale_roles"]: L.append("  ⚠ 掉线需重挂: " + ", ".join(sw["stale_roles"]))
     q = h["queues"]
     L.append("\n[队列]   inbox 待领 %d / processing 处理中 %d / held 待批 %d / failed 失败 %d"
@@ -1453,17 +1468,22 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
 
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
-    armed = stale = off = 0
+    armed = stale = off = retired = 0
     wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
+    retired_set = _retired_roles()
     print("%-14s %-8s %s" % ("role", "自醒", "说明"))
     print("-" * 78)
     for role in _list_roles():
+        if role in retired_set:        # 退役:不计掉线(否则误报),只标注
+            sb = _load_agents().get(role, {}).get("succeeded_by")
+            print("%-14s %-8s %s" % (role, "⊘退役", "已退役" + ("·接替=" + sb if sb else "") + "(留痕不删,不派活)"))
+            retired += 1; continue
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
         mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}[st]
         print("%-14s %-8s %s" % (role, mark, detail))
         armed += st == "armed"; stale += st == "stale"; off += st == "off"
     print("-" * 78)
-    print("自醒在岗 %d / 掉线 %d / 未醒 %d" % (armed, stale, off))
+    print("自醒在岗 %d / 掉线 %d / 未醒 %d / 退役 %d" % (armed, stale, off, retired))
     if stale:
         print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
 
@@ -1725,8 +1745,9 @@ def cmd_roster(args):
     kw = (getattr(args, "grep", None) or "").strip().lower()
     if kw:  # 路由助手:按关键词在 role/专长(desc)/caps 里筛"谁管这事"→ 直接派给它,不广播
         agents = {r: v for r, v in agents.items()
-                  if kw in r.lower() or kw in (v.get("desc", "") or "").lower()
-                  or kw in " ".join(v.get("caps", [])).lower()}
+                  if not (isinstance(v, dict) and v.get("retired"))   # 退役不进路由(别把活派给退役的)
+                  and (kw in r.lower() or kw in (v.get("desc", "") or "").lower()
+                       or kw in " ".join(v.get("caps", [])).lower())}
     wait_roles = _wait_proc_roles()
     mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}
     hdr = ("花名册·匹配「%s」(%d):" % (kw, len(agents))) if kw else ("花名册(agents.json · %d 个角色):" % len(agents))
@@ -1735,6 +1756,11 @@ def cmd_roster(args):
     if not agents:
         print("(无匹配——可能无此专责;考虑广播,或 register 新专家)"); return
     for role, v in agents.items():
+        if isinstance(v, dict) and v.get("retired"):   # 退役:标注、不显示在岗状态(它本就不该在岗)
+            sb = v.get("succeeded_by")
+            print("● %-12s ⊘退役  retired=%s%s" % (role, v.get("retired"), ("  接替=" + sb if sb else "")))
+            print("   专长(存档): %s" % ((v.get("desc", "") or "").strip()[:100]))
+            continue
         st = _self_wake_state(role, wait_roles=wait_roles)[0]
         caps = "/".join(v.get("caps", [])) or "(无)"
         desc = (v.get("desc", "") or "(专长未填)").strip()

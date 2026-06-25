@@ -1206,15 +1206,27 @@ def read_live(role=None, dispatch_id=None):
 
 
 # =============================================================
-#  历史用量 BI (P0)—— 使用分析 token_stats.py --json(全扫 ~3s)
-#  口径:已按 message.id 去重、Shanghai 日、cost=API 等价。stale-while-revalidate 缓存 5min,
-#  绝不阻塞请求(后台线程跑那 ~3s 全扫)。
+#  历史用量 BI (P0)—— 使用分析 token_stats.py --json(增量 ETL,已 ~50ms)
+#  口径:已按 message.id 去重、Shanghai 日、cost=API 等价。
+#  fresh=1 同步跑增量再返回(点一次即最新);非 fresh 走缓存,含今日缩 TTL 60s 贴近实时。
 # =============================================================
 TOKEN_STATS = str(Path.home() / ".claude" / "projects" / "token_stats.py")
-_USAGE_TTL = 300.0
+_USAGE_TTL = 300.0          # 纯历史(数据不含今日)长 TTL
+_USAGE_TTL_TODAY = 60.0     # 数据含今日 → 缩 TTL 贴近实时(ETL 已增量 ~50ms)
 _usage_cache = {"ts": 0.0, "data": None}
 _usage_lock = threading.Lock()
 _usage_refreshing = {"v": False}
+
+
+def _data_has_today(data):
+    """data 最新一天是否就是今天(本地=Shanghai 日)。含今日则用短 TTL。"""
+    try:
+        daily = (data or {}).get("daily") or []
+        if not daily:
+            return False
+        return daily[-1].get("date") == time.strftime("%Y-%m-%d", time.localtime())
+    except Exception:
+        return False
 
 
 def _run_token_stats():
@@ -1241,11 +1253,24 @@ def _refresh_usage():
 
 
 def get_usage(force=False):
+    if force:
+        # fresh=1:同步跑一次增量 ETL+聚合再返回最新(增量已 ~50ms,可接受)。
+        # 不再「立即返回旧缓存 + 后台异步刷新」——那是旧 3s 全扫时代的设计,
+        # 正是它导致 fresh=1 当次仍返回旧值、要点两下。失败则兜旧缓存。
+        try:
+            data = _run_token_stats()
+        except Exception as e:
+            with _usage_lock:
+                return _usage_cache["data"] or {"error": str(e)}
+        with _usage_lock:
+            _usage_cache["data"] = data
+            _usage_cache["ts"] = time.time()
+        return data
     with _usage_lock:
         data = _usage_cache["data"]
         age = time.time() - _usage_cache["ts"]
     if data is None:
-        # 首次:同步跑一次(~3s);之后都走缓存 + 后台刷新
+        # 首次:同步跑一次(增量 ~50ms);之后走缓存 + 到期后台刷新
         try:
             data = _run_token_stats()
         except Exception as e:
@@ -1254,7 +1279,9 @@ def get_usage(force=False):
             _usage_cache["data"] = data
             _usage_cache["ts"] = time.time()
         return data
-    if (force or age >= _USAGE_TTL) and not _usage_refreshing["v"]:
+    # 含今日数据 → 短 TTL 贴近实时;纯历史 → 长 TTL
+    ttl = _USAGE_TTL_TODAY if _data_has_today(data) else _USAGE_TTL
+    if age >= ttl and not _usage_refreshing["v"]:
         _usage_refreshing["v"] = True
         threading.Thread(target=_refresh_usage, daemon=True).start()
     return data
@@ -2418,7 +2445,7 @@ function drawModels(bmm){
   document.getElementById('uModelLegend').innerHTML=models.map(md=>`<span><i style="background:${modelColor(md)}"></i>${esc(modelShort(md))}</span>`).join('');
 }
 async function loadUsage(force){
-  const kp=document.getElementById('usageKpis'); if(!kp.innerHTML) kp.innerHTML='<div class="muted" style="padding:6px 12px">加载中（全扫 ~3s）…</div>';
+  const kp=document.getElementById('usageKpis'); if(!kp.innerHTML) kp.innerHTML='<div class="muted" style="padding:6px 12px">加载中…</div>';
   try{ const r=await fetch('/api/usage'+(force?'?fresh=1':'')); renderUsage(await r.json()); }
   catch(e){ kp.innerHTML='<div class="muted" style="padding:6px 12px">加载失败:'+esc(e)+'</div>'; }
 }
@@ -2519,6 +2546,7 @@ function showTab(t){
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
   document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
   window.scrollTo({top:0});
+  if(t==='bi') loadUsage(true);   // 进入 BI tab 即同步刷新,第一眼贴近当前(增量 ~50ms)
 }
 function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
 document.querySelectorAll('#tabbar .tab').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
@@ -2577,8 +2605,8 @@ syncTabTop(); showTab(curTab);
 // 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
 // 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
 loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
-// 历史用量(全扫 ~3s,缓存5min)+ 派工效率(metrics.jsonl 轻量,缓存20s)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
-setTimeout(loadUsage, 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
+// 历史用量(增量 ~50ms;含今日缩 TTL 60s)+ 派工效率(metrics.jsonl 轻量,缓存20s)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
+setTimeout(()=>loadUsage(true), 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 </script>
 </body></html>"""
