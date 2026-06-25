@@ -1185,11 +1185,22 @@ def _health_sweep_core(stuck_min=90, apply=False):
     except Exception:
         todos = []
     seen = {t.get("ref") for t in todos if t.get("ref")}
-    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0}
+    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0, "resolved_stale": 0}
+
+    # 自愈反收:撤销【异常已解决】的健康待办(避免过时派发——任务早已处理,待办却还在池里被派发)。
+    # 仍存在的异常 id;不在其中=已解决→把对应 health:* 待办标"完成"(进历史,不再占活跃)。
+    if apply and todos:
+        live = {"health:stuck:" + s["id"] for s in a["stuck"]} | {"health:orphan:" + o["id"] for o in a["orphans"]}
+        for t in todos:
+            ref = t.get("ref") or ""
+            if ref.startswith("health:") and t.get("status") != "完成" and ref not in live:
+                t["status"] = "完成"; t["updated"] = _now()
+                t["detail"] = (t.get("detail", "") + " 〔bus健康:异常已解决,自动关闭〕").strip()
+                rep["resolved_stale"] += 1
 
     def _add_todo(title, detail, ref):
-        if ref in seen:
-            rep["skipped_dup"] += 1
+        if any(t.get("ref") == ref and t.get("status") != "完成" for t in todos):
+            rep["skipped_dup"] += 1     # 已有【未完成】的同 ref 待办才算重复;已完成的允许新异常重新开
             return False
         todos.append({"id": "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex()),
                       "title": title, "detail": detail, "source": "确认·bus健康", "priority": "中",
@@ -1227,7 +1238,7 @@ def _health_sweep_core(stuck_min=90, apply=False):
                       "health:stuck:" + s["id"])
         rep["stuck_to_todo"].append({"role": s["role"], "id": s["id"], "age_min": s["age_min"]})
 
-    if apply and (rep["orphans_rerouted"] or rep["orphans_to_todo"] or rep["stuck_to_todo"]):
+    if apply and (rep["orphans_to_todo"] or rep["stuck_to_todo"] or rep["resolved_stale"]):
         _write_json(tf, todos)               # 复用鲁棒落地(含 os.replace 重试)
     return rep
 
