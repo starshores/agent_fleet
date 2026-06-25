@@ -30,6 +30,8 @@
   "caps": ["bus-comms", "self-wake", "confidentiality"]
  },
  "Master数分": {
-  "registered": "2026-06-24T16:12:17"
+  "registered": "2026-06-24T16:12:17",
+  "desc": "数据分析口——bus/用量/成本资源的数据分析与口径把关:usage.db/metrics 实测分析(配额利用率·产出价值·成本归因)、数据真实性核查、退役贡献溯源;协调/分析位,不 loop。",
+  "caps": ["bus-comms", "self-wake", "confidentiality"]
  }
 }

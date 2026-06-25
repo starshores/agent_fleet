@@ -1026,9 +1026,11 @@ def _orphan_daemon_pids(fleet_roles):
 
 
 def _stale_webui_pids(port=8799, min_age=30):
-    """重复/陈旧 WebUI = 在跑 server.py 但【没占住 port】的 python 进程(如 31468:旧实例没占端口却还跑 supervisor)。
-    安全铁律:只在【确实有一个 server.py 进程占住 port】时,才认定其余没占端口的为陈旧;否则一个不动(可能正在启动)。
-    再加 min_age 秒龄保护(太年轻可能在 bind 中,跳过)。返回 [(pid, age_s), ...]。绝不返回占端口的那个。"""
+    """重复/陈旧 WebUI = 在跑【agent_fleet 的 ui/server.py】但没占住 port 的 python 进程(如 31468 旧实例)。
+    安全铁律(业务侧 agent 报过误杀 sql_agent server.py 的惨案后强化):
+      ① 候选【只认 cmdline 含 /ui/server.py】—— 精确匹配 WebUI 本体,绝不把别的 server.py(如 sql_agent 占 5678)算进来;
+      ② 绝不杀【占着任何监听端口】的进程(那是合法服务,如 sql_agent);
+      ③ 只在确有进程占住 8799 时才认定其余为陈旧;④ min_age 保护(太年轻可能在 bind)。返回 [(pid, age_s)]。"""
     if psutil is None:
         return []
     webui = {}
@@ -1036,27 +1038,32 @@ def _stale_webui_pids(port=8799, min_age=30):
         try:
             if "python" not in (p.info.get("name") or "").lower():
                 continue
-            if any("server.py" in str(x) for x in (p.cmdline() or [])):
+            cl = " ".join(str(x) for x in (p.cmdline() or [])).replace("\\", "/").lower()
+            if "/ui/server.py" in cl:          # 精确:只认 WebUI 的 ui/server.py,排除 sql_agent/server.py 等
                 webui[p.pid] = p.info.get("create_time")
         except Exception:
             continue
     if len(webui) <= 1:
         return []
     owner = None
+    port_owners = set()                        # 占着【任何】监听端口的 pid —— 一律不杀(合法服务)
     try:
         for c in psutil.net_connections(kind="inet"):
-            if c.status == "LISTEN" and c.laddr and c.laddr.port == port and c.pid:
-                owner = c.pid
-                break
+            if c.status == "LISTEN" and c.pid:
+                port_owners.add(c.pid)
+                if c.laddr and c.laddr.port == port:
+                    owner = c.pid
     except Exception:
         return []                      # 拿不到端口归属 → 不动(安全)
     if owner is None or owner not in webui:
-        return []                      # 没有明确占端口的 server.py → 不动(可能在启动/已切到非 server.py)
+        return []                      # 没有明确占 8799 的 WebUI → 不动(可能在启动)
     now = time.time()
     stale = []
     for pid, ct in webui.items():
         if pid == owner:
-            continue                   # 占端口的=在岗,绝不杀
+            continue                   # 占 8799 的=在岗,绝不杀
+        if pid in port_owners:
+            continue                   # 占着别的监听端口=合法服务(如 sql_agent 5678),绝不杀
         age = now - (ct or now)
         if age < min_age:
             continue                   # 太年轻,可能在 bind,跳过
