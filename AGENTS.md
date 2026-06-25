@@ -55,6 +55,8 @@ ab wait --role X --include-approval             # 有人值守的 tab 显式领�
 ab reap [--role X] [--ttl 4000 --grace 120 --dry-run]   # 孤儿回收:owner 进程已退/超期仍卡 processing 的任务退回 inbox
 ab supervise [--dry-run]                         # daemon 期望态对账:启 fleet 缺的 + 回收孤儿 daemon(role 不在 fleet)+ 清陈旧重复 WebUI(没占 8799 的 server.py 实例);只杀 worker_daemon / 非在岗 WebUI,前台 CLI/dispatch 与占端口的在岗 WebUI 不碰。WebUI 每 90s 自动跑
 ab webui-guard [--port 8799 --min-age 30 --dry-run]  # 单独跑:清没占端口的陈旧 server.py 实例(防 31468 那类流氓 supervisor);只在能确认端口归属时动、不杀在岗的
+ab health [--stale-min 30 --stuck-min 90 --json]  # ⭐【只读】bus 健康总检:自醒/队列/消息丢失(孤儿·卡死·久滞)/daemon舰队/WebUI/edge锁 + ⚠✓ 总判定。要知道 bus 健康状态看这个;不改状态
+ab health-sweep [--apply --stuck-min 90]          # 消息丢失巡检处置(push 补 pull):孤儿回执能推断 owner 就自动重路由、推不出/卡死投待办;去重;已集成 supervise(600s 闸)
 ab prune [--dry-run]                             # 清空的遗留 role 目录(无 presence 且队列全空)
 ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一次性 ad-hoc agent】:有总线沟通(request/send)、不监听队列、干完即逝、可重派;结果回填 <from>/done(replies 收)
 ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}

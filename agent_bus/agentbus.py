@@ -1223,6 +1223,117 @@ def cmd_health_sweep(args):
     print(json.dumps(rep, ensure_ascii=False, indent=1))
 
 
+def _collect_health(stale_min=30, stuck_min=90):
+    """只读汇总 bus 健康各项指标(不改任何状态)。返回 dict,供 cmd_health 渲染 / WebUI 复用。"""
+    now = time.time()
+    role_dirs = [d for d in sorted(BUS.iterdir())
+                 if d.is_dir() and not d.name.startswith((".", "_")) and d.name != "unknown"]
+    h = {"as_of": _now(), "warns": []}
+    # 1) 自醒
+    wr = _wait_proc_roles()
+    armed = stale = off = 0; stale_roles = []
+    for d in role_dirs:
+        if not (d / "presence.json").exists():
+            continue
+        stt, _ = _self_wake_state(d.name, wait_roles=wr)
+        if stt == "armed": armed += 1
+        elif stt == "stale": stale += 1; stale_roles.append(d.name)
+        else: off += 1
+    h["selfwake"] = {"armed": armed, "stale": stale, "off": off, "stale_roles": stale_roles}
+    if stale_roles: h["warns"].append("自醒掉线 %d(%s)" % (stale, ",".join(stale_roles)))
+    # 2) 队列
+    q = {"inbox": 0, "processing": 0, "held": 0, "failed": 0}
+    held_l, failed_l = [], []
+    for d in role_dirs:
+        for k in q:
+            qd = d / k
+            if qd.exists():
+                n = len(list(qd.glob("*.json"))); q[k] += n
+                if k == "held" and n: held_l.append("%s:%d" % (d.name, n))
+                if k == "failed" and n: failed_l.append("%s:%d" % (d.name, n))
+    h["queues"] = dict(q, held_roles=held_l, failed_roles=failed_l)
+    if held_l: h["warns"].append("held 待批 %d" % q["held"])
+    if failed_l: h["warns"].append("failed 失败 %d" % q["failed"])
+    # 3) 消息丢失巡检
+    a = _health_anomalies(stuck_min)
+    stale_inbox = []
+    for d in role_dirs:
+        for p in (d / "inbox").glob("*.json"):
+            age = (now - p.stat().st_mtime) / 60
+            if age > stale_min:
+                stale_inbox.append({"role": d.name, "age_min": int(age)})
+    h["loss"] = {"orphans": len(a["orphans"]), "stuck": a["stuck"], "stale_inbox": stale_inbox}
+    if a["orphans"]: h["warns"].append("孤儿回执 %d" % len(a["orphans"]))
+    if a["stuck"]: h["warns"].append("卡死任务 %d" % len(a["stuck"]))
+    if stale_inbox: h["warns"].append("久滞 inbox %d" % len(stale_inbox))
+    # 4) daemon 舰队
+    try:
+        daemons = json.loads((BUS / "fleet.json").read_text(encoding="utf-8")).get("daemons", [])
+    except Exception:
+        daemons = []
+    fleet_roles = {d.get("role") for d in daemons if d.get("role")}
+    dead = [r for r in fleet_roles if not _daemon_alive(r)]
+    orphan_d = _orphan_daemon_pids(fleet_roles) if psutil else []
+    h["fleet"] = {"expected": len(fleet_roles), "alive": len(fleet_roles) - len(dead),
+                  "dead": dead, "orphans": ["%s(pid%s)" % (r, p) for p, r in orphan_d]}
+    if dead: h["warns"].append("daemon 缺 %d(%s)" % (len(dead), ",".join(dead)))
+    if orphan_d: h["warns"].append("孤儿 daemon %d" % len(orphan_d))
+    # 5) WebUI
+    owner = None; stale_webui = _stale_webui_pids(8799, 30) if psutil else []
+    if psutil:
+        try:
+            for c in psutil.net_connections(kind="inet"):
+                if c.status == "LISTEN" and c.laddr and c.laddr.port == 8799 and c.pid:
+                    owner = c.pid; break
+        except Exception:
+            pass
+    h["webui"] = {"owner_pid": owner, "stale_dupes": len(stale_webui)}
+    if not owner: h["warns"].append("WebUI 未在岗")
+    if stale_webui: h["warns"].append("陈旧 WebUI %d" % len(stale_webui))
+    # 6) edge-lock
+    eh = _edge_holder()
+    h["edge_lock"] = {"who": eh.get("who")} if eh else None
+    h["healthy"] = not h["warns"]
+    return h
+
+
+def cmd_health(args):
+    """【只读】bus 健康总检:自醒 / 队列 / 消息丢失(孤儿·卡死·久滞)/ daemon 舰队 / WebUI / edge锁,
+    一屏看全 + ⚠/✓ + 总判定。不改任何状态(要处置走 supervise / health-sweep --apply)。--json 出结构化。"""
+    h = _collect_health(stale_min=getattr(args, "stale_min", 30) or 30,
+                        stuck_min=getattr(args, "stuck_min", 90) or 90)
+    if getattr(args, "json", False):
+        print(json.dumps(h, ensure_ascii=False, indent=1)); return
+    L = ["=== Bus 健康检查 (as of %s) ===" % h["as_of"]]
+    sw = h["selfwake"]
+    L.append("\n[自醒]   在岗 %d / 掉线 %d / 未醒 %d" % (sw["armed"], sw["stale"], sw["off"]))
+    if sw["stale_roles"]: L.append("  ⚠ 掉线需重挂: " + ", ".join(sw["stale_roles"]))
+    q = h["queues"]
+    L.append("\n[队列]   inbox 待领 %d / processing 处理中 %d / held 待批 %d / failed 失败 %d"
+             % (q["inbox"], q["processing"], q["held"], q["failed"]))
+    if q["held_roles"]: L.append("  ⚠ 待批: " + ", ".join(q["held_roles"]))
+    if q["failed_roles"]: L.append("  ⚠ 失败: " + ", ".join(q["failed_roles"]))
+    ls = h["loss"]
+    L.append("\n[消息丢失巡检]")
+    L.append("  %s 孤儿回执(unknown/): %d" % ("⚠" if ls["orphans"] else "✓", ls["orphans"]))
+    L.append("  %s 卡死任务(>%dmin): %d" % ("⚠" if ls["stuck"] else "✓", getattr(args, "stuck_min", 90) or 90, len(ls["stuck"])))
+    for s in ls["stuck"]:
+        L.append("       - %s/%s %dmin「%s」" % (s["role"], s["id"][-6:], s["age_min"], (s["title"] or "")[:28]))
+    L.append("  %s 久滞 inbox(>%dmin): %d" % ("⚠" if ls["stale_inbox"] else "✓", getattr(args, "stale_min", 30) or 30, len(ls["stale_inbox"])))
+    for s in ls["stale_inbox"]:
+        L.append("       - %s %dmin" % (s["role"], s["age_min"]))
+    f = h["fleet"]
+    L.append("\n[daemon] fleet 期望 %d / 在岗 %d / 孤儿 %d" % (f["expected"], f["alive"], len(f["orphans"])))
+    if f["dead"]: L.append("  ⚠ 期望但未在岗: " + ", ".join(f["dead"]))
+    if f["orphans"]: L.append("  ⚠ 孤儿 daemon: " + ", ".join(f["orphans"]))
+    w = h["webui"]
+    L.append("\n[WebUI]  8799 %s / 陈旧重复 %d" % (("在岗 pid=%s" % w["owner_pid"]) if w["owner_pid"] else "⚠ 没人占", w["stale_dupes"]))
+    L.append("\n[edge锁] " + ("持有者=%s" % h["edge_lock"]["who"] if h["edge_lock"] else "空闲"))
+    L.append("\n" + "-" * 52)
+    L.append("总判定: ✓ 全绿,bus 健康" if h["healthy"] else "总判定: ⚠ %d 项需注意 — %s" % (len(h["warns"]), "; ".join(h["warns"])))
+    print("\n".join(L))
+
+
 def cmd_supervise(args):
     """daemon 自愈 + 期望态对账:读 agent_bus/fleet.json 的期望 daemon 清单,重启其中【已死】的(存活跳过),
     并【回收孤儿 daemon】(worker_daemon 进程但 role 已不在 fleet —— 从 fleet 摘角色后的残留)。
@@ -1672,6 +1783,7 @@ def main():
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("webui-guard"); p.add_argument("--port", type=int, default=8799); p.add_argument("--min-age", type=float, default=30.0, dest="min_age"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_webui_guard)
     p = sub.add_parser("health-sweep"); p.add_argument("--apply", action="store_true"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.set_defaults(fn=cmd_health_sweep)
+    p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)

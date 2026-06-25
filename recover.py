@@ -68,13 +68,9 @@ def main():
     orphan = run_bus("reap", "--dry-run").rstrip()
     print(orphan if orphan else "(无)")
 
-    print("\n[2.6] 进程卫生体检(supervise --dry-run:孤儿 daemon / 陈旧重复 WebUI 会被标出,只读不动)")
-    sv = run_bus("supervise", "--dry-run").rstrip()
-    print(sv if sv else "(无)")
-
-    print("\n[2.7] 事件自醒在岗(selfwake:armed 在岗 / stale 掉线需重挂 / off 未醒)")
-    sw = run_bus("selfwake").rstrip()
-    print(sw if sw else "(无)")
+    print("\n[2.6] ⭐ Bus 健康总检(ab health,只读:自醒/队列/消息丢失/daemon舰队/WebUI/edge锁 + 总判定)")
+    hl = run_bus("health").rstrip()
+    print(hl if hl else "(无)")
 
     print("\n[3] 回填给 MasterAgent 的结果(replies)")
     rep = run_bus("replies", "--role", COORD).rstrip()
