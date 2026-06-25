@@ -676,11 +676,11 @@ def _maybe_toast(sender, status, title, result, notify, reply_mode=None):
 def _emit_completion_notice(sender, notifier_role, ref_id, status, title, result_loc=None):
     """若 sender 是【自醒在岗的协调位】,往其 inbox 投一条 kind:notice 轻量完成通知,触发其后台 wait 自醒。
     cmd_done 与 dispatch_agent 收尾共用(dispatch 直接写 done 不走 cmd_done,故此前不触发自醒——本函数补齐)。
-    防环铁律:notice 自身完成不要调本函数(调用方负责对 kind=notice 不调);只对 HUMAN_ATTENDED 协调位投。
+    防环铁律:notice 自身完成不要调本函数(调用方负责对 kind=notice 不调)。
+    投递唯一判据=【sender 自醒在岗(armed)】——任何挂了后台 wait 的角色都投,不限 Master/MasterAgent。
+    (原 HUMAN_ATTENDED 白名单闸已移除:它会让 Master数分 等新 hello 的自醒协调位静默失联;Master数分 报的 bug。)
     best-effort,绝不影响主流程。返回是否投了 notice。"""
     try:
-        if sender not in HUMAN_ATTENDED:
-            return False
         if _self_wake_state(sender)[0] != "armed":
             return False
         loc = result_loc or ("%s/done/%s.json" % (sender, ref_id))

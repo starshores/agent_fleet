@@ -1886,10 +1886,16 @@ function cardHtml(t){
   const confirmBadge=pc?`<span class="badge confirm">🙋 待确认</span>`:'';
   const confirmWho=pc&&t.confirm_from?`<span class="confirm-who">等 ${esc(t.confirm_from)} 拍板</span>`:'';
   const who=t.confirm_from||t.creator||t.source||'用户';   // 谁发的(创建者/来源)
-  const noteHtml=t.note
-    ? `<span class="unote">💬 补充:${esc(t.note)}</span><button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">改</button>`
-    : `<button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">+ 补充说明</button>`;
-  return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${pc?'pending-confirm':''} ${t.status==='完成'?'is-done':''}" data-id="${t.id}">
+  // 补充说明区:由 openEditors 状态驱动(打开=渲染 textarea+草稿;关闭=渲染按钮)→ morphdom 刷新天然保留
+  const editing = openEditors[t.id] !== undefined;
+  const noteHtml = editing
+    ? `<textarea class="note-edit" id="ne-${t.id}" placeholder="给这条待办加补充说明/上下文(随时改)" oninput="openEditors['${t.id}']=this.value">${esc(openEditors[t.id])}</textarea>`
+      + `<div class="note-btns"><button class="btn mini" onclick="tNoteSave('${t.id}')">保存</button>`
+      + `<button class="btn mini ghost" onclick="tNoteCancel('${t.id}')">取消</button></div>`
+    : (t.note
+        ? `<span class="unote">💬 补充:${esc(t.note)}</span><button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">改</button>`
+        : `<button class="btn mini ghost nbtn" onclick="tNoteEdit('${t.id}')">+ 补充说明</button>`);
+  return `<div class="todo-card ${PRI_CARD[t.priority]||''} ${pc?'pending-confirm':''} ${t.status==='完成'?'is-done':''}" id="todocard-${t.id}" data-id="${t.id}">
       <div class="todo-h">
         ${confirmBadge}
         <span class="badge ${PRI_CLS[t.priority]||'p-mid'}">${esc(t.priority)}</span>
@@ -1914,7 +1920,7 @@ function cardHtml(t){
         <span class="muted">状态</span>
         <select onchange="tStatus('${t.id}',this.value)">${stSel}</select>
         <span class="muted" style="margin-left:6px">派给</span>
-        <select id="trole-${t.id}" onchange="roleSel['${t.id}']=this.value;markDirty('${t.id}')">${roleOptsFor(t)}</select>
+        <select id="trole-${t.id}" onchange="roleSel['${t.id}']=this.value">${roleOptsFor(t)}</select>
         <button class="btn mini" onclick="tDispatch('${t.id}')">派活</button>
         ${t.status!=='完成'?`<button class="btn mini ghost" onclick="tIgnore('${t.id}')" title="标记了结:不派活、不发任何 bus 任务">忽略</button>`:''}
         <button class="btn mini ghost" onclick="tEdit('${t.id}')">编辑</button>
@@ -1946,24 +1952,21 @@ function renderTodos(){
   if(todoView==='active'){ items.sort((a,b)=>(isPendingConfirm(b)?1:0)-(isPendingConfirm(a)?1:0)); }
   else{ items.sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||''))); }
 
-  if(!items.length){
-    if(dirtyCards.size===0){ const msg=todoView==='history'?'（暂无已完成）':'（无未完成待办,或被筛选）';
-      box.innerHTML='<div class="muted" style="padding:8px 16px">'+msg+'</div>'; }
-    return;   // 有脏卡时别清空(理论上不会走到,稳妥)
-  }
-  // 记焦点(脏卡里正在输入的编辑器),重建后恢复
-  const ae=document.activeElement; const focId=ae&&ae.id; let ss=null,se=null;
-  if(ae&&(ae.tagName==='TEXTAREA'||ae.tagName==='INPUT')){ try{ss=ae.selectionStart;se=ae.selectionEnd;}catch(e){} }
-  // 收集现有卡 DOM(按 id),脏卡整卡复用、非脏卡按数据重建
-  const existing={}; box.querySelectorAll('.todo-card[data-id]').forEach(n=>{existing[n.getAttribute('data-id')]=n;});
-  const frag=document.createDocumentFragment();
-  items.forEach(t=>{
-    const ex=existing[t.id];
-    if(dirtyCards.has(t.id) && ex){ frag.appendChild(ex); }   // 脏卡:复用现有节点,保住输入/选择/打开的编辑器
-    else{ const tpl=document.createElement('template'); tpl.innerHTML=cardHtml(t).trim(); frag.appendChild(tpl.content.firstElementChild); }
+  const inner = items.length
+    ? items.map(cardHtml).join('')
+    : '<div class="muted" style="padding:8px 16px">'+(todoView==='history'?'（暂无已完成）':'（无未完成待办,或被筛选）')+'</div>';
+  // 增量 DOM diff:morphdom 把 #todoBox 的孩子 patch 成新 html,只动变化的节点。
+  //  · getNodeKey 用 id(卡片 id=todocard-<id>)→ 卡片按身份匹配、原地更新,不重建 → 不闪、滚动位不跳。
+  //  · onBeforeElUpdated:用户正在输入/选择的表单控件(textarea/select/input)直接跳过 patch →
+  //    光标、未提交的下拉态、草稿绝不被刷新冲掉。其余卡内态(草稿/派给选择)已由 openEditors/roleSel 渲进 html,morphdom 自然对齐。
+  morphdom(box, '<div id="todoBox">'+inner+'</div>', {
+    getNodeKey: el => (el.nodeType===1 && el.id) ? el.id : null,
+    onBeforeElUpdated(fromEl, toEl){
+      if(fromEl===document.activeElement &&
+         (fromEl.tagName==='TEXTAREA'||fromEl.tagName==='SELECT'||fromEl.tagName==='INPUT')) return false;
+      return true;
+    }
   });
-  box.replaceChildren(frag);
-  if(focId){ const el=document.getElementById(focId); if(el){ try{ el.focus(); if(ss!=null&&el.setSelectionRange) el.setSelectionRange(ss,se); }catch(e){} } }
 }
 
 async function tPost(url,body){
@@ -1976,38 +1979,33 @@ async function tDispatch(id){
   const to=document.getElementById('trole-'+id).value;
   if(!to){ toast('先选「派给…」要发给哪个 role',true); return; }   // 占位未选 → 不派,防误触
   // 先明确确认派活(发 bus 任务),再问可选附加说明 —— 别让随手点确定=派活
-  if(!confirm('确定把这条待办【派活】给 '+to+'?\n会给 '+to+' 发一个 bus 任务。\n(只想了结不处理→点取消,改用「忽略」)')){ clearDirty(id); return; }
+  if(!confirm('确定把这条待办【派活】给 '+to+'?\n会给 '+to+' 发一个 bus 任务。\n(只想了结不处理→点取消,改用「忽略」)')){ return; }
   const note=prompt('附加说明(可空)。点【确定】即派给 '+to+';点【取消】则不派:','');
-  if(note===null){ clearDirty(id); return; }   // 取消 = 不派
+  if(note===null){ return; }   // 取消 = 不派
   const j=await tPost('/api/todos/dispatch',{id,to,note:note.trim()});
-  clearDirty(id);
   if(j.ok){delete roleSel[id];toast('✅ 已派给 '+to+(note.trim()?'(含附加说明)':'')+' · task '+j.task_id);}else{toast('派活失败:'+(j.error||'?'),true);}
   load();
 }
 async function tIgnore(id){
   if(!confirm('忽略这条?将标记为【已了结】(状态置完成+已忽略),不派活、不发任何任务,移入历史。')) return;
-  clearDirty(id);
   const j=await tPost('/api/todos/update',{id,status:'完成',ignored:true});
   toast(j.ok?'已忽略(移入历史)':'操作失败:'+(j.error||'?'),!j.ok); load();
 }
-// 常驻可编辑【补充说明】(note):inline 点击编辑,保存写回 todos.json。打开即标脏,统一机制保护不被自动刷新冲掉。
+// 常驻可编辑【补充说明】(note):inline 编辑,草稿存 openEditors[id](响应式)→ 刷新中天然不丢。
 function tNoteEdit(id){
-  const t=(state.todos||[]).find(x=>x.id===id); const na=document.getElementById('na-'+id); if(!t||!na) return;
-  markDirty(id);   // 该卡进入未提交交互态 → 自动刷新时整卡复用、不重建
-  na.innerHTML='<textarea class="note-edit" id="ne-'+id+'" placeholder="给这条待办加补充说明/上下文(随时改)"></textarea>'
-    +'<div class="note-btns"><button class="btn mini" onclick="tNoteSave(\''+id+'\')">保存</button>'
-    +'<button class="btn mini ghost" onclick="tNoteCancel(\''+id+'\')">取消</button></div>';
-  const ta=document.getElementById('ne-'+id); ta.value=t.note||''; ta.focus();
+  const t=(state.todos||[]).find(x=>x.id===id); if(!t) return;
+  openEditors[id]=t.note||'';   // 进入编辑态(草稿入 state)→ cardHtml 渲染出 textarea
+  renderTodos();
+  const ta=document.getElementById('ne-'+id); if(ta){ ta.focus(); try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){} }
 }
 async function tNoteSave(id){
-  const ta=document.getElementById('ne-'+id); if(!ta){ clearDirty(id); return; }
-  const val=ta.value.trim();
+  const val=(openEditors[id]||'').trim();
   let j; try{ j=await tPost('/api/todos/update',{id,note:val}); }catch(e){ toast('保存失败:'+e,true); return; }
-  clearDirty(id);   // 提交完成 → 清脏,该卡恢复正常刷新
+  delete openEditors[id];   // 关闭编辑态
   toast(j&&j.ok?'补充说明已保存':'保存失败:'+((j&&j.error)||'?'),!(j&&j.ok));
   load();
 }
-function tNoteCancel(id){ clearDirty(id); load(); }
+function tNoteCancel(id){ delete openEditors[id]; renderTodos(); }
 function tEdit(id){
   const t=(state.todos||[]).find(x=>x.id===id); if(!t) return;
   const title=prompt('标题',t.title); if(title===null) return;
@@ -2255,15 +2253,16 @@ function applyRange(r){
   const t=d.totals||{};
   const rangeCost=daily.reduce((s,x)=>s+(x.cost_usd||0),0);
   const rl=r?(r+'d'):'全历史';
-  const denom=(t.cache_read||0)+(t.input||0)+(t.output||0);
+  const cacheDenom=(t.cache_read||0)+(t.input||0)+(t.cache_write_5m||0)+(t.cache_write_1h||0);
+  const cacheHit=cacheDenom?(Math.floor((t.cache_read||0)/cacheDenom*1000)/10).toFixed(1)+'%':'–';
   document.getElementById('usageKpis').innerHTML=[
     ['API 等价成本(全历史)',usd(t.cost_usd),''],
     ['API calls(去重)',fmtN(t.calls),'acc'],
-    ['cache 命中', denom?Math.round((t.cache_read||0)/denom*100)+'%':'–','good'],
+    ['cache 命中', cacheHit,'good','cache_read /(cache_read + cache_creation + input),输入侧命中占比'],
     ['范围 cost('+rl+')', usd(rangeCost),'warn'],
     ['活跃天('+rl+')', daily.length,''],
     ['项目数', (d.by_project||[]).length,''],
-  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  ].map(k=>`<div class="kpi"${k[3]?` title="${k[3]}"`:''}><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
   drawTrend(daily);
 }
 function drawTrend(daily){
