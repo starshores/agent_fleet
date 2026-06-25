@@ -1453,10 +1453,18 @@ def cmd_roster(args):
     """花名册:列每个 agent 的 在岗状态 / 能力(caps) / 专长(desc) / 注册时间。
     agents.json 是花名册真相源;在岗按自醒检测(armed=在岗 / stale=掉线 / off=未醒)。"""
     agents = _load_agents()
+    kw = (getattr(args, "grep", None) or "").strip().lower()
+    if kw:  # 路由助手:按关键词在 role/专长(desc)/caps 里筛"谁管这事"→ 直接派给它,不广播
+        agents = {r: v for r, v in agents.items()
+                  if kw in r.lower() or kw in (v.get("desc", "") or "").lower()
+                  or kw in " ".join(v.get("caps", [])).lower()}
     wait_roles = _wait_proc_roles()
     mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}
-    print("花名册(agents.json · %d 个角色):" % len(agents))
+    hdr = ("花名册·匹配「%s」(%d):" % (kw, len(agents))) if kw else ("花名册(agents.json · %d 个角色):" % len(agents))
+    print(hdr)
     print("-" * 78)
+    if not agents:
+        print("(无匹配——可能无此专责;考虑广播,或 register 新专家)"); return
     for role, v in agents.items():
         st = _self_wake_state(role, wait_roles=wait_roles)[0]
         caps = "/".join(v.get("caps", [])) or "(无)"
@@ -1510,7 +1518,7 @@ def main():
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
-    p = sub.add_parser("roster"); p.set_defaults(fn=cmd_roster)
+    p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
     p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
