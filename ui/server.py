@@ -2678,8 +2678,10 @@ syncTabTop(); showTab(curTab);
 // BI 表格先出(首屏快),随后 /api/state 慢扫只影响舰队表(本就慢,晚 ~220ms 无感)。
 // 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
 // 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
-loadBI().finally(load); connectSSE(); setPoll(); setInterval(loadBI, 10000);
-// 历史用量(增量 ~50ms;含今日缩 TTL 60s)+ 派工效率(metrics.jsonl 轻量,缓存20s)+ 可恢复会话(缓存60s):各自独立懒加载,不拖首屏
+loadBI().finally(load); connectSSE(); setPoll();
+// 刷新门控(P1):BI 定时刷只在【BI tab 可见】时跑,不再无视可见性每 10s 扫 psutil + 拉 /api/bi
+setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);
+// 首屏一次性预热(各自独立懒加载,不拖首屏);之后按 tab 进入再刷(见 showTab)
 setTimeout(()=>loadUsage(true), 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 </script>
