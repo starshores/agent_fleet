@@ -769,6 +769,11 @@ def cmd_done(args):
             reply_mode = obj.get("reply_mode"); task_kind = obj.get("kind")
         except Exception:
             pass
+    if getattr(args, "to", None):     # 显式指定回执目标——任务已被归档/reap/移走、_find_task 找不到原 from 时用
+        sender = args.to
+    if sender == "unknown":           # 治【done 回执落 unknown 静默丢失】(如:某业务 agent 的在飞任务被清 stuck 时归档,它再 done 就找不到 from)
+        sys.stderr.write("⚠ done: 找不到任务 %s 的请求方(任务可能已被归档/reap/移走)→回执将落 unknown/、原请求方收不到。"
+                         "若知道请求方,加 --to <role> 重发本 done。\n" % tid)
     result = {
         "id": real_id, "from": role, "to": sender, "title": title,
         "status": args.status, "result": args.result, "finished": _now(),
@@ -1905,7 +1910,7 @@ def main():
     p = sub.add_parser("wait"); p.add_argument("--role", required=True); p.add_argument("--timeout", type=float, default=110.0); p.add_argument("--include-approval", action="store_true", dest="include_approval"); p.set_defaults(fn=cmd_wait)
     p = sub.add_parser("serve"); p.add_argument("--timeout", type=float, default=590.0); p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("request"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--chain", default=""); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_request)
-    p = sub.add_parser("done"); p.add_argument("--id", required=True); p.add_argument("--role", default=None); p.add_argument("--result", required=True); p.add_argument("--status", default="ok", choices=["ok", "error"]); p.add_argument("--notify", default="auto", choices=["auto", "always", "never"]); p.set_defaults(fn=cmd_done)
+    p = sub.add_parser("done"); p.add_argument("--id", required=True); p.add_argument("--role", default=None); p.add_argument("--result", required=True); p.add_argument("--status", default="ok", choices=["ok", "error"]); p.add_argument("--notify", default="auto", choices=["auto", "always", "never"]); p.add_argument("--to", default=None, help="显式回执目标(任务已被归档/reap、找不到原 from 时用)"); p.set_defaults(fn=cmd_done)
     p = sub.add_parser("peek"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_peek)
     p = sub.add_parser("replies"); p.add_argument("--role", required=True); p.add_argument("--clear", action="store_true"); p.set_defaults(fn=cmd_replies)
     p = sub.add_parser("hello"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_hello)

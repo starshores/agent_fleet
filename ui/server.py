@@ -1624,7 +1624,8 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
 </header>
 <nav class="tabbar" id="tabbar">
   <button class="tab" data-t="fleet">🛰 舰队/运维</button>
-  <button class="tab" data-t="bi">📊 BI/分析</button>
+  <button class="tab" data-t="bi">📊 运营/资源</button>
+  <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -1760,9 +1761,9 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <pre id="liveBox" class="livebox">（选一个 role 看它的 live.log）</pre>
   </section>
 
-  <!-- 历史用量 BI (P0) -->
-  <section data-tab="bi">
-    <div class="sec-h">📊 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · API 等价成本 · Shanghai 日</span>
+  <!-- 历史用量 BI (P0) —— 独立 tab(账单级全量,与运营/资源口径分开) -->
+  <section data-tab="usage">
+    <div class="sec-h">📈 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · API 等价成本 · Shanghai 日</span>
       <span class="spacer" style="flex:1"></span>
       <span id="usageMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="usageRefresh">刷新</button>
@@ -1833,6 +1834,26 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
 /* ===== end morphdom ===== */
 let state=null, pollTimer=null, lastTasksOpen=new Set();
 
+// 增量更新统一入口:把容器 el 的【孩子】patch 成 innerHtml(childrenOnly→容器自身的 class/style 不动)。
+//  · getNodeKey 用 id 或 data-key(列表项给稳定业务 key)→ 原地更新、不重建 → 不闪、滚动不跳。
+//  · onBeforeElUpdated 跳过【正在输入/选择】的表单控件 → 光标/未提交输入/下拉态不被刷新冲掉。
+function _keyOf(n){ if(n.nodeType!==1) return null; return n.id || n.getAttribute('data-key') || null; }
+function _onBeforeUpd(f){ if(f===document.activeElement && (f.tagName==='INPUT'||f.tagName==='TEXTAREA'||f.tagName==='SELECT')) return false; return true; }
+function morphInto(el, innerHtml){
+  if(!el) return;
+  const tag=el.tagName.toLowerCase();
+  try{ morphdom(el, '<'+tag+'>'+innerHtml+'</'+tag+'>',
+    {childrenOnly:true, getNodeKey:_keyOf, onBeforeElUpdated:_onBeforeUpd}); }
+  catch(e){ el.innerHTML=innerHtml; }   // 兜底:morph 异常退回整建,绝不白屏
+}
+// 舰队表展开任务明细(委托 onclick;展开态记入 lastTasksOpen,morph 重渲染后由 render 还原)
+function toggleTasks(tr){
+  const det=tr.nextElementSibling;
+  if(!det || !det.classList.contains('tasks')) return;
+  const role=tr.dataset.role; const vis=det.style.display!=='none';
+  det.style.display=vis?'none':''; if(vis) lastTasksOpen.delete(role); else lastTasksOpen.add(role);
+}
+
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function fmtAge(a){ if(a==null) return '?'; if(a<60) return a+'s'; if(a<3600) return Math.floor(a/60)+'m'+(a%60)+'s'; return Math.floor(a/3600)+'h'+Math.floor((a%3600)/60)+'m';}
 function qc(n,cls){return `<span class="qcount ${n?cls:'z'}">${n}</span>`;}
@@ -1855,26 +1876,22 @@ function render(){
   document.getElementById('fleetN').textContent=f.fleet_count;
   document.getElementById('updT').textContent='更新 '+state.now;
 
-  // fleet table
-  const tb=document.getElementById('fleetBody'); tb.innerHTML='';
+  // fleet table —— 增量 morph(展开态由 lastTasksOpen 声明式驱动 + 委托 onclick,刷新中展开/滚动不丢)
+  const subBadge={inbox:'idle',processing:'warn',held:'held',failed:'failed'};
+  let fleetHtml='';
   f.roles.forEach(r=>{
     const hasTasks=(r.inbox+r.processing+(r.held||0)+(r.failed||0))>0;
-    const tr=document.createElement('tr');
-    tr.className='role-row'+(hasTasks?' clickable':'');
-    tr.innerHTML=`<td><b>${esc(r.role)}</b></td>
+    const open=lastTasksOpen.has(r.role);
+    fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
+      <td><b>${esc(r.role)}</b></td>
       <td><span class="badge ${r.vclass}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
       <td>${qc(r.inbox,'ib')}</td><td>${qc(r.processing,'pr')}</td><td>${qc(r.done,'dn')}</td>
       <td>${qc(r.held||0,'held')}</td><td>${qc(r.failed||0,'failed')}</td>
-      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td>`;
-    tb.appendChild(tr);
+      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td></tr>`;
     if(hasTasks){
-      const det=document.createElement('tr'); det.className='tasks'; det.dataset.role=r.role;
-      const open=lastTasksOpen.has(r.role);
-      det.style.display=open?'':'none';
       let inner='<div class="task-wrap">';
-      const subBadge={inbox:'idle',processing:'warn',held:'held',failed:'failed'};
       (r.tasks||[]).forEach(t=>{
         const appr=(t.sub==='inbox'&&t.requires_approval);
         inner+=`<div class="task-card"><div class="t-h">
@@ -1888,12 +1905,10 @@ function render(){
           <pre>${esc(t.task)}</pre></div>`;
       });
       inner+='</div>';
-      det.innerHTML=`<td colspan="10">${inner}</td>`;
-      tb.appendChild(det);
-      tr.onclick=()=>{const vis=det.style.display!=='none';det.style.display=vis?'none':'';
-        if(vis)lastTasksOpen.delete(r.role);else lastTasksOpen.add(r.role);};
+      fleetHtml+=`<tr data-key="fd-${esc(r.role)}" class="tasks" data-role="${esc(r.role)}" style="display:${open?'':'none'}"><td colspan="10">${inner}</td></tr>`;
     }
   });
+  morphInto(document.getElementById('fleetBody'), fleetHtml);
 
   // process footer
   let foot=[];
@@ -1903,46 +1918,46 @@ function render(){
 
   // daemon 自愈面板(fleet.json × 存活)
   const db=document.getElementById('daemonBox'); const dm=state.daemons||{daemons:[]};
-  if(dm.error){ db.innerHTML='<div class="dmn"><span class="badge dead">err</span> '+esc(dm.error)+'</div>'; }
-  else if(!dm.daemons.length){ db.innerHTML='<div class="muted" style="padding:8px 16px">fleet.json 无 daemon 条目</div>'; }
-  else{ db.innerHTML=dm.daemons.map(d=>`<div class="dmn">
+  if(dm.error){ morphInto(db,'<div class="dmn"><span class="badge dead">err</span> '+esc(dm.error)+'</div>'); }
+  else if(!dm.daemons.length){ morphInto(db,'<div class="muted" style="padding:8px 16px">fleet.json 无 daemon 条目</div>'); }
+  else{ morphInto(db, dm.daemons.map(d=>`<div class="dmn" data-key="dm-${esc(d.role)}">
       <span class="badge ${d.alive?'live':'dead'}">${d.alive?'✓ 存活':'✗ 已死'}</span>
       <b>${esc(d.role)}</b>
       <span class="cwd" title="${esc(d.cwd||'')}">${esc(d.cwd||'')}</span>
       <span class="spacer" style="flex:1"></span>
-      <span class="muted">wait ${esc(d.wait_timeout)}s</span></div>`).join(''); }
+      <span class="muted">wait ${esc(d.wait_timeout)}s</span></div>`).join('')); }
 
   // 最近事件(events.jsonl 倒序)
   const eb=document.getElementById('eventBox'); const evs=state.events||[];
-  if(!evs.length){ eb.innerHTML='<div class="muted" style="padding:8px 16px">（无事件）</div>'; }
-  else{ eb.innerHTML=evs.map(e=>{
+  if(!evs.length){ morphInto(eb,'<div class="muted" style="padding:8px 16px">（无事件）</div>'); }
+  else{ morphInto(eb, evs.map(e=>{
       const tail=e.event==='send'?('→ '+esc(e.to)+(e.title?' · '+esc(e.title):'')):
                  e.event==='claim'?('by '+esc(e.role)):
                  e.event==='done'?('→ '+esc(e.to)+' · '+esc(e.status||'')):(esc(e.raw||''));
-      return `<div class="ev"><span class="ets">${esc(e.ts)}</span>
+      return `<div class="ev" data-key="ev-${esc(e.id||'')}-${esc(e.ts||'')}-${esc(e.event||'')}"><span class="ets">${esc(e.ts)}</span>
         <span class="et ${esc(e.event)}">${esc(e.event)}</span>
         <span class="mono">${esc(e.id||'')}</span>
         ${e.frm?'<span class="muted">from '+esc(e.frm)+'</span>':''}
-        <span>${tail}</span></div>`; }).join(''); }
+        <span>${tail}</span></div>`; }).join('')); }
 
-  // send-to dropdown (preserve selection)
+  // send-to dropdown (preserve selection) —— morph 保选中 + 聚焦时不被刷
   const sel=document.getElementById('sendTo'); const cur=sel.value;
-  sel.innerHTML=state.all_roles.map(r=>`<option ${r==cur?'selected':''}>${esc(r)}</option>`).join('');
+  morphInto(sel, state.all_roles.map(r=>`<option data-key="o-${esc(r)}" ${r==cur?'selected':''}>${esc(r)}</option>`).join(''));
 
   // reply role dropdown
   const rr=document.getElementById('replyRole'); const rc=rr.value||state.reply_role;
-  rr.innerHTML=state.all_roles.map(r=>`<option ${r==rc?'selected':''}>${esc(r)}</option>`).join('');
+  morphInto(rr, state.all_roles.map(r=>`<option data-key="o-${esc(r)}" ${r==rc?'selected':''}>${esc(r)}</option>`).join(''));
 
   // replies
   const rb=document.getElementById('replyBox');
-  if(!state.replies.length){ rb.innerHTML='<div class="muted" style="padding:6px 16px">（无回填）</div>'; }
-  else{ rb.innerHTML=state.replies.map(r=>`<div class="reply">
+  if(!state.replies.length){ morphInto(rb,'<div class="muted" style="padding:6px 16px">（无回填）</div>'); }
+  else{ morphInto(rb, state.replies.map(r=>`<div class="reply" data-key="rp-${esc(r.file||r.id)}">
       <div class="r-h"><span class="badge ${r.status==='ok'?'live':'dead'}">${esc(r.status||'?')}</span>
         <span class="mono">${esc(r.id)}</span> · from <b>${esc(r.from)}</b>
         <span>${esc(r.title)}</span> <span class="muted">${esc(r.finished)}</span>
         <span class="spacer" style="flex:1"></span>
         <button class="btn ghost" style="margin:0;padding:2px 9px" onclick="clearOne('${esc(r.file)}')">清除</button></div>
-      <pre>${esc(r.result)}</pre></div>`).join(''); }
+      <pre>${esc(r.result)}</pre></div>`).join('')); }
 
   renderTodos();
   fillLiveRoles();
@@ -1953,8 +1968,8 @@ let livePoll=null;
 function fillLiveRoles(){
   const sel=document.getElementById('liveRole'); if(!sel) return;
   const cur=sel.value;
-  sel.innerHTML=['<option value="">（选 role）</option>']
-    .concat((state.all_roles||[]).map(r=>`<option ${r==cur?'selected':''}>${esc(r)}</option>`)).join('');
+  morphInto(sel, ['<option value="" data-key="o-">（选 role）</option>']
+    .concat((state.all_roles||[]).map(r=>`<option data-key="o-${esc(r)}" ${r==cur?'selected':''}>${esc(r)}</option>`)).join(''));
 }
 async function pollLive(){
   const role=document.getElementById('liveRole').value;
@@ -2305,45 +2320,44 @@ function renderBI(bi){
     ['近24h 成本', '$'+h.cost.toFixed(3), '', false],
     ['在跑任务', bi.running.length, '', false]
   ];
-  document.getElementById('biKpis').innerHTML=kpi.map(k=>
-    `<div class="bi-kpi${k[3]?' warn':''}"><div class="k">${esc(k[0])}</div><div class="v">${k[1]}${k[2]?'<small>'+esc(k[2])+'</small>':''}</div></div>`).join('');
-  const rb=document.getElementById('biRunning');
-  rb.innerHTML=bi.running.length? bi.running.map(r=>
-    `<span class="bi-run"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
-    : '<span class="muted" style="font-size:12px">当前无在跑任务</span>';
+  morphInto(document.getElementById('biKpis'), kpi.map(k=>
+    `<div class="bi-kpi${k[3]?' warn':''}" data-key="k-${esc(k[0])}"><div class="k">${esc(k[0])}</div><div class="v">${k[1]}${k[2]?'<small>'+esc(k[2])+'</small>':''}</div></div>`).join(''));
+  morphInto(document.getElementById('biRunning'), bi.running.length? bi.running.map(r=>
+    `<span class="bi-run" data-key="run-${esc(r.role)}"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
+    : '<span class="muted" style="font-size:12px">当前无在跑任务</span>');
   // ① 任务消耗:仅列近24h 有消耗(tasks>0)的 role —— 不再用 0 行稀释重点
-  const tb=document.getElementById('biBody');
   const consume=(bi.per_role||[]).filter(r=>r.tasks>0);
-  if(!consume.length){ tb.innerHTML='<tr><td colspan="7" class="muted" style="padding:10px 16px">近24h 无自动化任务消耗 — 埋点仅覆盖 daemon/dispatch 派工,跑完任务即累积</td></tr>'; }
-  else{ tb.innerHTML=consume.map(r=>`<tr>
+  morphInto(document.getElementById('biBody'), !consume.length
+    ? '<tr><td colspan="7" class="muted" style="padding:10px 16px">近24h 无自动化任务消耗 — 埋点仅覆盖 daemon/dispatch 派工,跑完任务即累积</td></tr>'
+    : consume.map(r=>`<tr data-key="bc-${esc(r.role)}">
       <td><b>${esc(r.role)}</b></td>
       <td class="num">${r.tasks}${r.errors?' <span style="color:var(--dead)">('+r.errors+'e)</span>':''}</td>
       <td class="num">${fmtN(r.tok_in)}</td>
       <td class="num">${fmtN(r.tok_out)}</td>
       <td class="num">${fmtN(r.cache_read)}</td>
       <td class="num">$${r.cost.toFixed(4)}</td>
-      <td class="num">${fmtDur(r.avg_dur_s)}</td></tr>`).join(''); }
+      <td class="num">${fmtDur(r.avg_dur_s)}</td></tr>`).join(''));
   // ② 在岗资源占用:仅列有活进程(sys)的 role,按内存降序 —— 与①口径分开
-  const sb=document.getElementById('biSysBody');
   const live=(bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
-  if(!live.length){ sb.innerHTML='<tr><td colspan="3" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'; }
-  else{ sb.innerHTML=live.map(r=>`<tr>
+  morphInto(document.getElementById('biSysBody'), !live.length
+    ? '<tr><td colspan="3" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'
+    : live.map(r=>`<tr data-key="bs-${esc(r.role)}">
       <td><b>${esc(r.role)}</b></td>
       <td class="num">${r.sys.cpu}</td>
-      <td class="num">${r.sys.rss_mb}</td></tr>`).join(''); }
+      <td class="num">${r.sys.rss_mb}</td></tr>`).join(''));
   // 任务活动历史(events.jsonl)
   const act=bi.activity||{roles:[],span:null};
   document.getElementById('actSpan').textContent=act.span?(act.span.from+' → '+act.span.to+' · 共 '+act.total+' 任务'):'无历史';
-  const ab_=document.getElementById('actBody');
-  if(!act.roles.length){ ab_.innerHTML='<tr><td colspan="7" class="muted" style="padding:10px 16px">无历史活动</td></tr>'; }
-  else{ ab_.innerHTML=act.roles.map(r=>`<tr>
+  morphInto(document.getElementById('actBody'), !act.roles.length
+    ? '<tr><td colspan="7" class="muted" style="padding:10px 16px">无历史活动</td></tr>'
+    : act.roles.map(r=>`<tr data-key="ac-${esc(r.role)}">
       <td><b>${esc(r.role)}</b></td>
       <td class="num">${r.tasks}</td>
       <td class="num">${r.tasks24||0}</td>
       <td class="num">${r.ok}</td>
       <td class="num">${r.err?'<span style="color:var(--dead)">'+r.err+'</span>':'0'}</td>
       <td class="num">${r.avg_dur_s?fmtDur(r.avg_dur_s):'–'}</td>
-      <td class="num" style="color:var(--dim)">${esc(r.last_active)}</td></tr>`).join(''); }
+      <td class="num" style="color:var(--dim)">${esc(r.last_active)}</td></tr>`).join(''));
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
@@ -2409,14 +2423,14 @@ function applyRange(r){
   const rl=r?(r+'d'):'全历史';
   const cacheDenom=(t.cache_read||0)+(t.input||0)+(t.cache_write_5m||0)+(t.cache_write_1h||0);
   const cacheHit=cacheDenom?(Math.floor((t.cache_read||0)/cacheDenom*1000)/10).toFixed(1)+'%':'–';
-  document.getElementById('usageKpis').innerHTML=[
+  morphInto(document.getElementById('usageKpis'), [
     ['API 等价成本(全历史)',usd(t.cost_usd),''],
     ['API calls(去重)',fmtN(t.calls),'acc'],
     ['cache 命中', cacheHit,'good','cache_read /(cache_read + cache_creation + input),输入侧命中占比'],
     ['范围 cost('+rl+')', usd(rangeCost),'warn'],
     ['活跃天('+rl+')', daily.length,''],
     ['项目数', (d.by_project||[]).length,''],
-  ].map(k=>`<div class="kpi"${k[3]?` title="${k[3]}"`:''}><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${k[3]}"`:''}><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
   drawTrend(daily);
 }
 function drawTrend(daily){
@@ -2499,7 +2513,7 @@ function drawModels(bmm){
     if(t){ctx.fillStyle=UC.acc;ctx.font='bold 10px Consolas';ctx.fillText(Math.round(v48/t*100)+'%',cx+bw/2,yCur-5);ctx.font='10px Consolas';}
   });
   ctx.textAlign='left';
-  document.getElementById('uModelLegend').innerHTML=models.map(md=>`<span><i style="background:${modelColor(md)}"></i>${esc(modelShort(md))}</span>`).join('');
+  morphInto(document.getElementById('uModelLegend'), models.map(md=>`<span data-key="ml-${esc(md)}"><i style="background:${modelColor(md)}"></i>${esc(modelShort(md))}</span>`).join(''));
 }
 async function loadUsage(force){
   const kp=document.getElementById('usageKpis'); if(!kp.innerHTML) kp.innerHTML='<div class="muted" style="padding:6px 12px">加载中…</div>';
@@ -2513,41 +2527,41 @@ function renderDispatch(d){
   const t=d.total||{};
   document.getElementById('dmMeta').textContent='刷新于 '+esc(d.now||'')+(d.span?(' · '+esc(d.span.from)+'→'+esc(d.span.to)):'');
   const ratio=(t.daemon||0)+':'+(t.dispatch||0);
-  document.getElementById('dmKpis').innerHTML=[
+  morphInto(document.getElementById('dmKpis'), [
     ['派工总成本', usd(t.cost), 'acc'],
     ['任务数', fmtN(t.tasks)+(t.errors?' ('+t.errors+'e)':''), ''],
     ['总 turns', fmtN(t.turns), ''],
     ['平均 $/任务', usd(t.avg_cost), ''],
     ['平均时长', fmtDur(t.avg_dur_s), ''],
     ['daemon:dispatch', ratio, 'warn'],
-  ].map(k=>`<div class="kpi"><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  ].map(k=>`<div class="kpi" data-key="dk-${esc(k[0])}"><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
   // 各角色成本(降序条形 + $/turn 效率)
   const roles=d.per_role||[]; const rmax=roles.length?(roles[0].cost||1):1;
-  document.getElementById('dmRoles').innerHTML=roles.map(r=>{
+  morphInto(document.getElementById('dmRoles'), roles.map(r=>{
     const pct=Math.max(2,(r.cost/(rmax||1))*100).toFixed(1);
-    return `<div class="bar-row" style="grid-template-columns:120px 1fr auto"><span class="lbl" title="${esc(r.role)}">${esc(r.role)}</span>
+    return `<div class="bar-row" data-key="dr-${esc(r.role)}" style="grid-template-columns:120px 1fr auto"><span class="lbl" title="${esc(r.role)}">${esc(r.role)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
       <span class="num">${usd(r.cost)} <span style="color:var(--dim)">· ${r.tasks}任务 · $${(r.per_turn||0).toFixed(3)}/t</span></span></div>`;
-  }).join('')||'<div class="muted" style="padding:6px 16px">无数据</div>';
+  }).join('')||'<div class="muted" style="padding:6px 16px">无数据</div>');
   // daemon vs dispatch 拆分
   const bk=d.by_kind||{}; const kinds=[['daemon',bk.daemon],['dispatch',bk.dispatch]];
   const kmax=Math.max(1,...kinds.map(k=>k[1]?(k[1].cost||0):0));
-  document.getElementById('dmKind').innerHTML=kinds.map(([name,k])=>{
+  morphInto(document.getElementById('dmKind'), kinds.map(([name,k])=>{
     k=k||{tasks:0,cost:0,per_task:0,avg_dur_s:0};
     const pct=Math.max(2,((k.cost||0)/kmax)*100).toFixed(1);
     const col=name==='dispatch'?'var(--warn)':'var(--accent)';
-    return `<div class="bar-row" style="grid-template-columns:90px 1fr auto"><span class="lbl"><span class="kind-tag ${name}">${name}</span></span>
+    return `<div class="bar-row" data-key="kind-${name}" style="grid-template-columns:90px 1fr auto"><span class="lbl"><span class="kind-tag ${name}">${name}</span></span>
       <span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${col}"></span></span>
       <span class="num">${usd(k.cost)} <span style="color:var(--dim)">· ${k.tasks}任务 · ${usd(k.per_task)}/任务 · ${fmtDur(k.avg_dur_s)}</span></span></div>`;
-  }).join('');
+  }).join(''));
   // Top 耗时任务(title 标注)
   const top=d.top_dur||[];
-  document.getElementById('dmTop').innerHTML=top.length? top.map(x=>{
+  morphInto(document.getElementById('dmTop'), top.length? top.map((x,i)=>{
     const secs=Math.round((x.dur_ms||0)/1000);
     const err=x.status==='error'?' <span style="color:var(--dead)">err</span>':'';
-    return `<div class="bar-row" style="grid-template-columns:1fr auto"><span class="lbl" title="${esc(x.title||'(无标题)')}"><span class="kind-tag ${esc(x.kind)}">${esc(x.kind)}</span>${esc(x.role)} · ${esc(x.title||'(无标题)')}${err}</span>
+    return `<div class="bar-row" data-key="dt-${esc(x.id||(x.role+'-'+i))}" style="grid-template-columns:1fr auto"><span class="lbl" title="${esc(x.title||'(无标题)')}"><span class="kind-tag ${esc(x.kind)}">${esc(x.kind)}</span>${esc(x.role)} · ${esc(x.title||'(无标题)')}${err}</span>
       <span class="num">${fmtDur(secs)} · ${x.turns}t · ${usd(x.cost)}</span></div>`;
-  }).join(''):'<div class="muted" style="padding:6px 16px">无数据</div>';
+  }).join(''):'<div class="muted" style="padding:6px 16px">无数据</div>');
 }
 async function loadDispatch(force){
   try{ const r=await fetch('/api/dispatch_metrics'+(force?'?fresh=1':'')); renderDispatch(await r.json()); }
@@ -2559,12 +2573,12 @@ document.getElementById('dmRefresh').onclick=()=>loadDispatch(true);
 let _sessData=null;
 function renderSessions(){
   const box=document.getElementById('sessBox'); if(!_sessData) return;
-  if(!_sessData.ok){ box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(_sessData.error||'?')+'</div>'; return; }
+  if(!_sessData.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败:'+esc(_sessData.error||'?')+'</div>'); return; }
   const all=document.getElementById('sessAll').checked;
   let list=_sessData.sessions.slice(); if(!all) list=list.filter(s=>s.is_agent);
   document.getElementById('sessCount').textContent='显示 '+list.length+' 条'+(all?'(全部)':' · agent 相关 '+_sessData.agent_count+' / 共 '+_sessData.total);
-  if(!list.length){ box.innerHTML='<div class="muted" style="padding:8px 16px">'+(all?'（无会话）':'（无 agent 相关会话,勾选「显示全部」看个人会话 '+_sessData.total+' 条）')+'</div>'; return; }
-  box.innerHTML=list.map(s=>`<div class="sess-row ${s.is_agent?'agent':''}">
+  if(!list.length){ morphInto(box,'<div class="muted" style="padding:8px 16px">'+(all?'（无会话）':'（无 agent 相关会话,勾选「显示全部」看个人会话 '+_sessData.total+' 条）')+'</div>'); return; }
+  morphInto(box, list.map(s=>`<div class="sess-row ${s.is_agent?'agent':''}" data-key="ss-${esc(s.id)}">
     <div class="sess-main">
       <div class="sess-title" title="${esc(s.title)}">${esc(s.title||'(无标题)')}</div>
       <div class="sess-meta">
@@ -2575,7 +2589,7 @@ function renderSessions(){
       </div>
     </div>
     <button class="btn mini copy" onclick="copyResume('${esc(s.id)}',this)">复制 resume</button>
-  </div>`).join('');
+  </div>`).join(''));
 }
 function copyResume(id,btn){
   const cmd='claude --resume '+id;
@@ -2594,7 +2608,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 BI/分析',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2603,7 +2617,10 @@ function showTab(t){
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
   document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
   window.scrollTo({top:0});
-  if(t==='bi') loadUsage(true);   // 进入 BI tab 即同步刷新,第一眼贴近当前(增量 ~50ms)
+  // 刷新门控(P1):只在进入对应 tab 时拉它的重数据 —— 不再无视可见性后台全刷(省 psutil 子进程+token)
+  if(t==='bi'){ loadBI(); loadDispatch(); }
+  else if(t==='usage') loadUsage(true);
+  else if(t==='fleet') load();
 }
 function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
 document.querySelectorAll('#tabbar .tab').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
