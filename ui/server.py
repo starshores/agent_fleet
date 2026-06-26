@@ -1763,7 +1763,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
 
   <!-- 历史用量 BI (P0) —— 独立 tab(账单级全量,与运营/资源口径分开) -->
   <section data-tab="usage">
-    <div class="sec-h">📈 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · API 等价成本 · Shanghai 日</span>
+    <div class="sec-h">📈 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · <b>token 消耗为主</b>($ 仅 API 等价参考)· Shanghai 日</span>
       <span class="spacer" style="flex:1"></span>
       <span id="usageMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="usageRefresh">刷新</button>
@@ -1771,7 +1771,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="kpis" id="usageKpis"></div>
     <div class="grid2">
       <div>
-        <div class="uchart-cap">日 cost 趋势
+        <div class="uchart-cap">日成本趋势 <span class="muted">(API等价·参考;daily 暂无 token 分项)</span>
           <span class="urange" id="uRange">
             <button type="button" data-r="7">7d</button><button type="button" data-r="30" class="on">30d</button><button type="button" data-r="90">90d</button><button type="button" data-r="0">全部</button>
           </span>
@@ -1780,7 +1780,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
         <div class="uchart-wrap" id="uTrendWrap"><canvas id="uTrend" height="220"></canvas><div class="uchart-tip" id="uTrendTip"></div></div>
       </div>
       <div>
-        <div class="uchart-cap">项目费用 Top N <span class="muted">(全历史)</span></div>
+        <div class="uchart-cap">项目 token 消耗 Top N <span class="muted" id="uProjUnit">(全历史)</span></div>
         <div class="bars" id="uProj"></div>
       </div>
     </div>
@@ -2370,6 +2370,14 @@ function _fit(cv,cssH){
 }
 const UC={bg:'#0f1115',line:'#2a2f3a',dim:'#9aa3b2',acc:'#5b9dff',live:'#3ecf8e',warn:'#f5a623',dead:'#ff5d5d',idle:'#7d8aa0',none:'#5a6172'};
 function usd(n){ return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// token 口径(用户定:token 才是固定物理量;$ 会随 plan/定价浮动)。总=io+cache_read+cache_write;io=新增有效工作量。
+function _tokTotals(t){ t=t||{};
+  const io=(t.input||0)+(t.output||0);
+  const cache=(t.cache_read||0);
+  const cw=(t.cache_write_5m||0)+(t.cache_write_1h||0);
+  const total=io+cache+cw;
+  return {io,cache,cw,total,cachePct: total?Math.round(cache/total*100):0};
+}
 function modelColor(m){ if(m.indexOf('opus-4-8')>=0)return UC.acc; if(m.indexOf('opus-4-7')>=0)return UC.idle; if(m.indexOf('haiku')>=0)return UC.live; return UC.none; }
 function modelShort(m){ return m.replace('claude-','').replace('-20251001',''); }
 function projShort(p){ return p ? p.replace(/^([A-Za-z])--/, '$1:/').replace(/-/g, '/') : ''; }
@@ -2398,14 +2406,25 @@ function renderUsage(d){
   if(rg && !rg._bound){ rg._bound=1; rg.querySelectorAll('button').forEach(b=>b.onclick=()=>applyRange(+b.dataset.r)); }
   _bindTrendHover();
   applyRange(_uRange);
-  // 项目 Top N(已套 alias 的 logical 名,直接用,不再 projShort)
-  const projs=(d.by_project||[]).slice(0,8); const max=projs.length?projs[0].cost_usd:1;
+  // 项目 Top N —— token 为主(用量统计侧已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径
+  let projs=(d.by_project||[]).slice();
+  const tokOf=p=>p.tokens_total!=null?p.tokens_total:(p.input!=null?((p.input||0)+(p.output||0)+(p.cache_read||0)+(p.cache_write_5m||0)+(p.cache_write_1h||0)):null);
+  const ioOf=p=>p.tokens_io!=null?p.tokens_io:(p.input!=null?((p.input||0)+(p.output||0)):null);
+  const hasTok=projs.some(p=>tokOf(p)!=null);
+  const valOf=p=>hasTok?(tokOf(p)||0):(p.cost_usd||0);
+  projs.sort((a,b)=>valOf(b)-valOf(a)); projs=projs.slice(0,8);
+  const max=projs.length?valOf(projs[0]):1;
+  const unit=document.getElementById('uProjUnit');
+  if(unit) unit.textContent=hasTok?'(全历史 · 按 tokens_total 排 · io/$ 对照)':'(全历史 · $ API等价·参考 — token 分项待 token_stats 迁移补齐)';
   document.getElementById('uProj').innerHTML=projs.map((p,i)=>{
-    const pct=Math.max(2,p.cost_usd/max*100).toFixed(1);
+    const v=valOf(p); const pct=Math.max(2,v/(max||1)*100).toFixed(1);
+    const num=hasTok
+      ? `${fmtN(tokOf(p))} tok <span style="color:var(--dim)">· io ${fmtN(ioOf(p))} · ${usd(p.cost_usd)}参考</span>`
+      : usd(p.cost_usd);
     return `<div class="bar-row uproj-row" data-proj="${esc(p.project)}" title="点击展开原始目录构成">
       <span class="lbl">${esc(p.project)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
-      <span class="num">${usd(p.cost_usd)}</span></div>
+      <span class="num">${num}</span></div>
       <div class="uproj-raw" id="uraw-${i}" style="display:none"></div>`;
   }).join('')||'<div class="muted" style="padding:6px 0">无数据</div>';
   bindProjDrill();
@@ -2423,14 +2442,17 @@ function applyRange(r){
   const rl=r?(r+'d'):'全历史';
   const cacheDenom=(t.cache_read||0)+(t.input||0)+(t.cache_write_5m||0)+(t.cache_write_1h||0);
   const cacheHit=cacheDenom?(Math.floor((t.cache_read||0)/cacheDenom*1000)/10).toFixed(1)+'%':'–';
+  // 用户定 BI 口径:token 消耗提主位;总 token + io(有效工作量)并列对照 + cache_read 单列标注;$ 标(参考)
+  const tk=_tokTotals(t);
   morphInto(document.getElementById('usageKpis'), [
-    ['API 等价成本(全历史)',usd(t.cost_usd),''],
-    ['API calls(去重)',fmtN(t.calls),'acc'],
+    ['总 token(全历史)', fmtN(tk.total),'acc','input+output+cache_read+cache_write,固定物理量(不随 plan/定价浮动)'],
+    ['io 有效工作量', fmtN(tk.io),'','input+output —— 真正的新 work / 有效工作量(不含 cache 重复读)'],
+    ['cache_read 重复读', fmtN(tk.cache),'','重复读上下文 · 占总 token ~'+tk.cachePct+'%(总 token 被它灌水,故单列)'],
     ['cache 命中', cacheHit,'good','cache_read /(cache_read + cache_creation + input),输入侧命中占比'],
-    ['范围 cost('+rl+')', usd(rangeCost),'warn'],
-    ['活跃天('+rl+')', daily.length,''],
-    ['项目数', (d.by_project||[]).length,''],
-  ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${k[3]}"`:''}><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
+    ['API calls(去重)', fmtN(t.calls),''],
+    ['API 等价成本(参考)', usd(t.cost_usd),'warn','$ 随 plan/定价浮动、plan 下还会下沉,仅作 API 等价参考;token 才是固定量'],
+    ['范围成本('+rl+'·参考)', usd(rangeCost),'','daily 暂无 token 分项(token_stats 迁移后补),范围仍按 $ 参考'],
+  ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${esc(k[3])}"`:''}><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
   drawTrend(daily);
 }
 function drawTrend(daily){
