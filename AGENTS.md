@@ -63,6 +63,8 @@ ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互
 ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
 ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
 ab roster                                           # 花名册:每个 agent 的 在岗/能力(caps)/专长(desc)/注册时间(agents.json 是真相源)
+ab route <关键词...>                                 # 对口路由助手:按专长/能力找【最对口+在岗】角色推荐派给谁(命中多优先、在岗优先、退役/测试排除)。派活前先 route,别自接跨领域/别乱广播
+ab answer --todo <id> --reply "<答复>" [--from 用户]  # 待办回路(闭环 ask-user):用户答复某🙋待确认项→自动路由回提问 agent(confirm_from)让它接着干+标该待办完成
 ab register --role X --desc "<专长/分管>"            # 把会话里训出的专家入册(设/改专长);再按需配 caps
 ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
 ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code 会话(~/.claude/projects/*.jsonl:cwd/aiTitle/最近/大小);给 UI"可恢复会话"视图用;真 resume 在终端 claude --resume <id>

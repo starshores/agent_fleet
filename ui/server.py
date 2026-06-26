@@ -1574,7 +1574,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
 <header>
   <h1>🛰 Agent Bus 控制台</h1>
   <span class="pill"><span id="connDot" class="dot"></span><span id="connTxt">连接中…</span></span>
-  <span class="pill">在跑 claude <b id="aliveN" style="color:var(--txt)">–</b> · fleet <b id="fleetN" style="color:var(--txt)">–</b></span>
+  <span class="pill" title="在跑 claude=机器上所有活着的 claude 进程;在岗=已认领到某 role(有 presence)的 claude 进程。两者都【不是】fleet.json 里的 daemon 数 —— daemon 看 🩺 健康徽标/舰队页。">在跑 claude <b id="aliveN" style="color:var(--txt)">–</b> · 在岗 <b id="fleetN" style="color:var(--txt)">–</b></span>
   <span id="gConfirm" class="gconfirm" style="display:none" title="点击跳到待办池查看待确认">🙋 <b>0</b> 项待确认</span>
   <span id="healthWrap" class="hwrap">
     <span id="healthBadge" class="hbadge loading" title="bus 健康(点击展开)">🩺 …</span>
@@ -1622,10 +1622,15 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="sec-b">
       <div class="bi-kpis" id="biKpis"></div>
       <div id="biRunning" style="padding:0 16px 8px"></div>
-      <div class="sub" style="padding:2px 16px 0">消耗(近24h · token/成本 = 埋点后前向真实)</div>
+      <div class="sub" style="padding:2px 16px 0">① 任务消耗(近24h · <span class="mono">metrics.jsonl</span> 埋点 · 仅列有消耗的 role · token/成本=埋点后前向真实)</div>
       <table class="bi-tbl">
-        <thead><tr><th>角色</th><th>任务<span class="sub" style="font-weight:400">(近24h)</span></th><th>token in</th><th>token out</th><th>cache读</th><th>成本 $</th><th>平均耗时</th><th>CPU%</th><th>内存MB</th></tr></thead>
+        <thead><tr><th>角色</th><th>任务<span class="sub" style="font-weight:400">(近24h)</span></th><th>token in</th><th>token out</th><th>cache读</th><th>成本 $</th><th>平均耗时</th></tr></thead>
         <tbody id="biBody"></tbody>
+      </table>
+      <div class="sub" style="padding:12px 16px 0">② 在岗资源占用(当前进程 · <span class="mono">psutil</span> 实时 · <b>与①不同口径</b>:这是进程此刻的 CPU/内存,与近24h任务消耗无关 · 按内存降序)</div>
+      <table class="bi-tbl">
+        <thead><tr><th>角色</th><th>CPU%</th><th>内存MB</th></tr></thead>
+        <tbody id="biSysBody"></tbody>
       </table>
       <div class="sub" style="padding:12px 16px 0">📜 任务活动历史 <span style="font-weight:400">— 全程(<span class="mono">events.jsonl</span>)· <b id="actSpan">–</b> · 仅活动量,无 token/成本(历史无从恢复)</span></div>
       <table class="bi-tbl">
@@ -1864,7 +1869,7 @@ function render(){
   // process footer
   let foot=[];
   if(f.tagged.length) foot.push('已标注(非fleet):'+f.tagged.map(t=>`<span class="tag ${t.private?'lock':''}">${esc(t.label)} pid ${t.pid}${t.private?' 🔒':''}</span>`).join(''));
-  foot.push(`<span class="muted">在跑 claude ${f.alive_count} · fleet ${f.fleet_count} · 已标注 ${f.tagged.length} · 未声明 ${f.unknown.length}${f.unknown.length?' ('+f.unknown.join(', ')+')':''}</span>`);
+  foot.push(`<span class="muted">在跑 claude ${f.alive_count} · 在岗(已认领)${f.fleet_count} · 已标注 ${f.tagged.length} · 未声明 ${f.unknown.length}${f.unknown.length?' ('+f.unknown.join(', ')+')':''}</span>`);
   document.getElementById('procFoot').innerHTML=foot.join('<br>');
 
   // daemon 自愈面板(fleet.json × 存活)
@@ -2262,18 +2267,26 @@ function renderBI(bi){
   rb.innerHTML=bi.running.length? bi.running.map(r=>
     `<span class="bi-run"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
     : '<span class="muted" style="font-size:12px">当前无在跑任务</span>';
+  // ① 任务消耗:仅列近24h 有消耗(tasks>0)的 role —— 不再用 0 行稀释重点
   const tb=document.getElementById('biBody');
-  if(!bi.per_role.length){ tb.innerHTML='<tr><td colspan="9" class="muted" style="padding:10px 16px">暂无消耗数据 — 埋点已上线,daemon/dispatch 跑完任务即开始累积</td></tr>'; return; }
-  tb.innerHTML=bi.per_role.map(r=>{ const s=r.sys; return `<tr>
+  const consume=(bi.per_role||[]).filter(r=>r.tasks>0);
+  if(!consume.length){ tb.innerHTML='<tr><td colspan="7" class="muted" style="padding:10px 16px">近24h 无自动化任务消耗 — 埋点仅覆盖 daemon/dispatch 派工,跑完任务即累积</td></tr>'; }
+  else{ tb.innerHTML=consume.map(r=>`<tr>
       <td><b>${esc(r.role)}</b></td>
       <td class="num">${r.tasks}${r.errors?' <span style="color:var(--dead)">('+r.errors+'e)</span>':''}</td>
       <td class="num">${fmtN(r.tok_in)}</td>
       <td class="num">${fmtN(r.tok_out)}</td>
       <td class="num">${fmtN(r.cache_read)}</td>
       <td class="num">$${r.cost.toFixed(4)}</td>
-      <td class="num">${r.tasks?fmtDur(r.avg_dur_s):'–'}</td>
-      <td class="num">${s?s.cpu:'–'}</td>
-      <td class="num">${s?s.rss_mb:'–'}</td></tr>`; }).join('');
+      <td class="num">${fmtDur(r.avg_dur_s)}</td></tr>`).join(''); }
+  // ② 在岗资源占用:仅列有活进程(sys)的 role,按内存降序 —— 与①口径分开
+  const sb=document.getElementById('biSysBody');
+  const live=(bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
+  if(!live.length){ sb.innerHTML='<tr><td colspan="3" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'; }
+  else{ sb.innerHTML=live.map(r=>`<tr>
+      <td><b>${esc(r.role)}</b></td>
+      <td class="num">${r.sys.cpu}</td>
+      <td class="num">${r.sys.rss_mb}</td></tr>`).join(''); }
   // 任务活动历史(events.jsonl)
   const act=bi.activity||{roles:[],span:null};
   document.getElementById('actSpan').textContent=act.span?(act.span.from+' → '+act.span.to+' · 共 '+act.total+' 任务'):'无历史';

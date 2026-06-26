@@ -94,6 +94,21 @@ def _is_test_role(name):
     return bool(name) and (name.startswith(("zz", "__")) or name == "?")
 
 
+def _warn_unreachable(role):
+    """目标可达校验(治【静默漏接】:派了≠接了):退役/自醒非在岗就 stderr 告警。
+    测试角色不校验;协调位 Master/MasterAgent(人值守、不走 claim)豁免。send/answer 共用。"""
+    if _is_test_role(role):
+        return
+    if role in _retired_roles():
+        sb = _load_agents().get(role, {}).get("succeeded_by")
+        sys.stderr.write("⚠ 目标 %s 已退役,活没人接——请改派%s。(仍写入留痕)\n"
+                         % (role, ("(接替=%s)" % sb) if sb else ""))
+    elif role not in HUMAN_ATTENDED:
+        if _self_wake_state(role)[0] != "armed":
+            sys.stderr.write("⚠ 目标 %s 自醒非在岗——派了可能没人接(claim);"
+                             "换个在岗的 / 让它重挂自醒,或确认它是人值守 tab。(仍写入其 inbox)\n" % role)
+
+
 def _load_agents():
     f = _agents_file()
     if f.exists():
@@ -397,16 +412,7 @@ def cmd_send(args):
         sys.stderr.write(
             "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
             "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
-    # 校验目标在岗(治【静默漏接】:派了≠接了,别静默写进死/退役 inbox 烂着)。测试目标不校验。
-    if not _is_test_role(role):
-        if role in _retired_roles():
-            sb = _load_agents().get(role, {}).get("succeeded_by")
-            sys.stderr.write("⚠ 目标 %s 已退役,活没人接——请改派%s。(仍写入留痕)\n"
-                             % (role, ("(接替=%s)" % sb) if sb else ""))
-        elif role not in HUMAN_ATTENDED:    # 协调位 Master/MasterAgent 人值守、不走 claim,豁免
-            if _self_wake_state(role)[0] != "armed":
-                sys.stderr.write("⚠ 目标 %s 自醒非在岗——派了可能没人接(claim);"
-                                 "换个在岗的 / 让它重挂自醒,或确认它是人值守 tab。(仍写入其 inbox)\n" % role)
+    _warn_unreachable(role)   # 校验目标在岗(治静默漏接:派了≠接了)
     tid = _gen_id(role)
     task = {
         "id": tid, "from": frm, "to": role,
@@ -1459,6 +1465,69 @@ def cmd_supervise(args):
         print("[%s] %s" % (a, r))
 
 
+def cmd_answer(args):
+    """待办回路(闭环 ask-user,补 capture-only 缺口):用户答复某条🙋待确认项 →
+    答复【自动路由回提问的 agent】(confirm_from)让它接着干 + 标该待办完成。
+    谁替用户跑:协调位(Master/MasterAgent)转达,或 WebUI 回复框(MasterUI 接 /api 调本命令)。"""
+    tf = BUS / "todos.json"
+    try:
+        todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
+        if not isinstance(todos, list):
+            todos = []
+    except Exception:
+        todos = []
+    item = next((t for t in todos if t.get("id") == args.todo), None)
+    if not item:
+        print(json.dumps({"error": "无此待办 id: %s" % args.todo}, ensure_ascii=False)); return
+    target = item.get("confirm_from")
+    if not target or target in ("bus健康", "unknown"):
+        print(json.dumps({"error": "该待办无可回的提问方(confirm_from=%s),无处回路" % target}, ensure_ascii=False)); return
+    frm = args.frm or "用户"
+    _warn_unreachable(target)   # 提问方不在岗就告警;答复仍写进它 inbox,它上线即见
+    tid = _gen_id(target)
+    ref = item.get("ref")
+    task = {"id": tid, "from": frm, "to": target,
+            "title": "[待办答复] " + (item.get("title") or "")[:60],
+            "task": "用户对你提问《%s》的答复:%s%s" % (
+                item.get("title") or "", args.reply, ("\n(原任务 ref: %s)" % ref) if ref else ""),
+            "created": _now(), "status": "pending", "answer_of": item.get("id"), "ref": ref}
+    _write_json(BUS / target / "inbox" / (tid + ".json"), task)
+    _audit("answer", todo=args.todo, to=target, frm=frm)
+    item["status"] = "完成"; item["updated"] = _now()
+    item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
+    _write_json(tf, todos)
+    print("答复已路由给 %s(任务 %s),待办 %s 标完成。" % (target, tid, args.todo))
+
+
+def cmd_route(args):
+    """对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,
+    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。"""
+    terms = [t.lower() for t in (args.keywords or []) if t.strip()]
+    if not terms:
+        print("用法: ab route <关键词...>(按专长/能力找对口角色)"); return
+    agents = _load_agents()
+    retired = _retired_roles()
+    wait_roles = _wait_proc_roles()
+    scored = []
+    for role, v in agents.items():
+        if role in retired or _is_test_role(role) or not isinstance(v, dict):
+            continue
+        hay = (role + " " + (v.get("desc") or "") + " " + " ".join(v.get("caps", []))).lower()
+        score = sum(hay.count(t) for t in terms)
+        if score > 0:
+            st = _self_wake_state(role, wait_roles=wait_roles)[0]
+            scored.append((score, 0 if st == "armed" else 1, role, st, (v.get("desc") or "")[:58]))
+    if not scored:
+        print("无对口专责命中「%s」——考虑广播,或 ab register 新专家。" % " ".join(terms)); return
+    scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先
+    mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}
+    print("对口路由推荐(命中「%s」):" % " ".join(terms))
+    for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):
+        tag = " ← 推荐(对口+在岗)" if i == 0 and st == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
+        print("  %-12s %s 命中%d  %s%s" % (role, mark.get(st, "?"), sc, desc, tag))
+    print("→ 对口直派:ab send --to <角色> --from <你> ...(别自接跨领域、别乱广播)")
+
+
 def _wait_proc_roles():
     """挂着 `agentbus wait --role X` 进程的 role 集合(协调位事件自醒判活;复用 _proc_scan 单次扫描+缓存)。
     只认真正的 python 进程(排除 bash -c 壳——壳 cmdline 也含 agentbus wait 串且退出后可能残留)。"""
@@ -1853,6 +1922,8 @@ def main():
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
+    p = sub.add_parser("answer"); p.add_argument("--todo", required=True); p.add_argument("--reply", required=True); p.add_argument("--from", dest="frm", default=None); p.set_defaults(fn=cmd_answer)
+    p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
     p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
