@@ -1120,6 +1120,33 @@ def todo_delete(b):
     return {"ok": True, "deleted": n - len(items)}
 
 
+def todo_answer(b):
+    """闭环 ask-user:用户在🙋待确认卡回复 → shell `agentbus answer` 把答复路由回提问 agent
+    (confirm_from)的 inbox + 标该待办完成。子进程带 CREATE_NO_WINDOW 不弹窗。"""
+    tid = (b.get("id") or "").strip()
+    reply = (b.get("reply") or "").strip()
+    if not tid:
+        return {"ok": False, "error": "缺 id"}
+    if not reply:
+        return {"ok": False, "error": "回复内容不能为空"}
+    try:
+        r = subprocess.run(
+            [_PYEXE, str(ABDIR / "agentbus.py"), "answer", "--todo", tid, "--reply", reply, "--from", "用户"],
+            capture_output=True, timeout=30, creationflags=_NO_WINDOW)
+        out = (r.stdout.decode("utf-8", "replace") + r.stderr.decode("utf-8", "replace")).strip()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    # answer 成功打印纯文本「答复已路由…」;失败打印 {"error": "..."}
+    if r.returncode == 0 and out and not out.lstrip().startswith('{"error"'):
+        return {"ok": True, "msg": out}
+    err = out
+    try:
+        err = json.loads(out).get("error", out)
+    except Exception:
+        pass
+    return {"ok": False, "error": err or "answer 失败(无输出)"}
+
+
 def todo_dispatch(b):
     """把一条待办派成 bus 任务(复用 send_task,from=Master),回写 task_id 闭环追踪。"""
     tid = b.get("id")
@@ -1532,6 +1559,8 @@ canvas{display:block;width:100%}
 .unote{color:#cdd4e0;background:var(--bg);padding:2px 9px;border-radius:5px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-width:560px}
 .nbtn{margin:0;padding:2px 9px;font-size:11px}
 .note-edit{width:100%;min-height:48px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:12px/1.45 inherit;resize:vertical}
+.answer-area{margin-top:7px;padding:7px 9px;background:rgba(154,123,255,.08);border:1px solid rgba(154,123,255,.35);border-radius:7px;display:flex;gap:7px;align-items:flex-start;flex-wrap:wrap}
+.ans-edit{flex:1;min-width:220px;min-height:42px;background:var(--bg);color:var(--txt);border:1px solid rgba(154,123,255,.5);border-radius:6px;padding:6px 8px;font:12px/1.45 inherit;resize:vertical}
 .note-btns{display:flex;gap:6px;margin-top:5px}
 .todo-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .todo-acts select,.todo-acts input{width:auto;margin:0;padding:3px 7px;font-size:12px}
@@ -1972,6 +2001,7 @@ function roleOptsFor(t){
 //   · roleSel[id]  —— 用户为该卡选的「派给」role(下拉选择)。
 //   · openEditors[id] —— 该卡的补充说明编辑器草稿文本(打开中);undefined=未打开。
 const openEditors={};
+const answerDrafts={};   // todoId → 🙋待确认卡回复框草稿(响应式,morphdom 刷新不丢)
 // 待确认:agent 通过 ask-user 投池、在等用户拍板的项(source 以「确认·」开头 或 带 confirm_from,且 status=待办)
 function isPendingConfirm(t){
   return t.status==='待办' && (t.confirm_from || (t.source||'').indexOf('确认·')===0);
@@ -2014,6 +2044,10 @@ function cardHtml(t){
         ${t.updated&&todoView==='history'?`<span>完成/更新:${esc(t.updated)}</span>`:''}
       </div>
       <div class="note-area" id="na-${t.id}">${noteHtml}</div>
+      ${(pc && t.confirm_from && t.confirm_from!=='bus健康' && t.confirm_from!=='unknown') ? `<div class="answer-area">
+        <textarea class="ans-edit" id="ans-${t.id}" placeholder="回复 ${esc(t.confirm_from)} 的提问 → 发送后自动路由回它、本项标完成" oninput="answerDrafts['${t.id}']=this.value">${esc(answerDrafts[t.id]||'')}</textarea>
+        <button class="btn mini" onclick="tAnswer('${t.id}')">↩ 回复 ${esc(t.confirm_from)}</button>
+      </div>` : ''}
       <div class="todo-acts">
         <span class="muted">状态</span>
         <select onchange="tStatus('${t.id}',this.value)">${stSel}</select>
@@ -2108,6 +2142,16 @@ async function tNoteSave(id){
   load();
 }
 function tNoteCancel(id){ delete openEditors[id]; renderTodos(); }
+// 🙋待确认卡回复 → 闭环 ask-user:把答复路由回提问 agent(confirm_from)+ 标本项完成
+async function tAnswer(id){
+  const reply=(answerDrafts[id]||'').trim();
+  if(!reply){ toast('回复内容不能为空',true); return; }
+  const t=(state.todos||[]).find(x=>x.id===id); const who=t&&t.confirm_from||'提问方';
+  let j; try{ j=await tPost('/api/todos/answer',{id,reply}); }catch(e){ toast('回复失败:'+e,true); return; }
+  if(j&&j.ok){ delete answerDrafts[id]; toast('↩ 已回复 '+who+',答复已路由、本项标完成'); }
+  else{ toast('回复失败:'+((j&&j.error)||'?'),true); }
+  load();
+}
 function tEdit(id){
   const t=(state.todos||[]).find(x=>x.id===id); if(!t) return;
   const title=prompt('标题',t.title); if(title===null) return;
@@ -2729,6 +2773,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, todo_delete(self._body_json()))
         elif path == "/api/todos/dispatch":
             self._send(200, todo_dispatch(self._body_json()))
+        elif path == "/api/todos/answer":
+            self._send(200, todo_answer(self._body_json()))
         else:
             self._send(404, {"error": "not found"})
 
