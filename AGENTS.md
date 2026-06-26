@@ -114,11 +114,12 @@ ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code �
 ```
 > `serve` 靠"本 tab 的 claude 进程 pid ↔ presence.json"反查角色,所以同一段 prompt 在任何 worker tab 都成立,无需改 role。
 
-## 执行模型(2026-06-22 切换)— 可见 CLI 执行 + WebUI 通知,执行 daemon 已退役
-用户定调:**任务一律由【可见 CLI tab】执行(跑 `/loop serve`,人看得见在干活);daemon 只做通知与消息管理,不再 headless 执行**。原因:headless `claude -p` daemon 不可观测、会半途 silent 死、还截走本该人监督的任务(实测踩过多次)。
-- **执行 = 可见 tab**:在该 role 的 tab 里 `hello` 一次,再 `/loop` 跑上面那段 serve prompt。`who` 显示 `✓ worker在听`,且 claim 后显示 `▶ 在做:<标题>`(current_task 可视)。
-- **通知/消息管理 = 常驻 WebUI**(127.0.0.1:8799):某 role 来了新任务但【没有活的执行 tab】→ 自动弹 WinRT toast「📥 X 有新任务待处理」提醒人去开/处理;完成通知由 `done` 端 toast。不另起需看护的进程。
-- **执行 daemon 已全部退役**;`fleet.json` 清空、`supervise` 成 no-op。`worker_daemon.py`/`start_worker.ps1`/`stop_worker.ps1` 仅作"特殊场景显式后台执行"的保留件(默认不用)。如确需无人值守后台执行某 role,才 `start_worker.ps1 -Role X -Cwd ...`(用正斜杠 cwd 避免 bash 吞反斜杠)并在 fleet.json 登记——但这违背"可见执行"原则,谨慎。
+## 执行模型(v3,2026-06-23 起 · 现行)— daemon 工作池为主 + 可见 tab,二选一
+**现行**:任务由【daemon 工作池】执行——`fleet.json` 列常驻 daemon(**名单以该文件实际登记为准**),常驻 WebUI 每 90s 跑 `supervise` 自动拉起缺的 + 自愈(回收孤儿 daemon / 清陈旧 WebUI / health-sweep)。daemon 起 claude -p 时从 `agents.json` 的 `desc` 注入角色身份,是名副其实的专家;过程流式写 `<role>/live.log`(`tail -f` 看 🔧工具/💬回复)可观测。
+- **也可【可见 tab】执行**:该 role 的 tab `hello` + `/loop serve`(人看得见,`who` 显示 `✓worker在听` + `▶在做:<标题>`)。**与 daemon 互斥**:某 role 有活 /loop tab 时 start_worker 拒绝;停掉 tab loop 后 90s 内 daemon 自动接管。
+- **通知 = 常驻 WebUI**(127.0.0.1:8799):新任务无执行体 / error 即弹 WinRT toast 提醒。
+- **⚠ 文档真实性纠错(2026-06-26,Master数分 报):此处原写"2026-06-22 daemon 全退役、fleet.json 清空、supervise no-op"=【v2 的旧态,已被 v3 取代,误导了读者整整一轮】。** 真实历史:v2(06-22)确曾因 headless daemon 不可观测/会 silent 死而"全退役、纯可见 tab";但 **v3(06-23,用户定调"不要 loop 就用 daemon")把 daemon 作为工作池主力回归**——配 live.log 可观测 + supervise 自愈 + 角色注入,解决了 v2 的顾虑。**所以现状:daemon 未退役、fleet.json 非空、supervise 非 no-op。**
+- 历史坑(保留备查):.ps1 必须 ASCII;daemon prompt 走 stdin 不走 argv;daemon 跑改 daemon 的任务会自杀(对自身 stop_worker)。
 - 历史坑(保留备查):.ps1 必须 ASCII;daemon prompt 走 stdin 不走 argv;daemon 跑改 daemon 的任务会自杀(对自身 stop_worker)。
 - **⚠ Claude 会话内别直接起常驻进程(2026-06-25,业务侧 agent 坐实)**:从 Claude 工具调用链里用 `Start-Process -Hidden`(start_worker.ps1:33 即此)或 `run_in_background` 起的子进程,**会被 Claude 工具的 job object 几分钟内回收**→ 看似拉起、实则不久就掉(诡异 respawn 即此)。**唯一可靠脱离 = `Invoke-CimMethod Win32_Process Create`**(CIM 进程不继承调用方 job)。**标准路径不受影响**:常驻 WebUI 的 supervise 起 daemon 时 WebUI 不在 Claude job 下,fleet daemon 正常——所以**要(重)起 daemon,让常驻 WebUI 的 supervise 去起,别在某个 Claude tab 里手动 start_worker/supervise**。follow-up:start_worker.ps1:33 改 CIM(需连带改 worker_daemon.py:29 的 print 对 stdout=None 健壮 + 窗口隐藏,单独测过再上)。
 
