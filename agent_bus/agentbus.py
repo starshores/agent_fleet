@@ -88,6 +88,12 @@ def _retired_roles():
         return set()
 
 
+def _is_test_role(name):
+    """测试/临时角色:zz* / __* / 单字符 ?。统计/健康/校验默认过滤,免测试 send 污染真实指标
+    (Master数分 实证:未claim 17 条里 6 条是 zztest_loss/__todotest 等测试,制造假"漏接")。"""
+    return bool(name) and (name.startswith(("zz", "__")) or name == "?")
+
+
 def _load_agents():
     f = _agents_file()
     if f.exists():
@@ -391,6 +397,16 @@ def cmd_send(args):
         sys.stderr.write(
             "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
             "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
+    # 校验目标在岗(治【静默漏接】:派了≠接了,别静默写进死/退役 inbox 烂着)。测试目标不校验。
+    if not _is_test_role(role):
+        if role in _retired_roles():
+            sb = _load_agents().get(role, {}).get("succeeded_by")
+            sys.stderr.write("⚠ 目标 %s 已退役,活没人接——请改派%s。(仍写入留痕)\n"
+                             % (role, ("(接替=%s)" % sb) if sb else ""))
+        elif role not in HUMAN_ATTENDED:    # 协调位 Master/MasterAgent 人值守、不走 claim,豁免
+            if _self_wake_state(role)[0] != "armed":
+                sys.stderr.write("⚠ 目标 %s 自醒非在岗——派了可能没人接(claim);"
+                                 "换个在岗的 / 让它重挂自醒,或确认它是人值守 tab。(仍写入其 inbox)\n" % role)
     tid = _gen_id(role)
     task = {
         "id": tid, "from": frm, "to": role,
@@ -1156,10 +1172,12 @@ def _health_anomalies(stuck_min=90):
                 o = json.loads(p.read_text(encoding="utf-8"))
             except Exception:
                 continue
+            if _is_test_role(o.get("from")):     # 测试发送方的孤儿=噪声,不计
+                continue
             orphans.append({"path": str(p), "id": p.stem, "from": o.get("from"),
                             "title": o.get("title") or "", "owner": _infer_orphan_owner(o), "obj": o})
     for d in BUS.iterdir():
-        if not d.is_dir() or d.name.startswith((".", "_")) or d.name == "unknown":
+        if not d.is_dir() or d.name.startswith((".", "_")) or d.name == "unknown" or _is_test_role(d.name):
             continue
         pd = d / "processing"
         if not pd.exists():
@@ -1254,7 +1272,8 @@ def _collect_health(stale_min=30, stuck_min=90):
     """只读汇总 bus 健康各项指标(不改任何状态)。返回 dict,供 cmd_health 渲染 / WebUI 复用。"""
     now = time.time()
     role_dirs = [d for d in sorted(BUS.iterdir())
-                 if d.is_dir() and not d.name.startswith((".", "_")) and d.name != "unknown"]
+                 if d.is_dir() and not d.name.startswith((".", "_")) and d.name != "unknown"
+                 and not _is_test_role(d.name)]
     h = {"as_of": _now(), "warns": []}
     # 1) 自醒(退役 role 跳过——不计掉线,否则误报)
     wr = _wait_proc_roles()
