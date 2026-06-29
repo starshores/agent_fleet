@@ -2957,6 +2957,9 @@ syncTabTop(); showTab(curTab);
 loadBI().finally(load); connectSSE(); setPoll();
 // 刷新门控(P1):BI 定时刷只在【BI tab 可见】时跑,不再无视可见性每 10s 扫 psutil + 拉 /api/bi
 setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);
+// 能力池兜底轮询:caps tab 可见时每 10s 重拉 /api/caps —— agents.json/capabilities.json 改了(如培训师加 cap)
+// 不必再手动刷新即可反映。门控同 BI:不在 caps tab 不跑。/api/caps 只读 JSON、零 psutil 扫,轮询开销极小。
+setInterval(()=>{ if(curTab==='caps') loadCaps(); }, 10000);
 // 首屏一次性预热(各自独立懒加载,不拖首屏);之后按 tab 进入再刷(见 showTab)
 setTimeout(()=>loadUsage(true), 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)

@@ -1,10 +1,4 @@
 {
   "_comment": "执行 daemon 工作池(2026-06-23,用 daemon 不用手动 /loop)。supervise 会把这些 role 中【没有活执行体】的拉起成后台 daemon;常驻 WebUI 每 90s 自动跑 supervise = 自动维持+自愈,进入多协同无需逐 tab 手动起 loop。注:某 role 若当前有活 /loop tab,start_worker 互斥会拒绝(那个 tab 在执行就不重复);要切成 daemon 先在该 tab 停掉 /loop(Esc),90s 内 daemon 自动接管。cwd 按各 role 实际仓。daemon→agent 状态走 fleet_status.json(5s 刷新)。",
-  "daemons": [
-    {
-      "role": "培训师",
-      "cwd": "C:/apphome/agent_fleet",
-      "wait_timeout": 300
-    }
-  ]
+  "daemons": []
 }

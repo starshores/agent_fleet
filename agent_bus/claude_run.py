@@ -9,6 +9,9 @@ worker_daemon.py 和 dispatch_agent.py 共用。
 """
 import subprocess, json, time, threading
 
+# 起 claude -p 不弹控制台窗口(claude_bin 多是 .cmd,无此标志会弹窗;daemon/dispatch 跑任务时尤其扰人)
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _now():
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
@@ -37,7 +40,8 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600):
     final, is_err, got_result = None, False, False
     try:
         p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                             creationflags=_NO_WINDOW)
         killed = {"v": False}
 
         def killer():
