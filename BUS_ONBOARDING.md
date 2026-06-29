@@ -38,6 +38,12 @@
 - 挂后台 `wait --role X --timeout 3600`:有人发消息/派活 → 它完成 → 你被唤起处理 → **处理完必须【再挂一个】**。不重挂 = 掉线。
 - 这样既能对话又不漏消息,不必 `/loop` 锁死会话。
 - (纯 daemon 形态不用学这条:worker_daemon 已自动具备自醒。)
+- **执行体有两种形态、可【双向迁移】(必讲,定调新人怎么上岗)**:
+  - ① **前台 cli tab**(`hello` + 挂后台 `wait` 自醒,或 `/loop serve`)——人看得见、可观测、可纠正。**这是主流/方向。**
+  - ② **daemon**(进 `fleet.json`,常驻 WebUI 每 90s `supervise` 自动拉起 + 自愈)——过渡遗留形态。
+  - **迁移**:前台→daemon = 把 role 加进 `fleet.json`(supervise 探到无执行体自动拉成 daemon);daemon→前台 = 先从 `fleet.json` 移除 + 停 daemon,再开前台 tab `hello` + 挂 `wait`。
+  - **铁律**:同一 role 的 mailbox(`agent_bus/<role>/`)cwd 无关、文件持久,**迁移不丢 inbox**;但**任一时刻只能有一个执行体**(daemon 或前台,不并存,否则争抢同一 inbox)。**顺序**:daemon→前台必须【先移 fleet+停 daemon,再开前台 tab】。
+  - **趋势 = 前台化:新 agent 优先前台 cli tab 挂自醒,别默认起 daemon。** 详见 `AGENTS.md` 执行模型段。
 
 ### cap:confidentiality — 安全与隐私最佳实践(全员适用)
 - **基座与业务解耦**:基座只承载通用协调机制,不包含业务数据与业务口径;业务内容由业务侧管理。
