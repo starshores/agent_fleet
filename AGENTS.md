@@ -64,6 +64,9 @@ ab edge-release --who X [--force]                   # 释放(默认只释放自�
 ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
 ab roster                                           # 花名册:每个 agent 的 在岗/能力(caps)/专长(desc)/注册时间(agents.json 是真相源)
 ab route <关键词...>                                 # 对口路由助手:按专长/能力找【最对口+在岗】角色推荐派给谁(命中多优先、在岗优先、退役/测试排除)。派活前先 route,别自接跨领域/别乱广播
+ab retired                                          # 退役档案馆/花名册:列已归档退役 agent(番号/退役时间/接替者/原因/会话ids/贡献记忆/状态)
+ab retire --role X --reason ".." [--succeeded-by Y --session-ids a,b --memory <记忆名>]  # 归档退役:记录进 retired_roster.json + 从 agents.json 摘除番号(下掉、不占活跃名额、可复用)+ mailbox 移 _retired/ 留痕。会话 jsonl 不动
+ab revive --role X                                  # 复用回路:从退役档案馆把番号调回 agents.json 活跃在册(恢复 desc/caps)+ mailbox 移回
 ab answer --todo <id> --reply "<答复>" [--from 用户]  # 待办回路(闭环 ask-user):用户答复某🙋待确认项→自动路由回提问 agent(confirm_from)让它接着干+标该待办完成
 ab register --role X --desc "<专长/分管>"            # 把会话里训出的专家入册(设/改专长);再按需配 caps
 ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
