@@ -123,6 +123,10 @@ ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code �
 - **执行重活 = dispatch 临时子 agent**:cli/协调位用 `ab dispatch` 起一次性 claude -p(headless、干完即逝、失败重派),形态像 daemon 但非常驻。
 - **通知 = 常驻 WebUI**(127.0.0.1:8799):新任务无执行体 / error 即弹 WinRT toast。
 - **⚠ 文档真实性·双纠错(2026-06-26,Master数分 两次报)**:此处①原写 v2(06-22)"daemon 全退役/fleet清空/supervise no-op"=旧态、误导一轮;②我一度改成"daemon 主力回归"=**又判偏**(只看 `fleet.json` 登记、没看 selfwake mode)。**真实:前台 cli 为主、daemon 前台化迁移中(遗留未迁完)、重活走 dispatch。教训:只认 selfwake/fleet.json 实证,别凭局部判断——数据真实铁律对我们自己也适用。**
+- **【daemon ↔ 前台 双向迁移流程】(2026-06-29,用户提:补"拉回前台"那半)**:同一 role 的 mailbox(`agent_bus/<role>/`)cwd 无关、文件持久,所以迁移**不丢 inbox 消息**;铁律=**任一时刻只一个执行体**(daemon 或前台 tab,不并存,否则争抢同一 inbox)。
+  - **前台 → daemon(已有·自动)**:role 进 `fleet.json` → 常驻 WebUI 每 90s `supervise` 探到该 role【无活执行体】→ 自动 `start_worker` 拉成 daemon(若该 role 有活 /loop/前台 tab,互斥拒绝、不重复)。
+  - **daemon → 前台(拉回·本次补)**:① **从 `fleet.json` 移除该 role**(supervise 不再维持它当 daemon,且下轮把它当【孤儿 daemon】回收=自动停);② 确认 daemon `current_task` 空(没在飞;若在飞,等它 done 或靠 reap/health-sweep 回 inbox)再停——`stop_worker` 或靠步骤①的 supervise 孤儿回收;③ **此时该 role 短暂无执行体**(inbox 消息等着,不丢);④ 在目标 cwd 开前台 tab `hello --role X` + 挂后台 `wait --role X`(前台自醒)→ 接管同一 mailbox、收 inbox;⑤ 验证 `ab selfwake`/`who` 显示该 role = 前台 listening(非 daemon)、`ab health` 无孤儿 daemon 残留。**顺序铁律:先移 fleet + 停 daemon,再开前台 tab**(确保不并存双执行体)。
+  - 实例:某管理角色 06-26 从前台 listening tab 退出后被 supervise 拉成 agent_fleet daemon(前台→daemon);若要拉回前台即按上面 daemon→前台 走。
 - 历史坑(保留备查):.ps1 必须 ASCII;daemon prompt 走 stdin 不走 argv;daemon 跑改 daemon 的任务会自杀(对自身 stop_worker)。
 - **⚠ Claude 会话内别直接起常驻进程(2026-06-25,业务侧 agent 坐实)**:从 Claude 工具调用链里用 `Start-Process -Hidden`(start_worker.ps1:33 即此)或 `run_in_background` 起的子进程,**会被 Claude 工具的 job object 几分钟内回收**→ 看似拉起、实则不久就掉(诡异 respawn 即此)。**唯一可靠脱离 = `Invoke-CimMethod Win32_Process Create`**(CIM 进程不继承调用方 job)。**标准路径不受影响**:常驻 WebUI 的 supervise 起 daemon 时 WebUI 不在 Claude job 下,fleet daemon 正常——所以**要(重)起 daemon,让常驻 WebUI 的 supervise 去起,别在某个 Claude tab 里手动 start_worker/supervise**。follow-up:start_worker.ps1:33 改 CIM(需连带改 worker_daemon.py:29 的 print 对 stdout=None 健壮 + 窗口隐藏,单独测过再上)。
 
