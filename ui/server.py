@@ -653,6 +653,115 @@ def get_dispatch_metrics(force=False):
     return data
 
 
+# =============================================================
+#  能力池 caps 面板 —— capabilities.json(能力定义)+ agents.json(各 role caps)
+#  + retired_roster.json(退役档案的存档 caps)。全只读,绝不改 caps。
+#  复用 agentbus 真相源:_load_caps_pool / _load_agents / _is_test_role,不另写一套。
+# =============================================================
+# 风险标注:哪些能力是【对外受限】/【高风险闸】—— 最小授权审视用。
+# 口径见 capabilities.json:external-tool-edge 只给对外 agent;high-risk 是写库/外发的人工审批闸。
+_CAP_RISK = {
+    "external-tool-edge": {"level": "对外受限", "cls": "edge"},
+    "high-risk":   {"level": "高风险闸", "cls": "hi"},
+}
+
+
+def build_caps():
+    """能力池/caps 数据:① 能力池清单(desc/default_for/风险/持有者)② agent×cap 矩阵
+    ③ 能力分布(每 cap 几人持有)④ 缺口(空caps在岗 agent / 无持有者能力 / 过滤的测试角色)
+    ⑤ 最小授权视角(高风险能力持有者)。文件实时读,只读不改。"""
+    pool = ab._load_caps_pool()        # capabilities.json 的 capabilities 段
+    agents = ab._load_agents()         # agents.json 花名册(含 retired 标记)
+    try:
+        roster = ab._load_retired_roster()    # retired_roster.json(已摘番号的存档)
+    except Exception:
+        roster = []
+
+    cap_order = list(pool.keys())
+
+    # 在册角色分流:测试角色过滤;retired 字段标注;其余为现行授权(active)。
+    active, retired_in_agents, test_roles = {}, {}, []
+    for role, v in agents.items():
+        v = v if isinstance(v, dict) else {}
+        if ab._is_test_role(role):
+            test_roles.append(role)
+            continue
+        caps = v.get("caps") or []
+        if v.get("retired"):
+            retired_in_agents[role] = {"caps": caps, "succeeded_by": v.get("succeeded_by")}
+        else:
+            active[role] = caps
+
+    # 退役档案(retired_roster.json 里、已从 agents.json 摘除番号的纯存档角色)
+    retired = []
+    for rec in retired_in_agents.items():
+        retired.append({"role": rec[0], "caps": rec[1]["caps"],
+                        "succeeded_by": rec[1].get("succeeded_by"), "src": "agents.json"})
+    for rec in roster:
+        r = rec.get("role")
+        if r and r not in agents:
+            retired.append({"role": r, "caps": rec.get("caps") or [],
+                            "succeeded_by": rec.get("succeeded_by"),
+                            "retired_at": rec.get("retired"), "src": "roster"})
+
+    # 持有者统计:只数【现行授权】(active)—— 这才是此刻生效的能力分配口径。
+    def holders_of(cap):
+        return sorted([r for r, caps in active.items() if cap in caps])
+
+    caps_list = []
+    for name in cap_order:
+        info = pool.get(name, {})
+        h = holders_of(name)
+        risk = _CAP_RISK.get(name)
+        caps_list.append({
+            "name": name,
+            "desc": info.get("desc", ""),
+            "default_for": info.get("default_for", ""),
+            "risk": risk["level"] if risk else None,
+            "risk_cls": risk["cls"] if risk else None,
+            "holders": h,
+            "count": len(h),
+        })
+
+    # agent×cap 矩阵:现行 agent(按 caps 数降序、名次稳定),retired 单列在后。
+    matrix = []
+    for role in sorted(active, key=lambda r: (-len(active[r]), r)):
+        matrix.append({"role": role, "caps": active[role], "retired": False,
+                       "empty": not active[role]})
+    # 缺口(a):在岗(在册非退役非测试)但 caps 为空 —— 待补
+    empty_caps_agents = sorted([r for r, c in active.items() if not c])
+    # 缺口(b):能力池里无人持有的能力 —— 无持有者
+    no_holder_caps = [c["name"] for c in caps_list if c["count"] == 0]
+
+    # ⑤ 最小授权:高风险/对外能力的持有者(一眼可见谁握着风险闸)
+    high_risk_view = []
+    for name in _CAP_RISK:
+        if name in pool:
+            high_risk_view.append({"name": name, "level": _CAP_RISK[name]["level"],
+                                   "cls": _CAP_RISK[name]["cls"],
+                                   "holders": holders_of(name)})
+
+    return {
+        "now": time.strftime("%H:%M:%S", time.localtime(time.time())),
+        "cap_order": cap_order,
+        "caps": caps_list,
+        "matrix": matrix,
+        "retired": retired,
+        "gaps": {
+            "empty_caps_agents": empty_caps_agents,
+            "no_holder_caps": no_holder_caps,
+            "test_roles": sorted(test_roles),
+        },
+        "high_risk_view": high_risk_view,
+        "summary": {
+            "n_caps": len(cap_order),
+            "n_active": len(active),
+            "n_retired": len(retired),
+            "n_empty": len(empty_caps_agents),
+        },
+    }
+
+
 def read_replies(role="Master"):
     d = BUS / role / "done"
     out = []
@@ -1598,6 +1707,42 @@ canvas{display:block;width:100%}
 table.bi-tbl td,table.bi-tbl th{font-variant-numeric:tabular-nums}
 table.bi-tbl td.num,table.bi-tbl thead th:not(:first-child){text-align:right}
 table.bi-tbl td.num{font-family:ui-monospace,monospace}
+/* 能力池 caps */
+.cap-pool{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;padding:12px 16px}
+.cap-card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;border-left:3px solid var(--accent2)}
+.cap-card.edge{border-left-color:var(--warn)} .cap-card.hi{border-left-color:var(--dead)}
+.cap-card .cn{font-weight:700;font-size:13px;font-family:"Cascadia Code",Consolas,monospace}
+.cap-card .cd{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.45}
+.cap-card .cf{font-size:11px;color:var(--idle);margin-top:5px}
+.cap-card .ch{font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
+.cap-card .ch b{font-size:16px;color:var(--txt)}
+.cap-card.zero .ch b{color:var(--dead)}
+.rb{display:inline-block;font-size:10px;padding:1px 7px;border-radius:5px;font-weight:700;vertical-align:1px;margin-left:6px}
+.rb.edge{background:rgba(245,166,35,.18);color:var(--warn);border:1px solid rgba(245,166,35,.5)}
+.rb.hi{background:rgba(255,93,93,.18);color:var(--dead);border:1px solid rgba(255,93,93,.5)}
+/* caps 矩阵 */
+table.capmx{width:100%;border-collapse:collapse;font-size:12.5px}
+table.capmx th,table.capmx td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:center}
+table.capmx th:first-child,table.capmx td:first-child{text-align:left;white-space:nowrap}
+table.capmx thead th{color:var(--dim);font-size:10.5px;font-weight:600;text-transform:none;letter-spacing:.3px;
+  font-family:"Cascadia Code",Consolas,monospace;writing-mode:initial}
+table.capmx thead th.edge{color:var(--warn)} table.capmx thead th.hi{color:var(--dead)}
+table.capmx tbody tr:hover{background:var(--panel2)}
+table.capmx .yes{color:var(--live);font-weight:700} table.capmx .no{color:var(--none)}
+table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
+.mx-role{font-weight:600} .mx-role.ret{color:var(--idle);text-decoration:line-through}
+.mx-foot{font-size:11px;color:var(--dim);padding:2px 16px 10px}
+.gap-box{margin:6px 16px 4px;padding:9px 12px;border-radius:8px;font-size:12.5px;line-height:1.6}
+.gap-box.todo{background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.4)}
+.gap-box.none{background:rgba(255,93,93,.08);border:1px solid rgba(255,93,93,.35)}
+.gap-box.ok{background:rgba(62,207,142,.08);border:1px solid rgba(62,207,142,.3)}
+.gap-box .gh{font-weight:700;margin-bottom:3px}
+.cap-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:5px;margin:2px;
+  background:var(--accent2);color:#cfe0ff;font-family:"Cascadia Code",Consolas,monospace}
+.cap-chip.warn{background:rgba(245,166,35,.18);color:var(--warn)}
+.cap-chip.dead{background:rgba(255,93,93,.18);color:var(--dead)}
+.sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:980px){.sec-grid{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header>
@@ -1626,6 +1771,7 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
   <button class="tab" data-t="fleet">🛰 舰队/运维</button>
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
+  <button class="tab" data-t="caps">🧬 能力池</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -1787,6 +1933,42 @@ table.bi-tbl td.num{font-family:ui-monospace,monospace}
     <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">模型迁移进度 <span class="muted">(按月堆叠 · 标 4.8 占比)</span></div>
     <canvas id="uModels" height="200"></canvas>
     <div class="legend" id="uModelLegend"></div>
+  </section>
+
+  <!-- 能力池 caps —— capabilities.json + agents.json 实时只读(最小授权审视)-->
+  <section data-tab="caps">
+    <div class="sec-h">🧬 能力池 / caps
+      <span class="sub">最小授权:每 agent 只持需要的能力 · 数据源 <span class="mono">capabilities.json</span> + <span class="mono">agents.json</span> 实时只读(不改 caps)</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="capsMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="capsRefresh">刷新</button>
+    </div>
+    <div class="sub" style="padding:8px 16px 0">① 能力池清单 <span style="font-weight:400">— 6 个 cap · desc / 默认给谁 / 风险标注 · 现持有人数(<b style="color:var(--dead)">红=无持有者</b>)</span></div>
+    <div class="cap-pool" id="capPool"></div>
+  </section>
+
+  <section data-tab="caps">
+    <div class="sec-h">② caps 矩阵 <span class="sub">agent × cap(✓=持有)· 现行 agent 按 caps 数排;退役角色单列在后(<span class="mono">删除线</span>)</span></div>
+    <div class="sec-b" style="overflow:auto">
+      <table class="capmx" id="capMatrix"></table>
+    </div>
+    <div class="mx-foot" id="capMxFoot"></div>
+  </section>
+
+  <div class="sec-grid" data-tab="caps">
+    <section>
+      <div class="sec-h">③ 能力分布 <span class="sub">每个 cap 被几个现行 agent 持有(降序)</span></div>
+      <div class="bars" id="capDist"></div>
+    </section>
+    <section>
+      <div class="sec-h">⑤ 最小授权 · 高风险能力持有者 <span class="sub">谁握着对外/高风险闸 — 一眼审授权面</span></div>
+      <div id="capRisk" style="padding:10px 16px"></div>
+    </section>
+  </div>
+
+  <section data-tab="caps">
+    <div class="sec-h">④ 缺口高亮 · 数据治理 <span class="sub">空 caps 在岗 agent(待补)/ 无持有者能力 / 已过滤的测试角色</span></div>
+    <div id="capGaps" style="padding:8px 0"></div>
   </section>
 
   <!-- 派工/协作效率(metrics.jsonl · 仅自动化派工口径)-->
@@ -2591,6 +2773,77 @@ async function loadDispatch(force){
 }
 document.getElementById('dmRefresh').onclick=()=>loadDispatch(true);
 
+// ===== 能力池 caps =====
+let _caps=null;
+function renderCaps(d){
+  _caps=d; if(!d) return;
+  const s=d.summary||{};
+  const meta=document.getElementById('capsMeta');
+  if(meta) meta.textContent=(d.now||'')+' · '+(s.n_caps||0)+' 能力 / '+(s.n_active||0)+' 现行 agent / '+(s.n_empty||0)+' 待补'+(s.n_retired?(' / '+s.n_retired+' 退役'):'');
+  // ① 能力池清单卡片
+  const pool=(d.caps||[]).map(c=>{
+    const rk=c.risk?('<span class="rb '+esc(c.risk_cls)+'">'+esc(c.risk)+'</span>'):'';
+    const cls='cap-card'+(c.risk_cls?(' '+c.risk_cls):'')+(c.count===0?' zero':'');
+    const hold=c.count?('<span class="muted" style="font-size:11px"> · '+c.holders.map(esc).join('、')+'</span>'):'<span class="muted" style="font-size:11px"> · 无持有者</span>';
+    return '<div class="'+cls+'"><div class="cn">'+esc(c.name)+rk+'</div>'+
+      '<div class="cd">'+esc(c.desc)+'</div>'+
+      '<div class="cf">默认给:'+esc(c.default_for||'-')+'</div>'+
+      '<div class="ch">持有 <b>'+c.count+'</b>'+hold+'</div></div>';
+  }).join('');
+  morphInto(document.getElementById('capPool'), pool);
+  // ② caps 矩阵
+  const order=d.cap_order||[];
+  const riskCls={}; (d.caps||[]).forEach(c=>{ if(c.risk_cls) riskCls[c.name]=c.risk_cls; });
+  let head='<thead><tr><th>agent ＼ cap</th>'+order.map(n=>'<th class="'+(riskCls[n]||'')+'" title="'+esc(n)+'">'+esc(n)+'</th>').join('')+'<th>计</th></tr></thead>';
+  const rowHtml=(r,ret)=>{
+    const set=new Set(r.caps||[]);
+    const cells=order.map(n=>set.has(n)?'<td class="yes">✓</td>':'<td class="no">·</td>').join('');
+    const rcls='mx-role'+(ret?' ret':'')+(r.empty?'':'');
+    const tail=ret&&r.succeeded_by?'<span class="muted" style="font-size:10.5px"> →'+esc(r.succeeded_by)+'</span>':'';
+    return '<tr><td><span class="'+rcls+'">'+esc(r.role)+'</span>'+tail+(r.empty?' <span class="rb edge" title="caps 为空,待补">待补</span>':'')+'</td>'+cells+'<td class="cnt">'+(r.caps||[]).length+'</td></tr>';
+  };
+  let body='<tbody>'+(d.matrix||[]).map(r=>rowHtml(r,false)).join('');
+  body+=(d.retired||[]).map(r=>rowHtml({role:r.role,caps:r.caps,succeeded_by:r.succeeded_by,empty:false},true)).join('')+'</tbody>';
+  morphInto(document.getElementById('capMatrix'), head+body);
+  document.getElementById('capMxFoot').textContent='✓=持有该能力 · 现行 '+(d.matrix||[]).length+' 个 agent · 退役 '+(d.retired||[]).length+' 个(存档 caps,不计入分布)';
+  // ③ 能力分布(条形)
+  const dist=(d.caps||[]).slice().sort((a,b)=>b.count-a.count);
+  const maxc=Math.max(1,...dist.map(c=>c.count));
+  morphInto(document.getElementById('capDist'), dist.map(c=>{
+    const pct=Math.round(c.count/maxc*100);
+    const fill=c.count===0?'background:var(--dead)':'';
+    return '<div class="bar-row"><div class="lbl mono" title="'+esc(c.name)+'">'+esc(c.name)+'</div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+(c.count?pct:3)+'%;'+fill+'"></div></div>'+
+      '<div class="num">'+c.count+' 人</div></div>';
+  }).join(''));
+  // ⑤ 高风险能力持有者
+  morphInto(document.getElementById('capRisk'), (d.high_risk_view||[]).map(v=>{
+    const has=v.holders&&v.holders.length;
+    const who=has?v.holders.map(h=>'<span class="cap-chip '+(v.cls==='hi'?'dead':'warn')+'">'+esc(h)+'</span>').join(''):'<span class="muted">无持有者(无人握此闸)</span>';
+    return '<div style="margin-bottom:10px"><div class="mono" style="font-size:12.5px"><span class="rb '+esc(v.cls)+'">'+esc(v.level)+'</span> '+esc(v.name)+'</div>'+
+      '<div style="margin-top:5px">'+who+'</div></div>';
+  }).join('')+'<div class="muted" style="font-size:11px;margin-top:4px">⚠ 持有者为空=能力闸当前无人可执行;要写库/外发或操作外部云文档须先补授权。</div>');
+  // ④ 缺口高亮
+  const g=d.gaps||{};
+  let gh='';
+  const ec=g.empty_caps_agents||[];
+  gh+='<div class="gap-box '+(ec.length?'todo':'ok')+'"><div class="gh">(a) 空 caps 的在岗 agent — 待补'+(ec.length?(' ('+ec.length+')'):'(无)')+'</div>'+
+      (ec.length?ec.map(r=>'<span class="cap-chip warn">'+esc(r)+'</span>').join(''):'<span class="muted">现行 agent 均已配 caps ✓</span>')+
+      (ec.length?'<div class="muted" style="font-size:11px;margin-top:4px">这些角色在册在岗但 agents.json 无 caps,培训师 onboarding 时按其专长补最小授权。</div>':'')+'</div>';
+  const nh=g.no_holder_caps||[];
+  gh+='<div class="gap-box '+(nh.length?'none':'ok')+'"><div class="gh">(b) 无人持有的能力 — 无持有者'+(nh.length?(' ('+nh.length+')'):'(无)')+'</div>'+
+      (nh.length?nh.map(n=>'<span class="cap-chip dead">'+esc(n)+'</span>').join(''):'<span class="muted">每个能力都至少有一个持有者 ✓</span>')+'</div>';
+  const tr=g.test_roles||[];
+  gh+='<div class="gap-box"><div class="gh">(c) 已过滤的测试角色 ('+tr.length+')</div>'+
+      (tr.length?tr.map(r=>'<span class="cap-chip">'+esc(r)+'</span>').join(''):'<span class="muted">无</span>')+
+      '<div class="muted" style="font-size:11px;margin-top:4px">zz* / __* / ? 测试角色不计入分布与缺口(_is_test_role 过滤)。</div></div>';
+  morphInto(document.getElementById('capGaps'), gh);
+}
+async function loadCaps(){
+  try{ const r=await fetch('/api/caps'); renderCaps(await r.json()); }catch(e){}
+}
+document.getElementById('capsRefresh').onclick=()=>loadCaps();
+
 // ===== 可恢复会话 =====
 let _sessData=null;
 function renderSessions(){
@@ -2630,7 +2883,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2642,6 +2895,7 @@ function showTab(t){
   // 刷新门控(P1):只在进入对应 tab 时拉它的重数据 —— 不再无视可见性后台全刷(省 psutil 子进程+token)
   if(t==='bi'){ loadBI(); loadDispatch(); }
   else if(t==='usage') loadUsage(true);
+  else if(t==='caps') loadCaps();
   else if(t==='fleet') load();
 }
 function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
@@ -2765,6 +3019,9 @@ class Handler(BaseHTTPRequestHandler):
                                       dispatch_id=(q.get("id", [None])[0])))
         elif path == "/api/bi":
             self._send(200, build_bi())
+        elif path == "/api/caps":
+            # 能力池/caps:capabilities.json + agents.json 实时只读(不改 caps)
+            self._send(200, build_caps())
         elif path == "/api/usage":
             q = parse_qs(u.query)
             fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")

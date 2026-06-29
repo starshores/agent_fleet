@@ -54,9 +54,15 @@
 - 取数走 **sql_agent**(inbox/shared 协议),**绝不直连 psycopg2**。
 - 跨库同口径反证等口径见项目记忆。
 
-### cap:external-tool-edge — 操作云文档(仅对外 agent)
-- **业务 agent 没有这条**:要外发就把内容交给【对外 agent】,自己不碰 Edge。
+### cap:external-tool-edge — 操作云文档外发(仅对外 agent)
+- **业务 agent 没有这条**:要外发就把内容交给【对外 agent】,自己不碰云文档。
 - 持有者:碰 Edge/云文档前 `edge-acquire --who X` 抢锁,用完 `edge-release --who X`(防多 agent 抢焦点串台)。
+
+### cap:edge-web — 内部 Web 系统 Edge 操作(非对外/非外发)
+- 经 Edge CDP 操作【已登录的内部 Web 系统】:模拟键鼠填表/点选/抓页面(如内部系统填报)。
+- **与 external-tool-edge 区分**:edge-web 只碰内部网页、**不含对外云文档外发**(外发严格走 external-tool-edge·仅对外 agent)。
+- 同样碰 Edge:`edge-acquire/release` 抢同一把共享焦点锁(与 external-tool-edge 同锁,防串台)。
+- 边界:对外提交类动作(提交按钮等)留人工 / 走审批,别自动点。
 
 ### cap:high-risk — 高风险闸(做写库/外发的)
 - 写库/外发类任务带 `requires_approval`:自动监听者(serve/daemon/wait)不会领,需人工 `wait --include-approval` 显式领取。

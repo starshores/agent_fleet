@@ -6,6 +6,7 @@
   "confidentiality": {"desc": "安全与隐私最佳实践:基座与业务解耦 / 最小权限与数据最小化 / 凭据与披露(密钥·令牌·凭据·绝对路径不进版本库/日志/记忆/对话)", "default_for": "全员适用"},
   "external-tool-edge": {"desc": "CDP 操作云文档(写单元格/读群/发消息) + edge-lock 互斥锁", "default_for": "仅【对外 agent】——业务 agent 外发走对外 agent,自己不碰"},
   "sql-fetch":       {"desc": "经 sql_agent 取数(inbox/shared 协议,绝不直连 psycopg2)", "default_for": "要数据的业务 agent"},
-  "high-risk":       {"desc": "requires_approval 高风险任务(写库/外发)的处理与人工审批闸", "default_for": "做写库/外发动作的"}
+  "high-risk":       {"desc": "requires_approval 高风险任务(写库/外发)的处理与人工审批闸", "default_for": "做写库/外发动作的"},
+  "edge-web":        {"desc": "内部 Web 系统 Edge-CDP 自动化:模拟键鼠填表/点选/抓已登录页面;用 edge-acquire/release 共享焦点锁(与 external-tool-edge 同锁不串台)。【不含对外云文档外发】——对外云文档走 external-tool-edge。", "default_for": "做浏览器内部网页操作的 agent;非对外"}
  }
 }
