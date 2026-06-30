@@ -48,10 +48,10 @@
 ④ 被用户纠正过的约定/口径/偏好;
 ⑤ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
 砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
-压后第一动作:复述①②③自检,答不全就重读自举文档(CLAUDE.md/AGENTS.md/CAPABILITIES.md)补回再干活。
+压后第一动作:复述①②③自检,答不全就重读【你自己的 CLAUDE.md + 相关记忆】补回再干活。
 ```
-(末句「压后第一动作…重读自举文档」即把 A③ 强制自举 + A⑤ verify-after-compact 内嵌进了指令本身。)
-**待 SQLAGent bare /compact 实验坐实**:compact 后摘要是否真 honored 这份 keep-list(尤其③操作层命令)+ 全局是否重注入。
+(末句「压后第一动作…」即把 A③ 强制自举 + A⑤ verify-after-compact 内嵌进指令。**已去项目专属化**:全局指令对所有 agent 生效,而 AGENTS.md/CAPABILITIES.md/recover.py 是 agent_fleet 专属——业务 agent 只有自己的 CLAUDE.md+记忆。agent_fleet 专属自举只放 agent_fleet 项目根 CLAUDE.md。)
+**SQLAGent 实测发现(重要)**:① compact 后那条 advisory 自检/自举文字**没自动触发**——被 harness 的 "resume directly/不要 recap" + idle 纪律压过,只在被探针问到才复述。印证官方「CLAUDE.md instructions are advisory, hooks are deterministic」。→ **要可靠的压后动作可能得改 PostCompact hook**(数分2 正在 agent_fleet 层 agent 重测确认)。② keep-list 是否被 honored + 全局是否重注入仍待坐实。
 
 ## B、自醒/投递可靠性硬化
 方向 = **heartbeat 存活信标 + 审计回执**(详见 `ARCH_EVAL_agent_teams.md` 第六节)。
