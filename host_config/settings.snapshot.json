@@ -1,0 +1,29 @@
+{
+  "model": "opus[1m]",
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/on_memory_write.py",
+            "timeout": 30,
+            "statusMessage": "刷新记忆硬链备份"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "feedbackSurveyRate": 0,
+  "autoUpdatesChannel": "latest",
+  "skipDangerousModePermissionPrompt": true,
+  "tui": "fullscreen"
+}

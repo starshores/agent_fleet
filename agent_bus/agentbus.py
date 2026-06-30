@@ -887,8 +887,89 @@ def cmd_hello(args):
     print("  (这是【业务侧某 agent】的真实教训:无分工时代被迫全科,积重难返。做减法=保专一=防失能)。")
 
 
+def _who_data():
+    """结构化版 who:权威核对 presence 心跳 与 实际 claude 进程,给 WebUI 健康模块吃。
+    返回 {as_of, psutil, roles:[...], alive_claude, claimed_pids, tagged, unclaimed_pids, edge_lock}。
+    每个 role 记 registered/caps(花名册真相)+ present/mode/claude_pid/daemon_pid/alive/age_s/verdict/cwd/current_*。
+    注:presence 只存 claude_pid+cwd,不存 session-jsonl id —— 会话↔角色的对齐由 WebUI 侧按 cwd 关联(同 cwd 多 agent 时标注歧义,不猜)。"""
+    alive = _alive_claude_pids()
+    roles = _list_roles()
+    retired_set = _retired_roles()
+    try:
+        agents = _load_agents()
+    except Exception:
+        agents = {}
+    claimed = set()
+    out_roles = []
+    for r in roles:
+        ent = agents.get(r) if isinstance(agents, dict) else None
+        rec = {
+            "role": r,
+            "registered": ent.get("registered") if isinstance(ent, dict) else None,
+            "caps": (ent.get("caps") if isinstance(ent, dict) else None) or [],
+            "retired": r in retired_set, "present": False, "mode": None,
+            "claude_pid": None, "daemon_pid": None, "alive": None, "age_s": None,
+            "verdict": None, "cwd": None, "current_task": None, "current_title": None,
+        }
+        if r in retired_set:
+            rec["verdict"] = "⊘ 退役"; out_roles.append(rec); continue
+        pf = BUS / r / "presence.json"
+        if not pf.exists():
+            rec["verdict"] = "未声明(无 presence)"; out_roles.append(rec); continue
+        try:
+            pr = json.loads(pf.read_text(encoding="utf-8"))
+        except Exception:
+            rec["verdict"] = "presence 损坏"; out_roles.append(rec); continue
+        rec["present"] = True
+        pid = pr.get("claude_pid"); rec["claude_pid"] = pid
+        age = _age_seconds(pr.get("last_seen", "")); rec["age_s"] = age
+        mode = pr.get("mode", "?"); rec["mode"] = mode
+        rec["cwd"] = pr.get("cwd")
+        rec["current_task"] = pr.get("current_task")
+        rec["current_title"] = pr.get("current_title")
+        wt = pr.get("wait_timeout") or 110
+        listen_fresh = (age is not None and age <= wt + 60)
+        if mode == "daemon":
+            dpid = pr.get("daemon_pid"); rec["daemon_pid"] = dpid
+            d_alive = psutil.pid_exists(dpid) if (dpid and psutil is not None) else None
+            rec["alive"] = d_alive
+            rec["verdict"] = ("✓ daemon在听" if d_alive else ("✗ daemon已退" if dpid else "daemon?"))
+            out_roles.append(rec); continue
+        proc_alive = (pid in alive) if (pid and psutil is not None) else None
+        rec["alive"] = proc_alive
+        if pid:
+            claimed.add(pid)
+        if psutil is None:
+            rec["verdict"] = "心跳%ss前(mode=%s)" % (age if age is not None else "?", mode)
+        elif pid and not proc_alive:
+            rec["verdict"] = "✗ 进程已退(残留)"
+        elif mode == "listening" and proc_alive and listen_fresh:
+            rec["verdict"] = "✓ worker在听"
+        elif mode == "listening" and proc_alive:
+            rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
+        elif proc_alive:
+            rec["verdict"] = "已声明(hello),未起循环"
+        else:
+            rec["verdict"] = "心跳%ss前(无pid)" % (age if age is not None else "?")
+        out_roles.append(rec)
+    tags = _load_pidtags() if psutil is not None else {}
+    rest = sorted(alive - claimed) if psutil is not None else []
+    tagged = [{"pid": pid, "label": tags[str(pid)].get("label"), "private": bool(tags[str(pid)].get("private"))}
+              for pid in rest if str(pid) in tags]
+    unknown = [pid for pid in rest if str(pid) not in tags]
+    h = _edge_holder()
+    return {
+        "as_of": _now(), "psutil": psutil is not None, "roles": out_roles,
+        "alive_claude": sorted(alive) if psutil is not None else [],
+        "claimed_pids": sorted(claimed), "tagged": tagged, "unclaimed_pids": unknown,
+        "edge_lock": ({"who": h.get("who"), "age_s": _age_seconds(h.get("acquired_at", ""))} if h else None),
+    }
+
+
 def cmd_who(args):
     """谁在跑 + 是谁:交叉核对 presence 心跳 与 实际 claude 进程。"""
+    if getattr(args, "json", False):
+        print(json.dumps(_who_data(), ensure_ascii=False)); return
     fresh = args.max_age
     alive = _alive_claude_pids()
     roles = _list_roles()
@@ -2024,7 +2105,7 @@ def main():
     p = sub.add_parser("peek"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_peek)
     p = sub.add_parser("replies"); p.add_argument("--role", required=True); p.add_argument("--clear", action="store_true"); p.set_defaults(fn=cmd_replies)
     p = sub.add_parser("hello"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_hello)
-    p = sub.add_parser("who"); p.add_argument("--max-age", type=int, default=900); p.set_defaults(fn=cmd_who)
+    p = sub.add_parser("who"); p.add_argument("--max-age", type=int, default=900); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_who)
     p = sub.add_parser("tag"); p.add_argument("--pid", type=int, required=True); p.add_argument("--label", required=True); p.add_argument("--note", default=""); p.add_argument("--public", action="store_true"); p.set_defaults(fn=cmd_tag)
     p = sub.add_parser("list"); p.set_defaults(fn=cmd_list)
     p = sub.add_parser("reap"); p.add_argument("--role", default=None); p.add_argument("--ttl", type=float, default=4000.0); p.add_argument("--grace", type=float, default=120.0); p.add_argument("--max-requeue", type=int, default=3, dest="max_requeue"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_reap)

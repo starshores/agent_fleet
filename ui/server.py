@@ -1781,6 +1781,154 @@ def start_ctx_refresher(interval=12):
 
 
 # =============================================================
+#  健康模块 · 会话 ↔ ab 注册对齐
+#  权威源 = `who --json`(presence 心跳 × 实际 claude 进程,与 cmd_who 同口径)。
+#  对齐口径(诚实):presence 只存 role→claude_pid+cwd,【不存 session-jsonl id】。
+#  故"会话↔角色"只能按 cwd 关联 —— 同 cwd 多 agent(如 <业务项目>/agent_fleet)时
+#  占用归属【标注不确定·不猜】,符合"数据真实可溯源"铁律。占用数仍来自 _ctx_cache。
+# =============================================================
+_WHO_TTL = 20.0
+_who_cache = {"ts": 0.0, "data": None}
+_who_lock = threading.Lock()
+
+
+def _refresh_who():
+    try:
+        r = subprocess.run([_PYEXE, str(ABDIR / "agentbus.py"), "who", "--json"],
+                           capture_output=True, timeout=30, creationflags=_NO_WINDOW)
+        raw = r.stdout.decode("utf-8", "replace")
+        data = json.loads(raw) if raw.strip() else None
+    except Exception:
+        data = None
+    if data is not None:
+        with _who_lock:
+            _who_cache["data"] = data
+            _who_cache["ts"] = time.time()
+
+
+def get_who():
+    with _who_lock:
+        return _who_cache["data"]
+
+
+def start_who_refresher(interval=20):
+    """唯一的 who 刷新者:后台 20s 跑子进程 who --json 刷新 _who_cache(内含 psutil 全扫,请求路径零扫描)。"""
+    def loop():
+        while True:
+            try:
+                _refresh_who()
+            except Exception:
+                pass
+            time.sleep(interval)
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print("[who] 后台角色对齐刷新线程已启动,间隔 %ds(子进程 who --json,请求零扫描)" % interval)
+    return t
+
+
+def _cwd_key(s):
+    """把 cwd 或 dash 编码的项目名归一成可比键:全部非字母数字→分隔,折叠连续分隔。
+    'C:\\apphome\\agent_fleet' 与 'C--apphome-agent-fleet' → 同键 'c-apphome-agent-fleet'。"""
+    s = (s or "").lower()
+    parts = []
+    cur = []
+    for ch in s:
+        if ch.isalnum():
+            cur.append(ch)
+        elif cur:
+            parts.append("".join(cur)); cur = []
+    if cur:
+        parts.append("".join(cur))
+    return "-".join(parts)
+
+
+def build_align():
+    """请求路径轻量内存 join:get_who()(权威角色) ⨝ get_ctx()(占用)。不扫描、不读盘。"""
+    who = get_who()
+    if not who:
+        return {"loading": True}
+    ctx = get_ctx() or {}
+    ctx_rows = ctx.get("rows", []) or []
+    # 占用按 cwd 键归集(仅 agent 会话);各 cwd 在岗角色数(判占用归属是否唯一)
+    occ_by_cwd, alive_roles_by_cwd = {}, {}
+    for cr in ctx_rows:
+        if cr.get("is_agent"):
+            occ_by_cwd.setdefault(_cwd_key(cr.get("proj")), []).append(cr)
+    for r in who.get("roles", []):
+        if (not r.get("retired")) and r.get("cwd") and r.get("alive"):
+            alive_roles_by_cwd.setdefault(_cwd_key(r["cwd"]), []).append(r["role"])
+
+    rows = []
+    for r in who.get("roles", []):
+        if r.get("retired"):
+            continue
+        flags = []
+        v = r.get("verdict") or ""
+        if r.get("present") and r.get("alive") is False:
+            flags.append("注册在册·进程已退(残留)")
+        if "未起循环" in v:
+            flags.append("已hello·未起 wait 循环")
+        if "静默" in v:
+            flags.append("worker 静默(超心跳)")
+        if (not r.get("present")) and (r.get("role") not in ("用户", "unknown")):
+            flags.append("未声明 presence(未 hello)")
+        occ, occ_note = None, None
+        if r.get("mode") == "daemon":
+            occ_note = "daemon · 无可见 tab 会话"
+        elif r.get("cwd"):
+            ck = _cwd_key(r["cwd"])
+            sharers = alive_roles_by_cwd.get(ck, [])
+            sess = occ_by_cwd.get(ck, [])
+            if sess:
+                top = max(sess, key=lambda x: x.get("pct", 0))
+                if len(sharers) <= 1:
+                    occ = {"pct": top["pct"], "ctx": top["ctx"], "win": top["win"],
+                           "win_known": top["win_known"], "level": top["level"],
+                           "sid": top["sid"], "model": top["model"]}
+                else:
+                    occ_note = "同 cwd %d 个在岗 · 占用归属不确定(%d 会话)" % (len(sharers), len(sess))
+            else:
+                occ_note = "无近 %dmin 活跃会话" % _CTX_ACTIVE_MIN
+        rows.append({
+            "role": r["role"], "registered": bool(r.get("registered")), "caps": r.get("caps") or [],
+            "mode": r.get("mode"), "verdict": v, "alive": r.get("alive"), "age_s": r.get("age_s"),
+            "cwd": r.get("cwd"), "current_title": r.get("current_title"),
+            "occ": occ, "occ_note": occ_note, "flags": flags,
+        })
+    # 排序:有红占用→在岗→其余;同档按 role 名
+    def _rank(rr):
+        return (0 if (rr["occ"] and rr["occ"]["level"] == "red") else 1 if rr.get("alive") else 2, rr["role"])
+    rows.sort(key=_rank)
+
+    # 未对齐会话:agent 会话所在 cwd 没有任何在岗注册角色(残留 tab / 未 hello / 退役遗留)
+    unaligned = []
+    for cr in ctx_rows:
+        if cr.get("is_agent") and _cwd_key(cr.get("proj")) not in alive_roles_by_cwd:
+            unaligned.append({"role": cr.get("role"), "title": cr.get("title"), "proj": cr.get("proj"),
+                              "pct": cr.get("pct"), "level": cr.get("level"), "sid": cr.get("sid"),
+                              "ctx": cr.get("ctx"), "win": cr.get("win"), "win_known": cr.get("win_known"),
+                              "model": cr.get("model"), "ts": cr.get("ts")})
+    txt = lambda r: " ".join(r["flags"])
+    summary = {
+        "on_duty": sum(1 for r in rows if r.get("alive")),
+        "registered": sum(1 for r in rows if r["registered"]),
+        "reg_not_running": sum(1 for r in rows if ("残留" in txt(r) or "未声明" in txt(r))),
+        "hello_no_loop": sum(1 for r in rows if "未起 wait 循环" in txt(r)),
+        "daemons": sum(1 for r in rows if r.get("mode") == "daemon"),
+        "n_red_occ": sum(1 for r in rows if r.get("occ") and r["occ"]["level"] == "red"),
+        "unaligned": len(unaligned),
+    }
+    return {
+        "ok": True, "as_of": who.get("as_of"), "psutil": who.get("psutil", True),
+        "rows": rows, "unaligned": unaligned, "summary": summary,
+        "red": _CTX_RED, "yellow": _CTX_YELLOW, "active_min": _CTX_ACTIVE_MIN,
+        # 让 🧠 占用徽标(renderCtxBadge)沿用同一对象
+        "max_pct": ctx.get("max_pct", 0.0), "n_red": ctx.get("n_red", 0),
+        "n_yellow": ctx.get("n_yellow", 0), "n": ctx.get("n", 0),
+    }
+
+
+# =============================================================
 #  HTTP
 # =============================================================
 INDEX_HTML = r"""<!doctype html>
@@ -2119,7 +2267,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
-  <button class="tab" data-t="ctx">🧠 上下文占用</button>
+  <button class="tab" data-t="ctx">🩺 健康</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -2325,10 +2473,10 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div id="capGaps" style="padding:8px 0"></div>
   </section>
 
-  <!-- 上下文窗口占用 · 1M 撞墙预警 -->
+  <!-- 健康模块 · 会话 ↔ ab 注册对齐 -->
   <section data-tab="ctx">
-    <div class="sec-h">🧠 上下文窗口占用 · 1M 撞墙预警
-      <span class="sub">各活跃会话 <span class="mono">ctx = input + cache_read + cache_creation</span> / 模型窗口 — ≥70%红(建议主动重置/落档换画布)·≥50%黄。撞墙(~99%)即灾难性 compact→失能</span>
+    <div class="sec-h">🩺 健康 · 会话 ↔ ab 注册对齐
+      <span class="sub">权威源 <span class="mono">who --json</span>(presence 心跳 × 实际 claude 进程)对齐花名册;上下文占用按 <span class="mono">cwd</span> 关联 — 同 cwd 多 agent 时占用归属<b>标注不确定</b>(presence 不存 session id,不猜)。占用 ≥70%红·≥50%黄</span>
       <span class="spacer" style="flex:1"></span>
       <span id="ctxMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="ctxRefresh">刷新</button>
@@ -2336,10 +2484,11 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div class="sec-b">
       <div class="ctx-kpis" id="ctxKpis"></div>
       <table>
-        <thead><tr><th>占用%</th><th>ctx tok</th><th>窗口</th><th>model</th><th>role / 会话</th><th>项目</th><th>最后活动 UTC</th></tr></thead>
+        <thead><tr><th>role</th><th>注册</th><th>在岗 / verdict</th><th>占用%</th><th>当前任务</th><th>cwd</th><th>告警</th></tr></thead>
         <tbody id="ctxBody"></tbody>
       </table>
       <div class="foot muted" id="ctxFoot"></div>
+      <div id="ctxUnaligned"></div>
     </div>
   </section>
 
@@ -3350,7 +3499,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文占用',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🩺 健康',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -3508,6 +3657,9 @@ class Handler(BaseHTTPRequestHandler):
             # 只读后台缓存(bounded jsonl 尾读);冷启未就绪回 loading 占位,绝不现读
             d = get_ctx()
             self._send(200, d if d is not None else {"loading": True})
+        elif path == "/api/align":
+            # 健康模块 · 会话↔注册对齐:内存 join who_cache ⨝ ctx_cache,请求路径零扫描/零读盘
+            self._send(200, build_align())
         else:
             self._send(404, {"error": "not found"})
 
@@ -3614,6 +3766,7 @@ def main():
     start_fleet_refresher(20)         # 唯一舰队刷新者:20s 子进程扫描刷新 _fleet_cache(请求路径零扫描)
     start_health_refresher(25)        # 唯一健康刷新者:25s 子进程 health --json 刷新 _health_cache(请求路径零扫描)
     start_ctx_refresher(12)           # 唯一上下文占用刷新者:12s bounded jsonl 尾读刷新 _ctx_cache(1M 撞墙预警,请求路径零现读)
+    start_who_refresher(20)           # 唯一角色对齐刷新者:20s 子进程 who --json 刷新 _who_cache(健康模块·会话↔注册对齐,请求路径零扫描)
     start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()

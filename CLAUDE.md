@@ -39,17 +39,22 @@
 `agent_fleet\` 现在**硬链镜像了全部源码+记忆**,只迁本目录即带走全部:
 - `agent_bus\` —— **总线本体源码**的硬链镜像(agentbus.py/worker_daemon.py/dispatch_agent.py/claude_run.py/start_stop_worker.ps1/config.json/fleet.json/agents.json/ab.cmd/README),`sync_code.ps1` 维护、PostToolUse hook 改代码时自动重链(同卷 NTFS;只镜像源码+配置,不含运行态队列)。
 - `memory\` —— 项目记忆硬链镜像,`sync_memory.ps1` 维护、hook 自动重链。
-- 其余(CLAUDE/AGENTS/CAPABILITIES/recover.py/ui/hooks)本目录原生。
+- `host_config\` —— **宿主全局配置快照**(`~/.claude/CLAUDE.md` + `settings.json`):含 Compact 指令 keep-list、65% 早压 env、PostToolUse hook 注册、model。这些 bus 相关配置住宿主全局(要对所有会话生效)、只迁 agent_fleet 会丢,故在此存**快照**(配置类改动少、快照即可,用户定调 2026-06-30);`sync_host_config.ps1` 刷新。
+- 其余(CLAUDE/AGENTS/CAPABILITIES/SESSION_RELIABILITY/SPECIALIZATION/ARCH_EVAL/recover.py/ui/hooks)本目录原生。
 **换机迁移清单**:
 - ① **新机装运行依赖**:Python 3 + `pip install watchdog psutil`(总线代码的运行依赖,不在源码目录里;watchdog 跑事件等待、psutil 探活/身份)。
 - ② 复制 `C:\apphome\agent_fleet\` 整个目录到新机。
 - ③ 把 `agent_bus\*` 放回新机 `~/.claude/agent_bus\`(总线运行的规范路径)。
 - ④ 编辑 `agent_bus\config.json` 6 路径改成新机实际值(或设 `AGENTBUS_*` 环境变量);尤其 `claude_bin` 指向新机的 claude.cmd(daemon/dispatch 起 claude -p 要用)。
+- ④b **回填宿主全局配置**:把 `host_config\` 快照并进新机 `~/.claude/CLAUDE.md`(尤其 **Compact Instructions 节**)+ `settings.json`(`env` 的 65% 早压、PostToolUse hook 注册按新机路径改、`model`)。详见 `host_config/README.md`。**不回填=丢 compact 自举层+早压。**
 - ⑤ 跑 `recover.py` 自检;`agentbus selfwake` 看自醒;按需 `start_worker.ps1` / fleet.json 拉起 daemon。
 - ⑥ **发版自动 snapshot 钩子**:`git config core.hooksPath githooks`(打 vX tag 时 `githooks/reference-transaction` 自动 zip 一份到同级 `agent_fleet_releases/`)。若整目录连 `.git` 一起复制则该 config 已随 `.git/config` 带过来;重新 clone 才需手动设。**注**:钩子里 tar 路径 `/c/Windows/System32/tar.exe` 是 Windows bsdtar,换非 Windows 机要改。
 - (WebUI 另需:`ui\start_ui.ps1` 拉起常驻控制台。)
 
 > 注:总线**运行**仍从规范路径 `~/.claude/agent_bus\` 跑;`agent_fleet\agent_bus\` 是同 inode 的可迁移快照,不是第二份运行实例。
 > **已实测自举**(2026-06-23):复制 agent_fleet 到干净目录、仅用副本即跑通 list/send/wait/done/reap/selfwake/recover.py;副本文件独立(非空链)。
+> **迁移基准复验**(2026-06-30):源码镜像 9/9 hash 一致(含当日改动)、memory 90 md 齐、运行态正确排除=✅;唯一缺口=宿主全局的 compact 指令+65%+hook 注册逸出到 `~/.claude/`,已建 `host_config\` 快照 + ④b 回填步骤补回。**只迁 agent_fleet + 按清单回填 host_config = 基准通过。**
+
+> **基准②·基础设施洁净**:bus = **基础设施、非业务**,与业务负载解耦(业务可插拔)。核心(`agent_bus/` 源码 + config + fleet/agents/capabilities.json)**只放协调机制本身**,不掺业务数据/口径/客户信息或敏感配置(凭据、密钥、客户环境标识、远端绝对路径等)。运行态队列里的业务消息是过境流量、不算污染;但**核心文件必须干净**。改 bus 描述/配置时按【脱敏替代表】用词。(2026-06-30 实测:核心 9 文件已清;capabilities.json 的凭据措辞已改为通用表述。)
 
 > 恢复完,先 `recover.py` 看有没有在飞的活(inbox 待领 / done 待读),再继续协调。
