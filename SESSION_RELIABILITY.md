@@ -38,6 +38,21 @@
 - **A⑤ 新增·verify-after-compact 标准动作**:压完第一动作自问「刚改了啥/pending/被纠正的约定」,答错就 Esc+Esc 回滚重压。= 把我们对 业务侧 agent 做的 4 点核验定为 **fleet 标准**(「不信会话自述」用在压后自检)。
 - **A③ 阈值佐证 + ⚠口径闸**:文章称 60–75% 是黄金压缩窗(等到 90% 已 context 饥荒、瞎裁)——**佐证我们 70% 红线方向对**。但 ⚠ **文章是 200K 窗口环境**(其 45k buffer/155k 可用/95% 数字都是 200K 的),**我们 fleet 是 1M,具体百分比绝不照搬**——原理通用、数字要按 1M 自测。决策表(/compact 续命 vs /clear 切主题 vs Esc+Esc 回退)+ /auto-compact off 纳入 onboarding。
 
+### ✅ canonical·已落地(2026-06-30 用户批准 t-1782724980778,经本人直接确认)
+已写入**全局 `~/.claude/CLAUDE.md`** 末尾新节「## Compact Instructions(bus 通用·压缩时套用)」。canonical 全文:
+```
+压缩(/compact 或 auto)时尽量逐字保留:
+① 我的 role 身份 + cwd + 职责边界(caps);
+② 当前目标 + 在做的事 + 未尽任务/待办 + 下一步;
+③ bus 操作确切命令(hello / wait --role / done --id --role --result / peek / selfwake / send --to --from --task)+ 自醒铁律(重挂后 selfwake 验、空唤醒静默不 dump、done 带 --role);
+④ 被用户纠正过的约定/口径/偏好;
+⑤ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
+砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
+压后第一动作:复述①②③自检,答不全就重读自举文档(CLAUDE.md/AGENTS.md/CAPABILITIES.md)补回再干活。
+```
+(末句「压后第一动作…重读自举文档」即把 A③ 强制自举 + A⑤ verify-after-compact 内嵌进了指令本身。)
+**待 SQLAGent bare /compact 实验坐实**:compact 后摘要是否真 honored 这份 keep-list(尤其③操作层命令)+ 全局是否重注入。
+
 ## B、自醒/投递可靠性硬化
 方向 = **heartbeat 存活信标 + 审计回执**(详见 `ARCH_EVAL_agent_teams.md` 第六节)。
 - ① 执行体周期写 heartbeat 时间戳;health-sweep 比对判**真**死活(替代只看 presence 自述)。
