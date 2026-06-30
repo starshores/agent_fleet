@@ -31,7 +31,7 @@
 - **③ 治本·强制自举**(待办 t-1782724980778 同源):compact 后 agent 重跑自恢复(重读 recovery doc、重验命令)。
 - **③b 早压·阈值可调(已 primary source 核实 /en/env-vars 逐字)**:`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`=触发百分比(1-100,调低=早压)、`CLAUDE_CODE_AUTO_COMPACT_WINDOW`=计算用的窗口容量(默认随模型 200K/1M)。**价值=早压提升摘要保真**(趁模型有余力压、出更好摘要,印证文章 60-75% 黄金窗),非减损失量。⚠ **我们 fleet=Opus 4.8/1M 扩展上下文,单设 PCT_OVERRIDE 多半不触发**——原文小字:PCT_OVERRIDE 仅在「AUTO_COMPACT_WINDOW 已设 / cloud / Opus4.6·Sonnet4.6 无扩展上下文」时生效;故须**同时设 `AUTO_COMPACT_WINDOW`(如 500000)** 才会提前压。**铁闸:测试 tab 实测真生效再推全队。** 关闭则用 `autoCompactEnabled:false` / `DISABLE_AUTO_COMPACT`。
   - ✅ **已应用(2026-06-30 用户指令)**:全局 `~/.claude/settings.json` 的 `env` 加 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=65` + `CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000`(= 65% × 真实 1M = **650K 触发**,留 350K 余力出好摘要;WINDOW 显式设 1M 以满足"WINDOW is set"令 override 在扩展上下文 Opus 4.8 上生效)。
-  - ⚠ **作用面 + 待验**:① 全局 settings → 影响**所有** Claude 会话(含用户本人 + 全 bus agent);② **仅对新起会话生效**(env 启动时加载;当前在跑的 agent 要重启才吃到);③ **是否真在 650K 触发仍须实测坐实**(docs 列了生效条件但 4.8 实际行为待 SQLAGent/测试 tab 验)——铁闸未撤。
+  - ✅ **实测确认(数分2 compact 五例实验,2026-06-30,铁闸已过)**:① **65% 真生效**——数分2 在 **63.5%(634K)被自动压**(非默认 ~95%),`PCT_OVERRIDE=65`+`WINDOW=1000000` 在 Opus 4.8/1M 上确认活。② **更正旧推断**:settings.json mtime 比数分2 会话启动晚 22h、它仍按 65% 触发 → **Claude Code 运行时热重载 settings.json,非"仅新/重启会话生效"**(我原推断作废)。③ 作用面:全局 → 影响所有会话(用户本人 + 全 bus)。
 - **④ 引导压缩**(官方文档化·已 primary source 确认):在 **CLAUDE.md 写 compaction 指令**(如"compact 时务必保留:role/cwd/caps、未尽任务、bus 确切命令+自醒铁律、被纠约定、关键文件路径;砍:被否方案/闲聊"),compaction 时自动套用、确保关键上下文 survive。放全局 CLAUDE.md = bus 通用(数分2 起草的 keep-list 即用作此内容)。补充手段:`/compact <focus>` 一次性参数(手动)、PreCompact/PostCompact hook(代码级)。
 - **弃**:调 compact 比例(系统固定);单靠早压(本地未必生效 + 不减损失)。
 
@@ -55,6 +55,16 @@
 ```
 (末句「压后第一动作…」即把 A③ 强制自举 + A⑤ verify-after-compact 内嵌进指令。**已去项目专属化**:全局指令对所有 agent 生效,而 AGENTS.md/CAPABILITIES.md/recover.py 是 agent_fleet 专属——业务 agent 只有自己的 CLAUDE.md+记忆。agent_fleet 专属自举只放 agent_fleet 项目根 CLAUDE.md。)
 **SQLAGent 实测发现(重要)**:① compact 后那条 advisory 自检/自举文字**没自动触发**——被 harness 的 "resume directly/不要 recap" + idle 纪律压过,只在被探针问到才复述。印证官方「CLAUDE.md instructions are advisory, hooks are deterministic」。→ **要可靠的压后动作可能得改 PostCompact hook**(数分2 正在 agent_fleet 层 agent 重测确认)。② keep-list 是否被 honored + 全局是否重注入仍待坐实。
+
+### compact 五例对照实验结论(数分2,2026-06-30·判据=有效记忆能否继承,非压缩比)
+五例同 ~92–98% 压缩,**成败只看「落档 + keep-list +(有则)自举设计」三件套备齐没**:
+- Master数分(996K 裸压·无三件套)→ ❌失能退役;业务侧 agent(980K+落档+重读)→ ✅救回;SQLAGent(719K+全局 keep-list)→ ✅操作层保住;Master(落档+keep-list+精简自检)→ ✅✅行级实操+守边界;Master数分2(634K bare-65% 自动压)→ ✅✅✅**透明接续、不自知被压过**。
+- 关键:**keep-list 是核心**;Master 压后只做精简自检(读落档+重挂)、**理性跳过"全套重读"**(摘要已带 keep-list、信息在手)→ 「自动全套自举」非必需。
+
+### PostCompact hook 决策(2026-06-30 MasterAgent·基建定夺:**暂不上**)
+- **理由**:① 证据=带 keep-list 的 4/4 全成功(含纯 bare 自动压 Master数分2),**主力机制(keep-list 进全局 CLAUDE.md)已实测够用**——hook 在解一个我们目前没有的问题(同 L4 判断:别为未观测的问题预建)。② hook 的设想兜底角色(把 keep-list 补进摘要)**很可能机制上做不到**——PostCompact hook 跑的是【代码】、在摘要【已生成后】,既改不动摘要、也强迫不了模型重读;其输出能否注入上下文 = **未经 primary source 核实,不能假设**(本主线铁律)。
+- **触发阈值(再议时)**:仅当**实际观测到"keep-list 在场却仍压后失能/掉操作层"**才重评;且届时只有【确定性副作用】(压后必重挂 selfwake、落 state-marker 文件)是 hook 可靠做得到的,"注入内容"须先核实 hook 能力。
+- **现状=最简且够用**:65% 早压(实测生效,趁余力出好摘要)+ keep-list(全局 CLAUDE.md,实测保操作层)+ 落档/记忆 + 压后精简自检。
 
 ## B、自醒/投递可靠性硬化
 方向 = **heartbeat 存活信标 + 审计回执**(详见 `ARCH_EVAL_agent_teams.md` 第六节)。
