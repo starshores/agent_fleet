@@ -18,8 +18,10 @@
           绝不显示 cwd/细节,也绝不 psutil 探它。
 """
 import argparse
+import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -688,7 +690,8 @@ def build_caps():
             continue
         caps = v.get("caps") or []
         if v.get("retired"):
-            retired_in_agents[role] = {"caps": caps, "succeeded_by": v.get("succeeded_by")}
+            retired_in_agents[role] = {"caps": caps, "succeeded_by": v.get("succeeded_by"),
+                                       "desc": v.get("desc", "")}
         else:
             active[role] = caps
 
@@ -696,12 +699,15 @@ def build_caps():
     retired = []
     for rec in retired_in_agents.items():
         retired.append({"role": rec[0], "caps": rec[1]["caps"],
-                        "succeeded_by": rec[1].get("succeeded_by"), "src": "agents.json"})
+                        "succeeded_by": rec[1].get("succeeded_by"),
+                        "desc": rec[1].get("desc", ""), "src": "agents.json"})
     for rec in roster:
         r = rec.get("role")
         if r and r not in agents:
             retired.append({"role": r, "caps": rec.get("caps") or [],
                             "succeeded_by": rec.get("succeeded_by"),
+                            "desc": rec.get("desc", ""),
+                            "reason": rec.get("reason", ""),
                             "retired_at": rec.get("retired"), "src": "roster"})
 
     # 持有者统计:只数【现行授权】(active)—— 这才是此刻生效的能力分配口径。
@@ -741,6 +747,52 @@ def build_caps():
                                    "cls": _CAP_RISK[name]["cls"],
                                    "holders": holders_of(name)})
 
+    # ⓪ Agent 详情:每个 agent「会哪些内容」= desc(职责全文)+ caps + 在岗状态。
+    # 状态从舰队缓存(compute_fleet_cached,只读缓存零扫描)取 verdict/mode/self_wake;
+    # 据此派生 form(前台cli / daemon / 离线)+ cls(配色)。退役 agent 从 retired 列表单列、标接替者。
+    fleet = compute_fleet_cached()
+    fmap = {r.get("role"): r for r in (fleet.get("roles") or [])}
+
+    def _status_of(role):
+        fr = fmap.get(role) or {}
+        verdict = fr.get("verdict", "未声明(无 presence)")
+        vclass = fr.get("vclass", "none")
+        mode = fr.get("mode")
+        sw = fr.get("self_wake")
+        if mode == "daemon":
+            form, fcls = "daemon", "daemon"
+        elif vclass in ("live", "idle") or sw == "armed" or mode == "listening":
+            form, fcls = "前台cli", "cli"
+        else:
+            form, fcls = "离线", "off"
+        return {"verdict": verdict, "vclass": vclass, "mode": mode,
+                "self_wake": sw, "form": form, "form_cls": fcls}
+
+    agents_detail = []
+    for role in sorted(active, key=lambda r: (-len(active[r]), r)):
+        v = agents.get(role) or {}
+        st = _status_of(role)
+        agents_detail.append({
+            "role": role,
+            "desc": v.get("desc", "") if isinstance(v, dict) else "",
+            "caps": active[role],
+            "registered": v.get("registered", "") if isinstance(v, dict) else "",
+            "retired": False,
+            **st,
+        })
+    agents_retired = []
+    for r in retired:
+        agents_retired.append({
+            "role": r["role"],
+            "desc": r.get("desc", ""),
+            "caps": r.get("caps") or [],
+            "succeeded_by": r.get("succeeded_by"),
+            "reason": r.get("reason", ""),
+            "retired_at": r.get("retired_at", ""),
+            "retired": True,
+            "form": "退役", "form_cls": "ret",
+        })
+
     return {
         "now": time.strftime("%H:%M:%S", time.localtime(time.time())),
         "cap_order": cap_order,
@@ -753,6 +805,8 @@ def build_caps():
             "test_roles": sorted(test_roles),
         },
         "high_risk_view": high_risk_view,
+        "agents": agents_detail,
+        "agents_retired": agents_retired,
         "summary": {
             "n_caps": len(cap_order),
             "n_active": len(active),
@@ -1365,12 +1419,84 @@ def _data_has_today(data):
         return False
 
 
+def _augment_daily_with_backfill(data):
+    """把 usage.db 的 daily_backfill(03-27~04-28,Claude Code stats-cache 抢救的【日聚合】历史)
+    并入 data['daily'],让历史从 03-27 连续。加法:不覆盖真实 ETL 行(messages),不碰 totals/by_project。
+    数据真实性:① backfill 标 src='backfill'(日聚合粒度、无逐会话/cache 拆分、口径或略异);
+    ② 04-29~05-10 无任何源 → 插 src='gap' 占位(tokens=None,绝不填 0);③ 真实行标 src='messages'。"""
+    try:
+        daily = data.get("daily")
+        if not isinstance(daily, list):
+            return data
+        import sqlite3
+        from datetime import date, timedelta
+        dbp = ABDIR / "usage.db"
+        if not dbp.exists():
+            return data
+        con = sqlite3.connect(str(dbp))
+        try:
+            rows = con.execute("SELECT date,total_tokens,tokens_by_model,messages,sessions,"
+                               "tool_calls,source FROM daily_backfill ORDER BY date").fetchall()
+        except Exception:
+            return data
+        finally:
+            con.close()
+        existing = set()
+        for d in daily:
+            d.setdefault("src", "messages")
+            existing.add(d.get("date"))
+        if not rows:
+            return data
+        bf, bf_dates = [], set()
+        for (dt, tot, bym, msgs, sess, tools, source) in rows:
+            if dt in existing:           # 真实 ETL 优先,backfill 不覆盖
+                continue
+            try:
+                bymodel = json.loads(bym) if bym else {}
+            except Exception:
+                bymodel = {}
+            bf.append({"date": dt, "src": "backfill", "tokens_total": tot, "tokens_io": None,
+                       "cost_usd": None, "calls": None, "messages": msgs, "sessions": sess,
+                       "tool_calls": tools, "by_model": bymodel, "source": source})
+            bf_dates.add(dt)
+        gap = []
+        if bf_dates and existing:
+            try:
+                cur = date.fromisoformat(max(bf_dates)) + timedelta(days=1)
+                end = date.fromisoformat(min(existing))
+                while cur < end:
+                    ds = cur.isoformat()
+                    if ds not in bf_dates and ds not in existing:
+                        gap.append({"date": ds, "src": "gap", "tokens_total": None,
+                                    "tokens_io": None, "cost_usd": None, "calls": None})
+                    cur += timedelta(days=1)
+            except Exception:
+                pass
+        merged = bf + gap + daily
+        merged.sort(key=lambda x: x.get("date") or "")
+        data["daily"] = merged
+        data["backfill_meta"] = {
+            "n_backfill": len(bf), "n_gap": len(gap),
+            "bf_from": (min(bf_dates) if bf_dates else None),
+            "bf_to": (max(bf_dates) if bf_dates else None),
+            "gap_from": (gap[0]["date"] if gap else None),
+            "gap_to": (gap[-1]["date"] if gap else None),
+            "source": (rows[0][6] if rows else None),
+            "note": "03-27~04-28 为 Claude Code stats-cache 抢救的【日聚合】数据(无逐会话/cache 拆分、"
+                    "口径或略异,供趋势参考);04-29~05-10 无任何源,显示为缺口(非0)。",
+        }
+        return data
+    except Exception:
+        return data   # 任何异常都不拖垮正常用量返回
+
+
 def _run_token_stats():
     r = subprocess.run([sys.executable, TOKEN_STATS, "--json"],
                        capture_output=True, timeout=60, creationflags=_NO_WINDOW)
     if r.returncode != 0:
         raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300] or "token_stats 失败")
-    return json.loads(r.stdout.decode("utf-8", "replace"))
+    data = json.loads(r.stdout.decode("utf-8", "replace"))
+    return _augment_daily_with_backfill(data)
 
 
 def _refresh_usage():
@@ -1464,6 +1590,184 @@ def read_sessions():
         _sess_cache["data"] = res
         _sess_cache["ts"] = time.time()
     return res
+
+
+# =============================================================
+#  上下文窗口占用 —— 1M 撞墙预警(SESSION_RELIABILITY 可视化落地)
+#  数据源:每个活跃 session 的 jsonl 尾部最后一条 assistant.usage:
+#    ctx = input_tokens + cache_read_input_tokens + cache_creation_input_tokens
+#    占用% = ctx / 窗口(按模型真实值,opus-4*/sonnet-4=1M、haiku=200K、未知=200K 标注)
+#  性能:bounded tail/head 读(不整文件加载),且只在后台刷新线程跑 → 请求路径只读缓存,绝不现读。
+#  隐私:agent 相关会话(cwd 命中 _AGENT_CWD_HINTS)显标题/role;个人会话只计占用、标题/路径一律掩码🔒。
+# =============================================================
+_CTX_PROJECTS_DIR = str(Path.home() / ".claude" / "projects")
+_CTX_ACTIVE_MIN = 90          # 最近 90 分钟有写入 = 活跃会话
+_CTX_TAIL_BYTES = 512 * 1024  # 读尾部 512KB 找最后一条 assistant.usage(够容一条完整消息)
+_CTX_HEAD_BYTES = 64 * 1024   # 读头部 64KB 提取标题/role 标记
+_CTX_RED = 70.0               # ≥70% 红(建议主动重置/落档换画布,留足撞墙余量)
+_CTX_YELLOW = 50.0            # ≥50% 黄
+_ctx_cache = {"ts": 0.0, "data": None}
+_ctx_lock = threading.Lock()
+_CTX_ROLE_PATS = [
+    re.compile(r"hello\s+--role\s+([A-Za-z0-9_一-鿿]{2,24})"),
+    re.compile(r"--role\s+([A-Za-z0-9_一-鿿]{2,24})"),
+    re.compile(r"你是\s*[「『\"]?\s*([A-Za-z0-9_一-鿿]{2,24})"),
+    re.compile(r"\brole\s*[=:]\s*([A-Za-z0-9_一-鿿]{2,24})"),
+]
+
+
+def _ctx_win_of(model):
+    """模型→上下文窗口(真实值)。返回 (window, known):known=False 表示窗口为假定值,UI 需标注。
+    切勿按名硬编 200K——opus-4-7/opus-4-8 都是 1M(踩过把 opus-4-7 当 200K 算出假 164%)。"""
+    m = (model or "").lower()
+    if "opus-4" in m or "haiku" in m:           # 任务确认:opus-4*=1M、haiku=200K
+        return (1000000 if "opus-4" in m else 200000), True
+    if "sonnet-4" in m:                          # 1M-capable 家族(沿用参考实现,窗口标假定)
+        return 1000000, False
+    return 200000, False                         # 未知:默认 200K 且标注
+
+
+def _ctx_tail_text(path, nbytes):
+    try:
+        sz = os.path.getsize(path)
+        with open(path, "rb") as f:
+            if sz > nbytes:
+                f.seek(sz - nbytes)
+            return f.read().decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def _ctx_head_text(path, nbytes):
+    try:
+        with open(path, "rb") as f:
+            return f.read(nbytes).decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def _ctx_last_usage(path):
+    """尾部找最后一条 assistant.usage → (ctx_tokens, model, ts) 或 (None, None, None)。"""
+    txt = _ctx_tail_text(path, _CTX_TAIL_BYTES)
+    for line in reversed(txt.splitlines()):
+        line = line.strip()
+        if not line or '"usage"' not in line:
+            continue
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        m = r.get("message", {})
+        u = m.get("usage")
+        if u and m.get("role") == "assistant":
+            ctx = (u.get("input_tokens", 0) or 0) + (u.get("cache_read_input_tokens", 0) or 0) \
+                + (u.get("cache_creation_input_tokens", 0) or 0)
+            return ctx, m.get("model", ""), (r.get("timestamp", "") or "")[:19]
+    return None, None, None
+
+
+def _ctx_head_meta(path):
+    """头部提取 (title, role_guess):title=ai-title 或首条 user 文本;role 由标记/标题最佳努力猜。"""
+    txt = _ctx_head_text(path, _CTX_HEAD_BYTES)
+    title = None
+    first_user = None
+    for line in txt.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        if r.get("type") == "ai-title":
+            c = r.get("title") or r.get("content")
+            if isinstance(c, str):
+                title = c
+        if first_user is None and r.get("type") == "user":
+            c = r.get("message", {}).get("content")
+            if isinstance(c, str):
+                first_user = c[:200]
+    role = None
+    for pat in _CTX_ROLE_PATS:
+        mm = pat.search(txt)
+        if mm:
+            role = mm.group(1)
+            break
+    return (title or (first_user[:40] if first_user else None) or "?"), role
+
+
+def _refresh_ctx():
+    rows = []
+    now = time.time()
+    try:
+        paths = glob.glob(_CTX_PROJECTS_DIR + "/*/*.jsonl")
+    except Exception:
+        paths = []
+    for p in paths:
+        try:
+            if now - os.path.getmtime(p) > _CTX_ACTIVE_MIN * 60:
+                continue
+        except Exception:
+            continue
+        ctx, model, ts = _ctx_last_usage(p)
+        if not ctx:
+            continue
+        win, known = _ctx_win_of(model)
+        pct = round(100.0 * ctx / win, 1) if win else 0.0
+        proj = os.path.basename(os.path.dirname(p))
+        # 项目目录名是 cwd 的 dash 编码(C:\apphome\agent_fleet → C--apphome-agent-fleet),
+        # 而 _AGENT_CWD_HINTS 用下划线;两边都归一(_→-、小写)再匹配,否则永远 False。
+        nproj = proj.lower()
+        is_agent = any(h.replace("_", "-").lower() in nproj for h in _AGENT_CWD_HINTS)
+        sid = os.path.basename(p)[:-6]
+        if is_agent:
+            title, role = _ctx_head_meta(p)
+            label = role or "?"
+        else:
+            title, role, label = None, None, None   # 个人会话:掩码,不读标题
+        rows.append({
+            "pct": pct, "ctx": ctx, "win": win, "win_known": known,
+            "model": (model or "?"), "is_agent": is_agent,
+            "role": label, "title": (title or "")[:60] if is_agent else None,
+            "proj": proj if is_agent else None, "sid": sid[:8],
+            "ts": ts, "level": ("red" if pct >= _CTX_RED else "yellow" if pct >= _CTX_YELLOW else "green"),
+        })
+    rows.sort(key=lambda x: x["pct"], reverse=True)
+    reds = [r for r in rows if r["level"] == "red"]
+    data = {
+        "ok": True, "rows": rows, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "active_min": _CTX_ACTIVE_MIN, "red": _CTX_RED, "yellow": _CTX_YELLOW,
+        "n": len(rows), "n_red": len(reds), "n_yellow": sum(1 for r in rows if r["level"] == "yellow"),
+        "max_pct": rows[0]["pct"] if rows else 0.0,
+    }
+    with _ctx_lock:
+        _ctx_cache["data"] = data
+        _ctx_cache["ts"] = time.time()
+
+
+def get_ctx():
+    with _ctx_lock:
+        return _ctx_cache["data"]
+
+
+def start_ctx_refresher(interval=12):
+    """唯一的上下文占用刷新者:后台线程每 interval 秒读活跃会话 jsonl 尾部刷新 _ctx_cache。
+    bounded tail/head 读 + 后台独立 GIL → 请求路径只读缓存,零现读。首轮立即跑。"""
+    stop = threading.Event()
+
+    def loop():
+        while True:
+            try:
+                _refresh_ctx()
+            except Exception:
+                pass
+            if stop.wait(interval):
+                break
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print("[ctx] 后台上下文占用刷新线程已启动,间隔 %ds(bounded jsonl 尾读,请求零现读)" % interval)
+    return t
 
 
 # =============================================================
@@ -1590,6 +1894,16 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .hbadge.ok{background:rgba(60,200,120,.16);color:#7ee0a6;border-color:rgba(60,200,120,.55)}
 .hbadge.warn{background:rgba(240,190,70,.16);color:#f0cf7a;border-color:rgba(240,190,70,.6)}
 .hbadge.loading{background:var(--bg);color:var(--muted);border-color:var(--line)}
+.hbadge.danger{background:rgba(255,93,93,.18);color:#ff9b9b;border-color:rgba(255,93,93,.6)}
+.ctx-kpis{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px 6px}
+.ctx-kpis .k{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-width:96px}
+.ctx-kpis .k .v{font-size:18px;font-weight:700}
+.ctx-kpis .k .l{font-size:11px;color:var(--dim)}
+.ctxpct{font-weight:700;font-variant-numeric:tabular-nums}
+.ctxpct.green{color:var(--live)} .ctxpct.yellow{color:var(--warn)} .ctxpct.red{color:var(--dead)}
+.ctxbar{display:inline-block;height:7px;border-radius:4px;vertical-align:middle;margin-left:7px;min-width:2px;background:currentColor;opacity:.55}
+tr.ctx-red td{background:rgba(255,93,93,.08)}
+.winassumed{color:var(--dim);font-size:10.5px}
 .hpanel{position:absolute;top:30px;left:0;z-index:30;width:360px;max-height:70vh;overflow:auto;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
   box-shadow:0 10px 34px rgba(0,0,0,.5);font-size:12px;line-height:1.5;cursor:default}
@@ -1624,6 +1938,10 @@ canvas{display:block;width:100%}
 .urange button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .uchart-wrap{position:relative}
 .uchart-tip{position:absolute;pointer-events:none;display:none;background:rgba(10,12,16,.96);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font:11px Consolas,monospace;color:#e6ebf2;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.trend-legend{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:4px 16px 2px;font-size:11px;color:var(--dim)}
+.trend-legend span{display:inline-flex;align-items:center;gap:5px}
+.trend-legend i{width:12px;height:8px;border-radius:2px;display:inline-block}
+.trend-legend i.gapi{background:repeating-linear-gradient(45deg,rgba(125,138,160,.5),rgba(125,138,160,.5) 2px,transparent 2px,transparent 4px);border:1px solid var(--line)}
 .uproj-row{cursor:pointer}
 .uproj-row:hover .lbl{color:var(--accent)}
 .uproj-raw{padding:3px 0 7px 10px;margin:-2px 0 5px;border-left:2px solid var(--line)}
@@ -1741,6 +2059,24 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   background:var(--accent2);color:#cfe0ff;font-family:"Cascadia Code",Consolas,monospace}
 .cap-chip.warn{background:rgba(245,166,35,.18);color:var(--warn)}
 .cap-chip.dead{background:rgba(255,93,93,.18);color:var(--dead)}
+/* ⓪ Agent 详情(会哪些内容)*/
+.ag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:11px;padding:12px 16px}
+.ag-card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px;border-left:3px solid var(--accent2);display:flex;flex-direction:column;gap:7px}
+.ag-card.daemon{border-left-color:var(--idle)} .ag-card.cli{border-left-color:var(--live)}
+.ag-card.off{border-left-color:var(--none)} .ag-card.ret{border-left-color:var(--dead);opacity:.82}
+.ag-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ag-name{font-weight:700;font-size:14px}
+.ag-card.ret .ag-name{text-decoration:line-through;color:var(--idle)}
+.ag-form{display:inline-block;font-size:10px;padding:1px 8px;border-radius:5px;font-weight:700;font-family:"Cascadia Code",Consolas,monospace}
+.ag-form.cli{background:rgba(62,207,142,.16);color:var(--live);border:1px solid rgba(62,207,142,.45)}
+.ag-form.daemon{background:rgba(106,160,255,.14);color:var(--idle);border:1px solid rgba(106,160,255,.4)}
+.ag-form.off{background:rgba(150,150,150,.14);color:var(--none);border:1px solid rgba(150,150,150,.35)}
+.ag-form.ret{background:rgba(255,93,93,.14);color:var(--dead);border:1px solid rgba(255,93,93,.4)}
+.ag-verdict{font-size:11px;color:var(--dim);font-family:"Cascadia Code",Consolas,monospace}
+.ag-succ{font-size:11px;color:var(--idle)}
+.ag-desc{font-size:12px;color:var(--dim);line-height:1.5}
+.ag-caps{display:flex;flex-wrap:wrap;gap:3px;margin-top:1px}
+.ag-meta{font-size:10.5px;color:var(--none);margin-top:1px}
 .sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:980px){.sec-grid{grid-template-columns:1fr}}
 </style></head>
@@ -1754,6 +2090,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <span id="healthBadge" class="hbadge loading" title="bus 健康(点击展开)">🩺 …</span>
     <div id="healthPanel" class="hpanel" style="display:none"></div>
   </span>
+  <span id="ctxBadge" class="hbadge loading" title="上下文窗口占用(点击看占用看板)·≥70%红=建议主动重置">🧠 …</span>
   <span class="spacer"></span>
   <span class="ctrl">兜底轮询
     <select id="pollSel">
@@ -1772,6 +2109,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
+  <button class="tab" data-t="ctx">🧠 上下文占用</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -1917,13 +2255,14 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div class="kpis" id="usageKpis"></div>
     <div class="grid2">
       <div>
-        <div class="uchart-cap">日成本趋势 <span class="muted">(API等价·参考;daily 暂无 token 分项)</span>
+        <div class="uchart-cap">每日 token 趋势 <span class="muted">(io 口径:input+output)</span>
           <span class="urange" id="uRange">
             <button type="button" data-r="7">7d</button><button type="button" data-r="30" class="on">30d</button><button type="button" data-r="90">90d</button><button type="button" data-r="0">全部</button>
           </span>
           <span class="muted" id="trendPeak"></span>
         </div>
         <div class="uchart-wrap" id="uTrendWrap"><canvas id="uTrend" height="220"></canvas><div class="uchart-tip" id="uTrendTip"></div></div>
+        <div class="trend-legend" id="trendLegend"></div>
       </div>
       <div>
         <div class="uchart-cap">项目 token 消耗 Top N <span class="muted" id="uProjUnit">(全历史)</span></div>
@@ -1943,6 +2282,11 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
       <span id="capsMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="capsRefresh">刷新</button>
     </div>
+    <div class="sub" style="padding:8px 16px 0">⓪ Agent 详情 · <b>各 agent 会哪些内容</b> <span style="font-weight:400">— 名 / <b>职责 desc(会什么)</b> / caps / 状态(<span style="color:var(--live)">前台cli</span>·<span style="color:var(--idle)">daemon</span>·<span style="color:var(--none)">离线</span>·<span style="color:var(--dead)">退役→接替者</span>)· 数据源 <span class="mono">agents.json.desc</span> + <span class="mono">retired_roster.json</span> 实时只读</span></div>
+    <div class="ag-grid" id="agDetail"></div>
+  </section>
+
+  <section data-tab="caps">
     <div class="sub" style="padding:8px 16px 0">① 能力池清单 <span style="font-weight:400">— 6 个 cap · desc / 默认给谁 / 风险标注 · 现持有人数(<b style="color:var(--dead)">红=无持有者</b>)</span></div>
     <div class="cap-pool" id="capPool"></div>
   </section>
@@ -1969,6 +2313,24 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <section data-tab="caps">
     <div class="sec-h">④ 缺口高亮 · 数据治理 <span class="sub">空 caps 在岗 agent(待补)/ 无持有者能力 / 已过滤的测试角色</span></div>
     <div id="capGaps" style="padding:8px 0"></div>
+  </section>
+
+  <!-- 上下文窗口占用 · 1M 撞墙预警 -->
+  <section data-tab="ctx">
+    <div class="sec-h">🧠 上下文窗口占用 · 1M 撞墙预警
+      <span class="sub">各活跃会话 <span class="mono">ctx = input + cache_read + cache_creation</span> / 模型窗口 — ≥70%红(建议主动重置/落档换画布)·≥50%黄。撞墙(~99%)即灾难性 compact→失能</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="ctxMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="ctxRefresh">刷新</button>
+    </div>
+    <div class="sec-b">
+      <div class="ctx-kpis" id="ctxKpis"></div>
+      <table>
+        <thead><tr><th>占用%</th><th>ctx tok</th><th>窗口</th><th>model</th><th>role / 会话</th><th>项目</th><th>最后活动 UTC</th></tr></thead>
+        <tbody id="ctxBody"></tbody>
+      </table>
+      <div class="foot muted" id="ctxFoot"></div>
+    </div>
   </section>
 
   <!-- 派工/协作效率(metrics.jsonl · 仅自动化派工口径)-->
@@ -2637,28 +2999,55 @@ function applyRange(r){
   ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${esc(k[3])}"`:''}><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
   drawTrend(daily);
 }
+// 每日 token 趋势:口径混合(真实段=io=input+output;backfill 段=stats-cache 日聚合 total,口径或略异·供趋势参考);
+// gap=无源缺口(不画点、line 断开 + 阴影带,绝不当 0)。横轴含 gap 槽 → 缺口在视觉上是真断层。
+function _trendVal(x){ if(!x||x.src==='gap') return null; return x.src==='backfill' ? x.tokens_total : (x.tokens_io!=null?x.tokens_io:null); }
 function drawTrend(daily){
   const cv=document.getElementById('uTrend'); const f=_fit(cv,220); const ctx=f.ctx,w=f.w,h=f.h;
-  const pts=daily.filter(x=>x.cost_usd!=null);
   _trendPts=[]; const tip=document.getElementById('uTrendTip'); if(tip)tip.style.display='none';
-  const padL=48,padR=14,padT=14,padB=22, gw=w-padL-padR, gh=h-padT-padB;
-  if(!pts.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); document.getElementById('trendPeak').textContent=''; return; }
-  const maxV=Math.max.apply(null,pts.map(p=>p.cost_usd))*1.12||1;
-  const X=i=>padL+gw*(pts.length<2?0.5:i/(pts.length-1)), Y=v=>padT+gh*(1-v/maxV);
+  const padL=54,padR=14,padT=14,padB=22, gw=w-padL-padR, gh=h-padT-padB;
+  const all=daily||[];
+  const vals=all.map(_trendVal);
+  const has=vals.filter(v=>v!=null);
+  const lg=document.getElementById('trendLegend');
+  if(!has.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); document.getElementById('trendPeak').textContent=''; if(lg)lg.innerHTML=''; return; }
+  const maxV=Math.max.apply(null,has)*1.12||1;
+  const n=all.length;
+  const X=i=>padL+gw*(n<2?0.5:i/(n-1)), Y=v=>padT+gh*(1-v/maxV);
+  // 网格 + token 轴
   ctx.strokeStyle=UC.line;ctx.fillStyle=UC.dim;ctx.lineWidth=1;ctx.font='10px Consolas';
-  for(let g=0;g<=4;g++){const gv=maxV*g/4,yy=Y(gv);ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(w-padR,yy);ctx.stroke();ctx.fillText('$'+Math.round(gv),4,yy+3);}
-  // 面积+线
-  const grad=ctx.createLinearGradient(0,padT,0,padT+gh);grad.addColorStop(0,'rgba(91,157,255,.28)');grad.addColorStop(1,'rgba(91,157,255,0)');
-  ctx.beginPath();ctx.moveTo(X(0),Y(pts[0].cost_usd));pts.forEach((p,i)=>ctx.lineTo(X(i),Y(p.cost_usd)));
-  ctx.lineTo(X(pts.length-1),padT+gh);ctx.lineTo(X(0),padT+gh);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
-  ctx.beginPath();ctx.moveTo(X(0),Y(pts[0].cost_usd));pts.forEach((p,i)=>ctx.lineTo(X(i),Y(p.cost_usd)));
-  ctx.strokeStyle=UC.acc;ctx.lineWidth=2;ctx.stroke();
-  // 峰值标注 + 存点供 hover
-  let pk=0;pts.forEach((p,i)=>{if(p.cost_usd>pts[pk].cost_usd)pk=i;});
-  pts.forEach((p,i)=>{const px=X(i),py=Y(p.cost_usd);ctx.beginPath();ctx.arc(px,py,i===pk?4:2,0,7);ctx.fillStyle=i===pk?UC.dead:UC.acc;ctx.fill();
-    _trendPts.push({x:px,y:py,date:p.date,cost:p.cost_usd,calls:p.calls});});
-  ctx.fillStyle=UC.dim;ctx.fillText(pts[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(pts[pts.length-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
-  document.getElementById('trendPeak').textContent='峰值 '+usd(pts[pk].cost_usd)+' · '+pts[pk].date.slice(5)+' · '+pts.length+'天';
+  for(let g=0;g<=4;g++){const gv=maxV*g/4,yy=Y(gv);ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(w-padR,yy);ctx.stroke();ctx.fillText(fmtN(Math.round(gv)),2,yy+3);}
+  // gap 阴影带(连续 gap 区间)
+  let gi=0; while(gi<n){ if(all[gi].src==='gap'){ let gj=gi; while(gj+1<n && all[gj+1].src==='gap') gj++;
+      const x0=X(gi)-(gw/(n-1||1))*0.5, x1=X(gj)+(gw/(n-1||1))*0.5;
+      ctx.fillStyle='rgba(125,138,160,.10)'; ctx.fillRect(Math.max(padL,x0),padT,Math.min(w-padR,x1)-Math.max(padL,x0),gh);
+      ctx.fillStyle=UC.none; ctx.textAlign='center'; ctx.fillText('无源', (Math.max(padL,x0)+Math.min(w-padR,x1))/2, padT+gh/2); ctx.textAlign='left';
+      gi=gj+1; } else gi++; }
+  // 折线:按 src 分段上色(断点处=gap 自然断开),backfill 段虚线
+  function seg(colorFn){
+    let prev=null;
+    all.forEach((p,i)=>{ const v=vals[i];
+      if(v==null){ prev=null; return; }
+      const px=X(i),py=Y(v);
+      if(prev!=null){ ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(px,py);
+        const bf=(p.src==='backfill'); ctx.setLineDash(bf?[4,3]:[]); ctx.strokeStyle=colorFn(p); ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); }
+      prev={x:px,y:py};
+    });
+  }
+  seg(p=>p.src==='backfill'?UC.idle:UC.acc);
+  // 点 + 峰值 + 存 hover
+  let pk=-1, pkv=-1;
+  all.forEach((p,i)=>{ const v=vals[i]; if(v==null) return; if(v>pkv){pkv=v;pk=i;}
+    const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,2.5,0,7); ctx.fillStyle=p.src==='backfill'?UC.idle:UC.acc; ctx.fill();
+    _trendPts.push({x:px,y:py,date:p.date,v:v,src:p.src,cost:p.cost_usd,calls:p.calls}); });
+  if(pk>=0){ const px=X(pk),py=Y(pkv); ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fillStyle=UC.dead; ctx.fill(); }
+  ctx.fillStyle=UC.dim;ctx.fillText(all[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(all[n-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
+  document.getElementById('trendPeak').textContent='峰值 '+fmtN(pkv)+' tok · '+all[pk].date.slice(5)+(all[pk].src==='backfill'?'(backfill·口径异)':'')+' · '+n+'天';
+  if(lg){ const bm=_usageData&&_usageData.backfill_meta;
+    lg.innerHTML='<span><i style="background:'+UC.acc+'"></i>正式(io=in+out)</span>'
+      +'<span><i style="background:'+UC.idle+'"></i>backfill·日聚合</span>'
+      +'<span><i class="gapi"></i>无源缺口</span>'
+      +(bm?'<span class="muted" style="margin-left:auto">backfill '+esc(bm.bf_from||'')+'~'+esc(bm.bf_to||'')+' · stats-cache 日聚合,口径或略异·供趋势参考;'+esc(bm.gap_from||'')+'~'+esc(bm.gap_to||'')+' 无源(非0)</span>':''); }
 }
 function _bindTrendHover(){
   const cv=document.getElementById('uTrend'); if(!cv||cv._hov)return; cv._hov=1;
@@ -2668,7 +3057,11 @@ function _bindTrendHover(){
     const rect=cv.getBoundingClientRect(); const mx=e.clientX-rect.left;
     let best=_trendPts[0],bd=1e9;
     _trendPts.forEach(p=>{const dd=Math.abs(p.x-mx); if(dd<bd){bd=dd;best=p;}});
-    tip.innerHTML='<b>'+esc(best.date)+'</b><br>'+usd(best.cost)+' · '+fmtN(best.calls)+' calls';
+    const tag = best.src==='backfill' ? ' <span style="color:'+UC.idle+'">·backfill日聚合</span>' : '';
+    let line = best.src==='backfill'
+      ? fmtN(best.v)+' tok <span class="muted">(stats-cache·口径或异)</span>'
+      : fmtN(best.v)+' tok io'+(best.cost!=null?' · '+usd(best.cost)+' 参考':'')+(best.calls!=null?' · '+fmtN(best.calls)+' calls':'');
+    tip.innerHTML='<b>'+esc(best.date)+'</b>'+tag+'<br>'+line;
     tip.style.display='block';
     let lx=best.x+10; if(lx>rect.width-130)lx=best.x-122;
     tip.style.left=Math.max(2,lx)+'px'; tip.style.top=Math.max(2,best.y-36)+'px';
@@ -2780,6 +3173,25 @@ function renderCaps(d){
   const s=d.summary||{};
   const meta=document.getElementById('capsMeta');
   if(meta) meta.textContent=(d.now||'')+' · '+(s.n_caps||0)+' 能力 / '+(s.n_active||0)+' 现行 agent / '+(s.n_empty||0)+' 待补'+(s.n_retired?(' / '+s.n_retired+' 退役'):'');
+  // ⓪ Agent 详情 — 各 agent 会哪些内容(desc)+ caps + 状态
+  const agCap=(c)=>'<span class="cap-chip">'+esc(c)+'</span>';
+  const agCard=(a)=>{
+    const fcls=esc(a.form_cls||'off');
+    const form='<span class="ag-form '+fcls+'">'+esc(a.form||'?')+'</span>';
+    const verdict=a.retired?'':('<span class="ag-verdict" title="'+esc(a.verdict||'')+'">'+esc(a.verdict||'')+'</span>');
+    const succ=(a.retired&&a.succeeded_by)?('<span class="ag-succ">→ 接替:<b>'+esc(a.succeeded_by)+'</b></span>'):'';
+    const caps=(a.caps&&a.caps.length)?('<div class="ag-caps">'+a.caps.map(agCap).join('')+'</div>'):'<div class="ag-caps"><span class="muted" style="font-size:11px">(无 caps)</span></div>';
+    const desc=a.desc?esc(a.desc):'<span class="muted">（未填 desc / 职责）</span>';
+    let metaLine='';
+    if(a.retired){ metaLine='<div class="ag-meta">退役 '+esc(a.retired_at||'')+(a.reason?(' · '+esc(a.reason)):'')+'</div>'; }
+    else if(a.registered){ metaLine='<div class="ag-meta">注册 '+esc(a.registered)+'</div>'; }
+    return '<div class="ag-card '+fcls+'" data-key="ag-'+esc(a.role)+'">'+
+      '<div class="ag-head"><span class="ag-name">'+esc(a.role)+'</span>'+form+succ+'</div>'+
+      (verdict?('<div>'+verdict+'</div>'):'')+
+      '<div class="ag-desc">'+desc+'</div>'+caps+metaLine+'</div>';
+  };
+  const agAll=(d.agents||[]).map(agCard).join('')+(d.agents_retired||[]).map(agCard).join('');
+  morphInto(document.getElementById('agDetail'), agAll||'<div class="muted" style="padding:8px">（无 agent）</div>');
   // ① 能力池清单卡片
   const pool=(d.caps||[]).map(c=>{
     const rk=c.risk?('<span class="rb '+esc(c.risk_cls)+'">'+esc(c.risk)+'</span>'):'';
@@ -2844,6 +3256,51 @@ async function loadCaps(){
 }
 document.getElementById('capsRefresh').onclick=()=>loadCaps();
 
+// ===== 🧠 上下文窗口占用 · 1M 撞墙预警 =====
+let _ctx=null;
+function fmtWin(w){ return w>=1000000 ? (w/1000000)+'M' : (w/1000)+'K'; }
+function renderCtx(){
+  const d=_ctx; if(!d) return;
+  const meta=document.getElementById('ctxMeta'); const kp=document.getElementById('ctxKpis');
+  const body=document.getElementById('ctxBody'); const foot=document.getElementById('ctxFoot');
+  if(!body) return;
+  if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="7" class="muted">加载中（后台读 jsonl 尾部）…</td></tr>'); return; }
+  meta.textContent='活跃 '+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
+  kp.innerHTML='<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
+    +'<div class="k"><div class="v ctxpct red">'+d.n_red+'</div><div class="l">≥70% 危(建议重置)</div></div>'
+    +'<div class="k"><div class="v ctxpct yellow">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
+    +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>';
+  if(!d.rows.length){ morphInto(body,'<tr><td colspan="7" class="muted">（最近 '+d.active_min+' 分钟无活跃会话）</td></tr>'); foot.textContent=''; return; }
+  morphInto(body, d.rows.map(r=>{
+    const who = r.is_agent ? ('<b>'+esc(r.role||'?')+'</b>'+(r.title?' <span class="muted">· '+esc(r.title)+'</span>':''))
+                           : '<span class="muted">🔒 个人会话</span>';
+    const proj = r.is_agent ? esc(r.proj||'') : '<span class="muted">—</span>';
+    const barW = Math.max(2, Math.min(100, r.pct))*0.6;
+    return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
+      +'<td><span class="ctxpct '+r.level+'">'+r.pct+'%</span><span class="ctxbar '+r.level+'" style="width:'+barW+'px"></span></td>'
+      +'<td class="mono">'+fmtN(r.ctx)+'</td>'
+      +'<td>'+fmtWin(r.win)+(r.win_known?'':' <span class="winassumed" title="窗口为假定值,非模型确认">假定</span>')+'</td>'
+      +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
+      +'<td>'+who+'</td>'
+      +'<td>'+proj+'</td>'
+      +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
+  }).join(''));
+  foot.textContent='占用% = (input + cache_read + cache_creation) / 模型窗口。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定者标注)。个人会话仅计占用、不显标题(隐私)。';
+}
+async function loadCtx(){
+  try{ const r=await fetch('/api/ctx'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
+  renderCtx(); renderCtxBadge();
+}
+function renderCtxBadge(){
+  const b=document.getElementById('ctxBadge'); if(!b) return; const d=_ctx;
+  if(!d || d.loading){ b.className='hbadge loading'; b.textContent='🧠 …'; return; }
+  if(d.n_red>0){ b.className='hbadge danger'; b.textContent='🧠 ⚠ '+d.n_red+' 濒危 '+d.max_pct+'%'; b.title=d.n_red+' 个会话 ≥70%(峰值 '+d.max_pct+'%)— 建议主动重置/落档换画布'; }
+  else if(d.n_yellow>0){ b.className='hbadge warn'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'%(有 ≥50% 会话)'; }
+  else{ b.className='hbadge ok'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'% — 全部安全'; }
+}
+document.getElementById('ctxRefresh').onclick=()=>loadCtx();
+document.getElementById('ctxBadge').onclick=()=>showTab('ctx');
+
 // ===== 可恢复会话 =====
 let _sessData=null;
 function renderSessions(){
@@ -2896,6 +3353,7 @@ function showTab(t){
   if(t==='bi'){ loadBI(); loadDispatch(); }
   else if(t==='usage') loadUsage(true);
   else if(t==='caps') loadCaps();
+  else if(t==='ctx') loadCtx();
   else if(t==='fleet') load();
 }
 function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
@@ -2963,6 +3421,7 @@ setInterval(()=>{ if(curTab==='caps') loadCaps(); }, 10000);
 // 首屏一次性预热(各自独立懒加载,不拖首屏);之后按 tab 进入再刷(见 showTab)
 setTimeout(()=>loadUsage(true), 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
+loadCtx(); setInterval(loadCtx, 15000);          // 🧠 上下文占用徽标+看板:15s 轮询(后端缓存,请求零现读)— 全局告警,不分 tab
 </script>
 </body></html>"""
 
@@ -3035,6 +3494,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, get_dispatch_metrics(force=fresh))
         elif path == "/api/sessions":
             self._send(200, read_sessions())
+        elif path == "/api/ctx":
+            # 只读后台缓存(bounded jsonl 尾读);冷启未就绪回 loading 占位,绝不现读
+            d = get_ctx()
+            self._send(200, d if d is not None else {"loading": True})
         else:
             self._send(404, {"error": "not found"})
 
@@ -3140,6 +3603,7 @@ def main():
     start_watcher()
     start_fleet_refresher(20)         # 唯一舰队刷新者:20s 子进程扫描刷新 _fleet_cache(请求路径零扫描)
     start_health_refresher(25)        # 唯一健康刷新者:25s 子进程 health --json 刷新 _health_cache(请求路径零扫描)
+    start_ctx_refresher(12)           # 唯一上下文占用刷新者:12s bounded jsonl 尾读刷新 _ctx_cache(1M 撞墙预警,请求路径零现读)
     start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()
