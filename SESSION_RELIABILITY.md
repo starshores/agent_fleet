@@ -72,6 +72,7 @@
 - ② 关键投递走审计回执(收方落地即写回执、发方核回执而非假定送达)。
 - ③ 自醒重挂由独立侧验 armed(铁律③已部分做)。
 - 数分2 提的 OSS(claude-tmux-orchestration heartbeat 等)= 可借鉴同类,**待核实后取用**,不照搬不预断真实性。
+- **backlog·精确会话归属**:hello 时把当前 claude 的 session-jsonl id 落进 presence(现 `open_files()` 拿不到=空),则健康/对齐能精确"session↔role"、并强化掉聋检测(presence 声称 X 但实际 session 死/不符)。属"不信会话自述"同源。现按 cwd+标歧义已够用且诚实(数分2 的 /api/align)。
 
 ## D、idle 输出纪律(空唤醒收敛)——延缓 compact 的最便宜一招
 **现象**(用户观察):有的 cli 自醒 agent(如 Master数分2)每次被唤起,即使没新活,也**重复 dump"在岗/状态/花名册"**进自己的上下文窗 → 逐轮自我膨胀;MasterAgent 则收敛成一行"静默待命"、不重述。

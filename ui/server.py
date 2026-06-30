@@ -1881,12 +1881,11 @@ def build_align():
             sess = occ_by_cwd.get(ck, [])
             if sess:
                 top = max(sess, key=lambda x: x.get("pct", 0))
-                if len(sharers) <= 1:
-                    occ = {"pct": top["pct"], "ctx": top["ctx"], "win": top["win"],
-                           "win_known": top["win_known"], "level": top["level"],
-                           "sid": top["sid"], "model": top["model"]}
-                else:
-                    occ_note = "同 cwd %d 个在岗 · 占用归属不确定(%d 会话)" % (len(sharers), len(sess))
+                occ = {"pct": top["pct"], "ctx": top["ctx"], "win": top["win"],
+                       "win_known": top["win_known"], "level": top["level"],
+                       "sid": top["sid"], "model": top["model"],
+                       # 同 cwd 多在岗:仍给出 cwd 峰值占用(保住 1M 撞墙预警),但明确标"共享·归属不确定"不冒充本 role
+                       "ambiguous": len(sharers) > 1, "sharers": len(sharers), "nsess": len(sess)}
             else:
                 occ_note = "无近 %dmin 活跃会话" % _CTX_ACTIVE_MIN
         rows.append({
@@ -3418,36 +3417,63 @@ document.getElementById('capsRefresh').onclick=()=>loadCaps();
 // ===== 🧠 上下文窗口占用 · 1M 撞墙预警 =====
 let _ctx=null;
 function fmtWin(w){ return w>=1000000 ? (w/1000000)+'M' : (w/1000)+'K'; }
+function verdictCls(v,alive){ if(alive===false) return 'red'; if(v&&v.indexOf('✓')>=0) return 'green'; if(v&&(v.indexOf('⚠')>=0||v.indexOf('静默')>=0||v.indexOf('未起')>=0)) return 'yellow'; return ''; }
+function occCell(r){
+  if(r.occ){ const o=r.occ; const barW=Math.max(2,Math.min(100,o.pct))*0.6;
+    const amb = o.ambiguous ? ' <span class="winassumed" title="同 cwd '+o.sharers+' 个在岗('+o.nsess+' 会话)·presence 不存 session id,这是该 cwd 峰值占用,非本 role 确定归属">⚠cwd峰值·共享'+o.sharers+'</span>' : '';
+    return '<span class="ctxpct '+o.level+'">'+o.pct+'%</span><span class="ctxbar '+o.level+'" style="width:'+barW+'px"></span>'
+      +' <span class="muted mono" style="font-size:11px" title="'+esc(o.model)+'">'+fmtN(o.ctx)+'/'+fmtWin(o.win)+(o.win_known?'':'·假定')+'</span>'+amb;
+  }
+  if(r.occ_note) return '<span class="muted" style="font-size:11px">'+esc(r.occ_note)+'</span>';
+  return '<span class="muted">—</span>';
+}
 function renderCtx(){
   const d=_ctx; if(!d) return;
   const meta=document.getElementById('ctxMeta'); const kp=document.getElementById('ctxKpis');
   const body=document.getElementById('ctxBody'); const foot=document.getElementById('ctxFoot');
+  const un=document.getElementById('ctxUnaligned');
   if(!body) return;
-  if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="7" class="muted">加载中（后台读 jsonl 尾部）…</td></tr>'); return; }
-  meta.textContent='活跃 '+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
-  kp.innerHTML='<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
-    +'<div class="k"><div class="v ctxpct red">'+d.n_red+'</div><div class="l">≥70% 危(建议重置)</div></div>'
-    +'<div class="k"><div class="v ctxpct yellow">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
-    +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>';
-  if(!d.rows.length){ morphInto(body,'<tr><td colspan="7" class="muted">（最近 '+d.active_min+' 分钟无活跃会话）</td></tr>'); foot.textContent=''; return; }
-  morphInto(body, d.rows.map(r=>{
-    const who = r.is_agent ? ('<b>'+esc(r.role||'?')+'</b>'+(r.title?' <span class="muted">· '+esc(r.title)+'</span>':''))
-                           : '<span class="muted">🔒 个人会话</span>';
-    const proj = r.is_agent ? esc(r.proj||'') : '<span class="muted">—</span>';
-    const barW = Math.max(2, Math.min(100, r.pct))*0.6;
-    return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
-      +'<td><span class="ctxpct '+r.level+'">'+r.pct+'%</span><span class="ctxbar '+r.level+'" style="width:'+barW+'px"></span></td>'
-      +'<td class="mono">'+fmtN(r.ctx)+'</td>'
-      +'<td>'+fmtWin(r.win)+(r.win_known?'':' <span class="winassumed" title="窗口为假定值,非模型确认">假定</span>')+'</td>'
-      +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
-      +'<td>'+who+'</td>'
-      +'<td>'+proj+'</td>'
-      +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
+  if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="7" class="muted">加载中（后台 who --json + jsonl 尾读）…</td></tr>'); return; }
+  const s=d.summary||{};
+  meta.textContent='在岗 '+(s.on_duty||0)+'/'+(s.registered||0)+' 注册 · '+esc(d.as_of||'');
+  kp.innerHTML='<div class="k"><div class="v">'+(s.on_duty||0)+'</div><div class="l">在岗(alive)</div></div>'
+    +'<div class="k"><div class="v ctxpct '+((s.reg_not_running||0)>0?'red':'green')+'">'+(s.reg_not_running||0)+'</div><div class="l">注册未在跑</div></div>'
+    +'<div class="k"><div class="v ctxpct '+((s.hello_no_loop||0)>0?'yellow':'green')+'">'+(s.hello_no_loop||0)+'</div><div class="l">hello 未起循环</div></div>'
+    +'<div class="k"><div class="v">'+(s.daemons||0)+'</div><div class="l">daemon</div></div>'
+    +'<div class="k"><div class="v ctxpct '+((s.n_red_occ||0)>0?'red':'green')+'">'+(s.n_red_occ||0)+'</div><div class="l">≥70% 占用</div></div>'
+    +'<div class="k"><div class="v ctxpct '+((s.unaligned||0)>0?'yellow':'green')+'">'+(s.unaligned||0)+'</div><div class="l">未对齐会话</div></div>';
+  if(!d.rows||!d.rows.length){ morphInto(body,'<tr><td colspan="7" class="muted">（无在册角色）</td></tr>'); }
+  else morphInto(body, d.rows.map(r=>{
+    const vcls=verdictCls(r.verdict,r.alive);
+    const reg = r.registered ? '<span style="color:var(--live)" title="agents.json 在册">✓</span>' : '<span class="muted" title="不在 agents.json">—</span>';
+    const dm = r.mode==='daemon' ? ' <span class="winassumed">daemon</span>' : '';
+    const flags = (r.flags&&r.flags.length) ? r.flags.map(f=>'<span style="color:var(--warn)">⚠ '+esc(f)+'</span>').join('<br>') : '<span class="muted">—</span>';
+    const task = r.current_title ? '<span title="'+esc(r.current_title)+'">▶ '+esc(r.current_title.slice(0,40))+'</span>' : '<span class="muted">—</span>';
+    const cwd = r.cwd ? '<span class="muted mono" title="'+esc(r.cwd)+'">'+esc(projShort(r.cwd))+'</span>' : '<span class="muted">—</span>';
+    const rowcls = (r.occ&&r.occ.level==='red')||(r.alive===false) ? 'ctx-red':'';
+    return '<tr class="'+rowcls+'" data-key="al-'+esc(r.role)+'">'
+      +'<td><b>'+esc(r.role)+'</b>'+dm+'</td>'
+      +'<td>'+reg+'</td>'
+      +'<td><span class="ctxpct '+vcls+'">'+esc(r.verdict||'?')+'</span>'+(r.age_s!=null?' <span class="muted" style="font-size:10.5px">'+r.age_s+'s</span>':'')+'</td>'
+      +'<td>'+occCell(r)+'</td>'
+      +'<td style="font-size:12px">'+task+'</td>'
+      +'<td>'+cwd+'</td>'
+      +'<td style="font-size:11px">'+flags+'</td></tr>';
   }).join(''));
-  foot.textContent='占用% = (input + cache_read + cache_creation) / 模型窗口。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定者标注)。个人会话仅计占用、不显标题(隐私)。';
+  if(un){
+    if(d.unaligned&&d.unaligned.length){
+      un.innerHTML='<div class="sub" style="padding:10px 4px 4px"><b>未对齐会话('+d.unaligned.length+')</b> — agent 会话所在 cwd 无任何在岗注册角色(残留 tab / 未 hello / 退役遗留):</div>'
+        +'<table><thead><tr><th>占用%</th><th>会话猜测 role</th><th>标题</th><th>项目</th><th>最后活动 UTC</th></tr></thead><tbody>'
+        +d.unaligned.map(u=>'<tr class="'+(u.level==='red'?'ctx-red':'')+'"><td><span class="ctxpct '+u.level+'">'+u.pct+'%</span></td>'
+          +'<td>'+esc(u.role||'?')+'</td><td class="muted">'+esc((u.title||'').slice(0,50))+'</td>'
+          +'<td class="mono">'+esc(u.proj||'')+'</td><td class="muted mono">'+esc(u.ts||'')+'</td></tr>').join('')
+        +'</tbody></table>';
+    } else un.innerHTML='';
+  }
+  foot.textContent='对齐口径:role 来自 who(presence×进程,权威);占用按 cwd 关联 ctx 会话,同 cwd 多在岗 agent 时归属不确定(presence 不存 session id)。占用% =(input+cache_read+cache_creation)/窗口。';
 }
 async function loadCtx(){
-  try{ const r=await fetch('/api/ctx'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
+  try{ const r=await fetch('/api/align'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
   renderCtx(); renderCtxBadge();
 }
 function renderCtxBadge(){
