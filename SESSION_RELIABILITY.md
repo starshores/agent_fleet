@@ -28,7 +28,8 @@
 **对策(按性价比;均待用户 t-1782724980778 拍板,先不动)**:
 - **① 主干·零风险**:操作层命令小抄(`ab send/wait --role/done --id/peek/selfwake` 确切语法 + 铁律③)放进 **CLAUDE.md**。**放全局 `~/.claude/CLAUDE.md`**(官方:对所有会话生效)= 一处搞定、所有 cwd 的 agent 都吃到、不依赖 env。数分2 估单此挡 ~80% compact 失能。(post-compact 全局是否重注入待 SQLAGent 实验坐实;不放心可同时落各项目根 CLAUDE.md=官方明确重注入,双保险。)
 - **② 加固**:PostCompact hook 自动重读 AGENTS.md/CAPABILITIES.md(先确认 hook 本地真触发)。
-- **③ 治本·强制自举**(待办 t-1782724980778 同源):compact 后 agent 重跑自恢复(重读 recovery doc、重验命令)。**比"早压"治本**——早压(`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`)只改丢失【时机】、不减损失,且文档称本地 tab 可能不生效。
+- **③ 治本·强制自举**(待办 t-1782724980778 同源):compact 后 agent 重跑自恢复(重读 recovery doc、重验命令)。
+- **③b 早压·阈值可调(已 primary source 核实 /en/env-vars 逐字)**:`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`=触发百分比(1-100,调低=早压)、`CLAUDE_CODE_AUTO_COMPACT_WINDOW`=计算用的窗口容量(默认随模型 200K/1M)。**价值=早压提升摘要保真**(趁模型有余力压、出更好摘要,印证文章 60-75% 黄金窗),非减损失量。⚠ **我们 fleet=Opus 4.8/1M 扩展上下文,单设 PCT_OVERRIDE 多半不触发**——原文小字:PCT_OVERRIDE 仅在「AUTO_COMPACT_WINDOW 已设 / cloud / Opus4.6·Sonnet4.6 无扩展上下文」时生效;故须**同时设 `AUTO_COMPACT_WINDOW`(如 500000)** 才会提前压。**铁闸:测试 tab 实测真生效再推全队。** 关闭则用 `autoCompactEnabled:false` / `DISABLE_AUTO_COMPACT`。
 - **④ 引导压缩**(官方文档化·已 primary source 确认):在 **CLAUDE.md 写 compaction 指令**(如"compact 时务必保留:role/cwd/caps、未尽任务、bus 确切命令+自醒铁律、被纠约定、关键文件路径;砍:被否方案/闲聊"),compaction 时自动套用、确保关键上下文 survive。放全局 CLAUDE.md = bus 通用(数分2 起草的 keep-list 即用作此内容)。补充手段:`/compact <focus>` 一次性参数(手动)、PreCompact/PostCompact hook(代码级)。
 - **弃**:调 compact 比例(系统固定);单靠早压(本地未必生效 + 不减损失)。
 
