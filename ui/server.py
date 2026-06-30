@@ -1693,7 +1693,17 @@ def _ctx_head_meta(path):
         if mm:
             role = mm.group(1)
             break
-    return (title or (first_user[:40] if first_user else None) or "?"), role
+    label = title or first_user or ""
+    # 首条是 shell 启动命令(env 变量 / ab.cmd / .claude 反斜杠路径 / 解释器调用)→ 标题不可读,
+    # 用干净占位(role 已单独提取,标题不必背这串命令)。否则截断到 40 字。
+    low = label.lower()
+    cmd_like = (label.startswith('"') or label.startswith("'") or "$env" in low
+                or "ab.cmd" in low or "\\.claude" in low or "/.claude" in low
+                or low.startswith("powershell") or low.startswith("python ")
+                or low.startswith("cmd ") or low.startswith("& "))
+    if cmd_like:
+        label = ("启动会话/" + role) if role else "(启动会话)"
+    return (label[:40] if label else "?"), role
 
 
 def _refresh_ctx():
@@ -2398,7 +2408,7 @@ function toggleTasks(tr){
   det.style.display=vis?'none':''; if(vis) lastTasksOpen.delete(role); else lastTasksOpen.add(role);
 }
 
-function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtAge(a){ if(a==null) return '?'; if(a<60) return a+'s'; if(a<3600) return Math.floor(a/60)+'m'+(a%60)+'s'; return Math.floor(a/3600)+'h'+Math.floor((a%3600)/60)+'m';}
 function qc(n,cls){return `<span class="qcount ${n?cls:'z'}">${n}</span>`;}
 function swBadge(s,detail){
@@ -3340,7 +3350,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文占用',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
