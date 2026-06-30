@@ -1604,8 +1604,9 @@ _CTX_PROJECTS_DIR = str(Path.home() / ".claude" / "projects")
 _CTX_ACTIVE_MIN = 90          # 最近 90 分钟有写入 = 活跃会话
 _CTX_TAIL_BYTES = 512 * 1024  # 读尾部 512KB 找最后一条 assistant.usage(够容一条完整消息)
 _CTX_HEAD_BYTES = 64 * 1024   # 读头部 64KB 提取标题/role 标记
-_CTX_RED = 70.0               # ≥70% 红(建议主动重置/落档换画布,留足撞墙余量)
-_CTX_YELLOW = 50.0            # ≥50% 黄
+_CTX_COMPACT_FRAC = 0.65      # 实测:占用达窗口 65% 触发 auto-compact(有损摘要→降智)。这是真阈,不是撞 1M。
+_CTX_RED = 65.0               # ≥65% 红 = 将被 auto-compact(建议先主动落档重置,别被动挨压)
+_CTX_YELLOW = 50.0            # ≥50% 黄(逼近自动压线,留意)
 _ctx_cache = {"ts": 0.0, "data": None}
 _ctx_lock = threading.Lock()
 _CTX_ROLE_PATS = [
@@ -1724,6 +1725,8 @@ def _refresh_ctx():
             continue
         win, known = _ctx_win_of(model)
         pct = round(100.0 * ctx / win, 1) if win else 0.0
+        compact_at = int(round(win * _CTX_COMPACT_FRAC)) if win else 0   # 该窗口的 65% 自动压阈(tok)
+        margin = compact_at - ctx                                        # 距自动压余量(<0=已过线、将被压)
         proj = os.path.basename(os.path.dirname(p))
         # 项目目录名是 cwd 的 dash 编码(C:\apphome\agent_fleet → C--apphome-agent-fleet),
         # 而 _AGENT_CWD_HINTS 用下划线;两边都归一(_→-、小写)再匹配,否则永远 False。
@@ -1737,6 +1740,7 @@ def _refresh_ctx():
             title, role, label = None, None, None   # 个人会话:掩码,不读标题
         rows.append({
             "pct": pct, "ctx": ctx, "win": win, "win_known": known,
+            "compact_at": compact_at, "margin": margin,
             "model": (model or "?"), "is_agent": is_agent,
             "role": label, "title": (title or "")[:60] if is_agent else None,
             "proj": proj if is_agent else None, "sid": sid[:8],
@@ -1781,11 +1785,10 @@ def start_ctx_refresher(interval=12):
 
 
 # =============================================================
-#  健康模块 · 会话 ↔ ab 注册对齐
+#  who 缓存 —— 上下文模块仅用它【校验 role 标签是否在岗注册】(role_live ✓/?)。
 #  权威源 = `who --json`(presence 心跳 × 实际 claude 进程,与 cmd_who 同口径)。
-#  对齐口径(诚实):presence 只存 role→claude_pid+cwd,【不存 session-jsonl id】。
-#  故"会话↔角色"只能按 cwd 关联 —— 同 cwd 多 agent(如 <业务项目>/agent_fleet)时
-#  占用归属【标注不确定·不猜】,符合"数据真实可溯源"铁律。占用数仍来自 _ctx_cache。
+#  注:liveness/注册/verdict 等健康项归 🛰 运维面板;此处只取在岗 role 集做标签校验。
+#  presence 不存 session-jsonl id,故无法精确会话↔role(占用本身逐会话精确,见 build_ctxpanel)。
 # =============================================================
 _WHO_TTL = 20.0
 _who_cache = {"ts": 0.0, "data": None}
@@ -1822,7 +1825,7 @@ def start_who_refresher(interval=20):
             time.sleep(interval)
     t = threading.Thread(target=loop, daemon=True)
     t.start()
-    print("[who] 后台角色对齐刷新线程已启动,间隔 %ds(子进程 who --json,请求零扫描)" % interval)
+    print("[who] 后台 who 刷新线程已启动,间隔 %ds(子进程 who --json,供上下文模块校验 role 在岗,请求零扫描)" % interval)
     return t
 
 
@@ -1842,86 +1845,51 @@ def _cwd_key(s):
     return "-".join(parts)
 
 
-def build_align():
-    """请求路径轻量内存 join:get_who()(权威角色) ⨝ get_ctx()(占用)。不扫描、不读盘。"""
-    who = get_who()
-    if not who:
+def build_ctxpanel():
+    """纯上下文预算看板(请求路径只读缓存、零扫描/读盘):
+    每行 = 一个活跃会话(窗口)的占用 + 距 65% 自动压余量;role 仅作"谁的窗口"标签,
+    用 who(权威 presence×进程)校验 regex 猜的 role 是否当前在岗注册(role_live)。
+    liveness/注册/verdict/告警 等健康项【不在此】——归 🛰 运维面板,避免重复(去重原则)。"""
+    ctx = get_ctx()
+    if not ctx:
         return {"loading": True}
-    ctx = get_ctx() or {}
-    ctx_rows = ctx.get("rows", []) or []
-    # 占用按 cwd 键归集(仅 agent 会话);各 cwd 在岗角色数(判占用归属是否唯一)
-    occ_by_cwd, alive_roles_by_cwd = {}, {}
-    for cr in ctx_rows:
+    who = get_who() or {}
+    # who 的权威在岗角色集 + cwd→在岗角色(用于校验/兜底 role 标签,不做占用归属)
+    alive_roles = set()
+    alive_by_cwd = {}
+    for r in who.get("roles", []):
+        if (not r.get("retired")) and r.get("alive") and r.get("role"):
+            alive_roles.add(r["role"])
+            if r.get("cwd"):
+                alive_by_cwd.setdefault(_cwd_key(r["cwd"]), []).append(r["role"])
+    src = ctx.get("rows", []) or []
+    # 同 cwd 活跃会话数(仅作"共享 cwd"诚实提示;占用本身是逐会话精确的,不需归属猜测)
+    sess_by_cwd = {}
+    for cr in src:
         if cr.get("is_agent"):
-            occ_by_cwd.setdefault(_cwd_key(cr.get("proj")), []).append(cr)
-    for r in who.get("roles", []):
-        if (not r.get("retired")) and r.get("cwd") and r.get("alive"):
-            alive_roles_by_cwd.setdefault(_cwd_key(r["cwd"]), []).append(r["role"])
-
+            sess_by_cwd.setdefault(_cwd_key(cr.get("proj")), 0)
+            sess_by_cwd[_cwd_key(cr.get("proj"))] += 1
     rows = []
-    for r in who.get("roles", []):
-        if r.get("retired"):
-            continue
-        flags = []
-        v = r.get("verdict") or ""
-        if r.get("present") and r.get("alive") is False:
-            flags.append("注册在册·进程已退(残留)")
-        if "未起循环" in v:
-            flags.append("已hello·未起 wait 循环")
-        if "静默" in v:
-            flags.append("worker 静默(超心跳)")
-        if (not r.get("present")) and (r.get("role") not in ("用户", "unknown")):
-            flags.append("未声明 presence(未 hello)")
-        occ, occ_note = None, None
-        if r.get("mode") == "daemon":
-            occ_note = "daemon · 无可见 tab 会话"
-        elif r.get("cwd"):
-            ck = _cwd_key(r["cwd"])
-            sharers = alive_roles_by_cwd.get(ck, [])
-            sess = occ_by_cwd.get(ck, [])
-            if sess:
-                top = max(sess, key=lambda x: x.get("pct", 0))
-                occ = {"pct": top["pct"], "ctx": top["ctx"], "win": top["win"],
-                       "win_known": top["win_known"], "level": top["level"],
-                       "sid": top["sid"], "model": top["model"],
-                       # 同 cwd 多在岗:仍给出 cwd 峰值占用(保住 1M 撞墙预警),但明确标"共享·归属不确定"不冒充本 role
-                       "ambiguous": len(sharers) > 1, "sharers": len(sharers), "nsess": len(sess)}
-            else:
-                occ_note = "无近 %dmin 活跃会话" % _CTX_ACTIVE_MIN
+    for cr in src:
+        role = cr.get("role")
+        role_live = bool(role and role in alive_roles)
+        if cr.get("is_agent") and (not role or role == "?"):
+            # regex 没抓到 role:若该 cwd 恰有唯一在岗角色,用它兜底(标 by_cwd)
+            cand = alive_by_cwd.get(_cwd_key(cr.get("proj")), [])
+            if len(cand) == 1:
+                role, role_live = cand[0], True
         rows.append({
-            "role": r["role"], "registered": bool(r.get("registered")), "caps": r.get("caps") or [],
-            "mode": r.get("mode"), "verdict": v, "alive": r.get("alive"), "age_s": r.get("age_s"),
-            "cwd": r.get("cwd"), "current_title": r.get("current_title"),
-            "occ": occ, "occ_note": occ_note, "flags": flags,
+            "is_agent": cr.get("is_agent"), "role": role, "role_live": role_live,
+            "pct": cr.get("pct"), "level": cr.get("level"), "ctx": cr.get("ctx"),
+            "win": cr.get("win"), "win_known": cr.get("win_known"),
+            "compact_at": cr.get("compact_at"), "margin": cr.get("margin"),
+            "model": cr.get("model"), "sid": cr.get("sid"), "ts": cr.get("ts"),
+            "cwd_sessions": sess_by_cwd.get(_cwd_key(cr.get("proj")), 1) if cr.get("is_agent") else 1,
         })
-    # 排序:有红占用→在岗→其余;同档按 role 名
-    def _rank(rr):
-        return (0 if (rr["occ"] and rr["occ"]["level"] == "red") else 1 if rr.get("alive") else 2, rr["role"])
-    rows.sort(key=_rank)
-
-    # 未对齐会话:agent 会话所在 cwd 没有任何在岗注册角色(残留 tab / 未 hello / 退役遗留)
-    unaligned = []
-    for cr in ctx_rows:
-        if cr.get("is_agent") and _cwd_key(cr.get("proj")) not in alive_roles_by_cwd:
-            unaligned.append({"role": cr.get("role"), "title": cr.get("title"), "proj": cr.get("proj"),
-                              "pct": cr.get("pct"), "level": cr.get("level"), "sid": cr.get("sid"),
-                              "ctx": cr.get("ctx"), "win": cr.get("win"), "win_known": cr.get("win_known"),
-                              "model": cr.get("model"), "ts": cr.get("ts")})
-    txt = lambda r: " ".join(r["flags"])
-    summary = {
-        "on_duty": sum(1 for r in rows if r.get("alive")),
-        "registered": sum(1 for r in rows if r["registered"]),
-        "reg_not_running": sum(1 for r in rows if ("残留" in txt(r) or "未声明" in txt(r))),
-        "hello_no_loop": sum(1 for r in rows if "未起 wait 循环" in txt(r)),
-        "daemons": sum(1 for r in rows if r.get("mode") == "daemon"),
-        "n_red_occ": sum(1 for r in rows if r.get("occ") and r["occ"]["level"] == "red"),
-        "unaligned": len(unaligned),
-    }
     return {
-        "ok": True, "as_of": who.get("as_of"), "psutil": who.get("psutil", True),
-        "rows": rows, "unaligned": unaligned, "summary": summary,
-        "red": _CTX_RED, "yellow": _CTX_YELLOW, "active_min": _CTX_ACTIVE_MIN,
-        # 让 🧠 占用徽标(renderCtxBadge)沿用同一对象
+        "ok": True, "as_of": ctx.get("as_of"), "rows": rows,
+        "red": _CTX_RED, "yellow": _CTX_YELLOW, "compact_frac": _CTX_COMPACT_FRAC,
+        "active_min": _CTX_ACTIVE_MIN,
         "max_pct": ctx.get("max_pct", 0.0), "n_red": ctx.get("n_red", 0),
         "n_yellow": ctx.get("n_yellow", 0), "n": ctx.get("n", 0),
     }
@@ -2247,7 +2215,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <span id="healthBadge" class="hbadge loading" title="bus 健康(点击展开)">🩺 …</span>
     <div id="healthPanel" class="hpanel" style="display:none"></div>
   </span>
-  <span id="ctxBadge" class="hbadge loading" title="上下文窗口占用(点击看占用看板)·≥70%红=建议主动重置">🧠 …</span>
+  <span id="ctxBadge" class="hbadge loading" title="上下文预算(点击看看板)·≥65%红=将被 auto-compact,建议先主动落档重置">🧠 …</span>
   <span class="spacer"></span>
   <span class="ctrl">兜底轮询
     <select id="pollSel">
@@ -2266,7 +2234,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
-  <button class="tab" data-t="ctx">🩺 健康</button>
+  <button class="tab" data-t="ctx">🧠 上下文</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -2472,10 +2440,10 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div id="capGaps" style="padding:8px 0"></div>
   </section>
 
-  <!-- 健康模块 · 会话 ↔ ab 注册对齐 -->
+  <!-- 上下文模块 · 1M 预算/auto-compact 预警 -->
   <section data-tab="ctx">
-    <div class="sec-h">🩺 健康 · 会话 ↔ ab 注册对齐
-      <span class="sub">权威源 <span class="mono">who --json</span>(presence 心跳 × 实际 claude 进程)对齐花名册;上下文占用按 <span class="mono">cwd</span> 关联 — 同 cwd 多 agent 时占用归属<b>标注不确定</b>(presence 不存 session id,不猜)。占用 ≥70%红·≥50%黄</span>
+    <div class="sec-h">🧠 上下文 · 1M 预算预警
+      <span class="sub">每个活跃会话(窗口)的上下文预算:<span class="mono">ctx=input+cache_read+cache_creation</span> / 模型窗口 — <b>≥65% 将被 auto-compact</b>(实测真阈·有损摘要→降智)、≥50%黄。role 仅标"谁的窗口"(who 校验)。<b>谁活着/在岗</b>看 🛰 运维面板</span>
       <span class="spacer" style="flex:1"></span>
       <span id="ctxMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="ctxRefresh">刷新</button>
@@ -2483,11 +2451,10 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div class="sec-b">
       <div class="ctx-kpis" id="ctxKpis"></div>
       <table>
-        <thead><tr><th>role</th><th>注册</th><th>在岗 / verdict</th><th>占用%</th><th>当前任务</th><th>cwd</th><th>告警</th></tr></thead>
+        <thead><tr><th>占用%</th><th>距自动压(65%)余量</th><th>ctx / 窗口</th><th>role(谁的窗口)</th><th>model</th><th>最后活动 UTC</th></tr></thead>
         <tbody id="ctxBody"></tbody>
       </table>
       <div class="foot muted" id="ctxFoot"></div>
-      <div id="ctxUnaligned"></div>
     </div>
   </section>
 
@@ -3417,69 +3384,47 @@ document.getElementById('capsRefresh').onclick=()=>loadCaps();
 // ===== 🧠 上下文窗口占用 · 1M 撞墙预警 =====
 let _ctx=null;
 function fmtWin(w){ return w>=1000000 ? (w/1000000)+'M' : (w/1000)+'K'; }
-function verdictCls(v,alive){ if(alive===false) return 'red'; if(v&&v.indexOf('✓')>=0) return 'green'; if(v&&(v.indexOf('⚠')>=0||v.indexOf('静默')>=0||v.indexOf('未起')>=0)) return 'yellow'; return ''; }
-function occCell(r){
-  if(r.occ){ const o=r.occ; const barW=Math.max(2,Math.min(100,o.pct))*0.6;
-    const amb = o.ambiguous ? ' <span class="winassumed" title="同 cwd '+o.sharers+' 个在岗('+o.nsess+' 会话)·presence 不存 session id,这是该 cwd 峰值占用,非本 role 确定归属">⚠cwd峰值·共享'+o.sharers+'</span>' : '';
-    return '<span class="ctxpct '+o.level+'">'+o.pct+'%</span><span class="ctxbar '+o.level+'" style="width:'+barW+'px"></span>'
-      +' <span class="muted mono" style="font-size:11px" title="'+esc(o.model)+'">'+fmtN(o.ctx)+'/'+fmtWin(o.win)+(o.win_known?'':'·假定')+'</span>'+amb;
-  }
-  if(r.occ_note) return '<span class="muted" style="font-size:11px">'+esc(r.occ_note)+'</span>';
-  return '<span class="muted">—</span>';
+function marginCell(r){
+  if(r.margin==null||r.compact_at==null) return '<span class="muted">—</span>';
+  if(r.margin>0) return '<span class="ctxpct '+(r.level==='yellow'?'yellow':'green')+'">+'+fmtN(r.margin)+'</span> <span class="muted" style="font-size:11px">tok 余量</span>';
+  return '<span class="ctxpct red">已超 '+fmtN(-r.margin)+'</span> <span class="muted" style="font-size:11px">tok·将被压</span>';
 }
 function renderCtx(){
   const d=_ctx; if(!d) return;
   const meta=document.getElementById('ctxMeta'); const kp=document.getElementById('ctxKpis');
   const body=document.getElementById('ctxBody'); const foot=document.getElementById('ctxFoot');
-  const un=document.getElementById('ctxUnaligned');
   if(!body) return;
-  if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="7" class="muted">加载中（后台 who --json + jsonl 尾读）…</td></tr>'); return; }
-  const s=d.summary||{};
-  meta.textContent='在岗 '+(s.on_duty||0)+'/'+(s.registered||0)+' 注册 · '+esc(d.as_of||'');
-  kp.innerHTML='<div class="k"><div class="v">'+(s.on_duty||0)+'</div><div class="l">在岗(alive)</div></div>'
-    +'<div class="k"><div class="v ctxpct '+((s.reg_not_running||0)>0?'red':'green')+'">'+(s.reg_not_running||0)+'</div><div class="l">注册未在跑</div></div>'
-    +'<div class="k"><div class="v ctxpct '+((s.hello_no_loop||0)>0?'yellow':'green')+'">'+(s.hello_no_loop||0)+'</div><div class="l">hello 未起循环</div></div>'
-    +'<div class="k"><div class="v">'+(s.daemons||0)+'</div><div class="l">daemon</div></div>'
-    +'<div class="k"><div class="v ctxpct '+((s.n_red_occ||0)>0?'red':'green')+'">'+(s.n_red_occ||0)+'</div><div class="l">≥70% 占用</div></div>'
-    +'<div class="k"><div class="v ctxpct '+((s.unaligned||0)>0?'yellow':'green')+'">'+(s.unaligned||0)+'</div><div class="l">未对齐会话</div></div>';
-  if(!d.rows||!d.rows.length){ morphInto(body,'<tr><td colspan="7" class="muted">（无在册角色）</td></tr>'); }
-  else morphInto(body, d.rows.map(r=>{
-    const vcls=verdictCls(r.verdict,r.alive);
-    const reg = r.registered ? '<span style="color:var(--live)" title="agents.json 在册">✓</span>' : '<span class="muted" title="不在 agents.json">—</span>';
-    const dm = r.mode==='daemon' ? ' <span class="winassumed">daemon</span>' : '';
-    const flags = (r.flags&&r.flags.length) ? r.flags.map(f=>'<span style="color:var(--warn)">⚠ '+esc(f)+'</span>').join('<br>') : '<span class="muted">—</span>';
-    const task = r.current_title ? '<span title="'+esc(r.current_title)+'">▶ '+esc(r.current_title.slice(0,40))+'</span>' : '<span class="muted">—</span>';
-    const cwd = r.cwd ? '<span class="muted mono" title="'+esc(r.cwd)+'">'+esc(projShort(r.cwd))+'</span>' : '<span class="muted">—</span>';
-    const rowcls = (r.occ&&r.occ.level==='red')||(r.alive===false) ? 'ctx-red':'';
-    return '<tr class="'+rowcls+'" data-key="al-'+esc(r.role)+'">'
-      +'<td><b>'+esc(r.role)+'</b>'+dm+'</td>'
-      +'<td>'+reg+'</td>'
-      +'<td><span class="ctxpct '+vcls+'">'+esc(r.verdict||'?')+'</span>'+(r.age_s!=null?' <span class="muted" style="font-size:10.5px">'+r.age_s+'s</span>':'')+'</td>'
-      +'<td>'+occCell(r)+'</td>'
-      +'<td style="font-size:12px">'+task+'</td>'
-      +'<td>'+cwd+'</td>'
-      +'<td style="font-size:11px">'+flags+'</td></tr>';
+  if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="6" class="muted">加载中（后台 jsonl 尾读）…</td></tr>'); return; }
+  meta.textContent='活跃 '+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
+  kp.innerHTML='<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
+    +'<div class="k"><div class="v ctxpct '+(d.n_red>0?'red':'green')+'">'+d.n_red+'</div><div class="l">≥65% 将被自动压</div></div>'
+    +'<div class="k"><div class="v ctxpct '+(d.n_yellow>0?'yellow':'green')+'">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
+    +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>';
+  if(!d.rows||!d.rows.length){ morphInto(body,'<tr><td colspan="6" class="muted">（最近 '+d.active_min+' 分钟无活跃会话）</td></tr>'); foot.textContent=''; return; }
+  morphInto(body, d.rows.map(r=>{
+    const barW=Math.max(2,Math.min(100,r.pct))*0.6;
+    let who;
+    if(!r.is_agent) who='<span class="muted">🔒 个人会话</span>';
+    else { who='<b>'+esc(r.role||'?')+'</b>'+(r.role_live?' <span style="color:var(--live)" title="who 校验:该 role 当前在岗注册">✓</span>':' <span class="winassumed" title="该 role 非当前在岗注册(可能已结束/残留),仅按会话内标记猜">?</span>');
+            if(r.cwd_sessions>1) who+=' <span class="winassumed" title="同 cwd '+r.cwd_sessions+' 个活跃会话共享(占用本身逐会话精确)">·cwd'+r.cwd_sessions+'</span>'; }
+    return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
+      +'<td><span class="ctxpct '+r.level+'">'+r.pct+'%</span><span class="ctxbar '+r.level+'" style="width:'+barW+'px"></span></td>'
+      +'<td>'+marginCell(r)+'</td>'
+      +'<td class="muted mono" style="font-size:11px">'+fmtN(r.ctx)+' / '+fmtWin(r.win)+(r.win_known?'':'·假定')+'</td>'
+      +'<td>'+who+'</td>'
+      +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
+      +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
   }).join(''));
-  if(un){
-    if(d.unaligned&&d.unaligned.length){
-      un.innerHTML='<div class="sub" style="padding:10px 4px 4px"><b>未对齐会话('+d.unaligned.length+')</b> — agent 会话所在 cwd 无任何在岗注册角色(残留 tab / 未 hello / 退役遗留):</div>'
-        +'<table><thead><tr><th>占用%</th><th>会话猜测 role</th><th>标题</th><th>项目</th><th>最后活动 UTC</th></tr></thead><tbody>'
-        +d.unaligned.map(u=>'<tr class="'+(u.level==='red'?'ctx-red':'')+'"><td><span class="ctxpct '+u.level+'">'+u.pct+'%</span></td>'
-          +'<td>'+esc(u.role||'?')+'</td><td class="muted">'+esc((u.title||'').slice(0,50))+'</td>'
-          +'<td class="mono">'+esc(u.proj||'')+'</td><td class="muted mono">'+esc(u.ts||'')+'</td></tr>').join('')
-        +'</tbody></table>';
-    } else un.innerHTML='';
-  }
-  foot.textContent='对齐口径:role 来自 who(presence×进程,权威);占用按 cwd 关联 ctx 会话,同 cwd 多在岗 agent 时归属不确定(presence 不存 session id)。占用% =(input+cache_read+cache_creation)/窗口。';
+  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role 仅作"谁的窗口"标签(who 校验在岗;✓=确认/?=未确认);占用本身逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定者标注)。个人会话仅计占用、不显内容(隐私)。liveness/注册看 🛰 运维面板。';
 }
 async function loadCtx(){
-  try{ const r=await fetch('/api/align'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
+  try{ const r=await fetch('/api/ctxpanel'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
   renderCtx(); renderCtxBadge();
 }
 function renderCtxBadge(){
   const b=document.getElementById('ctxBadge'); if(!b) return; const d=_ctx;
   if(!d || d.loading){ b.className='hbadge loading'; b.textContent='🧠 …'; return; }
-  if(d.n_red>0){ b.className='hbadge danger'; b.textContent='🧠 ⚠ '+d.n_red+' 濒危 '+d.max_pct+'%'; b.title=d.n_red+' 个会话 ≥70%(峰值 '+d.max_pct+'%)— 建议主动重置/落档换画布'; }
+  if(d.n_red>0){ b.className='hbadge danger'; b.textContent='🧠 ⚠ '+d.n_red+' 将压 '+d.max_pct+'%'; b.title=d.n_red+' 个会话 ≥65%(峰值 '+d.max_pct+'%)— 将被 auto-compact,建议先主动落档重置'; }
   else if(d.n_yellow>0){ b.className='hbadge warn'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'%(有 ≥50% 会话)'; }
   else{ b.className='hbadge ok'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'% — 全部安全'; }
 }
@@ -3525,7 +3470,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🩺 健康',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -3683,9 +3628,9 @@ class Handler(BaseHTTPRequestHandler):
             # 只读后台缓存(bounded jsonl 尾读);冷启未就绪回 loading 占位,绝不现读
             d = get_ctx()
             self._send(200, d if d is not None else {"loading": True})
-        elif path == "/api/align":
-            # 健康模块 · 会话↔注册对齐:内存 join who_cache ⨝ ctx_cache,请求路径零扫描/零读盘
-            self._send(200, build_align())
+        elif path == "/api/ctxpanel":
+            # 纯上下文预算看板:内存 ctx_cache(+who_cache 仅校验 role 标签),请求路径零扫描/零读盘
+            self._send(200, build_ctxpanel())
         else:
             self._send(404, {"error": "not found"})
 
@@ -3792,7 +3737,7 @@ def main():
     start_fleet_refresher(20)         # 唯一舰队刷新者:20s 子进程扫描刷新 _fleet_cache(请求路径零扫描)
     start_health_refresher(25)        # 唯一健康刷新者:25s 子进程 health --json 刷新 _health_cache(请求路径零扫描)
     start_ctx_refresher(12)           # 唯一上下文占用刷新者:12s bounded jsonl 尾读刷新 _ctx_cache(1M 撞墙预警,请求路径零现读)
-    start_who_refresher(20)           # 唯一角色对齐刷新者:20s 子进程 who --json 刷新 _who_cache(健康模块·会话↔注册对齐,请求路径零扫描)
+    start_who_refresher(20)           # 唯一 who 刷新者:20s 子进程 who --json 刷新 _who_cache(供上下文模块校验 role 在岗,请求路径零扫描)
     start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()
