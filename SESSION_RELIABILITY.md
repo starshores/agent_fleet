@@ -19,16 +19,17 @@
 - 🎯 **项目根 + 全局 CLAUDE.md、MEMORY.md 前 200 行 compact 后【自动重注入】;AGENTS.md / CAPABILITIES.md 【不】自动重载。** 降智真因 = 操作层确切命令住在不重载的 AGENTS.md = **放错位置**。
 - PostCompact / PreCompact hook 存在,可压缩后自动跑动作。
 
-> ⚠️ **机制更正(2026-06-30 claude-code-guide 查官方文档,推翻两处早期假设)**:
-> - **没有**文档化的"Compact Instructions CLAUDE.md 段自动套用"机制。引导 compact 只有两条真实途径:`/compact [focus]` **一次性**参数(手动、不持久)+ PreCompact/PostCompact **hook**(跑代码非指令)。→ 下面 A④ 据此改写。
-> - **只确认【项目根 CLAUDE.md】compact 后自动重注入**;**全局 `~/.claude/CLAUDE.md` 能否 survive = 官方未文档化**。→ A① 命令小抄应放**项目根 CLAUDE.md**(每个 agent 的 cwd 根),全局**必须先实测**再用(SQLAGent 实验验)。
-> - 站得住的:项目根 CLAUDE.md 重注入(A①项目根版/A②基础)、PreCompact/PostCompact hook(A②)、/compact 手动参数(A④)、verify-after-compact 纯纪律(A⑤)。
+> ✅ **机制核实(2026-06-30 primary source 裁决;纠正本 callout 上一版的错误)**:上一版据 claude-code-guide 写"机制不存在"=**该 agent 的【假阴性幻觉】**(它读了 context-window/memory 页、漏了 best-practices 页)。数分2 WebFetch + 我**亲自 WebFetch 官方 best-practices 页逐字复核**,确认:
+> - ✅ 原文:"Customize compaction behavior in CLAUDE.md with instructions like *When compacting, always preserve the full list of modified files and any test commands* to ensure critical context survives summarization" → **CLAUDE.md 定制 compaction = 官方文档化、确实存在**(普通 CLAUDE.md 指令即可,不需特殊段名)。**A④ 成立。**
+> - ✅ 原文:"Home folder (~/.claude/CLAUDE.md): applies to all Claude sessions" → **全局 CLAUDE.md 对所有会话生效** → bus-wide 一处放通用 compact 指令可行。**A① 全局版成立。**
+> - 待实测(SQLAGent 实验坐实,非阻塞):全局 CLAUDE.md 的 compaction 指令在项目会话 compact 时是否真被 honored(doc 说会);post-compact 全局是否重注入(context-window 表只列了项目根、未提全局)。
+> - 🔑 **元教训(本主线立为铁律)**:**doc-query agent 会【双向幻觉】**——既能假"有"也能假"无"(本次 claude-code-guide 给了假阴性、上次给 Agent Teams 是对的=不稳定)。「不信会话自述」升级到顶:**不信任何单个 agent 的 doc 总结/核实结论,核到【primary source 原文】或【实测】才算数**;连"派 agent 去验证"本身也是一层会幻觉的自述。
 
 **对策(按性价比;均待用户 t-1782724980778 拍板,先不动)**:
-- **① 主干·零风险**:操作层命令小抄(`ab send/wait --role/done --id/peek/selfwake` 确切语法 + 铁律③)放进**compact 后自动重注入的 CLAUDE.md**。⚠ **放【项目根 CLAUDE.md】**(官方仅确认项目根重注入)——即每个 agent 各自 cwd 的根 CLAUDE.md;**全局 `~/.claude/CLAUDE.md` 未文档化、先实测**(若全局生效则一处搞定,否则逐项目放)。数分2 估单此挡 ~80% compact 失能。
+- **① 主干·零风险**:操作层命令小抄(`ab send/wait --role/done --id/peek/selfwake` 确切语法 + 铁律③)放进 **CLAUDE.md**。**放全局 `~/.claude/CLAUDE.md`**(官方:对所有会话生效)= 一处搞定、所有 cwd 的 agent 都吃到、不依赖 env。数分2 估单此挡 ~80% compact 失能。(post-compact 全局是否重注入待 SQLAGent 实验坐实;不放心可同时落各项目根 CLAUDE.md=官方明确重注入,双保险。)
 - **② 加固**:PostCompact hook 自动重读 AGENTS.md/CAPABILITIES.md(先确认 hook 本地真触发)。
 - **③ 治本·强制自举**(待办 t-1782724980778 同源):compact 后 agent 重跑自恢复(重读 recovery doc、重验命令)。**比"早压"治本**——早压(`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`)只改丢失【时机】、不减损失,且文档称本地 tab 可能不生效。
-- **④ 引导压缩**(更正:非 CLAUDE.md 段):用 **`/compact <keep-list>` 一次性参数**手动引导(保:文件路径/未尽/测试/被纠约定;砍:被否/闲聊)——定为压缩时**标准手动动作**;或 **PreCompact hook** 在压前把工作态 dump 到文件、PostCompact 再读回(代码级,更稳)。**不靠**不存在的"CLAUDE.md Compact Instructions 自动段"。
+- **④ 引导压缩**(官方文档化·已 primary source 确认):在 **CLAUDE.md 写 compaction 指令**(如"compact 时务必保留:role/cwd/caps、未尽任务、bus 确切命令+自醒铁律、被纠约定、关键文件路径;砍:被否方案/闲聊"),compaction 时自动套用、确保关键上下文 survive。放全局 CLAUDE.md = bus 通用(数分2 起草的 keep-list 即用作此内容)。补充手段:`/compact <focus>` 一次性参数(手动)、PreCompact/PostCompact hook(代码级)。
 - **弃**:调 compact 比例(系统固定);单靠早压(本地未必生效 + 不减损失)。
 
 **外部独立实证 + 加固**(数分2 经 业务侧 agent 抓回实战长文《/compact 我用了 3 个月》对照分析;原文在 `Master数分2/done/1782789552504-业务侧 agent-eada67.json`):
