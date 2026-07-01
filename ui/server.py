@@ -1609,12 +1609,6 @@ _CTX_RED = 65.0               # ≥65% 红 = 将被 auto-compact(建议先主动
 _CTX_YELLOW = 50.0            # ≥50% 黄(逼近自动压线,留意)
 _ctx_cache = {"ts": 0.0, "data": None}
 _ctx_lock = threading.Lock()
-_CTX_ROLE_PATS = [
-    re.compile(r"hello\s+--role\s+([A-Za-z0-9_一-鿿]{2,24})"),
-    re.compile(r"--role\s+([A-Za-z0-9_一-鿿]{2,24})"),
-    re.compile(r"你是\s*[「『\"]?\s*([A-Za-z0-9_一-鿿]{2,24})"),
-    re.compile(r"\brole\s*[=:]\s*([A-Za-z0-9_一-鿿]{2,24})"),
-]
 
 
 def _ctx_win_of(model):
@@ -1667,11 +1661,29 @@ def _ctx_last_usage(path):
     return None, None, None
 
 
+def _tooluse_commands(msg):
+    """从一条 assistant 消息里抽出所有 Bash/PowerShell tool_use 的 command 串(list[str])。"""
+    cmds = []
+    content = (msg or {}).get("content")
+    if isinstance(content, list):
+        for b in content:
+            if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") in ("Bash", "PowerShell"):
+                cmd = (b.get("input") or {}).get("command")
+                if isinstance(cmd, str):
+                    cmds.append(cmd)
+    return cmds
+
+
 def _ctx_head_meta(path):
-    """头部提取 (title, role_guess):title=ai-title 或首条 user 文本;role 由标记/标题最佳努力猜。"""
+    """头部提取 (title, role, role_src):
+    role【只认会话真实执行过的 agentbus hello/wait/serve --role X 命令】(bash tool_use 里的实际调用),
+    绝不 match prose / CLAUDE.md 模板里的 '--role Master' 文本(那是污染源:多会话被误标 Master)。
+    role_src='hello'(最权威·会话自报身份)/ 'cmd'(agentbus 其它 --role,如 wait/serve worker 循环)/ None(测不到)。"""
     txt = _ctx_head_text(path, _CTX_HEAD_BYTES)
     title = None
     first_user = None
+    hello_role = None      # 最后一次 hello --role X(会话身份声明,最权威)
+    cmd_role = None        # 兜底:agentbus wait/serve/done 里的 --role X
     for line in txt.splitlines():
         line = line.strip()
         if not line:
@@ -1680,31 +1692,42 @@ def _ctx_head_meta(path):
             r = json.loads(line)
         except Exception:
             continue
-        if r.get("type") == "ai-title":
+        typ = r.get("type")
+        if typ == "ai-title":
             c = r.get("title") or r.get("content")
             if isinstance(c, str):
                 title = c
-        if first_user is None and r.get("type") == "user":
-            c = r.get("message", {}).get("content")
-            if isinstance(c, str):
-                first_user = c[:200]
-    role = None
-    for pat in _CTX_ROLE_PATS:
-        mm = pat.search(txt)
-        if mm:
-            role = mm.group(1)
-            break
+        elif typ == "user":
+            if first_user is None:
+                c = r.get("message", {}).get("content")
+                if isinstance(c, str):
+                    first_user = c[:200]
+        elif typ == "assistant":
+            for cmd in _tooluse_commands(r.get("message")):
+                if "agentbus" not in cmd and "\\.claude" not in cmd and "/.claude" not in cmd:
+                    continue   # 只认针对 agentbus 的命令,进一步防误抓
+                mh = re.search(r"hello\b[^\n]*?--role\s+([A-Za-z0-9_一-鿿]{2,24})", cmd)
+                if mh:
+                    hello_role = mh.group(1)
+                    continue
+                mc = re.search(r"--role\s+([A-Za-z0-9_一-鿿]{2,24})", cmd)
+                if mc:
+                    cmd_role = mc.group(1)
+    if hello_role:
+        role, role_src = hello_role, "hello"
+    elif cmd_role:
+        role, role_src = cmd_role, "cmd"
+    else:
+        role, role_src = None, None
     label = title or first_user or ""
-    # 首条是 shell 启动命令(env 变量 / ab.cmd / .claude 反斜杠路径 / 解释器调用)→ 标题不可读,
-    # 用干净占位(role 已单独提取,标题不必背这串命令)。否则截断到 40 字。
     low = label.lower()
     cmd_like = (label.startswith('"') or label.startswith("'") or "$env" in low
                 or "ab.cmd" in low or "\\.claude" in low or "/.claude" in low
                 or low.startswith("powershell") or low.startswith("python ")
                 or low.startswith("cmd ") or low.startswith("& "))
     if cmd_like:
-        label = ("启动会话/" + role) if role else "(启动会话)"
-    return (label[:40] if label else "?"), role
+        label = ("会话/" + role) if role else "(启动会话)"
+    return (label[:40] if label else "?"), role, role_src
 
 
 def _refresh_ctx():
@@ -1734,15 +1757,15 @@ def _refresh_ctx():
         is_agent = any(h.replace("_", "-").lower() in nproj for h in _AGENT_CWD_HINTS)
         sid = os.path.basename(p)[:-6]
         if is_agent:
-            title, role = _ctx_head_meta(p)
+            title, role, role_src = _ctx_head_meta(p)
             label = role or "?"
         else:
-            title, role, label = None, None, None   # 个人会话:掩码,不读标题
+            title, label, role_src = None, None, None   # 个人会话:掩码,不读标题
         rows.append({
             "pct": pct, "ctx": ctx, "win": win, "win_known": known,
             "compact_at": compact_at, "margin": margin,
             "model": (model or "?"), "is_agent": is_agent,
-            "role": label, "title": (title or "")[:60] if is_agent else None,
+            "role": label, "role_src": role_src, "title": (title or "")[:60] if is_agent else None,
             "proj": proj if is_agent else None, "sid": sid[:8],
             "ts": ts, "level": ("red" if pct >= _CTX_RED else "yellow" if pct >= _CTX_YELLOW else "green"),
         })
@@ -1872,14 +1895,15 @@ def build_ctxpanel():
     rows = []
     for cr in src:
         role = cr.get("role")
+        role_src = cr.get("role_src")   # 'hello'(权威)/ 'cmd' / None
         role_live = bool(role and role in alive_roles)
         if cr.get("is_agent") and (not role or role == "?"):
-            # regex 没抓到 role:若该 cwd 恰有唯一在岗角色,用它兜底(标 by_cwd)
+            # 会话内没有真实 hello/agentbus --role 命令:若该 cwd 恰有唯一在岗角色,用它兜底(标 cwd·推测)
             cand = alive_by_cwd.get(_cwd_key(cr.get("proj")), [])
             if len(cand) == 1:
-                role, role_live = cand[0], True
+                role, role_live, role_src = cand[0], True, "cwd"
         rows.append({
-            "is_agent": cr.get("is_agent"), "role": role, "role_live": role_live,
+            "is_agent": cr.get("is_agent"), "role": role, "role_live": role_live, "role_src": role_src,
             "pct": cr.get("pct"), "level": cr.get("level"), "ctx": cr.get("ctx"),
             "win": cr.get("win"), "win_known": cr.get("win_known"),
             "compact_at": cr.get("compact_at"), "margin": cr.get("margin"),
@@ -3405,8 +3429,17 @@ function renderCtx(){
     const barW=Math.max(2,Math.min(100,r.pct))*0.6;
     let who;
     if(!r.is_agent) who='<span class="muted">🔒 个人会话</span>';
-    else { who='<b>'+esc(r.role||'?')+'</b>'+(r.role_live?' <span style="color:var(--live)" title="who 校验:该 role 当前在岗注册">✓</span>':' <span class="winassumed" title="该 role 非当前在岗注册(可能已结束/残留),仅按会话内标记猜">?</span>');
-            if(r.cwd_sessions>1) who+=' <span class="winassumed" title="同 cwd '+r.cwd_sessions+' 个活跃会话共享(占用本身逐会话精确)">·cwd'+r.cwd_sessions+'</span>'; }
+    else if(!r.role) who='<span class="winassumed" title="会话内未测到真实 hello/agentbus --role 命令">?未测到</span>';
+    else {
+      // role 可信度看来源:hello=会话真实自报身份(权威)、cmd=agentbus --role 命令、cwd=按目录唯一在岗角色推测
+      const src=r.role_src;
+      const mark = src==='hello' ? '<span style="color:var(--live)" title="来自会话真实执行的 hello --role 命令(权威)">✓hello</span>'
+                 : src==='cmd'  ? '<span style="color:var(--live)" title="来自会话 agentbus --role 命令(wait/serve)">✓cmd</span>'
+                 : src==='cwd'  ? '<span class="winassumed" title="会话内无 hello 命令,按该 cwd 唯一在岗角色推测,未必确属">(推测·cwd)</span>'
+                                : '<span class="winassumed" title="来源不明">(推测)</span>';
+      who='<b>'+esc(r.role)+'</b> '+mark+(r.role_live?'':' <span class="winassumed" title="该 role 当前不在 who 在岗集(可能已结束/残留)">·非在岗</span>');
+      if(r.cwd_sessions>1) who+=' <span class="winassumed" title="同 cwd '+r.cwd_sessions+' 个活跃会话(占用逐会话精确)">·cwd'+r.cwd_sessions+'</span>';
+    }
     return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
       +'<td><span class="ctxpct '+r.level+'">'+r.pct+'%</span><span class="ctxbar '+r.level+'" style="width:'+barW+'px"></span></td>'
       +'<td>'+marginCell(r)+'</td>'
@@ -3415,7 +3448,7 @@ function renderCtx(){
       +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
       +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
   }).join(''));
-  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role 仅作"谁的窗口"标签(who 校验在岗;✓=确认/?=未确认);占用本身逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定者标注)。个人会话仅计占用、不显内容(隐私)。liveness/注册看 🛰 运维面板。';
+  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role 仅标"谁的窗口",来源:✓hello=会话真实执行的 hello 命令(权威·不再 match CLAUDE.md 模板文本)、✓cmd=agentbus --role 命令、(推测·cwd)=按目录唯一在岗角色猜、?未测到。占用本身逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定标注)。精确会话↔role 绑定(v2)需 hello 落 session-id 进 presence。个人会话仅计占用不显内容(隐私);liveness/注册看 🛰 运维面板。';
 }
 async function loadCtx(){
   try{ const r=await fetch('/api/ctxpanel'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }

@@ -272,6 +272,9 @@ def _touch_presence(role, mode, extra=None):
         "started": prev.get("started") or _now(),
         "last_seen": _now(),
         "mode": mode,
+        # 权威 session→role 绑定:交互 tab 的 hello/心跳子进程继承 CLAUDE_CODE_SESSION_ID
+        # (= 会话 jsonl id),据此 WebUI 看板精确对齐、不再 regex 猜 role。daemon 无此 env→None。
+        "session_id": os.environ.get("CLAUDE_CODE_SESSION_ID") or prev.get("session_id"),
     }
     if extra:
         pres.update(extra)
@@ -915,6 +918,7 @@ def _who_data():
             "retired": r in retired_set, "present": False, "mode": None,
             "claude_pid": None, "daemon_pid": None, "alive": None, "age_s": None,
             "verdict": None, "cwd": None, "current_task": None, "current_title": None,
+            "session_id": None,
         }
         if r in retired_set:
             rec["verdict"] = "⊘ 退役"; out_roles.append(rec); continue
@@ -930,6 +934,7 @@ def _who_data():
         age = _age_seconds(pr.get("last_seen", "")); rec["age_s"] = age
         mode = pr.get("mode", "?"); rec["mode"] = mode
         rec["cwd"] = pr.get("cwd")
+        rec["session_id"] = pr.get("session_id")   # 权威 session→role(取代 regex 猜)
         rec["current_task"] = pr.get("current_task")
         rec["current_title"] = pr.get("current_title")
         wt = pr.get("wait_timeout") or 110
