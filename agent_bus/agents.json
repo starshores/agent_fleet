@@ -2,7 +2,7 @@
  "SQLAGent": {
   "registered": "2026-06-22T10:39:35",
   "desc": "维护 sql_agent 代理(server.py)那个 cli 本身,不是通用查库 worker;别给它派查询活。",
-  "caps": ["bus-comms", "confidentiality"]
+  "caps": ["bus-comms", "self-wake", "confidentiality", "sql-proxy-maint"]
  },
  "Master": {
   "registered": "2026-06-22T11:27:43",
@@ -12,7 +12,7 @@
  "MasterUI": {
   "registered": "2026-06-22T11:39:32",
   "desc": "agent bus 可视化 WebUI(127.0.0.1:8799)的开发与维护专责。",
-  "caps": ["bus-comms", "confidentiality"]
+  "caps": ["bus-comms", "self-wake", "confidentiality", "webui"]
  },
  "MasterAgent": {
   "registered": "2026-06-22T15:47:39",
@@ -32,6 +32,6 @@
  "Master数分2": {
   "registered": "2026-06-29T16:24:32",
   "desc": "数据分析口(接替 Master数分 session a4fe9191·2026-06-29):bus/用量/成本资源的数据分析与口径把关——usage.db/metrics 实测分析(配额利用率·产出价值·成本归因)、数据真实性核查、退役 agent 贡献溯源建档;协调/分析位,不 loop。",
-  "caps": ["bus-comms", "self-wake", "confidentiality"]
+  "caps": ["bus-comms", "self-wake", "confidentiality", "data-analysis", "bus-monitoring"]
  }
 }

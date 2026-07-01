@@ -7,6 +7,11 @@
   "external-tool-edge": {"desc": "CDP 操作云文档(写单元格/读群/发消息) + edge-lock 互斥锁", "default_for": "仅【对外 agent】——业务 agent 外发走对外 agent,自己不碰"},
   "sql-fetch":       {"desc": "经 sql_agent 取数(inbox/shared 协议,绝不直连 psycopg2)", "default_for": "要数据的业务 agent"},
   "high-risk":       {"desc": "requires_approval 高风险任务(写库/外发)的处理与人工审批闸", "default_for": "做写库/外发动作的"},
-  "edge-web":        {"desc": "内部 Web 系统 Edge-CDP 自动化:模拟键鼠填表/点选/抓已登录页面;用 edge-acquire/release 共享焦点锁(与 external-tool-edge 同锁不串台)。【不含对外云文档外发】——对外云文档走 external-tool-edge。", "default_for": "做浏览器内部网页操作的 agent;非对外"}
+  "edge-web":        {"desc": "内部 Web 系统 Edge-CDP 自动化:模拟键鼠填表/点选/抓已登录页面;用 edge-acquire/release 共享焦点锁(与 external-tool-edge 同锁不串台)。【不含对外云文档外发】——对外云文档走 external-tool-edge。", "default_for": "做浏览器内部网页操作的 agent;非对外"},
+  "webui":           {"desc": "WebUI 可视化开发维护(ui/server.py·127.0.0.1:8799 stdlib):舰队/BI/用量/能力池/上下文/协作面板、吃 who/health/token_stats/metrics --json+读 usage.db、morphdom增量/canvas图/SSE实时、上下文65%告警", "default_for": "MasterUI"},
+  "data-analysis":   {"desc": "数据分析/审计/量化:bus用量·成本·健康数据实测分析、数据真实性核查、退役贡献溯源", "default_for": "数分/分析位"},
+  "bus-monitoring":  {"desc": "bus 监控:会话↔注册对齐、上下文占用、健康巡检数据、commit暴露审计", "default_for": "监控/数分位"},
+  "token-usage-etl": {"desc": "Claude Code 全会话 token 用量增量 ETL 入 usage.db + SQLite 分析 + BI JSON API", "default_for": "用量分析位"},
+  "sql-proxy-maint": {"desc": "sql_agent 代理本体维护:server.py/config/README、连接路由矩阵、保密闸(≤30行自动share)、经CIM稳起server避job回收、诊断webui-guard误杀", "default_for": "SQLAGent"}
  }
 }
