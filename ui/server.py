@@ -1603,7 +1603,6 @@ def read_sessions():
 _CTX_PROJECTS_DIR = str(Path.home() / ".claude" / "projects")
 _CTX_ACTIVE_MIN = 90          # 最近 90 分钟有写入 = 活跃会话
 _CTX_TAIL_BYTES = 512 * 1024  # 读尾部 512KB 找最后一条 assistant.usage(够容一条完整消息)
-_CTX_HEAD_BYTES = 64 * 1024   # 读头部 64KB 提取标题/role 标记
 _CTX_COMPACT_FRAC = 0.65      # 实测:占用达窗口 65% 触发 auto-compact(有损摘要→降智)。这是真阈,不是撞 1M。
 _CTX_RED = 65.0               # ≥65% 红 = 将被 auto-compact(建议先主动落档重置,别被动挨压)
 _CTX_YELLOW = 50.0            # ≥50% 黄(逼近自动压线,留意)
@@ -1633,14 +1632,6 @@ def _ctx_tail_text(path, nbytes):
         return ""
 
 
-def _ctx_head_text(path, nbytes):
-    try:
-        with open(path, "rb") as f:
-            return f.read(nbytes).decode("utf-8", "replace")
-    except Exception:
-        return ""
-
-
 def _ctx_last_usage(path):
     """尾部找最后一条 assistant.usage → (ctx_tokens, model, ts) 或 (None, None, None)。"""
     txt = _ctx_tail_text(path, _CTX_TAIL_BYTES)
@@ -1659,75 +1650,6 @@ def _ctx_last_usage(path):
                 + (u.get("cache_creation_input_tokens", 0) or 0)
             return ctx, m.get("model", ""), (r.get("timestamp", "") or "")[:19]
     return None, None, None
-
-
-def _tooluse_commands(msg):
-    """从一条 assistant 消息里抽出所有 Bash/PowerShell tool_use 的 command 串(list[str])。"""
-    cmds = []
-    content = (msg or {}).get("content")
-    if isinstance(content, list):
-        for b in content:
-            if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") in ("Bash", "PowerShell"):
-                cmd = (b.get("input") or {}).get("command")
-                if isinstance(cmd, str):
-                    cmds.append(cmd)
-    return cmds
-
-
-def _ctx_head_meta(path):
-    """头部提取 (title, role, role_src):
-    role【只认会话真实执行过的 agentbus hello/wait/serve --role X 命令】(bash tool_use 里的实际调用),
-    绝不 match prose / CLAUDE.md 模板里的 '--role Master' 文本(那是污染源:多会话被误标 Master)。
-    role_src='hello'(最权威·会话自报身份)/ 'cmd'(agentbus 其它 --role,如 wait/serve worker 循环)/ None(测不到)。"""
-    txt = _ctx_head_text(path, _CTX_HEAD_BYTES)
-    title = None
-    first_user = None
-    hello_role = None      # 最后一次 hello --role X(会话身份声明,最权威)
-    cmd_role = None        # 兜底:agentbus wait/serve/done 里的 --role X
-    for line in txt.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            r = json.loads(line)
-        except Exception:
-            continue
-        typ = r.get("type")
-        if typ == "ai-title":
-            c = r.get("title") or r.get("content")
-            if isinstance(c, str):
-                title = c
-        elif typ == "user":
-            if first_user is None:
-                c = r.get("message", {}).get("content")
-                if isinstance(c, str):
-                    first_user = c[:200]
-        elif typ == "assistant":
-            for cmd in _tooluse_commands(r.get("message")):
-                if "agentbus" not in cmd and "\\.claude" not in cmd and "/.claude" not in cmd:
-                    continue   # 只认针对 agentbus 的命令,进一步防误抓
-                mh = re.search(r"hello\b[^\n]*?--role\s+([A-Za-z0-9_一-鿿]{2,24})", cmd)
-                if mh:
-                    hello_role = mh.group(1)
-                    continue
-                mc = re.search(r"--role\s+([A-Za-z0-9_一-鿿]{2,24})", cmd)
-                if mc:
-                    cmd_role = mc.group(1)
-    if hello_role:
-        role, role_src = hello_role, "hello"
-    elif cmd_role:
-        role, role_src = cmd_role, "cmd"
-    else:
-        role, role_src = None, None
-    label = title or first_user or ""
-    low = label.lower()
-    cmd_like = (label.startswith('"') or label.startswith("'") or "$env" in low
-                or "ab.cmd" in low or "\\.claude" in low or "/.claude" in low
-                or low.startswith("powershell") or low.startswith("python ")
-                or low.startswith("cmd ") or low.startswith("& "))
-    if cmd_like:
-        label = ("会话/" + role) if role else "(启动会话)"
-    return (label[:40] if label else "?"), role, role_src
 
 
 def _refresh_ctx():
@@ -1755,18 +1677,12 @@ def _refresh_ctx():
         # 而 _AGENT_CWD_HINTS 用下划线;两边都归一(_→-、小写)再匹配,否则永远 False。
         nproj = proj.lower()
         is_agent = any(h.replace("_", "-").lower() in nproj for h in _AGENT_CWD_HINTS)
-        sid = os.path.basename(p)[:-6]
-        if is_agent:
-            title, role, role_src = _ctx_head_meta(p)
-            label = role or "?"
-        else:
-            title, label, role_src = None, None, None   # 个人会话:掩码,不读标题
+        sid_full = os.path.basename(p)[:-6]   # 会话 jsonl id(= who 暴露的 session_id,用于精确 session→role 绑定)
         rows.append({
             "pct": pct, "ctx": ctx, "win": win, "win_known": known,
             "compact_at": compact_at, "margin": margin,
             "model": (model or "?"), "is_agent": is_agent,
-            "role": label, "role_src": role_src, "title": (title or "")[:60] if is_agent else None,
-            "proj": proj if is_agent else None, "sid": sid[:8],
+            "proj": proj if is_agent else None, "sid": sid_full[:8], "sid_full": sid_full,
             "ts": ts, "level": ("red" if pct >= _CTX_RED else "yellow" if pct >= _CTX_YELLOW else "green"),
         })
     rows.sort(key=lambda x: x["pct"], reverse=True)
@@ -1852,71 +1768,104 @@ def start_who_refresher(interval=20):
     return t
 
 
-def _cwd_key(s):
-    """把 cwd 或 dash 编码的项目名归一成可比键:全部非字母数字→分隔,折叠连续分隔。
-    'C:\\apphome\\agent_fleet' 与 'C--apphome-agent-fleet' → 同键 'c-apphome-agent-fleet'。"""
-    s = (s or "").lower()
-    parts = []
-    cur = []
-    for ch in s:
-        if ch.isalnum():
-            cur.append(ch)
-        elif cur:
-            parts.append("".join(cur)); cur = []
-    if cur:
-        parts.append("".join(cur))
-    return "-".join(parts)
-
-
 def build_ctxpanel():
     """纯上下文预算看板(请求路径只读缓存、零扫描/读盘):
-    每行 = 一个活跃会话(窗口)的占用 + 距 65% 自动压余量;role 仅作"谁的窗口"标签,
-    用 who(权威 presence×进程)校验 regex 猜的 role 是否当前在岗注册(role_live)。
-    liveness/注册/verdict/告警 等健康项【不在此】——归 🛰 运维面板,避免重复(去重原则)。"""
+    每行 = 一个活跃会话(窗口)的占用 + 距 65% 自动压余量。
+    role 用 who 暴露的 session_id 做【精确 session→role 绑定】(MasterAgent 全解:hello 继承
+    CLAUDE_CODE_SESSION_ID→presence.session_id);不再 regex 猜。匹配不上(个人会话/
+    daemon 无 session_id / 未 re-hello)→ 标"未绑定",不猜。
+    liveness/注册/verdict/告警 等健康项【不在此】——归 🛰 运维面板(去重原则)。"""
     ctx = get_ctx()
     if not ctx:
         return {"loading": True}
     who = get_who() or {}
-    # who 的权威在岗角色集 + cwd→在岗角色(用于校验/兜底 role 标签,不做占用归属)
-    alive_roles = set()
-    alive_by_cwd = {}
+    # session_id → role(权威精确绑定)。只认带 session_id 的在岗角色(daemon session_id=None 不入表)。
+    sid2role = {}
     for r in who.get("roles", []):
-        if (not r.get("retired")) and r.get("alive") and r.get("role"):
-            alive_roles.add(r["role"])
-            if r.get("cwd"):
-                alive_by_cwd.setdefault(_cwd_key(r["cwd"]), []).append(r["role"])
+        sidv = r.get("session_id")
+        if sidv and not r.get("retired"):
+            sid2role[sidv] = {"role": r.get("role"), "alive": bool(r.get("alive"))}
     src = ctx.get("rows", []) or []
-    # 同 cwd 活跃会话数(仅作"共享 cwd"诚实提示;占用本身是逐会话精确的,不需归属猜测)
-    sess_by_cwd = {}
-    for cr in src:
-        if cr.get("is_agent"):
-            sess_by_cwd.setdefault(_cwd_key(cr.get("proj")), 0)
-            sess_by_cwd[_cwd_key(cr.get("proj"))] += 1
+    n_bound = 0
     rows = []
     for cr in src:
-        role = cr.get("role")
-        role_src = cr.get("role_src")   # 'hello'(权威)/ 'cmd' / None
-        role_live = bool(role and role in alive_roles)
-        if cr.get("is_agent") and (not role or role == "?"):
-            # 会话内没有真实 hello/agentbus --role 命令:若该 cwd 恰有唯一在岗角色,用它兜底(标 cwd·推测)
-            cand = alive_by_cwd.get(_cwd_key(cr.get("proj")), [])
-            if len(cand) == 1:
-                role, role_live, role_src = cand[0], True, "cwd"
+        bind = sid2role.get(cr.get("sid_full"))
+        if bind:
+            role, role_live, role_src = bind["role"], bind["alive"], "session_id"
+            n_bound += 1
+        else:
+            role, role_live, role_src = None, False, None   # 未绑定:个人会话/daemon/未 re-hello,不猜
         rows.append({
             "is_agent": cr.get("is_agent"), "role": role, "role_live": role_live, "role_src": role_src,
             "pct": cr.get("pct"), "level": cr.get("level"), "ctx": cr.get("ctx"),
             "win": cr.get("win"), "win_known": cr.get("win_known"),
             "compact_at": cr.get("compact_at"), "margin": cr.get("margin"),
             "model": cr.get("model"), "sid": cr.get("sid"), "ts": cr.get("ts"),
-            "cwd_sessions": sess_by_cwd.get(_cwd_key(cr.get("proj")), 1) if cr.get("is_agent") else 1,
         })
     return {
-        "ok": True, "as_of": ctx.get("as_of"), "rows": rows,
+        "ok": True, "as_of": ctx.get("as_of"), "rows": rows, "n_bound": n_bound,
         "red": _CTX_RED, "yellow": _CTX_YELLOW, "compact_frac": _CTX_COMPACT_FRAC,
         "active_min": _CTX_ACTIVE_MIN,
         "max_pct": ctx.get("max_pct", 0.0), "n_red": ctx.get("n_red", 0),
         "n_yellow": ctx.get("n_yellow", 0), "n": ctx.get("n", 0),
     }
+
+
+# =============================================================
+#  提示词审核 —— 只读展示【当前喂给 agent 的提示词原文】供审核措辞。
+#  小文件,请求路径直接读(手动刷新,不设后台 poller/缓存)。每节标源路径+mtime。只读不回写。
+# =============================================================
+def build_prompts():
+    sections = []
+
+    def add(key, title, path):
+        p = Path(path)
+        try:
+            st = p.stat()
+            content = p.read_text(encoding="utf-8", errors="replace")
+            sections.append({"key": key, "title": title, "path": str(p),
+                             "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
+                             "bytes": st.st_size, "lines": content.count("\n") + 1, "content": content})
+        except Exception as e:
+            sections.append({"key": key, "title": title, "path": str(p), "error": str(e)})
+
+    # ① hello onboarding 预览(调 MasterAgent 的 `ab hello --preview`;入口未就绪则诚实占位)
+    try:
+        r = subprocess.run([_PYEXE, str(ABDIR / "agentbus.py"), "hello", "--preview"],
+                           capture_output=True, timeout=30, creationflags=_NO_WINDOW)
+        out = r.stdout.decode("utf-8", "replace")
+        if r.returncode == 0 and out.strip():
+            sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+                             "mtime": "实时", "bytes": len(out.encode("utf-8")),
+                             "lines": out.count("\n") + 1, "content": out})
+        else:
+            err = (r.stderr.decode("utf-8", "replace") or "")[:200]
+            sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+                             "error": "入口尚未就绪(待 MasterAgent 提供 hello --preview);" + err})
+    except Exception as e:
+        sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+                         "error": "待 MasterAgent 提供 hello --preview 入口:" + str(e)})
+
+    add("global", "② 全局 CLAUDE.md", str(Path.home() / ".claude" / "CLAUDE.md"))
+
+    # ③ 项目 CLAUDE.md:命名两份 + 活跃 agent cwd 里有 CLAUDE.md 的
+    projset = {str(Path(__file__).resolve().parent.parent): 1}
+    who = get_who() or {}
+    for rr in who.get("roles", []):
+        cwd = rr.get("cwd")
+        if cwd:
+            projset[cwd] = 1
+    for cwd in sorted(projset):
+        cp = Path(cwd) / "CLAUDE.md"
+        if cp.exists():
+            add("proj:" + cwd, "③ 项目 CLAUDE.md · " + cwd, str(cp))
+
+    # ④ 基座文档层
+    BASE = Path(__file__).resolve().parent.parent
+    for fn in ("AGENTS.md", "CAPABILITIES.md", "BUS_ONBOARDING.md"):
+        add("base:" + fn, "④ 基座 · " + fn, str(BASE / fn))
+
+    return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"), "sections": sections}
 
 
 # =============================================================
@@ -2044,6 +1993,14 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .hbadge.warn{background:rgba(240,190,70,.16);color:#f0cf7a;border-color:rgba(240,190,70,.6)}
 .hbadge.loading{background:var(--bg);color:var(--muted);border-color:var(--line)}
 .hbadge.danger{background:rgba(255,93,93,.18);color:#ff9b9b;border-color:rgba(255,93,93,.6)}
+.pmt-sec{border:1px solid var(--line);border-radius:8px;margin:8px 0;overflow:hidden;background:var(--panel2)}
+.pmt-sec.err{border-color:rgba(245,166,35,.5)}
+.pmt-h{display:flex;gap:12px;align-items:baseline;padding:9px 12px;cursor:pointer;user-select:none}
+.pmt-h:hover{background:rgba(91,157,255,.08)}
+.pmt-t{font-weight:600;color:var(--txt)}
+.pmt-meta{font-size:11px;color:var(--dim);margin-left:auto;text-align:right;word-break:break-all}
+.pmt-b{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg);
+  font:12px/1.55 Consolas,monospace;color:var(--txt);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto}
 .ctx-kpis{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px 6px}
 .ctx-kpis .k{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-width:96px}
 .ctx-kpis .k .v{font-size:18px;font-weight:700}
@@ -2259,6 +2216,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
   <button class="tab" data-t="ctx">🧠 上下文</button>
+  <button class="tab" data-t="prompts">📝 提示词审核</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <span class="spacer" style="flex:1"></span>
@@ -2479,6 +2437,19 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
         <tbody id="ctxBody"></tbody>
       </table>
       <div class="foot muted" id="ctxFoot"></div>
+    </div>
+  </section>
+
+  <!-- 提示词审核(只读·手动刷新)-->
+  <section data-tab="prompts">
+    <div class="sec-h">📝 提示词审核
+      <span class="sub">当前喂给 agent 的提示词<b>原文</b>(只读·供审核措辞)— hello onboarding / 全局+项目 CLAUDE.md / 基座层文档。手动刷新才重读,每节标源路径+mtime</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="promptsMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="promptsRefresh">刷新</button>
+    </div>
+    <div class="sec-b">
+      <div id="promptsBox" style="padding:8px 16px 16px"></div>
     </div>
   </section>
 
@@ -3419,7 +3390,7 @@ function renderCtx(){
   const body=document.getElementById('ctxBody'); const foot=document.getElementById('ctxFoot');
   if(!body) return;
   if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="6" class="muted">加载中（后台 jsonl 尾读）…</td></tr>'); return; }
-  meta.textContent='活跃 '+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
+  meta.textContent='活跃 '+d.n+' · 精确绑定 '+(d.n_bound||0)+'/'+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
   kp.innerHTML='<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
     +'<div class="k"><div class="v ctxpct '+(d.n_red>0?'red':'green')+'">'+d.n_red+'</div><div class="l">≥65% 将被自动压</div></div>'
     +'<div class="k"><div class="v ctxpct '+(d.n_yellow>0?'yellow':'green')+'">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
@@ -3428,18 +3399,9 @@ function renderCtx(){
   morphInto(body, d.rows.map(r=>{
     const barW=Math.max(2,Math.min(100,r.pct))*0.6;
     let who;
-    if(!r.is_agent) who='<span class="muted">🔒 个人会话</span>';
-    else if(!r.role) who='<span class="winassumed" title="会话内未测到真实 hello/agentbus --role 命令">?未测到</span>';
-    else {
-      // role 可信度看来源:hello=会话真实自报身份(权威)、cmd=agentbus --role 命令、cwd=按目录唯一在岗角色推测
-      const src=r.role_src;
-      const mark = src==='hello' ? '<span style="color:var(--live)" title="来自会话真实执行的 hello --role 命令(权威)">✓hello</span>'
-                 : src==='cmd'  ? '<span style="color:var(--live)" title="来自会话 agentbus --role 命令(wait/serve)">✓cmd</span>'
-                 : src==='cwd'  ? '<span class="winassumed" title="会话内无 hello 命令,按该 cwd 唯一在岗角色推测,未必确属">(推测·cwd)</span>'
-                                : '<span class="winassumed" title="来源不明">(推测)</span>';
-      who='<b>'+esc(r.role)+'</b> '+mark+(r.role_live?'':' <span class="winassumed" title="该 role 当前不在 who 在岗集(可能已结束/残留)">·非在岗</span>');
-      if(r.cwd_sessions>1) who+=' <span class="winassumed" title="同 cwd '+r.cwd_sessions+' 个活跃会话(占用逐会话精确)">·cwd'+r.cwd_sessions+'</span>';
-    }
+    if(r.role) who='<b>'+esc(r.role)+'</b> <span style="color:var(--live)" title="session_id 精确绑定(who 暴露的 presence.session_id ⨝ 会话 jsonl id)">✓</span>';
+    else if(!r.is_agent) who='<span class="muted">🔒 个人会话</span>';
+    else who='<span class="winassumed" title="who 无匹配 session_id:daemon(无此 env)/ 尚未 re-hello / 非注册会话 — 不猜">未绑定</span>';
     return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
       +'<td><span class="ctxpct '+r.level+'">'+r.pct+'%</span><span class="ctxbar '+r.level+'" style="width:'+barW+'px"></span></td>'
       +'<td>'+marginCell(r)+'</td>'
@@ -3448,7 +3410,7 @@ function renderCtx(){
       +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
       +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
   }).join(''));
-  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role 仅标"谁的窗口",来源:✓hello=会话真实执行的 hello 命令(权威·不再 match CLAUDE.md 模板文本)、✓cmd=agentbus --role 命令、(推测·cwd)=按目录唯一在岗角色猜、?未测到。占用本身逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定标注)。精确会话↔role 绑定(v2)需 hello 落 session-id 进 presence。个人会话仅计占用不显内容(隐私);liveness/注册看 🛰 运维面板。';
+  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role✓=session_id 精确绑定(who 暴露 presence.session_id ⨝ 会话 jsonl id,MasterAgent 全解;不再 regex 猜);未绑定=daemon(无此 env)/尚未 re-hello/非注册会话,不猜。占用逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定标注)。个人会话仅计占用不显内容(隐私);liveness/注册看 🛰 运维面板。';
 }
 async function loadCtx(){
   try{ const r=await fetch('/api/ctxpanel'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
@@ -3463,6 +3425,31 @@ function renderCtxBadge(){
 }
 document.getElementById('ctxRefresh').onclick=()=>loadCtx();
 document.getElementById('ctxBadge').onclick=()=>showTab('ctx');
+
+// ===== 📝 提示词审核(只读·手动刷新)=====
+let _promptsLoaded=false;
+function renderPrompts(d){
+  const box=document.getElementById('promptsBox'); const meta=document.getElementById('promptsMeta');
+  if(!box) return;
+  if(!d||!d.ok){ box.innerHTML='<div class="muted">读取失败:'+esc((d&&d.error)||'?')+'</div>'; return; }
+  meta.textContent='共 '+d.sections.length+' 节 · 读取于 '+esc(d.as_of||'');
+  box.innerHTML=d.sections.map((s,i)=>{
+    const head='<div class="pmt-h" onclick="togglePrompt('+i+')"><span class="pmt-t">'+esc(s.title)+'</span>'
+      +'<span class="pmt-meta mono">'+esc(s.path||'')+(s.mtime?(' · '+esc(s.mtime)):'')
+      +(s.bytes!=null?(' · '+fmtN(s.bytes)+'B/'+ (s.lines||0) +'行'):'')+'</span></div>';
+    const body = s.error
+      ? '<div class="pmt-b muted" id="pmt-'+i+'" style="display:none">⚠ '+esc(s.error)+'</div>'
+      : '<pre class="pmt-b" id="pmt-'+i+'" style="display:none">'+esc(s.content||'')+'</pre>';
+    return '<div class="pmt-sec'+(s.error?' err':'')+'">'+head+body+'</div>';
+  }).join('')||'<div class="muted">无内容</div>';
+}
+function togglePrompt(i){ const el=document.getElementById('pmt-'+i); if(el) el.style.display = el.style.display==='none'?'block':'none'; }
+async function loadPrompts(){
+  const box=document.getElementById('promptsBox'); if(box&&!box.innerHTML) box.innerHTML='<div class="muted">读取中…</div>';
+  try{ const r=await fetch('/api/prompts'); renderPrompts(await r.json()); _promptsLoaded=true; }
+  catch(e){ if(box) box.innerHTML='<div class="muted">读取失败:'+esc(e)+'</div>'; }
+}
+document.getElementById('promptsRefresh').onclick=()=>loadPrompts();
 
 // ===== 可恢复会话 =====
 let _sessData=null;
@@ -3503,7 +3490,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 document.getElementById('sessAll').onchange=renderSessions;
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -3517,6 +3504,7 @@ function showTab(t){
   else if(t==='usage') loadUsage(true);
   else if(t==='caps') loadCaps();
   else if(t==='ctx') loadCtx();
+  else if(t==='prompts'){ if(!_promptsLoaded) loadPrompts(); }
   else if(t==='fleet') load();
 }
 function syncTabTop(){ const hd=document.querySelector('header'); if(hd) document.getElementById('tabbar').style.top=hd.offsetHeight+'px'; }
@@ -3664,6 +3652,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/ctxpanel":
             # 纯上下文预算看板:内存 ctx_cache(+who_cache 仅校验 role 标签),请求路径零扫描/零读盘
             self._send(200, build_ctxpanel())
+        elif path == "/api/prompts":
+            # 提示词审核:手动刷新时直接读小文件(无缓存/无 poller);只读
+            self._send(200, build_prompts())
         else:
             self._send(404, {"error": "not found"})
 
