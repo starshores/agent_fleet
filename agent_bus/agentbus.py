@@ -88,6 +88,17 @@ def _retired_roles():
         return set()
 
 
+# 伪角色/系统桶:有 mailbox 目录但本质【非执行体】——不是 CLI tab、永不 hello、无 presence=正常,
+# 不该在 selfwake/who 里被判"掉线/未醒"混进真 agent(用户 2026-07-02·数分 转)。显式名单为准,纯显示层标注。
+_PSEUDO_ROLE_LABELS = {
+    "用户": "伪角色·待办池(ask-user 投给人类的收件箱,人类永不 hello)",
+    "unknown": "伪角色·死信桶(role 解析不出的消息/回执落此,无害待清)",
+}
+def _pseudo_role_label(role):
+    """伪角色返回其标注串;真 agent 返回 None。"""
+    return _PSEUDO_ROLE_LABELS.get(role)
+
+
 def _is_test_role(name):
     """测试/临时角色:zz* / __* / 单字符 ?。统计/健康/校验默认过滤,免测试 send 污染真实指标
     (Master数分 实证:未claim 17 条里 6 条是 zztest_loss/__todotest 等测试,制造假"漏接")。"""
@@ -940,6 +951,9 @@ def _who_data():
             "verdict": None, "cwd": None, "current_task": None, "current_title": None,
             "session_id": None,
         }
+        plabel = _pseudo_role_label(r)
+        if plabel:                    # 伪角色/系统桶:非执行体,不判在线/掉线,单列标注
+            rec["pseudo"] = True; rec["verdict"] = "◇ " + plabel; out_roles.append(rec); continue
         if r in retired_set:
             rec["verdict"] = "⊘ 退役"; out_roles.append(rec); continue
         pf = BUS / r / "presence.json"
@@ -1008,6 +1022,9 @@ def cmd_who(args):
     print("%-14s %-22s %-9s %8s  %s" % ("role", "verdict", "claude_pid", "心跳age", "cwd"))
     print("-" * 88)
     for r in roles:
+        plabel = _pseudo_role_label(r)
+        if plabel:                  # 伪角色/系统桶:非执行体,不当掉线/未醒,单列标注
+            print("%-14s %-22s  %s" % (r, "◇ 伪角色", plabel)); continue
         if r in retired_set:        # 退役:标注、不当残留/异常(进程退是应该的)
             print("%-14s %-22s" % (r, "⊘ 退役")); continue
         pf = BUS / r / "presence.json"
@@ -1799,12 +1816,16 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
 
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
-    armed = stale = off = retired = 0
+    armed = stale = off = retired = pseudo = 0
     wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
     retired_set = _retired_roles()
     print("%-14s %-8s %s" % ("role", "自醒", "说明"))
     print("-" * 78)
     for role in _list_roles():
+        plabel = _pseudo_role_label(role)
+        if plabel:                     # 伪角色/系统桶:非执行体,不计掉线/未醒,单列标注
+            print("%-14s %-8s %s" % (role, "◇伪角色", plabel))
+            pseudo += 1; continue
         if role in retired_set:        # 退役:不计掉线(否则误报),只标注
             sb = _load_agents().get(role, {}).get("succeeded_by")
             print("%-14s %-8s %s" % (role, "⊘退役", "已退役" + ("·接替=" + sb if sb else "") + "(留痕不删,不派活)"))
@@ -1814,7 +1835,7 @@ def cmd_selfwake(args):
         print("%-14s %-8s %s" % (role, mark, detail))
         armed += st == "armed"; stale += st == "stale"; off += st == "off"
     print("-" * 78)
-    print("自醒在岗 %d / 掉线 %d / 未醒 %d / 退役 %d" % (armed, stale, off, retired))
+    print("自醒在岗 %d / 掉线 %d / 未醒 %d / 退役 %d / 伪角色 %d" % (armed, stale, off, retired, pseudo))
     if stale:
         print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
 
