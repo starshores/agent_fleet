@@ -1413,7 +1413,30 @@ def cmd_health_sweep(args):
     print(json.dumps(rep, ensure_ascii=False, indent=1))
 
 
-def _collect_health(stale_min=30, stuck_min=90):
+def _stale_todos(threshold_min=1440):
+    """扫 todos.json 里停"待"态(待办/待确认…)、停留 > threshold 的停滞项(防丢/回收提醒·Master 2026-07-02 提)。
+    只报 状态+归属(source)+停留时长+标题+deadline —— 不碰业务内容。按停留时长降序。"""
+    tf = BUS / "todos.json"
+    out = []
+    try:
+        items = json.loads(tf.read_text(encoding="utf-8"))
+    except Exception:
+        return out
+    for it in (items if isinstance(items, list) else []):
+        if "待" not in (it.get("status") or ""):     # 只看未完成
+            continue
+        age_s = _age_seconds(it.get("updated") or it.get("created") or "")
+        if age_s is None or int(age_s / 60) < threshold_min:
+            continue
+        out.append({"id": it.get("id"), "title": (it.get("title") or "")[:40],
+                    "source": it.get("source"), "priority": it.get("priority"),
+                    "status": it.get("status"), "deadline": it.get("deadline"),
+                    "age_min": int(age_s / 60)})
+    out.sort(key=lambda x: x["age_min"], reverse=True)
+    return out
+
+
+def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     """只读汇总 bus 健康各项指标(不改任何状态)。返回 dict,供 cmd_health 渲染 / WebUI 复用。"""
     now = time.time()
     role_dirs = [d for d in sorted(BUS.iterdir())
@@ -1487,6 +1510,10 @@ def _collect_health(stale_min=30, stuck_min=90):
     # 6) edge-lock
     eh = _edge_holder()
     h["edge_lock"] = {"who": eh.get("who")} if eh else None
+    # 7) 待办池停滞(防丢/回收提醒):停"待"态 > 阈值(默认24h)的项,按 状态+归属+停留时长
+    st = _stale_todos(todo_stale_min)
+    h["stale_todos"] = st
+    if st: h["warns"].append("待办停滞 %d(>%dh)" % (len(st), todo_stale_min // 60))
     h["healthy"] = not h["warns"]
     return h
 
@@ -1495,7 +1522,8 @@ def cmd_health(args):
     """【只读】bus 健康总检:自醒 / 队列 / 消息丢失(孤儿·卡死·久滞)/ daemon 舰队 / WebUI / edge锁,
     一屏看全 + ⚠/✓ + 总判定。不改任何状态(要处置走 supervise / health-sweep --apply)。--json 出结构化。"""
     h = _collect_health(stale_min=getattr(args, "stale_min", 30) or 30,
-                        stuck_min=getattr(args, "stuck_min", 90) or 90)
+                        stuck_min=getattr(args, "stuck_min", 90) or 90,
+                        todo_stale_min=getattr(args, "todo_stale_min", 1440) or 1440)
     if getattr(args, "json", False):
         print(json.dumps(h, ensure_ascii=False, indent=1)); return
     L = ["=== Bus 健康检查 (as of %s) ===" % h["as_of"]]
@@ -1523,9 +1551,35 @@ def cmd_health(args):
     w = h["webui"]
     L.append("\n[WebUI]  8799 %s / 陈旧重复 %d" % (("在岗 pid=%s" % w["owner_pid"]) if w["owner_pid"] else "⚠ 没人占", w["stale_dupes"]))
     L.append("\n[edge锁] " + ("持有者=%s" % h["edge_lock"]["who"] if h["edge_lock"] else "空闲"))
+    stt = h.get("stale_todos") or []
+    L.append("\n[待办池停滞] %s 停「待」态 >%dh: %d" % ("⚠" if stt else "✓", (getattr(args, "todo_stale_min", 1440) or 1440) // 60, len(stt)))
+    for s in stt[:10]:
+        d = ("·%dh" % (s["age_min"] // 60)) if s["age_min"] >= 60 else ("·%dmin" % s["age_min"])
+        L.append("       - [%s] 归属=%s 停留%s%s「%s」" % (s.get("status"), s.get("source"), d, ("·⏰" + s["deadline"]) if s.get("deadline") else "", s["title"]))
+    if len(stt) > 10: L.append("       … 另 %d 条(全量走 `ab stale`)" % (len(stt) - 10))
     L.append("\n" + "-" * 52)
     L.append("总判定: ✓ 全绿,bus 健康" if h["healthy"] else "总判定: ⚠ %d 项需注意 — %s" % (len(h["warns"]), "; ".join(h["warns"])))
     print("\n".join(L))
+
+
+def cmd_stale(args):
+    """【只读·防丢回收提醒】列待办池停"待"态 > 阈值(默认24h·--hours 调)的停滞项,
+    按 状态+归属(source)+停留时长 降序,只报不碰业务内容。Master/MasterAgent 定期跑此回收(Master 2026-07-02 提)。"""
+    th = (getattr(args, "hours", 24) or 24) * 60
+    st = _stale_todos(th)
+    if getattr(args, "json", False):
+        print(json.dumps(st, ensure_ascii=False, indent=1)); return
+    if not st:
+        print("✓ 待办池无停滞项(停「待」态 >%dh = 0)" % (th // 60)); return
+    print("⚠ 待办池停滞项(停「待」态 >%dh):%d 条 · 按停留时长降序 · 只报状态/归属/时长(不含业务内容)" % (th // 60, len(st)))
+    print("-" * 72)
+    for s in st:
+        d = ("%dh" % (s["age_min"] // 60)) if s["age_min"] >= 60 else ("%dmin" % s["age_min"])
+        dl = ("⏰" + s["deadline"] + " ") if s.get("deadline") else ""
+        print("[%s] 停留%-7s 归属=%-12s %s「%s」" % (s.get("status"), d, s.get("source"), dl, s["title"]))
+        print("        id=%s  pri=%s" % (s.get("id"), s.get("priority")))
+    print("-" * 72)
+    print("处置:派发/跟催走 send;需用户拍板走 ask-user;已无效则标完成。")
 
 
 # ── 退役 agent 档案馆/花名册(2026-06-29,用户提:番号下掉+记录保留+可复用恢复)──────────
@@ -2211,7 +2265,8 @@ def main():
     p = sub.add_parser("supervise"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("webui-guard"); p.add_argument("--port", type=int, default=8799); p.add_argument("--min-age", type=float, default=30.0, dest="min_age"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_webui_guard)
     p = sub.add_parser("health-sweep"); p.add_argument("--apply", action="store_true"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.set_defaults(fn=cmd_health_sweep)
-    p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
+    p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--todo-stale-min", type=int, default=1440, dest="todo_stale_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
+    p = sub.add_parser("stale"); p.add_argument("--hours", type=int, default=24); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_stale)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
