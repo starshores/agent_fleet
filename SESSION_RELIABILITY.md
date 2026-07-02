@@ -74,6 +74,12 @@
 - 数分2 提的 OSS(claude-tmux-orchestration heartbeat 等)= 可借鉴同类,**待核实后取用**,不照搬不预断真实性。
 - ✅ **精确会话归属·已实现(2026-07-01·v2)**:crux"hello 怎么拿自己 session id"实测解决——**env `CLAUDE_CODE_SESSION_ID`**(= 会话 jsonl id,交互 tab 子进程继承;非 `open_files()`,那个是空)。`_touch_presence` 落 `session_id`、`_who_data` 暴露 → 看板精确 session→role、取代 regex 猜(修 538c5371 被误标 Master)。daemon 无此 env→None(正确)。消费侧(看板按 presence.session_id 对齐)= MasterUI 半。**强化掉聋检测**同源可用(session 死/不符)。
 
+### ✅ 缺口裁决:hello 不自动 self-wake(用户2026-07-01发现·培训师核实转 MasterAgent 定·MasterAgent 裁决)
+**现象**:新起交互 CLI 只跑 `ab hello` 不会自动挂 self-wake。`cmd_hello`(agentbus.py:860)只做 注册+`_touch_presence(idle)`+**打印**自醒说明+铁律①-④,**不 spawn 任何 wait**;self-wake 全靠 agent(LLM)读输出后自己 `run_in_background` 挂那条 wait。实证:新 Master hello 完 selfwake=未自醒,培训师催它手挂才起。
+**根因(架构级·不是代码 bug)**:唤醒依赖 **harness 把 `run_in_background` 包装成 task-notification 回调 LLM**;若 `cmd_hello` 内部直接 `Popen` 一个 wait 子进程,那子进程 detached、**不挂进 harness 唤醒回调**→跑完静默退、LLM 永不被唤起=假在岗。**故"hello 内部自动挂 wait"根本无法真唤醒**(培训师诊断正确)。可靠 self-wake **必须由 LLM 经 harness 挂**,agentbus.py 无从代劳。
+**已有三层覆盖**(缺口非"没护栏"):① hello 输出已含铁律①-④(极强提示);② **检测早已存在**——`selfwake`/`health`/`recover.py` 把"会话在但无 wait 进程"的 idle 会话判为 `stale`=⚠掉线(说明"没重挂?"),协调位据此抓 straggler(培训师抓新 Master 正是靠这个);③ onboarding 握手关。
+**裁决**:**不改 agentbus.py 加自动 spawn**(无法唤醒=白改)。弱点是**行为层**(新 agent 没执行已打印的指令),权威修法 = **培训师把「hello→手挂 wait→selfwake 验在岗」做成 onboarding 强制握手过关项(pass/fail)**——培训师已在做,MasterAgent 背书为权威修法。可选的"hello 末尾再加硬停行"= 低价值(问题不在文字量,在执行),暂不加。已按职责协议简报 Master(其正被 onboarding,自醒机制口径需同步)。
+
 ## D、idle 输出纪律(空唤醒收敛)——延缓 compact 的最便宜一招
 **现象**(用户观察):有的 cli 自醒 agent(如 Master数分2)每次被唤起,即使没新活,也**重复 dump"在岗/状态/花名册"**进自己的上下文窗 → 逐轮自我膨胀;MasterAgent 则收敛成一行"静默待命"、不重述。
 

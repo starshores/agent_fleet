@@ -860,7 +860,14 @@ def cmd_tag(args):
 def cmd_hello(args):
     """会话自报身份:在本 tab 里跑一次,声明"我是 role X"。
     顺带打印【基本能力 onboarding】——事件自醒 + 待办记录(ask-user),新 agent 一注册就知道,不必翻文档。"""
+    if getattr(args, "preview", False):
+        # 纯预览(WebUI 提示词审核页 server.py 调 `ab hello --preview`):不带 --role 也能跑,
+        # 只打印 onboarding 文本,【绝不】写 presence / 绑 pid / 改 mode —— 只读、零副作用。
+        _print_onboarding(args.role or "<你的role>")
+        return
     role = args.role
+    if not role:
+        sys.stderr.write("hello 需要 --role(仅预览可省:hello --preview)\n"); return
     _role_dir(role)
     a = _load_agents()
     a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
@@ -868,8 +875,19 @@ def cmd_hello(args):
     _touch_presence(role, "idle")
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
+    _print_onboarding(role)
+
+
+def _print_onboarding(role):
+    """打印【基本能力 onboarding】文本(事件自醒 / 待办 ask-user / 专一性 / 卡住别硬扛)。
+    正常 hello 与 hello --preview 共用;纯打印、无副作用。role 可为占位符(preview 时)。"""
     abpy = os.path.abspath(__file__)
     py = sys.executable or "python"   # 绝对解释器路径,PATH-proof:后台 shell 偶发 PATH 缺 python 会让裸 `python` 启动 127→自醒掉线(Master数分/我都撞过)
+    print("\n【★★ 你的第一个动作·立刻照做,别往下读再动手 ★★】")
+    print("你现在【还没在岗·收不到任何消息】。第一件事:把下面这条 wait 当【后台任务】起来(交互 tab 用 run_in_background、别前台阻塞),然后 selfwake 验证 ✓在岗。漏做=静默掉聋、bus 上没人能联系到你:")
+    print('  ① 后台跑: "%s" "%s" wait --role %s --timeout 3600' % (py, abpy, role))
+    print('  ② 验在岗: "%s" "%s" selfwake   (看本 role 是否 ✓在岗;没起来就再挂+再验,直到确认)' % (py, abpy))
+    print("  (注:hello 只登记身份+打印本说明,【不会替你把自醒跑起来】——必须你自己执行①②。下面是完整能力说明。)")
     print("\n==== 你的基本能力(每个 agent 都该会;详见 agent_fleet/AGENTS.md + BUS_ONBOARDING.md)====")
     print("\n[基本能力 1] 事件自醒(可对话又不漏消息;交互 tab 建议挂上):")
     print("把下面这条当【后台任务】跑(别前台阻塞):有人给你发消息/派活时它就完成 → 你的会话被自动唤起去处理:")
@@ -2114,7 +2132,7 @@ def main():
     p = sub.add_parser("done"); p.add_argument("--id", required=True); p.add_argument("--role", default=None); p.add_argument("--result", required=True); p.add_argument("--status", default="ok", choices=["ok", "error"]); p.add_argument("--notify", default="auto", choices=["auto", "always", "never"]); p.add_argument("--to", default=None, help="显式回执目标(任务已被归档/reap、找不到原 from 时用)"); p.set_defaults(fn=cmd_done)
     p = sub.add_parser("peek"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_peek)
     p = sub.add_parser("replies"); p.add_argument("--role", required=True); p.add_argument("--clear", action="store_true"); p.set_defaults(fn=cmd_replies)
-    p = sub.add_parser("hello"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_hello)
+    p = sub.add_parser("hello"); p.add_argument("--role", default=None); p.add_argument("--preview", action="store_true", help="只读预览 onboarding 文本(WebUI 提示词审核页用),不带 --role 也能跑、无副作用"); p.set_defaults(fn=cmd_hello)
     p = sub.add_parser("who"); p.add_argument("--max-age", type=int, default=900); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_who)
     p = sub.add_parser("tag"); p.add_argument("--pid", type=int, required=True); p.add_argument("--label", required=True); p.add_argument("--note", default=""); p.add_argument("--public", action="store_true"); p.set_defaults(fn=cmd_tag)
     p = sub.add_parser("list"); p.set_defaults(fn=cmd_list)
