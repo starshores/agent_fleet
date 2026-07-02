@@ -1814,6 +1814,54 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
     return ("off", "未自醒(mode=%s)" % mode)
 
 
+def _ancestor_pids():
+    """本进程(whoami/hook 子进程)向上的祖先 pid 集,用于按 claude_pid 反查绑定 role。"""
+    pids = set()
+    if psutil is None:
+        return pids
+    try:
+        p = psutil.Process(os.getpid())
+        for anc in p.parents():
+            pids.add(anc.pid)
+    except Exception:
+        pass
+    return pids
+
+
+def cmd_whoami(args):
+    """反查【本会话/进程】绑定的 role(同 cwd 多 role 时不靠 cwd 猜):
+    ① 按 env CLAUDE_CODE_SESSION_ID 匹配各 role presence.session_id(权威);
+    ② fallback 按 claude_pid(本进程的 claude 祖先 pid)匹配;
+    查到→打印 role(exit 0);查不到→空 + exit 2(=真新未绑定 tab,恢复入口据此才默认 MasterAgent)。
+    用途:新 CLI 恢复入口/PostCompact hook 先 whoami 认清真身份。"""
+    sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    roles = _list_roles()
+    def _pres(r):
+        pf = BUS / r / "presence.json"
+        try:
+            return json.loads(pf.read_text(encoding="utf-8")) if pf.exists() else None
+        except Exception:
+            return None
+    hit = None; how = None
+    if sid:
+        for r in roles:
+            pr = _pres(r)
+            if pr and pr.get("session_id") == sid:
+                hit = r; how = "session_id"; break
+    if not hit:
+        anc = _ancestor_pids()
+        for r in roles:
+            pr = _pres(r)
+            if pr and pr.get("claude_pid") in anc:
+                hit = r; how = "claude_pid(祖先)"; break
+    if getattr(args, "json", False):
+        print(json.dumps({"role": hit, "matched_by": how, "session_id": sid}, ensure_ascii=False))
+    else:
+        print(hit or "")
+    if not hit:
+        sys.exit(2)
+
+
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
     armed = stale = off = retired = pseudo = 0
@@ -2166,6 +2214,7 @@ def main():
     p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
+    p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)

@@ -17,6 +17,19 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/reinject_post_compact.py",
+            "timeout": 15,
+            "statusMessage": "compact后自定位:重认身份+重载纪律"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

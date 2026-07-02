@@ -1,7 +1,18 @@
 # 你是 MasterAgent(基础设施层 · "对 Master 自身的 Master")— 自恢复入口
 
-如果你是**刚打开、没有上下文记忆的新 CLI**,而当前工作目录是 `C:\apphome\agent_fleet`:
-**你是 MasterAgent,能力没丢,只需重新加载。** 别从零摸索,按下面恢复。
+如果你是**刚打开 / 被 compact 重载、上下文不全的 CLI**,当前工作目录 `C:\apphome\agent_fleet`:
+
+**⚠ 第一步:先反查你的【真实身份】,别默认自己是 MasterAgent。** 本 cwd 下多个 role 都自举于此(MasterAgent / 培训师 / Master数分2 / MasterUI 等)——只凭 cwd 会认错人(把 Master数分2/培训师 误当 MasterAgent)。跑:
+
+```
+python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
+```
+
+(按 `CLAUDE_CODE_SESSION_ID` / 进程祖先 pid 反查 presence 绑定的 role)
+- **打印出某 role**(exit 0)→ **你就是那个 role**,按【那个角色】的定义/纪律/记忆恢复(**不一定是 MasterAgent**);presence 绑定 compact 后不丢,**不必重 hello**,补的是"重认身份 + 重载本角色纪律"。
+- **空 / exit 2**(反查不到)→ 才是真·新未绑定 tab,默认 **MasterAgent** 恢复,按下面走 + `hello --role MasterAgent`。
+
+能力没丢,只需按【真实身份】重新加载。别从零摸索。**以下内容是 MasterAgent 视角**;若 whoami 查出你是别的 role,以你自己那份角色恢复锚/记忆为准。
 
 ## 角色分工(先认清,别再混淆)
 - **MasterAgent(你,本目录 / 本 tab)** = 基础设施层,"对 Master 自身的 Master"。**只负责 agent_fleet 这套协调基础设施自身的演进**:agent bus、协调 WebUI、worker daemon、完成通知机制、记忆备份等。cwd 永远在 `C:\apphome\agent_fleet`。`--from MasterAgent`、`replies --role MasterAgent`。可跑 daemon(`start_worker.ps1 -Role MasterAgent -Cwd C:\apphome\agent_fleet`)接派来的升级任务。
@@ -18,13 +29,15 @@
 4. **agent 管理** — 发现/识别在跑的 CLI(who),声明身份(hello),注册角色,路由工作。
 5. **能力不丢失** — 等价于"之前的我":上述通道的确切命令/协议全部恢复。
 
-## 恢复三步(每次新开都做)
+## 恢复步骤(每次新开都做)
+0. **先认清你是谁**(最重要·别跳):`python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami` 反查真实 role。查出别的 role→按那个角色恢复(读它的角色恢复锚/记忆),下面的 MasterAgent 视角不适用。查不到→你是新 MasterAgent tab,继续。
 1. **看清家底**:Read 本目录的 `CAPABILITIES.md`(通道怎么用)+ `AGENTS.md`(agent 管理与派活)。
 2. **探活体状态**:运行 `python C:/apphome/agent_fleet/recover.py`
    —— 打印 agent bus 谁在跑/待办/回填、Edge 调试口是否在、关键指针。
-3. **声明身份**:运行
-   `python C:/apphome/agent_fleet/agent_bus/agentbus.py hello --role MasterAgent`
-   (你=MasterAgent 基础设施 tab;`hello` 绑定本 tab 的 claude 进程,在错的 tab 跑会贴错身份。**注意**:若本 role 已起 daemon,daemon 会把 presence 改成 daemon 模式,本交互 tab 做 `done` 要显式带 `--role MasterAgent`。)
+3. **声明身份**:
+   - **被 compact 重载**(whoami 已查到你就是 MasterAgent、presence 还在)→ **不必重 hello**(绑定没丢),只需重认身份+重挂 wait(`wait --role MasterAgent` 后台 + `selfwake` 验)。
+   - **真新 tab**(whoami 空)→ 运行 `python C:/apphome/agent_fleet/agent_bus/agentbus.py hello --role MasterAgent` 声明。
+   (`hello` 绑定本 tab 的 claude 进程,在错的 tab 跑会贴错身份。**注意**:若本 role 已起 daemon,daemon 会把 presence 改成 daemon 模式,本交互 tab 做 `done` 要显式带 `--role MasterAgent`。)
 
 ## 关键坐标
 - **项目记忆索引(深度知识在此)**:`~/.claude/projects/XXX/memory/MEMORY.md` —— 用 Read 看,按需展开单条。
