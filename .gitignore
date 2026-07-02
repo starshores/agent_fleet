@@ -6,9 +6,9 @@ __pycache__/
 .claude/
 .idea/
 
-# memory/ 是业务记忆的硬链镜像(业务知识、易变、属另一项目),不纳入本架构仓。
-# 架构知识已在 CLAUDE.md / AGENTS.md / CAPABILITIES.md / ARCHITECTURE_REVIEW.md / ARCHITECTURE_SOURCE_MAP.md 中。
-# 如需把记忆也纳入版本,删掉下面这行。
+# memory/ = 【基座运行记忆】的硬链镜像,随 agent_fleet 文件夹拷贝迁移。
+# 项目定调:业务知识属业务侧、随业务留在原处,不随基座迁移;只带基座/协调运行记忆(见 sync_memory.ps1 源已切换)。
+# gitignore=记忆易变、走文件夹拷贝/tar-snapshot 迁移而非 git;如需纳入 git 版本(clone 亦可迁),删掉下面这行。
 memory/
 
 # BI 视觉验证截图(临时产物,不入仓)

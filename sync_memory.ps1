@@ -1,5 +1,6 @@
-# sync_memory.ps1 — 把项目记忆全量硬链镜像到 agent_fleet\memory\
-# 目的:只迁移 agent_fleet 文件夹即可带走全部记忆(复制文件夹会拷走硬链指向的真实内容)。
+# sync_memory.ps1 — 把基座运行记忆全量硬链镜像到 agent_fleet\memory\
+# 目的:只迁移 agent_fleet 文件夹即可带走基座自身的运行记忆(复制文件夹会拷走硬链指向的真实内容)。
+# 源=【基座会话记忆库】(路径按部署环境配置;项目定调:业务知识属业务侧、随业务留在原处,不随基座迁移;只带基座/协调运行记忆)。
 # 幂等:每次重建硬链(应对原子保存断链)+ 清理源已删的残链。同卷(C:)NTFS;不占额外空间。
 # 用法:powershell -NoProfile -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_memory.ps1
 

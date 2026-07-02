@@ -31,14 +31,14 @@
 - **全局规则**:`~/.claude/CLAUDE.md`(已自动加载:事件通知不弹窗、不 sleep polling)。
 - **干活的代码仓**:`C:\BaseSpace\XXX`(业务代码/文档;通道工具按部署环境配置)。
 - **agent bus**:`C:\apphome\agent_fleet\agent_bus\`(项目内源码;运行时规范路径 `~/.claude/agent_bus`;send/wait/done/who/hello 见 AGENTS.md)。
-- **记忆硬链备份**:`C:\apphome\agent_fleet\memory\` —— 技能+通道记忆硬链自此(同卷 NTFS,共享 inode,防误删)。
+- **记忆硬链备份**:`C:\apphome\agent_fleet\memory\` —— **基座运行记忆**(源=当前会话记忆库 `~/.claude/projects/XXX/memory`)硬链自此(同卷 NTFS,共享 inode,防误删)。**只镜像基座/协调运行记忆,不镜像业务知识**(业务知识属业务侧、随业务留在原处不迁)。
   原子保存(Write/Edit)会断链 → 改过记忆后跑 `powershell -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_memory.ps1` 刷新即可。
 - **机器相关路径集中配置**:`C:\apphome\agent_fleet\agent_bus\config.json`(claude_bin / default_worker_cwd / repo / memory_index / agent_fleet_home / sync_memory_script)。worker_daemon / ui.server / recover / hook 都从这读;每项可被 `AGENTBUS_<KEY大写>` 环境变量覆盖。**换机/换用户名只改这一处。**
 
 ## 迁移 / 换机(本目录现已自包含、可自举)
 `agent_fleet\` 现在**硬链镜像了全部源码+记忆**,只迁本目录即带走全部:
 - `agent_bus\` —— **总线本体源码**的硬链镜像(agentbus.py/worker_daemon.py/dispatch_agent.py/claude_run.py/start_stop_worker.ps1/config.json/fleet.json/agents.json/ab.cmd/README),`sync_code.ps1` 维护、PostToolUse hook 改代码时自动重链(同卷 NTFS;只镜像源码+配置,不含运行态队列)。
-- `memory\` —— 项目记忆硬链镜像,`sync_memory.ps1` 维护、hook 自动重链。
+- `memory\` —— **基座运行记忆**硬链镜像,`sync_memory.ps1` 维护、hook 自动重链。**不含业务知识**(业务记忆随业务留在原处,不随基座迁移)。
 - `host_config\` —— **宿主全局配置快照**(`~/.claude/CLAUDE.md` + `settings.json`):含 Compact 指令 keep-list、65% 早压 env、PostToolUse hook 注册、model。这些 bus 相关配置住宿主全局(要对所有会话生效)、只迁 agent_fleet 会丢,故在此存**快照**(配置类改动少、快照即可,用户定调 2026-06-30);`sync_host_config.ps1` 刷新。
 - 其余(CLAUDE/AGENTS/CAPABILITIES/SESSION_RELIABILITY/SPECIALIZATION/ARCH_EVAL/recover.py/ui/hooks)本目录原生。
 **换机迁移清单**:
