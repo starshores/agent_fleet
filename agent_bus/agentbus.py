@@ -612,7 +612,32 @@ def _wait_for_reply(from_role, tid, timeout):
     return _read_consume() if target.exists() else None
 
 
+def _kill_prior_waits(role):
+    """per-role 幂等:挂 wait 前清掉【该 role 已存活的独立 agentbus wait 进程】(排除自己)。
+    防 naive 重挂累积多 wait 抢同一 notice→即时空唤醒死循环(Master数分 2026-07-02 提:全队防坑,不靠各 agent 纪律)。
+    只杀独立 `agentbus.py wait --role <role>` 的 python 进程;daemon 的 wait 在 worker_daemon 进程内跑(cmdline 不同)不受影响。
+    正常流(旧 wait 已 fire 退出)扫不到东西=无副作用;只有真累积(旧 wait 仍阻塞)时才清,是纪律滑坡的安全网。返回清掉数。"""
+    if psutil is None:
+        return 0
+    me = os.getpid(); killed = 0
+    for p in psutil.process_iter(["name"]):
+        try:
+            if p.pid == me or "python" not in (p.info.get("name") or "").lower():
+                continue
+            cl = p.cmdline()
+            if "wait" not in cl or not any("agentbus" in str(x) for x in cl):
+                continue
+            for i, x in enumerate(cl):
+                if x == "--role" and i + 1 < len(cl) and cl[i + 1] == role:
+                    p.kill(); killed += 1
+                    break
+        except Exception:
+            continue
+    return killed
+
+
 def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, include_approval=False):
+    _kill_prior_waits(role)   # per-role 幂等:先清同 role 旧 wait,防累积(Master数分 2026-07-02)
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
     _touch_presence(role, presence_mode, extra)  # 声明身份 + 心跳
     obj = _wait_core(role, timeout, include_approval)
