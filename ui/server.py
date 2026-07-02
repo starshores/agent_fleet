@@ -535,15 +535,44 @@ def build_bi():
             running.append({"role": role, "task": pr.get("current_task"),
                             "title": pr.get("current_title") or ""})
 
+    # bus 总占用内存:各角色进程树 RSS/CPU 合计(用户令·2026-07-02)
+    sys_total = None
+    if ab.psutil is not None:
+        _srss = sum((r["sys"].get("rss_mb") or 0) for r in per_role if r.get("sys"))
+        _scpu = sum((r["sys"].get("cpu") or 0) for r in per_role if r.get("sys"))
+        _sn = sum((r["sys"].get("nproc") or 0) for r in per_role if r.get("sys"))
+        _sroles = sum(1 for r in per_role if r.get("sys"))
+        sys_total = {"rss_mb": round(_srss, 1), "cpu": round(_scpu, 1), "nproc": _sn, "roles": _sroles}
+
+    # 今日消耗:改接 usage.db(全量·含前台 cli),取代已随 daemon 移除而冻结的 metrics 口径(统一运营口径·2026-07-02)
+    today_usage = None
+    try:
+        _u = get_usage(force=False)          # 复用带 TTL 缓存的 token_stats json
+        _daily = _u.get("daily") or []
+        if _daily:
+            _last = _daily[-1]
+            _tstr = time.strftime("%Y-%m-%d", time.localtime(now))
+            _row = _last if _last.get("date") == _tstr else None
+            _src = _row or _last
+            today_usage = {
+                "date": _src.get("date"), "is_today": bool(_row),
+                "tokens_total": _src.get("tokens_total") or 0,
+                "tokens_io": _src.get("tokens_io") or 0,
+                "cost_usd": _src.get("cost_usd") or 0,
+                "calls": _src.get("calls") or 0,
+                "input": _src.get("input") or 0, "output": _src.get("output") or 0,
+                "as_of": _u.get("as_of"),
+            }
+    except Exception:
+        today_usage = None
+
     return {
         "now": time.strftime("%H:%M:%S", time.localtime(now)),
-        "today": _agg_metrics(today),
-        "last24": _agg_metrics(last24),
+        "today_usage": today_usage,          # ← usage.db 活数据(运营/资源新口径)
+        "sys_total": sys_total,              # ← bus 总占用内存/CPU 合计
         "per_role": per_role,
         "running": running,
-        "total_records": len(recs),
         "psutil": ab.psutil is not None,
-        "activity": build_activity(),
     }
 
 
@@ -2032,8 +2061,8 @@ canvas{display:block;width:100%}
 .bars{padding:2px 16px 12px}
 .bar-row{display:grid;grid-template-columns:130px 1fr 96px;gap:10px;align-items:center;margin:7px 0;font-size:12.5px}
 .bar-row .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-track{height:15px;background:var(--bg);border-radius:4px;overflow:hidden}
-.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#3b6fb0,var(--accent))}
+.bar-track{height:15px;background:var(--line);border:1px solid #333a47;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#5b9dff,#8ab8ff);box-shadow:0 0 0 1px rgba(91,157,255,.25)}
 .bar-row .num{text-align:right;font-family:var(--mono);font-size:12px;color:var(--dim)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);padding:6px 16px 14px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
@@ -2236,27 +2265,17 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   </section>
 
   <section data-tab="bi" style="scroll-margin-top:64px">
-    <div class="sec-h">📊 BI · 资源消耗 <span class="sub">舰队 token / 成本 / 系统资源 · 运营总览 — 数据自埋点上线起累积(<span class="mono">metrics.jsonl</span>)</span>
+    <div class="sec-h">📊 运营 / 资源 <span class="sub">今日消耗 = <span class="mono">usage.db</span>(全量·含前台 cli·Shanghai 日,统一运营口径)· 在跑任务 + 系统资源 <span class="mono">psutil</span> 实时</span>
       <span class="spacer" style="flex:1"></span>
       <span class="pill muted" id="biUpd">–</span>
     </div>
     <div class="sec-b">
       <div class="bi-kpis" id="biKpis"></div>
       <div id="biRunning" style="padding:0 16px 8px"></div>
-      <div class="sub" style="padding:2px 16px 0">① 任务消耗(近24h · <span class="mono">metrics.jsonl</span> 埋点 · 仅列有消耗的 role · token/成本=埋点后前向真实)</div>
-      <table class="bi-tbl">
-        <thead><tr><th>角色</th><th>任务<span class="sub" style="font-weight:400">(近24h)</span></th><th>token in</th><th>token out</th><th>cache读</th><th>成本 $</th><th>平均耗时</th></tr></thead>
-        <tbody id="biBody"></tbody>
-      </table>
-      <div class="sub" style="padding:12px 16px 0">② 在岗资源占用(当前进程 · <span class="mono">psutil</span> 实时 · <b>与①不同口径</b>:这是进程此刻的 CPU/内存,与近24h任务消耗无关 · 按内存降序)</div>
+      <div class="sub" style="padding:12px 16px 0">在岗资源占用(当前进程 · <span class="mono">psutil</span> 实时 · 进程此刻的 CPU/内存 · 按内存降序)</div>
       <table class="bi-tbl">
         <thead><tr><th>角色</th><th>CPU%</th><th>内存MB</th></tr></thead>
         <tbody id="biSysBody"></tbody>
-      </table>
-      <div class="sub" style="padding:12px 16px 0">📜 任务活动历史 <span style="font-weight:400">— 全程(<span class="mono">events.jsonl</span>)· <b id="actSpan">–</b> · 仅活动量,无 token/成本(历史无从恢复)</span></div>
-      <table class="bi-tbl">
-        <thead><tr><th>角色</th><th>累计任务</th><th>近24h</th><th>ok</th><th>err</th><th>平均耗时</th><th>最近活跃</th></tr></thead>
-        <tbody id="actBody"></tbody>
       </table>
     </div>
   </section>
@@ -2451,30 +2470,6 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div class="sec-b">
       <div id="promptsBox" style="padding:8px 16px 16px"></div>
     </div>
-  </section>
-
-  <!-- 派工/协作效率(metrics.jsonl · 仅自动化派工口径)-->
-  <section data-tab="bi">
-    <div class="sec-h">🤝 派工/协作效率
-      <span class="sub">仅自动化派工口径(<span class="mono">daemon/dispatch</span> 埋点 · <span class="mono">metrics.jsonl</span>)— <b style="color:var(--warn)">非总账</b>,总账见上方「历史用量」</span>
-      <span class="spacer" style="flex:1"></span>
-      <span id="dmMeta" class="muted" style="font-size:11.5px"></span>
-      <button class="btn ghost mini" id="dmRefresh">刷新</button>
-    </div>
-    <div class="dm-note">⚠ 此口径仅覆盖 bus <b>自动化派工</b>(后台 daemon + dispatch 一次性任务),<b>不含交互式 tab 会话</b> —— 实测同期它只占真实总成本 ≈0.5%。要看全量成本请用上方「历史用量」。</div>
-    <div class="kpis" id="dmKpis"></div>
-    <div class="grid2">
-      <div>
-        <div class="uchart-cap">各角色派工成本 <span class="muted">(降序 · 标 $/turn 效率)</span></div>
-        <div class="bars" id="dmRoles"></div>
-      </div>
-      <div>
-        <div class="uchart-cap">daemon vs dispatch <span class="muted">(dispatch 多为大开发任务·单价高)</span></div>
-        <div class="bars" id="dmKind"></div>
-      </div>
-    </div>
-    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">Top 耗时任务 <span class="muted">(按 duration · title 标注)</span></div>
-    <div id="dmTop" class="bars"></div>
   </section>
 
   <!-- 可恢复会话 (resume) -->
@@ -2975,13 +2970,15 @@ function fmtDur(s){ s=s||0; if(s>=60){const m=Math.floor(s/60);return m+'m'+Math
 function renderBI(bi){
   if(!bi) return;
   document.getElementById('biUpd').textContent=bi.now+(bi.psutil?'':' · 无psutil(系统资源不可用)');
-  const td=bi.today, h=bi.last24;
+  const tu=bi.today_usage||{};
+  const st=bi.sys_total;
+  const fmtMem=mb=>mb>=1024?(mb/1024).toFixed(2)+' GB':Math.round(mb)+' MB';
   const kpi=[
-    ['今日任务', td.tasks, td.errors?('含 err '+td.errors):'', td.errors>0],
-    ['今日 token', fmtN(td.tok_total), 'in '+fmtN(td.tok_in)+' / out '+fmtN(td.tok_out), false],
-    ['今日成本', '$'+td.cost.toFixed(3), '', false],
-    ['近24h token', fmtN(h.tok_total), h.tasks+' 任务', false],
-    ['近24h 成本', '$'+h.cost.toFixed(3), '', false],
+    ['bus 总内存', st?fmtMem(st.rss_mb):'—', st?(st.roles+' 角色 · '+st.nproc+' 进程 · '+st.cpu+'% CPU'):'无psutil', false],
+    ['今日 token(总)', fmtN(tu.tokens_total||0), (tu.date?(tu.is_today?tu.date:('库存至 '+tu.date)):'usage.db'), false],
+    ['今日 io(in+out)', fmtN(tu.tokens_io||0), 'in '+fmtN(tu.input||0)+' / out '+fmtN(tu.output||0), false],
+    ['今日成本($参考)', usd(tu.cost_usd||0), '', false],
+    ['今日 calls', fmtN(tu.calls||0), '', false],
     ['在跑任务', bi.running.length, '', false]
   ];
   morphInto(document.getElementById('biKpis'), kpi.map(k=>
@@ -2989,19 +2986,7 @@ function renderBI(bi){
   morphInto(document.getElementById('biRunning'), bi.running.length? bi.running.map(r=>
     `<span class="bi-run" data-key="run-${esc(r.role)}"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
     : '<span class="muted" style="font-size:12px">当前无在跑任务</span>');
-  // ① 任务消耗:仅列近24h 有消耗(tasks>0)的 role —— 不再用 0 行稀释重点
-  const consume=(bi.per_role||[]).filter(r=>r.tasks>0);
-  morphInto(document.getElementById('biBody'), !consume.length
-    ? '<tr><td colspan="7" class="muted" style="padding:10px 16px">近24h 无自动化任务消耗 — 埋点仅覆盖 daemon/dispatch 派工,跑完任务即累积</td></tr>'
-    : consume.map(r=>`<tr data-key="bc-${esc(r.role)}">
-      <td><b>${esc(r.role)}</b></td>
-      <td class="num">${r.tasks}${r.errors?' <span style="color:var(--dead)">('+r.errors+'e)</span>':''}</td>
-      <td class="num">${fmtN(r.tok_in)}</td>
-      <td class="num">${fmtN(r.tok_out)}</td>
-      <td class="num">${fmtN(r.cache_read)}</td>
-      <td class="num">$${r.cost.toFixed(4)}</td>
-      <td class="num">${fmtDur(r.avg_dur_s)}</td></tr>`).join(''));
-  // ② 在岗资源占用:仅列有活进程(sys)的 role,按内存降序 —— 与①口径分开
+  // 在岗资源占用:仅列有活进程(sys)的 role,按内存降序(metrics 任务消耗口径已随 daemon 移除退役,成本看「历史用量」)
   const live=(bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
   morphInto(document.getElementById('biSysBody'), !live.length
     ? '<tr><td colspan="3" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'
@@ -3009,19 +2994,6 @@ function renderBI(bi){
       <td><b>${esc(r.role)}</b></td>
       <td class="num">${r.sys.cpu}</td>
       <td class="num">${r.sys.rss_mb}</td></tr>`).join(''));
-  // 任务活动历史(events.jsonl)
-  const act=bi.activity||{roles:[],span:null};
-  document.getElementById('actSpan').textContent=act.span?(act.span.from+' → '+act.span.to+' · 共 '+act.total+' 任务'):'无历史';
-  morphInto(document.getElementById('actBody'), !act.roles.length
-    ? '<tr><td colspan="7" class="muted" style="padding:10px 16px">无历史活动</td></tr>'
-    : act.roles.map(r=>`<tr data-key="ac-${esc(r.role)}">
-      <td><b>${esc(r.role)}</b></td>
-      <td class="num">${r.tasks}</td>
-      <td class="num">${r.tasks24||0}</td>
-      <td class="num">${r.ok}</td>
-      <td class="num">${r.err?'<span style="color:var(--dead)">'+r.err+'</span>':'0'}</td>
-      <td class="num">${r.avg_dur_s?fmtDur(r.avg_dur_s):'–'}</td>
-      <td class="num" style="color:var(--dim)">${esc(r.last_active)}</td></tr>`).join(''));
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
@@ -3227,7 +3199,9 @@ function drawModels(bmm){
     models.forEach(md=>{const v=byMM[m+'|'+md]||0; if(!v)return; const bh=gh*v/maxV; yCur-=bh; ctx.fillStyle=modelColor(md); ctx.fillRect(cx,yCur,bw,bh);});
     ctx.fillStyle=UC.dim;ctx.fillText(m.slice(2),cx+bw/2,h-10);
     const v48=models.filter(md=>md.indexOf('opus-4-8')>=0).reduce((s,md)=>s+(byMM[m+'|'+md]||0),0);
-    if(t){ctx.fillStyle=UC.acc;ctx.font='bold 10px Consolas';ctx.fillText(Math.round(v48/t*100)+'%',cx+bw/2,yCur-5);ctx.font='10px Consolas';}
+    if(t){const pt=Math.round(v48/t*100)+'%';ctx.font='bold 10px Consolas';
+      ctx.lineWidth=3;ctx.strokeStyle='rgba(15,17,21,.92)';ctx.strokeText(pt,cx+bw/2,yCur-5);
+      ctx.fillStyle='#fff';ctx.fillText(pt,cx+bw/2,yCur-5);ctx.font='10px Consolas';}
   });
   ctx.textAlign='left';
   morphInto(document.getElementById('uModelLegend'), models.map(md=>`<span data-key="ml-${esc(md)}"><i style="background:${modelColor(md)}"></i>${esc(modelShort(md))}</span>`).join(''));
@@ -3284,7 +3258,6 @@ async function loadDispatch(force){
   try{ const r=await fetch('/api/dispatch_metrics'+(force?'?fresh=1':'')); renderDispatch(await r.json()); }
   catch(e){}
 }
-document.getElementById('dmRefresh').onclick=()=>loadDispatch(true);
 
 // ===== 能力池 caps =====
 let _caps=null;
@@ -3500,7 +3473,7 @@ function showTab(t){
   document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
   window.scrollTo({top:0});
   // 刷新门控(P1):只在进入对应 tab 时拉它的重数据 —— 不再无视可见性后台全刷(省 psutil 子进程+token)
-  if(t==='bi'){ loadBI(); loadDispatch(); }
+  if(t==='bi'){ loadBI(); }
   else if(t==='usage') loadUsage(true);
   else if(t==='caps') loadCaps();
   else if(t==='ctx') loadCtx();
@@ -3570,7 +3543,7 @@ setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);
 // 不必再手动刷新即可反映。门控同 BI:不在 caps tab 不跑。/api/caps 只读 JSON、零 psutil 扫,轮询开销极小。
 setInterval(()=>{ if(curTab==='caps') loadCaps(); }, 10000);
 // 首屏一次性预热(各自独立懒加载,不拖首屏);之后按 tab 进入再刷(见 showTab)
-setTimeout(()=>loadUsage(true), 800); setTimeout(loadDispatch, 1000); setTimeout(loadSessions, 1200);
+setTimeout(()=>loadUsage(true), 800); setTimeout(loadSessions, 1200);
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 loadCtx(); setInterval(loadCtx, 15000);          // 🧠 上下文占用徽标+看板:15s 轮询(后端缓存,请求零现读)— 全局告警,不分 tab
 </script>
