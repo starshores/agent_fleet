@@ -10,6 +10,18 @@
 
 **原因**:2026-06-01 用户 explicit — "对话框任务多不好处理"。事件级 toast 非阻塞,通知中心可累积,用户按节奏回看。
 
+## 需用户拍板/选择 → 走非阻塞待办池,禁用 AskUserQuestion 卡片
+
+**规则**:任何"要用户拍板/二选一/确认"的场景,**一律**跑
+`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> --title "<问题>" --detail "<背景+选项如 A=… / B=…>"`
+把决策投进**非阻塞待办池**(todos.json / WebUI),投完**继续手头的活、别等**;用户按自己节奏批量看、回填,你下轮再看结果。
+
+- **禁用 `AskUserQuestion` 交互卡片** —— 它是【阻塞式】:问了若用户没及时点,发问 agent 的会话就被**占住干等**。用户一般没时间实时看 cc 询问。
+- **已机制层硬拦**:PreToolUse hook `C:/apphome/agent_fleet/hooks/block_askuser.py`(settings.json 注册·matcher=AskUserQuestion)会拦下任何 AskUserQuestion → 自动把问题转投待办池 + deny,并提示"已代投、继续别等"。**所以就算你忘了这条约定,卡片也会被拦并转投**,别依赖硬拦、优先自己走 ask-user。
+- 这是 [[ask-user-standard]] 记忆 + 上面「禁用模态对话框」的合并强化。
+
+**原因**:2026-07-06 用户 explicit — "AskUserQuestion 会占用会话,要想办法优化掉"(展示了 agent 用卡片阻塞会话的实例)。
+
 ## 等本地长任务 / 文件变化 → 事件机制,不要 sleep polling
 
 - 文件变化用 `watchdog.observers.Observer` 或 `pywin32.win32file.ReadDirectoryChangesW`

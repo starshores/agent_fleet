@@ -5,6 +5,19 @@
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/block_askuser.py",
+            "timeout": 15,
+            "statusMessage": "AskUserQuestion→非阻塞待办池(不占会话)"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
