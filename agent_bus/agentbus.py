@@ -1607,6 +1607,89 @@ def cmd_stale(args):
     print("处置:派发/跟催走 send;需用户拍板走 ask-user;已无效则标完成。")
 
 
+# ── 长期任务线看板(2026-07-06,Master 提·用户要"展示")──────────────────────────────
+# tasklines.json = 运行态磁盘文件(gitignore·不进bus核心git=洁净基准[含业务明细+owner];落磁盘
+# =防compact+跨会话·Master 拍板存储方案A)。每条决策点带 ref → 对应 todos.json(ask-user 待办池)
+# 条目,看板据 ref 显示 已答/待答。展示两阶段:阶段1=本 CLI(ab tasklines);阶段2=Master数分 WebUI 面板。
+def _tasklines_path():
+    return BUS / "tasklines.json"
+
+def _load_tasklines():
+    p = _tasklines_path()
+    try:
+        d = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        tl = d.get("tasklines", []) if isinstance(d, dict) else []
+        return tl if isinstance(tl, list) else []
+    except Exception:
+        return []
+
+def _decision_status_map():
+    """ref → todos.json 里对应条目的 status(决策点是否已被用户答/标完成)。"""
+    f = BUS / "todos.json"
+    m = {}
+    try:
+        items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+        for it in (items if isinstance(items, list) else []):
+            r = it.get("ref")
+            if r:
+                m[r] = it.get("status")
+    except Exception:
+        pass
+    return m
+
+def cmd_tasklines(args):
+    """【只读·长期任务线看板】列各 owner 的持续/长期任务线:状态/owner/节奏/待决策数/更新日。
+    --id X 看单条详情(依赖/决策点/真相源)。数据源 tasklines.json(持久·跨会话·防compact)。
+    决策点据 ref 交叉 todos.json 显示 已答/待答(决策走 ask-user 待办池,不滚走)。"""
+    tls = _load_tasklines()
+    dsm = _decision_status_map()
+    _done = ("完成", "已完成", "done")
+    if getattr(args, "json", False):
+        print(json.dumps(tls, ensure_ascii=False, indent=1)); return
+    if not tls:
+        print("(长期任务线看板为空 · tasklines.json 无数据)"); return
+    tid = getattr(args, "id", None)
+    if tid:
+        tl = next((t for t in tls if t.get("id") == tid), None)
+        if not tl:
+            print("无此任务线:%s(ab tasklines 看全部)" % tid); return
+        print("═" * 72)
+        print("【%s】%s" % (tl.get("id"), tl.get("title")))
+        print("  owner=%s   节奏=%s   更新=%s" % (tl.get("owner"), tl.get("cadence"), tl.get("updated")))
+        print("  状态:%s" % (tl.get("status") or ""))
+        if tl.get("current"):
+            print("  当前:%s" % tl.get("current"))
+        if tl.get("deps"):
+            print("  依赖:")
+            for d in tl["deps"]:
+                print("    - %s" % d)
+        if tl.get("decisions"):
+            print("  待决策点(→ 待办池):")
+            for de in tl["decisions"]:
+                stt = dsm.get(de.get("ref"))
+                mark = "✓已答" if stt in _done else ("⧗待用户" if stt else "·未投池")
+                print("    [%s] %s" % (mark, de.get("q")))
+                if de.get("note"):
+                    print("            ↳ %s" % de["note"])
+        if tl.get("truth_source"):
+            print("  真相源:%s" % tl.get("truth_source"))
+        print("═" * 72)
+        return
+    print("━" * 78)
+    print("长期任务线看板 · %d 条 · 数据源 tasklines.json(持久·跨会话·防compact)" % len(tls))
+    print("━" * 78)
+    for t in tls:
+        decs = t.get("decisions", [])
+        pending = sum(1 for d in decs if dsm.get(d.get("ref")) not in _done)
+        dbadge = ("⧗待决策 %d/%d" % (pending, len(decs))) if decs else "—"
+        print("【%s】%s" % (t.get("id"), t.get("title")))
+        print("      owner=%-14s 节奏=%-16s 决策=%-10s 更新=%s"
+              % (t.get("owner"), t.get("cadence"), dbadge, t.get("updated")))
+        print("      状态:%s" % (t.get("status") or ""))
+    print("━" * 78)
+    print("详情:ab tasklines --id <TL-x>   ·   决策点走 ask-user 待办池(ab stale / WebUI 可看)")
+
+
 # ── 退役 agent 档案馆/花名册(2026-06-29,用户提:番号下掉+记录保留+可复用恢复)──────────
 # retired_roster.json = list 归档记录(与 agents.json 活跃在册分开);退役=从 agents.json 摘除番号
 # (selfwake/who/roster 不再显示、不占活跃名额)+ mailbox 移 _retired/ 留痕 + 完整记录进档案馆。
@@ -2292,6 +2375,7 @@ def main():
     p = sub.add_parser("health-sweep"); p.add_argument("--apply", action="store_true"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.set_defaults(fn=cmd_health_sweep)
     p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--todo-stale-min", type=int, default=1440, dest="todo_stale_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
     p = sub.add_parser("stale"); p.add_argument("--hours", type=int, default=24); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_stale)
+    p = sub.add_parser("tasklines"); p.add_argument("--id", default=None); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_tasklines)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
