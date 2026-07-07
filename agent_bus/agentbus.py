@@ -2211,6 +2211,33 @@ def _save_session_tags(d):
     os.replace(tmp, p)
 
 
+def _bus_ids_and_cwds():
+    """(bus会话id集, bus cwd集) —— 用于判一个历史会话是不是【bus 会话】。
+    bus id = 任一 presence.json 的 session_id(活/停都算,文件持久)+ 退役档案里记的 session_ids;
+    bus cwd = 任一 presence.json 的 cwd(bus agent 跑活的目录,即各角色自举的代码目录)。
+    判定:session_id∈ids 或 cwd∈cwds → bus(含 agent 的旧会话);否则非bus(用户个人会话,如个人项目目录下的)。"""
+    ids, cwds = set(), set()
+    try:
+        for pf in BUS.glob("*/presence.json"):
+            try:
+                d = json.loads(pf.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if d.get("session_id"):
+                ids.add(d["session_id"])
+            if d.get("cwd"):
+                cwds.add(os.path.normcase(d["cwd"]))
+    except Exception:
+        pass
+    try:
+        for e in _load_retired_roster():
+            for sid in (e.get("session_ids", []) or []):
+                ids.add(sid)
+    except Exception:
+        pass
+    return ids, cwds
+
+
 def _live_session_roles():
     """{session_id: role} —— 当前【在运行】的会话:presence.json 有 session_id 且其 claude_pid/daemon_pid
     进程还活着。用于把"死的历史 jsonl"和"正在跑的会话"区分开(活死实时算,不存,进程一死即翻'死')。"""
@@ -2340,9 +2367,12 @@ def cmd_sessions(args):
     # ── 列表 ──
     tags = _load_session_tags()
     live = _live_session_roles()          # {session_id: role} 当前在运行的
+    bus_ids, bus_cwds = _bus_ids_and_cwds()
     only_tagged = getattr(args, "tagged", False)
     only_live = getattr(args, "live", False)
     only_dead = getattr(args, "dead", False)
+    only_nonbus = getattr(args, "non_bus", False)
+    only_bus = getattr(args, "bus", False)
     root = Path.home() / ".claude" / "projects"
     out = []
     if root.exists():
@@ -2387,6 +2417,7 @@ def cmd_sessions(args):
                     pass
                 tg = tags.get(f.stem) or {}
                 lr = live.get(f.stem)
+                is_bus = (f.stem in bus_ids) or (bool(cwd) and os.path.normcase(cwd) in bus_cwds)
                 out.append({
                     "id": f.stem,
                     "project": pdir.name,
@@ -2399,6 +2430,7 @@ def cmd_sessions(args):
                     "note": tg.get("note", ""),
                     "state": "运行中" if lr else "死",
                     "live_role": lr,
+                    "is_bus": is_bus,
                 })
     seen = {s["id"] for s in out}
     # 已标记但 jsonl 不在 projects/(被归档/prune 移走)的会话:仍列出(用标记时快照的 cwd/title)
@@ -2408,11 +2440,12 @@ def cmd_sessions(args):
         if args.project and args.project.lower() not in (tg.get("cwd", "") or "").lower():
             continue
         lr = live.get(sid)
+        is_bus = (sid in bus_ids) or (bool(tg.get("cwd")) and os.path.normcase(tg.get("cwd")) in bus_cwds)
         out.append({
             "id": sid, "project": "(已归档/不在projects)", "cwd": tg.get("cwd", ""),
             "title": (tg.get("title") or "(无标题)")[:70], "last": "", "last_epoch": 0,
             "size_kb": 0, "tags": tg.get("tags", []), "note": tg.get("note", ""), "archived": True,
-            "state": "运行中" if lr else "死", "live_role": lr,
+            "state": "运行中" if lr else "死", "live_role": lr, "is_bus": is_bus,
         })
     if only_tagged:
         out = [s for s in out if s.get("tags")]
@@ -2420,25 +2453,33 @@ def cmd_sessions(args):
         out = [s for s in out if s.get("state") == "运行中"]
     if only_dead:
         out = [s for s in out if s.get("state") == "死"]
+    if only_nonbus:
+        out = [s for s in out if not s.get("is_bus")]
+    if only_bus:
+        out = [s for s in out if s.get("is_bus")]
     out.sort(key=lambda x: (x.get("state") != "运行中", -x["last_epoch"]))   # 运行中置顶,再按最近
     n_live = sum(1 for s in out if s.get("state") == "运行中")
+    n_nonbus = sum(1 for s in out if not s.get("is_bus"))
     if args.limit and args.limit > 0:
         out = out[:args.limit]
     if args.json:
         print(json.dumps(out, ensure_ascii=False))
         return
-    hdr = "已标记会话" if only_tagged else ("运行中会话" if only_live else ("死/可恢复会话" if only_dead else "Claude Code 历史会话"))
-    print("%s(~/.claude/projects/,共 %d · 运行中 %d · 死 %d):" % (hdr, len(out), n_live, len(out) - n_live))
-    print("%-8s %-11s %-22s %-38s %-12s %s" % ("状态", "最近", "项目(cwd编码)", "会话id", "🏷标签", "标题"))
+    hdr = ("非bus会话" if only_nonbus else ("bus会话" if only_bus else
+           ("已标记会话" if only_tagged else ("运行中会话" if only_live else
+            ("死/可恢复会话" if only_dead else "Claude Code 历史会话")))))
+    print("%s(~/.claude/projects/,共 %d · 运行中 %d · 死 %d · 非bus %d):" % (hdr, len(out), n_live, len(out) - n_live, n_nonbus))
+    print("%-8s %-6s %-9s %-38s %-11s %s" % ("状态", "归属", "最近", "会话id", "🏷标签", "标题"))
     for s in out:
-        tagstr = ("/".join(s["tags"]))[:12] if s.get("tags") else "-"
+        tagstr = ("/".join(s["tags"]))[:11] if s.get("tags") else "-"
         last = s["last"][5:] if s["last"] else "(归档)"
         state = ("▶运行·" + (s.get("live_role") or "?")) if s.get("state") == "运行中" else "·死"
-        print("%-8s %-11s %-22s %-38s %-12s %s" % (state[:8], last, s["project"][:22], s["id"], tagstr, s["title"]))
+        owner = "bus" if s.get("is_bus") else "个人"
+        print("%-8s %-6s %-9s %-38s %-11s %s" % (state[:8], owner, last, s["id"], tagstr, s["title"]))
         if s.get("note"):
-            print("%52s ↳ %s" % ("", s["note"]))
-    print("\n▶运行中=有活claude进程(bus在岗agent);·死=历史日志无活进程(真·可恢复/休眠)。筛选:--live / --dead / --tagged")
-    print("标记:ab sessions --tag <id> [--label 可恢复] [--note ..]   ·   恢复:在对应 cwd 跑 claude --resume <会话id>(终端)")
+            print("%48s ↳ %s" % ("", s["note"]))
+    print("\n▶运行中=有活claude进程(bus在岗agent);·死=无活进程(真可恢复)。归属:bus=agent会话/个人=非bus(你自己的会话)。")
+    print("筛选:--live / --dead / --tagged / --non-bus(只看个人)/ --bus   ·   标记:ab sessions --tag <id> [--label 可恢复]")
 
 
 def cmd_ask_user(args):
@@ -2572,7 +2613,7 @@ def main():
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)
     p = sub.add_parser("retired"); p.set_defaults(fn=cmd_retired)
-    p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.add_argument("--tag", default=None, help="给会话id打标记"); p.add_argument("--untag", default=None, help="撤会话id标记"); p.add_argument("--label", default=None, help="标签(默认'可恢复')"); p.add_argument("--note", default=None, help="标记备注"); p.add_argument("--tagged", action="store_true", help="只列已标记的会话"); p.add_argument("--live", action="store_true", help="只列运行中(有活进程)"); p.add_argument("--dead", action="store_true", help="只列死的(可恢复/休眠)"); p.set_defaults(fn=cmd_sessions)
+    p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.add_argument("--tag", default=None, help="给会话id打标记"); p.add_argument("--untag", default=None, help="撤会话id标记"); p.add_argument("--label", default=None, help="标签(默认'可恢复')"); p.add_argument("--note", default=None, help="标记备注"); p.add_argument("--tagged", action="store_true", help="只列已标记的会话"); p.add_argument("--live", action="store_true", help="只列运行中(有活进程)"); p.add_argument("--dead", action="store_true", help="只列死的(可恢复/休眠)"); p.add_argument("--non-bus", action="store_true", dest="non_bus", help="只列非bus(个人)会话"); p.add_argument("--bus", action="store_true", help="只列bus(agent)会话"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)
