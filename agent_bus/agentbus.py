@@ -2187,11 +2187,130 @@ def cmd_edge_release(args):
     print(json.dumps({"released": True, "by": who}, ensure_ascii=False))
 
 
+# 会话标记(2026-07-07 用户提:ab sessions 仅元数据模块要能打标记·标"可恢复"等)。
+# session_tags.json = 运行态磁盘文件(gitignore·不进 bus 核心 git);按 session-id 存
+# {tags:[...], note, cwd, title, tagged_by, tagged_at}。标时顺带快照 cwd/title,便于会话 jsonl 日后
+# 被归档/prune 移出 projects/ 后,--tagged 仍能列出并给出 resume 所需的 cwd。
+def _session_tags_path():
+    return BUS / "session_tags.json"
+
+
+def _load_session_tags():
+    p = _session_tags_path()
+    try:
+        d = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_session_tags(d):
+    p = _session_tags_path()
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def _session_meta(sid):
+    """按 session-id 在 ~/.claude/projects 找该会话 jsonl,读头部取 (cwd, title)。找不到→(None,None)。"""
+    root = Path.home() / ".claude" / "projects"
+    if not root.exists():
+        return None, None
+    for pdir in root.iterdir():
+        f = pdir / (sid + ".jsonl")
+        if not f.exists():
+            continue
+        cwd = title = label = None
+        try:
+            with open(f, encoding="utf-8", errors="replace") as fh:
+                for i, ln in enumerate(fh):
+                    if i > 80:
+                        break
+                    ln = ln.strip()
+                    if not ln:
+                        continue
+                    try:
+                        r = json.loads(ln)
+                    except Exception:
+                        continue
+                    if not cwd and r.get("cwd"):
+                        cwd = r.get("cwd")
+                    if not title and r.get("type") == "ai-title":
+                        title = r.get("aiTitle")
+                    if not label and r.get("type") == "user":
+                        m = r.get("message", {})
+                        c = m.get("content") if isinstance(m, dict) else None
+                        if isinstance(c, str):
+                            label = c
+                        elif isinstance(c, list):
+                            label = " ".join(b.get("text", "") for b in c
+                                              if isinstance(b, dict) and b.get("type") == "text")
+                    if cwd and title:
+                        break
+        except Exception:
+            pass
+        return cwd, ((title or label or "").strip() or None)
+    return None, None
+
+
 def cmd_sessions(args):
-    """列【可恢复的 Claude Code 会话】(~/.claude/projects/<cwd编码>/<session-id>.jsonl)。
-    给 UI 的"可恢复会话"视图提供数据;只读每个会话头部 ~80 行取元数据(cwd/aiTitle/首条/时间),不读全文。
-    注:UI 无法替用户跑交互式 resume,只能展示 + 给 `claude --resume <id>` 命令;真正 resume 在终端。"""
+    """列 Claude Code 历史会话(~/.claude/projects/<cwd编码>/<session-id>.jsonl),仅元数据、可【打标记】。
+    - 列表:ab sessions [--project X] [--limit N] [--tagged](只看已标记)[--json];标记的会话显示 🏷标签。
+    - 打标记:ab sessions --tag <会话id> [--label 可恢复] [--note "..."](默认标签=可恢复;顺带快照 cwd/title)。
+    - 撤标记:ab sessions --untag <会话id> [--label X](不带 --label 撤该会话全部标签)。
+    给 UI"可恢复会话"视图提供数据;真正 resume 在终端跑 `claude --resume <id>`(UI 只展示+给命令)。"""
     import datetime
+
+    # ── 打标记 / 撤标记(mutate 分支)──
+    sid_tag = getattr(args, "tag", None)
+    sid_untag = getattr(args, "untag", None)
+    if sid_tag or sid_untag:
+        tags = _load_session_tags()
+        label = (getattr(args, "label", None) or "").strip()
+        if sid_tag:
+            sid = sid_tag
+            entry = tags.get(sid) or {"tags": [], "note": "", "cwd": "", "title": "",
+                                      "tagged_by": "", "tagged_at": ""}
+            lab = label or "可恢复"
+            if lab not in entry["tags"]:
+                entry["tags"].append(lab)
+            if getattr(args, "note", None):
+                entry["note"] = args.note.strip()
+            cwd, title = _session_meta(sid)          # 快照元数据(防日后归档丢)
+            if cwd:
+                entry["cwd"] = cwd
+            if title:
+                entry["title"] = title[:70]
+            entry["tagged_by"] = _resolve_self_role() or os.environ.get("AGENTBUS_ROLE", "unknown")
+            entry["tagged_at"] = _now()
+            tags[sid] = entry
+            _save_session_tags(tags)
+            _audit("session_tag", id=sid, label=lab)
+            print("已标记会话 %s:🏷%s%s%s" % (
+                sid, "/".join(entry["tags"]),
+                ("  note=" + entry["note"]) if entry["note"] else "",
+                ("  cwd=" + entry["cwd"]) if entry.get("cwd") else "  (jsonl 不在 projects/·可能已归档)" if not cwd else ""))
+        else:
+            sid = sid_untag
+            if sid in tags:
+                if label:
+                    tags[sid]["tags"] = [t for t in tags[sid].get("tags", []) if t != label]
+                    if tags[sid]["tags"]:
+                        pass
+                    else:
+                        del tags[sid]
+                else:
+                    del tags[sid]
+                _save_session_tags(tags)
+                _audit("session_untag", id=sid, label=label or "*")
+                print("已撤标记会话 %s(%s)" % (sid, ("label=" + label) if label else "全部标签"))
+            else:
+                print("会话 %s 无标记,无需撤" % sid)
+        return
+
+    # ── 列表 ──
+    tags = _load_session_tags()
+    only_tagged = getattr(args, "tagged", False)
     root = Path.home() / ".claude" / "projects"
     out = []
     if root.exists():
@@ -2234,6 +2353,7 @@ def cmd_sessions(args):
                                 break
                 except Exception:
                     pass
+                tg = tags.get(f.stem) or {}
                 out.append({
                     "id": f.stem,
                     "project": pdir.name,
@@ -2242,18 +2362,40 @@ def cmd_sessions(args):
                     "last": datetime.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
                     "last_epoch": st.st_mtime,
                     "size_kb": round(st.st_size / 1024, 1),
+                    "tags": tg.get("tags", []),
+                    "note": tg.get("note", ""),
                 })
+    seen = {s["id"] for s in out}
+    # 已标记但 jsonl 不在 projects/(被归档/prune 移走)的会话:仍列出(用标记时快照的 cwd/title)
+    for sid, tg in tags.items():
+        if sid in seen or not tg.get("tags"):
+            continue
+        if args.project and args.project.lower() not in (tg.get("cwd", "") or "").lower():
+            continue
+        out.append({
+            "id": sid, "project": "(已归档/不在projects)", "cwd": tg.get("cwd", ""),
+            "title": (tg.get("title") or "(无标题)")[:70], "last": "", "last_epoch": 0,
+            "size_kb": 0, "tags": tg.get("tags", []), "note": tg.get("note", ""), "archived": True,
+        })
+    if only_tagged:
+        out = [s for s in out if s.get("tags")]
     out.sort(key=lambda x: -x["last_epoch"])
     if args.limit and args.limit > 0:
         out = out[:args.limit]
     if args.json:
         print(json.dumps(out, ensure_ascii=False))
         return
-    print("可恢复会话(~/.claude/projects/,按最近活动倒序,共 %d):" % len(out))
-    print("%-11s %-30s %-38s %s" % ("最近", "项目(cwd编码)", "会话id", "标题"))
+    hdr = "已标记会话" if only_tagged else "Claude Code 历史会话"
+    print("%s(~/.claude/projects/,按最近活动倒序,共 %d):" % (hdr, len(out)))
+    print("%-11s %-24s %-38s %-14s %s" % ("最近", "项目(cwd编码)", "会话id", "🏷标签", "标题"))
     for s in out:
-        print("%-11s %-30s %-38s %s" % (s["last"][5:], s["project"][:30], s["id"], s["title"]))
-    print("\n恢复:在对应 cwd 跑  claude --resume <会话id>(UI 只能看+给命令,交互 resume 在终端)")
+        tagstr = ("/".join(s["tags"]))[:14] if s.get("tags") else "-"
+        last = s["last"][5:] if s["last"] else "(归档)"
+        print("%-11s %-24s %-38s %-14s %s" % (last, s["project"][:24], s["id"], tagstr, s["title"]))
+        if s.get("note"):
+            print("%50s ↳ %s" % ("", s["note"]))
+    print("\n标记:ab sessions --tag <id> [--label 可恢复] [--note ..]  ·  只看已标记:ab sessions --tagged")
+    print("恢复:在对应 cwd 跑  claude --resume <会话id>(UI 只能看+给命令,交互 resume 在终端)")
 
 
 def cmd_ask_user(args):
@@ -2387,7 +2529,7 @@ def main():
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)
     p = sub.add_parser("retired"); p.set_defaults(fn=cmd_retired)
-    p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_sessions)
+    p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.add_argument("--tag", default=None, help="给会话id打标记"); p.add_argument("--untag", default=None, help="撤会话id标记"); p.add_argument("--label", default=None, help="标签(默认'可恢复')"); p.add_argument("--note", default=None, help="标记备注"); p.add_argument("--tagged", action="store_true", help="只列已标记的会话"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.set_defaults(fn=cmd_dispatch)
