@@ -539,7 +539,13 @@ def _wait_core(role, timeout, include_approval=False):
 
     obs = Observer()
     obs.schedule(H(), str(inbox), recursive=False)
-    obs.start()
+    # 兜底(2026-07-08 Master 提):Observer.start() 若抛异常(watchdog 装坏/资源限),原来会崩溃传播;
+    # 现捕获→降级【轮询式阻塞】(每 2s 查一次 inbox 到 deadline),【绝不秒返 idle】(秒返=事件自醒失效)。
+    obs_ok = True
+    try:
+        obs.start()
+    except Exception:
+        obs_ok = False
     try:
         t = _oldest_claimable(inbox, include_approval)  # 启动 observer 后再查一次,消除竞态
         if not t:
@@ -551,15 +557,26 @@ def _wait_core(role, timeout, include_approval=False):
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break                       # 真超时,无任务 → idle
-                woke = ev.wait(timeout=remaining)
-                t = _oldest_claimable(inbox, include_approval)
-                if t:
-                    break                       # 有可领取任务
-                if not woke:
-                    break                       # ev.wait 超时返回(非事件)→ idle
-                ev.clear()                      # 被事件唤醒但没抢到(竞态/无关)→ 继续等剩余
+                if obs_ok:
+                    woke = ev.wait(timeout=remaining)
+                    t = _oldest_claimable(inbox, include_approval)
+                    if t:
+                        break                   # 有可领取任务
+                    if not woke:
+                        break                   # ev.wait 超时返回(非事件)→ idle
+                    ev.clear()                  # 被事件唤醒但没抢到(竞态/无关)→ 继续等剩余
+                else:
+                    # 降级:watchdog 不可用 → 轮询阻塞(别秒返),延迟至多 2s 发现新消息
+                    time.sleep(min(remaining, 2.0))
+                    t = _oldest_claimable(inbox, include_approval)
+                    if t:
+                        break
     finally:
-        obs.stop(); obs.join()
+        if obs_ok:
+            try:
+                obs.stop(); obs.join()
+            except Exception:
+                pass
 
     return _claim(role, t) if t else None
 
