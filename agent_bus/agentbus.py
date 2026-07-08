@@ -115,7 +115,7 @@ def _warn_unreachable(role):
         sys.stderr.write("⚠ 目标 %s 已退役,活没人接——请改派%s。(仍写入留痕)\n"
                          % (role, ("(接替=%s)" % sb) if sb else ""))
     elif role not in HUMAN_ATTENDED:
-        if _self_wake_state(role)[0] != "armed":
+        if _self_wake_state(role)[0] in ("stale", "off"):   # recent(刚fire待重挂)不警:消息入inbox它重挂即领
             sys.stderr.write("⚠ 目标 %s 自醒非在岗——派了可能没人接(claim);"
                              "换个在岗的 / 让它重挂自醒,或确认它是人值守 tab。(仍写入其 inbox)\n" % role)
 
@@ -772,7 +772,7 @@ def _emit_completion_notice(sender, notifier_role, ref_id, status, title, result
     (原 HUMAN_ATTENDED 白名单闸已移除:它会让 Master数分 等新 hello 的自醒协调位静默失联;Master数分 报的 bug。)
     best-effort,绝不影响主流程。返回是否投了 notice。"""
     try:
-        if _self_wake_state(sender)[0] != "armed":
+        if _self_wake_state(sender)[0] in ("stale", "off"):   # recent 仍投:它重挂后即见 notice
             return False
         loc = result_loc or ("%s/done/%s.json" % (sender, ref_id))
         nid = "notice-" + ref_id
@@ -1478,7 +1478,7 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     # 1) 自醒(退役 role 跳过——不计掉线,否则误报)
     wr = _wait_proc_roles()
     retired_set = _retired_roles()
-    armed = stale = off = retired_n = 0; stale_roles = []
+    armed = recent = stale = off = retired_n = 0; stale_roles = []
     for d in role_dirs:
         if d.name in retired_set:
             retired_n += 1; continue
@@ -1486,9 +1486,10 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
             continue
         stt, _ = _self_wake_state(d.name, wait_roles=wr)
         if stt == "armed": armed += 1
+        elif stt == "recent": recent += 1            # 有心跳无wait·瞬时态·不计告警
         elif stt == "stale": stale += 1; stale_roles.append(d.name)
         else: off += 1
-    h["selfwake"] = {"armed": armed, "stale": stale, "off": off, "retired": retired_n, "stale_roles": stale_roles}
+    h["selfwake"] = {"armed": armed, "recent": recent, "stale": stale, "off": off, "retired": retired_n, "stale_roles": stale_roles}
     if stale_roles: h["warns"].append("自醒掉线 %d(%s)" % (stale, ",".join(stale_roles)))
     # 2) 队列
     q = {"inbox": 0, "processing": 0, "held": 0, "failed": 0}
@@ -1560,7 +1561,7 @@ def cmd_health(args):
         print(json.dumps(h, ensure_ascii=False, indent=1)); return
     L = ["=== Bus 健康检查 (as of %s) ===" % h["as_of"]]
     sw = h["selfwake"]
-    L.append("\n[自醒]   在岗 %d / 掉线 %d / 未醒 %d / 退役 %d" % (sw["armed"], sw["stale"], sw["off"], sw.get("retired", 0)))
+    L.append("\n[自醒]   在岗 %d / 待确认 %d / 掉线 %d / 未醒 %d / 退役 %d" % (sw["armed"], sw.get("recent", 0), sw["stale"], sw["off"], sw.get("retired", 0)))
     if sw["stale_roles"]: L.append("  ⚠ 掉线需重挂: " + ", ".join(sw["stale_roles"]))
     q = h["queues"]
     L.append("\n[队列]   inbox 待领 %d / processing 处理中 %d / held 待批 %d / failed 失败 %d"
@@ -1932,7 +1933,7 @@ def cmd_route(args):
     if not scored:
         print("无对口专责命中「%s」——考虑广播,或 ab register 新专家。" % " ".join(terms)); return
     scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先
-    mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}
+    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}
     print("对口路由推荐(命中「%s」):" % " ".join(terms))
     for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):
         tag = " ← 推荐(对口+在岗)" if i == 0 and st == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
@@ -1948,8 +1949,11 @@ def _wait_proc_roles():
 
 def _self_wake_state(role, alive_pids=None, wait_roles=None):
     """判一个 role 的事件自醒在不在岗。返回 (state, detail)。
-    armed=在岗;stale=掉线(曾自醒但进程退/没重挂);off=未自醒(idle/无 presence)。
+    armed=在岗(有真 wait 进程);recent=有心跳无 wait 进程(刚 fire 待重挂/交互中·非 event-armed·瞬时态非告警);
+    stale=掉线(曾自醒但进程退/没重挂·心跳超期);off=未自醒(idle/无 presence)。
     daemon 按 daemon_pid 判活;协调位/会话按【有无活的 wait 进程】判活(wait 不刷心跳,不能靠心跳)。
+    三态化(2026-07-08 Master批):原"listening+心跳新鲜"误报 armed(按心跳判)→ 改判 recent(如实=非 event-armed),
+    消除虚报✓在岗;event 自醒真正在岗只认 wait 进程。
     wait_roles:预扫好的"有 wait 进程的 role 集合"(循环调用务必传入,免每 role 全扫);None 则现扫一次。"""
     pf = BUS / role / "presence.json"
     if not pf.exists():
@@ -1976,7 +1980,7 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
         pid = pr.get("claude_pid")
         alive = bool(psutil is not None and pid and psutil.pid_exists(pid))
         if alive and fresh:
-            return ("armed", "会话自醒(tab /loop serve,心跳 %ss)" % age)
+            return ("recent", "有心跳无 wait 进程(刚 fire 待重挂/交互中·非 event-armed·心跳 %ss)" % age)
         if alive:
             return ("stale", "会话在但无 wait 进程、心跳超期 %ss——自醒掉线(没重挂?)" % age)
         return ("stale", "进程已退,自醒掉线")
@@ -2033,7 +2037,7 @@ def cmd_whoami(args):
 
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
-    armed = stale = off = retired = pseudo = 0
+    armed = recent = stale = off = retired = pseudo = 0
     wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
     retired_set = _retired_roles()
     print("%-14s %-8s %s" % ("role", "自醒", "说明"))
@@ -2048,11 +2052,13 @@ def cmd_selfwake(args):
             print("%-14s %-8s %s" % (role, "⊘退役", "已退役" + ("·接替=" + sb if sb else "") + "(留痕不删,不派活)"))
             retired += 1; continue
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
-        mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}[st]
+        mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}[st]
         print("%-14s %-8s %s" % (role, mark, detail))
-        armed += st == "armed"; stale += st == "stale"; off += st == "off"
+        armed += st == "armed"; recent += st == "recent"; stale += st == "stale"; off += st == "off"
     print("-" * 78)
-    print("自醒在岗 %d / 掉线 %d / 未醒 %d / 退役 %d / 伪角色 %d" % (armed, stale, off, retired, pseudo))
+    print("自醒在岗 %d / 待确认 %d / 掉线 %d / 未醒 %d / 退役 %d / 伪角色 %d" % (armed, recent, stale, off, retired, pseudo))
+    if recent:
+        print("◐待确认=有心跳无wait进程(刚fire待重挂/交互中·瞬时非告警);持续则下轮转掉线。")
     if stale:
         print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
 
@@ -2640,7 +2646,7 @@ def cmd_roster(args):
                   and (kw in r.lower() or kw in (v.get("desc", "") or "").lower()
                        or kw in " ".join(v.get("caps", [])).lower())}
     wait_roles = _wait_proc_roles()
-    mark = {"armed": "✓在岗", "stale": "⚠掉线", "off": "—未醒"}
+    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}
     hdr = ("花名册·匹配「%s」(%d):" % (kw, len(agents))) if kw else ("花名册(agents.json · %d 个角色):" % len(agents))
     print(hdr)
     print("-" * 78)
