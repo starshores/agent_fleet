@@ -836,6 +836,13 @@ def cmd_done(args):
     if reply_mode != "sync" and task_kind != "notice" and args.notify != "never":
         _emit_completion_notice(sender, role, real_id, args.status, title)
     print("done -> %s (status=%s)" % (sender, args.status))
+    # D(2026-07-08·防自醒-loss):done 后若本 role 无 armed wait 进程 → 提示重挂(前台CLI干完活易忘)
+    try:
+        if role and role not in ("用户", "unknown") and role not in _wait_proc_roles():
+            print("⚠ 自醒提示:你(%s)当前无 armed wait 进程,done 后请【后台 run_in_background】重挂 "
+                  "`wait --role %s --timeout 3600`,否则空闲后新消息事件唤不醒你。" % (role, role))
+    except Exception:
+        pass
 
 
 def cmd_peek(args):
@@ -2050,6 +2057,64 @@ def cmd_selfwake(args):
         print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
 
 
+def cmd_selfwake_guard(args):
+    """【B·自醒巡检报警·2026-07-08 Master拍板】周期扫自醒,发现掉自醒(claude活/无wait/心跳超期)的
+    agent → ①往其 inbox 投一条【重挂提醒】(dedup:已有未领的提醒就不重投)②WinRT toast 报警(汇总)。
+    只报警+提醒,不代挂(外部无法替前台CLI重挂,见方案评估)。--dry-run 只报不动。
+    周期驱动:可由 WebUI 常驻线程 / cron 每几分钟跑一次,把"18h没人发现"变"几分钟内报警"。"""
+    wait_roles = _wait_proc_roles()
+    retired_set = _retired_roles()
+    stale = []
+    for role in _list_roles():
+        if _pseudo_role_label(role) or role in retired_set:
+            continue
+        st, detail = _self_wake_state(role, wait_roles=wait_roles)
+        if st == "stale":
+            stale.append((role, detail))
+    if not stale:
+        print("✓ 自醒巡检:全员在岗,无掉自醒"); return
+    reminded, skipped = [], []
+    marker = "[自醒守卫·请重挂]"
+    for role, detail in stale:
+        inbox = BUS / role / "inbox"
+        # dedup:该 role inbox 已有未领的守卫提醒 → 跳过不重投
+        dup = False
+        try:
+            for f in inbox.glob("*.json"):
+                try:
+                    if marker in (json.loads(f.read_text(encoding="utf-8")).get("title", "") or ""):
+                        dup = True; break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        if dup:
+            skipped.append(role); continue
+        if args.dry_run:
+            reminded.append(role); continue
+        tid = _gen_id(role)
+        task = {
+            "id": tid, "from": "MasterAgent", "to": role,
+            "title": marker + " 你掉了自醒",
+            "task": ("自醒巡检发现你掉了自醒(%s)。看到即请【后台 run_in_background】跑 "
+                     "`python C:/apphome/agent_fleet/agent_bus/agentbus.py wait --role %s --timeout 3600`,"
+                     "再 selfwake 验在岗(别用 shell &)。" % (detail, role)),
+            "created": _now(), "status": "pending",
+        }
+        _write_json(inbox / (tid + ".json"), task)
+        reminded.append(role)
+    _audit("selfwake_guard", stale=len(stale), reminded=len(reminded))
+    if not args.dry_run and reminded:
+        _fire_toast("⚠ %d 个 agent 掉自醒" % len(stale),
+                    "已提醒重挂:" + "、".join(reminded) + ("(另%d已提醒过)" % len(skipped) if skipped else ""))
+    print("⚠ 自醒巡检:%d 掉线 → %s%d 已投重挂提醒%s%s" % (
+        len(stale), ("[dry-run] " if args.dry_run else ""), len(reminded),
+        (" · %d 已提醒过跳过" % len(skipped)) if skipped else "",
+        "" if args.dry_run else " + toast报警"))
+    for role, detail in stale:
+        print("   - %s:%s" % (role, detail))
+
+
 def cmd_dispatch(args):
     """派一个【一次性 ad-hoc agent】去做单条临时任务:有总线沟通能力、不监听队列、干完即逝、可重新派。
     与 send(投进某 role 的队列等它领)不同 —— dispatch 立刻 detached 起一个一次性执行体(claude -p),
@@ -2604,6 +2669,7 @@ def main():
     p = sub.add_parser("tasklines"); p.add_argument("--id", default=None); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_tasklines)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
+    p = sub.add_parser("selfwake-guard"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_selfwake_guard)
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
