@@ -2057,6 +2057,30 @@ def cmd_selfwake(args):
         print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
 
 
+def _guard_prev_path():
+    return BUS / ".selfwake_guard_prev.json"
+
+
+def _load_guard_prev():
+    """上一轮巡检判 stale 的 role 集 + 时间戳(用于连续2次确认降噪)。"""
+    p = _guard_prev_path()
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        return set(d.get("roles", [])), d.get("ts")
+    except Exception:
+        return set(), None
+
+
+def _save_guard_prev(roles):
+    try:
+        tmp = _guard_prev_path().with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"ts": time.time(), "roles": sorted(roles)}, ensure_ascii=False),
+                       encoding="utf-8")
+        os.replace(tmp, _guard_prev_path())
+    except Exception:
+        pass
+
+
 def cmd_selfwake_guard(args):
     """【B·自醒巡检报警·2026-07-08 Master拍板】周期扫自醒,发现掉自醒(claude活/无wait/心跳超期)的
     agent → ①往其 inbox 投一条【重挂提醒】(dedup:已有未领的提醒就不重投)②WinRT toast 报警(汇总)。
@@ -2071,11 +2095,25 @@ def cmd_selfwake_guard(args):
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
         if st == "stale":
             stale.append((role, detail))
+    # 2-scan 确认降噪(2026-07-08):cycling agent 在 post-fire 无-wait 瞬间窗口会被误判 stale(wait 不刷
+    # 心跳→>1h没re-arm的健康cycling者也显stale)。只对【连续2次扫描都掉线】的报警=瞬时假阳性(1次)被滤掉、
+    # 真掉线(持续)照报。代价:检测延到~2轮(~6min),仍远好于原来靠人偶然发现。
+    cur = {r for r, _ in stale}
+    prev, prev_ts = _load_guard_prev()
+    prev_fresh = prev_ts is not None and (time.time() - prev_ts) < 900  # 仅15min内的上轮基线算数
+    confirmed = (cur & prev) if prev_fresh else set()
+    _save_guard_prev(cur)
+    unconfirmed = cur - confirmed
     if not stale:
         print("✓ 自醒巡检:全员在岗,无掉自醒"); return
+    if not confirmed:
+        print("自醒巡检:%d 疑掉线,均【首次/未连续确认】→本轮不报(待下轮确认,消瞬时假阳性):%s"
+              % (len(stale), "、".join(sorted(cur))))
+        return
     reminded, skipped = [], []
     marker = "[自醒守卫·请重挂]"
-    for role, detail in stale:
+    stale_confirmed = [(r, d) for r, d in stale if r in confirmed]
+    for role, detail in stale_confirmed:
         inbox = BUS / role / "inbox"
         # dedup:该 role inbox 已有未领的守卫提醒 → 跳过不重投
         dup = False
@@ -2096,23 +2134,23 @@ def cmd_selfwake_guard(args):
         task = {
             "id": tid, "from": "MasterAgent", "to": role,
             "title": marker + " 你掉了自醒",
-            "task": ("自醒巡检发现你掉了自醒(%s)。看到即请【后台 run_in_background】跑 "
+            "task": ("自醒巡检【连续2次】发现你掉了自醒(%s)。看到即请【后台 run_in_background】跑 "
                      "`python C:/apphome/agent_fleet/agent_bus/agentbus.py wait --role %s --timeout 3600`,"
                      "再 selfwake 验在岗(别用 shell &)。" % (detail, role)),
             "created": _now(), "status": "pending",
         }
         _write_json(inbox / (tid + ".json"), task)
         reminded.append(role)
-    _audit("selfwake_guard", stale=len(stale), reminded=len(reminded))
+    _audit("selfwake_guard", stale=len(stale), confirmed=len(confirmed), reminded=len(reminded))
     if not args.dry_run and reminded:
-        _fire_toast("⚠ %d 个 agent 掉自醒" % len(stale),
+        _fire_toast("⚠ %d 个 agent 掉自醒(连续2次确认)" % len(confirmed),
                     "已提醒重挂:" + "、".join(reminded) + ("(另%d已提醒过)" % len(skipped) if skipped else ""))
-    print("⚠ 自醒巡检:%d 掉线 → %s%d 已投重挂提醒%s%s" % (
-        len(stale), ("[dry-run] " if args.dry_run else ""), len(reminded),
+    print("⚠ 自醒巡检:%d 掉线(%d 连续确认 / %d 首次待下轮) → %s%d 已投重挂提醒%s%s" % (
+        len(stale), len(confirmed), len(unconfirmed), ("[dry-run] " if args.dry_run else ""), len(reminded),
         (" · %d 已提醒过跳过" % len(skipped)) if skipped else "",
         "" if args.dry_run else " + toast报警"))
     for role, detail in stale:
-        print("   - %s:%s" % (role, detail))
+        print("   - %s%s:%s" % (role, "" if role in confirmed else "(待确认)", detail))
 
 
 def cmd_dispatch(args):
