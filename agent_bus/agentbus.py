@@ -2960,6 +2960,31 @@ def cmd_send_group(args):
     print(tid)
 
 
+# ---- 2a:弹性池工人 —— 内存感知并发上限(使用方 2026-07-10 公式)+ 派发器 spin 前闸 ----
+def _mem_cap(per_worker_gb=0.5, reserve_gb=2.0):
+    """实时内存感知并发上限(每次 spin 前查 live 内存·非静态)。返回 dict 供派发器闸 + WebUI 看板。
+    budget = avail − reserve;cap = budget // per_worker;
+    硬闸:percent≥92 或 avail<reserve → cap=0(已在 swap 颠簸别再 spin,分片留组 inbox 等 pull 背压·宁排队别拖垮全机)。
+    per_worker 建议派发器记实测 claude -p worker p90 RSS 动态回填(冷启默认 0.5G)。"""
+    GB = 1024 ** 3
+    if psutil is None:
+        return {"avail_gb": None, "percent": None, "budget_gb": None, "mem_cap": 0,
+                "hard_gate": True, "note": "无 psutil → cap=0 保守", "per_worker_gb": per_worker_gb, "reserve_gb": reserve_gb}
+    vm = psutil.virtual_memory()
+    avail = vm.available; reserve = reserve_gb * GB; per = max(per_worker_gb, 0.05) * GB
+    budget = max(0, avail - reserve)
+    cap = int(budget // per)
+    hard = (vm.percent >= 92) or (avail < reserve)
+    if hard:
+        cap = 0
+    return {"avail_gb": round(avail / GB, 2), "percent": vm.percent, "budget_gb": round(budget / GB, 2),
+            "mem_cap": cap, "per_worker_gb": per_worker_gb, "reserve_gb": reserve_gb, "hard_gate": hard}
+
+
+def cmd_mem_cap(args):
+    print(json.dumps(_mem_cap(args.per_worker_gb, args.reserve_gb), ensure_ascii=False, indent=1))
+
+
 # ---- 1b:fan-out(一逻辑任务拆 N 分片撒全组并行)+ 流式 collect(边到边产出,barrier 降为例外)----
 def _fanout_dir(g):
     return _group_dir(g) / "fanout"
@@ -3107,6 +3132,7 @@ def main():
     p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
     p = sub.add_parser("fanout"); p.add_argument("--group", required=True); p.add_argument("--shards", required=True, help="JSON数组 / 换行分隔 / -(stdin)"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.set_defaults(fn=cmd_fanout)
     p = sub.add_parser("fanout-collect"); p.add_argument("--id", required=True); p.add_argument("--group", default=None); p.add_argument("--wait", action="store_true", help="barrier:攒齐N个再返(默认流式边到边·barrier是例外)"); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_fanout_collect)
+    p = sub.add_parser("mem-cap"); p.add_argument("--per-worker-gb", type=float, default=0.5, dest="per_worker_gb"); p.add_argument("--reserve-gb", type=float, default=2.0, dest="reserve_gb"); p.set_defaults(fn=cmd_mem_cap)
     p = sub.add_parser("wait"); p.add_argument("--role", required=True); p.add_argument("--timeout", type=float, default=110.0); p.add_argument("--include-approval", action="store_true", dest="include_approval"); p.set_defaults(fn=cmd_wait)
     p = sub.add_parser("serve"); p.add_argument("--timeout", type=float, default=590.0); p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("request"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--chain", default=""); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_request)
