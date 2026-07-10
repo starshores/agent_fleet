@@ -2744,12 +2744,159 @@ def cmd_caps(args):
         print("       现持有(%d): %s" % (len(holders), ", ".join(holders) if holders else "无"))
 
 
+# ========================= 工作组池化(Phase 1a · 2026-07-10) =========================
+# 共享组 inbox + 成员 pull-claim:活丢组队列、谁空谁自取 → 治负载偏/串行喂料/并行率低。
+# 组目录用 "_groups/" 前缀(_ 开头,_list_roles/health 已跳过,不当 role)。成员=运行时状态(join/leave·不改配置)。
+# 并发 claim 命门:用 O_EXCL 独占锁——实测本机 Windows 上 os.replace 争同源【会双跑】(200-300轮出2-8胜者),
+# O_EXCL 独占创建恒 1 胜(gate① 压测坐实)。故组 claim 绝不能沿用 _claim 的 os.replace 争源手法。
+_GROUPS_ROOT = BUS / "_groups"
+
+
+def _group_dir(g):
+    return _GROUPS_ROOT / g
+
+
+def _group_members_file(g):
+    return _group_dir(g) / "members.json"
+
+
+def _load_group_members(g):
+    f = _group_members_file(g)
+    if not f.exists():
+        return []
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        return d.get("members", []) if isinstance(d, dict) else (d if isinstance(d, list) else [])
+    except Exception:
+        return []
+
+
+def _group_caps_baseline(g):
+    """组能力基线(首成员 caps 快照;join 时核一致=只有真·可互换复制体才组池)。无则 None。"""
+    f = _group_members_file(g)
+    if not f.exists():
+        return None
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        return set(d.get("caps") or []) if isinstance(d, dict) else None
+    except Exception:
+        return None
+
+
+def _role_caps(role):
+    return set((_load_agents().get(role) or {}).get("caps") or [])
+
+
+def _role_groups(role):
+    """role 所属的所有组(扫 _groups/*/members.json)——给 _wait_core 决定还听哪些组 inbox。"""
+    out = []
+    if not _GROUPS_ROOT.exists():
+        return out
+    for d in sorted(_GROUPS_ROOT.iterdir()):
+        try:
+            if d.is_dir() and role in _load_group_members(d.name):
+                out.append(d.name)
+        except Exception:
+            continue
+    return out
+
+
+def _save_group(g, members, caps):
+    _write_json(_group_members_file(g), {"group": g, "members": members,
+                                         "caps": sorted(caps or []), "updated": _now()})
+
+
+def cmd_join_group(args):
+    role, g = args.role, args.group
+    _role_dir(role)   # 确保成员 role 目录(inbox/processing/…)存在——组任务 claim 要移进其 processing
+    (_group_dir(g) / "inbox").mkdir(parents=True, exist_ok=True)
+    (_group_dir(g) / "shared").mkdir(parents=True, exist_ok=True)   # 共享上下文契约(1a 前置·状态外置地基)
+    members = _load_group_members(g)
+    my_caps = _role_caps(role)
+    base = _group_caps_baseline(g)
+    if members and base is not None and my_caps != base:
+        print("✗ join-group 拒绝:%s 的 caps=%s 与组「%s」基线 caps=%s 不一致(不可互换≠可池)。"
+              % (role, sorted(my_caps) or "(空)", g, sorted(base) or "(空)"))
+        sys.exit(2)
+    if role not in members:
+        members.append(role)
+    _save_group(g, members, base if base is not None else my_caps)
+    _audit("join_group", role=role, group=g)
+    print("✓ %s 已加入组「%s」(成员 %d:%s)。下次 wait 重挂即开始 pull 该组 inbox。"
+          % (role, g, len(members), ", ".join(members)))
+
+
+def cmd_leave_group(args):
+    role, g = args.role, args.group
+    members = [m for m in _load_group_members(g) if m != role]
+    _save_group(g, members, _group_caps_baseline(g))
+    _audit("leave_group", role=role, group=g)
+    print("✓ %s 已离开组「%s」(剩 %d 成员:%s)。" % (role, g, len(members), ", ".join(members) or "无"))
+
+
+def _claim_group_task(role, g, include_approval=False):
+    """从组 g 共享 inbox 用 O_EXCL 独占锁【并发安全】领一个任务到 role 的 processing。
+    谁建成 <task>.lock 谁独占该 task(实测 os.replace 争同源本机会双跑,故必用 O_EXCL);
+    抢输/无任务返回 None(干净落空,惊群败者据此续等·gate②)。"""
+    gin = _group_dir(g) / "inbox"
+    if not gin.exists():
+        return None
+    t = _oldest_claimable(gin, include_approval)
+    if not t:
+        return None
+    lock = t.with_name(t.name + ".lock")
+    try:
+        fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        return None          # 别的成员已独占该 task → 干净落空
+    except OSError:
+        return None
+    try:
+        obj = _claim(role, t)   # 此刻仅持锁者到达,os.replace 到 role/processing 无并发争用=安全
+    finally:
+        try:
+            lock.unlink()       # task 已移走,释放锁(留了也无害:_oldest_claimable 只认 *.json)
+        except Exception:
+            pass
+    if obj:
+        obj["via_group"] = g    # 留痕:此活来自组池 pull
+    return obj
+
+
+def cmd_send_group(args):
+    """把任务丢进【组共享 inbox】(不指定成员)→ 谁空谁 pull-claim(负载均衡+并行+异步派发)。
+    组任务应自带/引用全部上下文(状态外置·任一成员可接)。"""
+    g = args.group
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    members = _load_group_members(g)
+    gin = _group_dir(g) / "inbox"
+    gin.mkdir(parents=True, exist_ok=True)
+    if not members:
+        sys.stderr.write("⚠ 组「%s」当前无成员(没人 join)——任务会留在组 inbox 等成员加入 pull。\n" % g)
+    tid = _gen_id(g)
+    task = {"id": tid, "from": frm, "to_group": g,
+            "title": args.title or "", "task": args.task,
+            "created": _now(), "status": "pending"}
+    if getattr(args, "affinity", None):
+        task["affinity"] = args.affinity   # 会话粘连提示(优先某成员;掉线/超时由 reap 回落组池)
+    if args.requires_approval:
+        task["requires_approval"] = True
+    _write_json(gin / (tid + ".json"), task)
+    _audit("send_group", id=tid, frm=frm, group=g, title=args.title or "")
+    print(tid)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="agentbus")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("register"); p.add_argument("--role", required=True); p.add_argument("--desc", default=""); p.set_defaults(fn=cmd_register)
     p = sub.add_parser("send"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send)
+    # 工作组池化(Phase 1a):join/leave 组(运行时·不改配置)、send-group 丢共享组 inbox(谁空谁 pull)
+    p = sub.add_parser("join-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_join_group)
+    p = sub.add_parser("leave-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_leave_group)
+    p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
     p = sub.add_parser("wait"); p.add_argument("--role", required=True); p.add_argument("--timeout", type=float, default=110.0); p.add_argument("--include-approval", action="store_true", dest="include_approval"); p.set_defaults(fn=cmd_wait)
     p = sub.add_parser("serve"); p.add_argument("--timeout", type=float, default=590.0); p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("request"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--chain", default=""); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_request)
