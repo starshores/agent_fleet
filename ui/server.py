@@ -975,6 +975,7 @@ def build_state(reply_role="Master", fresh=False):
     fleet = compute_fleet_cached(force=fresh)  # 缓存兜住轮询;fresh=SSE/手动刷新强制新算
     # 给每个 role 附带可点开的任务明细(inbox/processing/held/failed 任一非空就读)
     for row in fleet["roles"]:
+        row["turn"] = _turn_state(row["role"])   # 现读 turn 状态(不吃 20s 舰队缓存;/api/state 有 3s TTL → ≤3s 刷新,灵敏)
         if row["inbox"] or row["processing"] or row["held"] or row["failed"]:
             row["tasks"] = _read_tasks(row["role"])
         else:
@@ -2667,14 +2668,23 @@ function swBadge(s,detail){
   if(s==='stale') return ` <span class="badge dead" title="自醒掉线!需重挂 ${t}">⚠自醒掉线</span>`;
   return ` <span class="badge none" title="未自醒 ${t}">—</span>`;
 }
-// turn 状态(turn_state.py hook 实时盖):thinking=在turn内思考/执行 / tool=正跑工具 / idle=空闲。
-// 数据只来自 hook 事件(非推断);age 显时长。thinking/tool 太久(>10min)标灰=可能漏了 Stop,存疑不误报忙。
-function turnBadge(tn){
-  if(!tn||!tn.state) return '<span class="badge none" title="无 turn 状态(未装 hook / 该会话非 bus 成员 / 尚未产生事件)">–</span>';
-  const age=tn.age, ag=(age==null?'':' '+fmtAge(age)), t=esc((tn.label||tn.state)+ag);
-  const stale=(age!=null&&age>600);   // >10min 的 thinking/tool 存疑(hook 可能漏 Stop)
-  if(tn.state==='idle') return `<span class="badge idle" title="turn 已结束·空闲${ag} ${t}">⚪ 空闲${ag}</span>`;
-  if(stale) return `<span class="badge none" title="${t}(超10min·存疑:或漏 Stop)">◌ ${esc(tn.label||tn.state)}?${ag}</span>`;
+// turn 状态(turn_state.py hook 实时盖):thinking=turn内思考 / tool=正跑工具 / idle=空闲。
+// 稳健化(2026-07-10 用户「不够灵敏 + 中断后卡住」):
+//  ① armed(有 wait 进程=阻塞等消息)→ 权威判空闲待命,覆盖任何陈旧 thinking(此时不可能在思考);
+//  ② thinking/tool 但 ts 超 STALE 秒无新事件 → 判「停顿?」——治中断/漏 Stop 卡在思考不回落
+//     (PreToolUse/PostToolUse 每步刷新 ts,正常多工具干活 age 一直很小;冻住=中断或超长单工具)。
+//  数据只来自 hook 事件 + wait 进程,非推断。
+// 分状态陈旧阈:思考态推理很少 >30s,冻这么久多是【中断】(中断不触发任何 hook·官方证实);
+// 工具态本可跑很久(长 bash 等),放宽到 300s 才疑,免误报正常长工具。
+const TURN_STALE={thinking:30, tool:300};
+function turnBadge(tn, sw){
+  if(sw==='armed') return `<span class="badge idle" title="有 wait 进程·阻塞等消息=空闲待命(不可能在思考)">⚪ 空闲·待命</span>`;
+  if(!tn||!tn.state) return '<span class="badge none" title="无 turn 状态(未装 hook / 非 bus 成员 / 尚无事件)">–</span>';
+  const age=tn.age, ag=(age==null?'':' '+fmtAge(age));
+  if(tn.state==='idle') return `<span class="badge idle" title="turn 已结束(Stop/idle_prompt)·空闲${ag}">⚪ 空闲${ag}</span>`;
+  const stale=TURN_STALE[tn.state]||60;
+  if(age!=null && age>stale)
+    return `<span class="badge none" title="状态为「${esc(tn.label||tn.state)}」但已 ${fmtAge(age)} 无新 hook 事件 → 判停顿(用户中断不触发任何 hook·官方证实 / 或异常结束)">◌ 停顿?${ag}</span>`;
   if(tn.state==='tool') return `<span class="badge warn" title="正在执行工具 ${esc(tn.tool||'')}${ag}">🔧 ${esc(tn.label)}${ag}</span>`;
   return `<span class="badge live" title="在 turn 内(思考/执行中)${ag}">🟢 ${esc(tn.label||'思考/执行中')}${ag}</span>`;
 }
@@ -2700,7 +2710,7 @@ function render(){
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
       <td><b>${esc(r.role)}</b></td>
       <td><span class="badge ${r.vclass}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
-      <td>${turnBadge(r.turn)}</td>
+      <td>${turnBadge(r.turn, r.self_wake)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
       <td>${qc(r.inbox,'ib')}</td><td>${qc(r.processing,'pr')}</td><td>${qc(r.done,'dn')}</td>

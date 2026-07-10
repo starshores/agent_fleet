@@ -21,12 +21,17 @@ from pathlib import Path
 
 BUS = Path(os.environ.get("AGENTBUS_DIR", str(Path.home() / ".claude" / "agent_bus")))
 
-# hook 事件 → (state, 中文标签模板)。thinking 含"turn 开始/工具间隙推理";tool=正跑某工具;idle=turn 结束。
+# hook 事件 → (state, 中文标签模板)。thinking 含"turn 开始/工具间隙推理";tool=正跑某工具;idle=turn 结束/等输入。
+# 依据(claude-code-guide 2 次核实官方 hooks-guide.md/hooks.md):
+#   UserPromptSubmit=turn 开始;PreToolUse=将跑工具(带 tool_name);PostToolUse=工具完回推理(async 免延迟);
+#   Stop=turn 正常结束(⚠ 用户中断/取消【不】触发任何 hook → 靠运维面板 ts-陈旧兜底补);
+#   Notification+matcher idle_prompt=Claude 答完等下一条输入 → idle。
 _EVENT_STATE = {
     "UserPromptSubmit": ("thinking", "思考/执行中"),
     "PreToolUse":       ("tool",     "跑工具"),
     "PostToolUse":      ("thinking", "思考/执行中"),
     "Stop":             ("idle",     "空闲"),
+    "Notification":     ("idle",     "空闲·等输入"),
 }
 
 
@@ -59,6 +64,11 @@ def main():
     ev = data.get("hook_event_name") or ""
     if ev not in _EVENT_STATE:
         return
+    if ev == "Notification":
+        # 只有"空闲等输入/答完"类通知才算 idle;权限弹窗等其它通知不改 turn 状态(即便 matcher 已过滤,再兜一层)
+        nt = data.get("notification_type") or ""
+        if nt and nt not in ("idle_prompt", "agent_completed"):
+            return
     role = _role_of(data.get("session_id"))
     if not role:
         return  # 非 bus 成员 → 不写(与 bus 收窄一致,也省得给无关项目留状态文件)

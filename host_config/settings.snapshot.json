@@ -16,6 +16,17 @@
             "statusMessage": "AskUserQuestion→非阻塞待办池(不占会话)"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
+            "async": true,
+            "timeout": 10,
+            "statusMessage": "turn状态:跑工具"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -27,6 +38,30 @@
             "command": "python C:/apphome/agent_fleet/hooks/on_memory_write.py",
             "timeout": 30,
             "statusMessage": "刷新记忆硬链备份"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
+            "async": true,
+            "timeout": 10,
+            "statusMessage": "turn状态:回思考"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
+            "timeout": 10,
+            "statusMessage": "turn状态:空闲等输入"
           }
         ]
       }
