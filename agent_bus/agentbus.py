@@ -522,9 +522,26 @@ def _wait_core(role, timeout, include_approval=False):
     include_approval=False(默认,所有自动监听者)时,requires_approval 高风险任务不会被领取,
     统一实现 requires_approval 闸(tab 与 daemon 一致),高风险任务留 inbox 等人工批准领取。"""
     inbox = _role_dir(role) / "inbox"
-    t = _oldest_claimable(inbox, include_approval)
-    if t:
-        return _claim(role, t)
+    groups = _role_groups(role)                       # 所属工作组(运行时·可空);无组 → 下面组循环空转 = 行为与旧完全一致
+    group_inboxes = [_group_dir(g) / "inbox" for g in groups]
+
+    def _try_claim():
+        """先自己 inbox(点名/会话粘连活),再各组共享 inbox(池活·O_EXCL 并发安全)。
+        返回 claim 到的 task dict,或 None(无可领 / 竞态没抢到 → 调用方续等,gate②)。"""
+        t = _oldest_claimable(inbox, include_approval)
+        if t:
+            obj = _claim(role, t)
+            if obj:
+                return obj                            # _claim 返 None=竞态没抢到 → 落到组循环继续看
+        for g in groups:
+            obj = _claim_group_task(role, g, include_approval)
+            if obj:
+                return obj
+        return None
+
+    obj = _try_claim()
+    if obj:
+        return obj
 
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
@@ -541,37 +558,41 @@ def _wait_core(role, timeout, include_approval=False):
 
     obs = Observer()
     obs.schedule(H(), str(inbox), recursive=False)
+    for gin in group_inboxes:                         # 双听:所属组共享 inbox 的新任务也唤醒本成员来 pull
+        try:
+            gin.mkdir(parents=True, exist_ok=True)
+            obs.schedule(H(), str(gin), recursive=False)
+        except Exception:
+            pass
     # 兜底(2026-07-08 Master 提):Observer.start() 若抛异常(watchdog 装坏/资源限),原来会崩溃传播;
-    # 现捕获→降级【轮询式阻塞】(每 2s 查一次 inbox 到 deadline),【绝不秒返 idle】(秒返=事件自醒失效)。
+    # 现捕获→降级【轮询式阻塞】(每 2s 查一次 到 deadline),【绝不秒返 idle】(秒返=事件自醒失效)。
     obs_ok = True
     try:
         obs.start()
     except Exception:
         obs_ok = False
     try:
-        t = _oldest_claimable(inbox, include_approval)  # 启动 observer 后再查一次,消除竞态
-        if not t:
-            # 循环等到截止时间:被【无关/竞态】文件事件唤醒但无可领取任务时,清标志继续等
-            # 剩余时间,而非直接返回 idle。否则一次 spurious 事件就让 wait 提前空返 →
-            # 自醒会话被白白唤起(daemon 只多空转一圈,但协调位自醒每次唤起都费 token)。
+        obj = _try_claim()                            # 启动 observer 后再查一次,消除竞态
+        if not obj:
+            # 循环等到截止:被【无关/竞态/惊群没抢到】的事件唤醒但没领到时,清标志继续等剩余,
+            # 而非直接返回 idle(一次 spurious 就空返 = 自醒被白白唤起费 token)。惊群败者走这条=优雅续等(gate②)。
             deadline = time.monotonic() + timeout
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    break                       # 真超时,无任务 → idle
+                    break                             # 真超时,无任务 → idle
                 if obs_ok:
                     woke = ev.wait(timeout=remaining)
-                    t = _oldest_claimable(inbox, include_approval)
-                    if t:
-                        break                   # 有可领取任务
+                    obj = _try_claim()
+                    if obj:
+                        break                         # 领到(自己 inbox 或组池)
                     if not woke:
-                        break                   # ev.wait 超时返回(非事件)→ idle
-                    ev.clear()                  # 被事件唤醒但没抢到(竞态/无关)→ 继续等剩余
+                        break                         # ev.wait 超时返回(非事件)→ idle
+                    ev.clear()                        # 被事件唤醒但没领到(惊群没抢到/竞态/无关)→ 续等剩余
                 else:
-                    # 降级:watchdog 不可用 → 轮询阻塞(别秒返),延迟至多 2s 发现新消息
-                    time.sleep(min(remaining, 2.0))
-                    t = _oldest_claimable(inbox, include_approval)
-                    if t:
+                    time.sleep(min(remaining, 2.0))   # 降级:轮询阻塞(别秒返),≤2s 发现新任务(含组 inbox)
+                    obj = _try_claim()
+                    if obj:
                         break
     finally:
         if obs_ok:
@@ -580,7 +601,7 @@ def _wait_core(role, timeout, include_approval=False):
             except Exception:
                 pass
 
-    return _claim(role, t) if t else None
+    return obj
 
 
 def _wait_for_reply(from_role, tid, timeout):
