@@ -1339,6 +1339,9 @@ def cmd_webui_guard(args):
 # Master 定调(2026-06-25):能自动追回的先自动修(孤儿回执→推断 owner 自动重路由),
 # 修不了/需人定的才投🙋待办池,去重、别让巡检变噪音源。
 _MGMT_OWNER = {"MasterUI": "MasterAgent", "培训师": "MasterAgent"}
+# 卡死硬上限(分):owner 进程还活着但任务真卡这么久也兜底判卡死。远大于 daemon claude -p 的
+# 3600s 超时与正常长任务,避免误伤;跨夜掉自醒(进程活·心跳陈)不会触达这里→不再误判卡死。
+_STUCK_TTL_MIN = 1440
 
 def _infer_orphan_owner(reply):
     """从孤儿回执推断原请求方:管理位(MasterUI/培训师)的活多来自 MasterAgent;
@@ -1376,16 +1379,22 @@ def _health_anomalies(stuck_min=90):
         pd = d / "processing"
         if not pd.exists():
             continue
+        live = _owner_live(d.name)   # owner 进程是否还在(不看心跳,与 reaper 同口径)
         for p in pd.glob("*.json"):
             age = (now - p.stat().st_mtime) / 60
-            if age < stuck_min:
+            # 只在【owner 进程已死 且 age≥stuck_min】或【age≥硬 ttl(真卡这么久也兜)】时算卡死。
+            # owner 进程还活着(哪怕掉了自醒/在阻塞跑长任务)且未超 ttl → 不算卡死:掉自醒由
+            # selfwake-guard 专管,别误 framing 成"任务卡死·要不要重派"。否则跨夜全队掉线时
+            # 每个在飞 processing 都被判卡死冲爆待确认池(2026-07-10 用户案:33 项待确认 27 是此噪声)。
+            if not ((not live and age >= stuck_min) or age >= _STUCK_TTL_MIN):
                 continue
             try:
                 o = json.loads(p.read_text(encoding="utf-8"))
             except Exception:
                 continue
             stuck.append({"role": d.name, "id": p.stem, "age_min": int(age),
-                          "from": o.get("from"), "title": o.get("title") or ""})
+                          "from": o.get("from"), "title": o.get("title") or "",
+                          "body": (o.get("task") or ""), "owner_dead": not live})
     return {"orphans": orphans, "stuck": stuck}
 
 def _health_sweep_core(stuck_min=90, apply=False):
@@ -1399,7 +1408,7 @@ def _health_sweep_core(stuck_min=90, apply=False):
     except Exception:
         todos = []
     seen = {t.get("ref") for t in todos if t.get("ref")}
-    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0, "resolved_stale": 0}
+    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0, "resolved_stale": 0, "skipped_empty": 0}
 
     # 自愈反收:撤销【异常已解决】的健康待办(避免过时派发——任务早已处理,待办却还在池里被派发)。
     # 仍存在的异常 id;不在其中=已解决→把对应 health:* 待办标"完成"(进历史,不再占活跃)。
@@ -1439,13 +1448,20 @@ def _health_sweep_core(stuck_min=90, apply=False):
                 _audit("health_reroute_orphan", id=o["id"], frm=o["from"], owner=o["owner"])
             rep["orphans_rerouted"].append({"id": o["id"], "from": o["from"], "owner": o["owner"]})
         else:                                # 推不出 owner:需人定,投待办
-            if apply:
-                _add_todo("孤儿回执需认领:from %s" % o["from"],
-                          "回执丢进 unknown/、原请求方不可考。标题「%s」。要不要指认 owner/重投?" % o["title"][:80],
-                          "health:orphan:" + o["id"])
-            rep["orphans_to_todo"].append({"id": o["id"], "from": o["from"]})
+            _ob = o.get("obj") or {}
+            if not (o.get("title") or "").strip() and not (_ob.get("task") or "").strip():
+                rep["skipped_empty"] += 1    # 空指向:回执标题+正文皆空=无物可认领的死信,不投(否则冲爆待确认池)
+            else:
+                if apply:
+                    _add_todo("孤儿回执需认领:from %s" % o["from"],
+                              "回执丢进 unknown/、原请求方不可考。标题「%s」。要不要指认 owner/重投?" % o["title"][:80],
+                              "health:orphan:" + o["id"])
+                rep["orphans_to_todo"].append({"id": o["id"], "from": o["from"]})
 
     for s in a["stuck"]:                     # 卡死任务:需人定(重派/催/判死),不自动杀
+        if not (s.get("title") or "").strip() and not (s.get("body") or "").strip():
+            rep["skipped_empty"] += 1        # 空指向:任务标题+正文皆空=无物可判的噪声,不投
+            continue
         if apply:
             _add_todo("任务卡死:%s 的 processing 已 %dmin" % (s["role"], s["age_min"]),
                       "任务 from=%s「%s」认领后久未完成,worker 可能死/卡。要不要重派/催/判死?" % (s["from"], s["title"][:80]),
