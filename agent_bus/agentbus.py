@@ -955,6 +955,13 @@ def cmd_hello(args):
     a = _load_agents()
     a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
     _save_agents(a)
+    try:
+        _parked_path(role).unlink()   # 重开 hello=活跃 → 清 park/休眠标(秒回活跃·⑤)
+        print("(已清除 park/休眠标——重新活跃)")
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
     _touch_presence(role, "idle")
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
@@ -1534,18 +1541,19 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     # 1) 自醒(退役 role 跳过——不计掉线,否则误报)
     wr = _wait_proc_roles()
     retired_set = _retired_roles()
-    armed = recent = stale = off = retired_n = 0; stale_roles = []
+    armed = recent = stale = off = retired_n = parked_n = 0; stale_roles = []
     for d in role_dirs:
         if d.name in retired_set:
             retired_n += 1; continue
+        stt, _ = _self_wake_state(d.name, wait_roles=wr)   # parked 先判(不依赖 presence),故不能因无 presence 提前 continue
+        if stt == "parked": parked_n += 1; continue        # 🅿️休眠:故意暂离,不计掉线/未醒/告警
         if not (d / "presence.json").exists():
             continue
-        stt, _ = _self_wake_state(d.name, wait_roles=wr)
         if stt == "armed": armed += 1
         elif stt == "recent": recent += 1            # 有心跳无wait·瞬时态·不计告警
         elif stt == "stale": stale += 1; stale_roles.append(d.name)
         else: off += 1
-    h["selfwake"] = {"armed": armed, "recent": recent, "stale": stale, "off": off, "retired": retired_n, "stale_roles": stale_roles}
+    h["selfwake"] = {"armed": armed, "recent": recent, "stale": stale, "off": off, "parked": parked_n, "retired": retired_n, "stale_roles": stale_roles}
     if stale_roles: h["warns"].append("自醒掉线 %d(%s)" % (stale, ",".join(stale_roles)))
     # 2) 队列
     q = {"inbox": 0, "processing": 0, "held": 0, "failed": 0}
@@ -1989,7 +1997,7 @@ def cmd_route(args):
     if not scored:
         print("无对口专责命中「%s」——考虑广播,或 ab register 新专家。" % " ".join(terms)); return
     scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先
-    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}
+    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}
     print("对口路由推荐(命中「%s」):" % " ".join(terms))
     for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):
         tag = " ← 推荐(对口+在岗)" if i == 0 and st == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
@@ -2003,14 +2011,44 @@ def _wait_proc_roles():
     return _proc_scan()[1]
 
 
+def _parked_path(role):
+    return BUS / role / "parked.json"
+
+
+def _is_parked(role):
+    """role 是否【故意暂离(park/休眠)】——用户手动关 tab 省内存时标,与崩溃掉线区分。
+    返回 parked dict(since/days/until/note)或 None。轻量·独立 marker 文件·外部可写(role 关了也能标)。"""
+    p = _parked_path(role)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"since": "?"}
+
+
+def _park_expired(pk):
+    """park 若带 --days 到期(until 已过)→ True(guard 可温和提醒一次·非掉线报警)。"""
+    if not pk or not pk.get("until"):
+        return False
+    age = _age_seconds(pk.get("until"))
+    return age is not None and age > 0
+
+
 def _self_wake_state(role, alive_pids=None, wait_roles=None):
     """判一个 role 的事件自醒在不在岗。返回 (state, detail)。
+    parked=🅿️休眠(用户故意暂离·独立态·不计掉线/不报警·与 stale 严格区分);
     armed=在岗(有真 wait 进程);recent=有心跳无 wait 进程(刚 fire 待重挂/交互中·非 event-armed·瞬时态非告警);
     stale=掉线(曾自醒但进程退/没重挂·心跳超期);off=未自醒(idle/无 presence)。
     daemon 按 daemon_pid 判活;协调位/会话按【有无活的 wait 进程】判活(wait 不刷心跳,不能靠心跳)。
     三态化(2026-07-08 Master批):原"listening+心跳新鲜"误报 armed(按心跳判)→ 改判 recent(如实=非 event-armed),
     消除虚报✓在岗;event 自醒真正在岗只认 wait 进程。
     wait_roles:预扫好的"有 wait 进程的 role 集合"(循环调用务必传入,免每 role 全扫);None 则现扫一次。"""
+    pk = _is_parked(role)
+    if pk:   # 故意暂离优先短路:不管 presence 死活都判 parked(不误报 stale/掉线)
+        ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
+        note = ("·" + pk["note"]) if pk.get("note") else ""
+        return ("parked", "🅿️休眠(用户故意暂离%s%s)" % (ext, note))
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return ("off", "无 presence")
@@ -2093,7 +2131,7 @@ def cmd_whoami(args):
 
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
-    armed = recent = stale = off = retired = pseudo = 0
+    armed = recent = stale = off = retired = pseudo = parked = 0
     wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
     retired_set = _retired_roles()
     print("%-14s %-8s %s" % ("role", "自醒", "说明"))
@@ -2108,11 +2146,11 @@ def cmd_selfwake(args):
             print("%-14s %-8s %s" % (role, "⊘退役", "已退役" + ("·接替=" + sb if sb else "") + "(留痕不删,不派活)"))
             retired += 1; continue
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
-        mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}[st]
+        mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}.get(st, "?")
         print("%-14s %-8s %s" % (role, mark, detail))
-        armed += st == "armed"; recent += st == "recent"; stale += st == "stale"; off += st == "off"
+        armed += st == "armed"; recent += st == "recent"; stale += st == "stale"; off += st == "off"; parked += st == "parked"
     print("-" * 78)
-    print("自醒在岗 %d / 待确认 %d / 掉线 %d / 未醒 %d / 退役 %d / 伪角色 %d" % (armed, recent, stale, off, retired, pseudo))
+    print("自醒在岗 %d / 待确认 %d / 掉线 %d / 未醒 %d / 休眠 %d / 退役 %d / 伪角色 %d" % (armed, recent, stale, off, parked, retired, pseudo))
     if recent:
         print("◐待确认=有心跳无wait进程(刚fire待重挂/交互中·瞬时非告警);持续则下轮转掉线。")
     if stale:
@@ -2152,8 +2190,8 @@ def cmd_selfwake_guard(args):
     retired_set = _retired_roles()
     stale = []
     for role in _list_roles():
-        if _pseudo_role_label(role) or role in retired_set:
-            continue
+        if _pseudo_role_label(role) or role in retired_set or _is_parked(role):
+            continue                          # parked=故意暂离 → 不巡检报警(用户手动关 tab 的关键配套)
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
         if st == "stale":
             stale.append((role, detail))
@@ -2723,7 +2761,7 @@ def cmd_roster(args):
                   and (kw in r.lower() or kw in (v.get("desc", "") or "").lower()
                        or kw in " ".join(v.get("caps", [])).lower())}
     wait_roles = _wait_proc_roles()
-    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒"}
+    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}
     hdr = ("花名册·匹配「%s」(%d):" % (kw, len(agents))) if kw else ("花名册(agents.json · %d 个角色):" % len(agents))
     print(hdr)
     print("-" * 78)
@@ -2866,6 +2904,43 @@ def cmd_leave_group(args):
     _save_group(g, members, _group_caps_baseline(g))
     _audit("leave_group", role=role, group=g)
     print("✓ %s 已离开组「%s」(剩 %d 成员:%s)。" % (role, g, len(members), ", ".join(members) or "无"))
+
+
+# ---- park/休眠:用户手动关 idle tab 省内存的配套(标故意暂离·压 guard 误报·与 retire 严格区分)----
+def cmd_park(args):
+    """标 role【故意暂离(park/休眠)】——用户手动关 tab 省内存前跑,免 selfwake-guard 每轮误报掉线。
+    与 retire 严格区分:park=临时·保留花名册/caps/mailbox 原封·只压警;retire=永久归档+revive需重onboard。
+    池成员 park→自动 leave 所属组(成员数准确·不路由到暂离者);unpark 或重开 hello→秒回活跃。"""
+    role = args.role
+    _role_dir(role)
+    rec = {"parked": True, "since": _now(), "by": args.by or os.environ.get("AGENTBUS_ROLE", "user"),
+           "note": args.note or ""}
+    if args.days:
+        rec["days"] = args.days
+        rec["until"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() + args.days * 86400))
+    _write_json(_parked_path(role), rec)
+    left = []
+    for g in _role_groups(role):    # ④ 池成员 park → 自动退组(池数准确)
+        _save_group(g, [m for m in _load_group_members(g) if m != role], _group_caps_baseline(g))
+        left.append(g)
+    _audit("park", role=role, days=args.days or 0, note=(args.note or "")[:40])
+    print("🅿️ %s 已 park(休眠·故意暂离%s%s)。selfwake-guard 不再报警、health/selfwake 显🅿️休眠态。%s`ab unpark --role %s` 或重开 hello 秒回活跃。"
+          % (role, ("·%d天" % args.days) if args.days else "", ("·" + args.note) if args.note else "",
+             ("已自动退出组:%s。" % "、".join(left)) if left else "", role))
+
+
+def cmd_unpark(args):
+    """清 park/休眠标 → 回活跃态。(池成员需重 join-group 才回池。)"""
+    role = args.role
+    p = _parked_path(role)
+    if not p.exists():
+        print("(%s 未处于 park 态)" % role); return
+    try:
+        p.unlink()
+    except Exception as e:
+        print("unpark 失败:%s" % e); return
+    _audit("unpark", role=role)
+    print("✓ %s 已 unpark——回活跃态(如是池成员需重 `ab join-group` 才回池;重挂 wait 恢复自醒)。" % role)
 
 
 _GROUP_LOCK_TTL = 60   # 正常持锁=毫秒级(建锁→移 task→删锁);>60s 必是孤儿(锁主建锁后崩溃)
@@ -3129,6 +3204,8 @@ def main():
     # 工作组池化(Phase 1a):join/leave 组(运行时·不改配置)、send-group 丢共享组 inbox(谁空谁 pull)
     p = sub.add_parser("join-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.add_argument("--target", type=int, default=None, help="可选软目标成员数(WebUI 激活进度分母,如 示例组=3)"); p.set_defaults(fn=cmd_join_group)
     p = sub.add_parser("leave-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_leave_group)
+    p = sub.add_parser("park"); p.add_argument("--role", required=True); p.add_argument("--days", type=int, default=None); p.add_argument("--note", default=""); p.add_argument("--by", default=None); p.set_defaults(fn=cmd_park)
+    p = sub.add_parser("unpark"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_unpark)
     p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
     p = sub.add_parser("fanout"); p.add_argument("--group", required=True); p.add_argument("--shards", required=True, help="JSON数组 / 换行分隔 / -(stdin)"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.set_defaults(fn=cmd_fanout)
     p = sub.add_parser("fanout-collect"); p.add_argument("--id", required=True); p.add_argument("--group", default=None); p.add_argument("--wait", action="store_true", help="barrier:攒齐N个再返(默认流式边到边·barrier是例外)"); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_fanout_collect)
