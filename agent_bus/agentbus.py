@@ -2960,6 +2960,141 @@ def cmd_send_group(args):
     print(tid)
 
 
+# ---- 1b:fan-out(一逻辑任务拆 N 分片撒全组并行)+ 流式 collect(边到边产出,barrier 降为例外)----
+def _fanout_dir(g):
+    return _group_dir(g) / "fanout"
+
+
+def _find_fanout_manifest(fid, group=None):
+    cands = [group] if group else ([d.name for d in _GROUPS_ROOT.iterdir() if d.is_dir()] if _GROUPS_ROOT.exists() else [])
+    for g in cands:
+        mf = _fanout_dir(g) / (fid + ".json")
+        if mf.exists():
+            try:
+                return json.loads(mf.read_text(encoding="utf-8"))
+            except Exception:
+                return None
+    return None
+
+
+def cmd_fanout(args):
+    """把一逻辑任务拆 N 独立分片撒进组共享 inbox(并行 pull)。--shards:JSON 数组 / 换行分隔 / -(stdin)。
+    每分片自带上下文(状态外置)。记 manifest 供 collect 收敛。打印 fanout_id。"""
+    g = args.group
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    raw = args.shards
+    if raw == "-":
+        raw = sys.stdin.buffer.read().decode("utf-8")
+    rs = raw.strip()
+    if rs.startswith(("[", "{")):
+        shards = json.loads(rs)
+        if isinstance(shards, dict):
+            shards = [shards]
+    else:
+        shards = [ln for ln in raw.splitlines() if ln.strip()]
+    if not shards:
+        sys.stderr.write("⚠ fanout:无分片(--shards 空)\n"); sys.exit(2)
+    gin = _group_dir(g) / "inbox"; gin.mkdir(parents=True, exist_ok=True)
+    fid = _gen_id("fanout")
+    tids = []
+    for i, sh in enumerate(shards):
+        tid = "%s-s%d" % (fid, i)
+        body = sh if isinstance(sh, str) else json.dumps(sh, ensure_ascii=False)
+        _write_json(gin / (tid + ".json"),
+                    {"id": tid, "from": frm, "to_group": g, "fanout_id": fid, "shard_index": i,
+                     "title": (args.title or "") + (" [shard %d/%d]" % (i + 1, len(shards))),
+                     "task": body, "created": _now(), "status": "pending"})
+        tids.append(tid)
+    _fanout_dir(g).mkdir(parents=True, exist_ok=True)
+    _write_json(_fanout_dir(g) / (fid + ".json"),
+                {"fanout_id": fid, "group": g, "from": frm, "n": len(tids), "shard_tids": tids, "created": _now()})
+    _audit("fanout", id=fid, group=g, n=len(tids), frm=frm)
+    print(fid)
+
+
+def cmd_fanout_collect(args):
+    """收敛 fanout 结果。默认【流式】:每个分片 done 回流到 <from>/done/ 就产出一条(边到边·不等齐)——
+    治 Master 阻塞在 barrier join 的病根(用户 2026-07-10)。--wait=barrier(攒齐 N 个再返),降为例外。"""
+    fid = args.id
+    man = _find_fanout_manifest(fid, args.group)
+    if not man:
+        print(json.dumps({"error": "fanout manifest 未找到: %s" % fid}, ensure_ascii=False)); sys.exit(2)
+    frm = man["from"]; tids = man["shard_tids"]; n = man["n"]
+    done_dir = _role_dir(frm) / "done"
+    stream = not args.wait                      # 默认流式;--wait 才 barrier
+    got = {}
+
+    def _collect_ready():
+        new = []
+        for tid in tids:
+            if tid in got:
+                continue
+            f = done_dir / (tid + ".json")
+            if f.exists():
+                try:
+                    obj = json.loads(f.read_text(encoding="utf-8"))
+                except Exception:
+                    obj = {"error": "bad result", "id": tid}
+                got[tid] = obj
+                try:
+                    f.unlink()                  # 消费,不污染 replies
+                except Exception:
+                    pass
+                new.append(obj)
+        return new
+
+    def _emit(objs):
+        for o in objs:
+            print(json.dumps(o, ensure_ascii=False), flush=True)   # 边到边:一分片一行
+
+    ready = _collect_ready()
+    if stream:
+        _emit(ready)
+    if len(got) < n:
+        from watchdog.observers import Observer
+        from watchdog.events import FileSystemEventHandler
+        ev = threading.Event()
+
+        class H(FileSystemEventHandler):
+            def on_created(self, e):
+                if str(e.src_path).endswith(".json"):
+                    ev.set()
+            def on_moved(self, e):
+                if str(getattr(e, "dest_path", "")).endswith(".json"):
+                    ev.set()
+
+        done_dir.mkdir(parents=True, exist_ok=True)
+        obs = Observer(); obs.schedule(H(), str(done_dir), recursive=False)
+        obs_ok = True
+        try:
+            obs.start()
+        except Exception:
+            obs_ok = False
+        try:
+            deadline = time.monotonic() + args.timeout
+            while len(got) < n:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                if obs_ok:
+                    ev.wait(timeout=remaining); ev.clear()
+                else:
+                    time.sleep(min(remaining, 1.0))
+                if stream:
+                    _emit(_collect_ready())
+                else:
+                    _collect_ready()
+        finally:
+            if obs_ok:
+                try:
+                    obs.stop(); obs.join()
+                except Exception:
+                    pass
+    if not stream:
+        print(json.dumps(list(got.values()), ensure_ascii=False))
+    sys.stderr.write("[fanout-collect] %s:收到 %d/%d%s\n" % (fid, len(got), n, "" if len(got) >= n else "(超时,余未回)"))
+
+
 def main():
     ap = argparse.ArgumentParser(prog="agentbus")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2970,6 +3105,8 @@ def main():
     p = sub.add_parser("join-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.add_argument("--target", type=int, default=None, help="可选软目标成员数(WebUI 激活进度分母,如 示例组=3)"); p.set_defaults(fn=cmd_join_group)
     p = sub.add_parser("leave-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_leave_group)
     p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
+    p = sub.add_parser("fanout"); p.add_argument("--group", required=True); p.add_argument("--shards", required=True, help="JSON数组 / 换行分隔 / -(stdin)"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.set_defaults(fn=cmd_fanout)
+    p = sub.add_parser("fanout-collect"); p.add_argument("--id", required=True); p.add_argument("--group", default=None); p.add_argument("--wait", action="store_true", help="barrier:攒齐N个再返(默认流式边到边·barrier是例外)"); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_fanout_collect)
     p = sub.add_parser("wait"); p.add_argument("--role", required=True); p.add_argument("--timeout", type=float, default=110.0); p.add_argument("--include-approval", action="store_true", dest="include_approval"); p.set_defaults(fn=cmd_wait)
     p = sub.add_parser("serve"); p.add_argument("--timeout", type=float, default=590.0); p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("request"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--chain", default=""); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_request)
