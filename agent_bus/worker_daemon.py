@@ -12,6 +12,14 @@
 import argparse, json, os, sys, time, subprocess, socket
 from pathlib import Path
 
+# UTF-8 根治(2026-07-10):Win console=GBK,daemon 形态原本零 reconfigure → 日志/提醒 CJK 全 garble。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+os.environ.setdefault("PYTHONUTF8", "1")   # 传给本 daemon 起的子 python,覆盖其默认 GBK
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentbus as ab  # 复用同一套总线逻辑
 

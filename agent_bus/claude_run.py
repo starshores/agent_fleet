@@ -7,7 +7,15 @@ headless daemon / dispatch 用它替代一次性 capture,这样虽然不能 atta
 同时抓最终 result 返回给调用方。解析不出就回退原样写 + 纯捕获结果。
 worker_daemon.py 和 dispatch_agent.py 共用。
 """
-import subprocess, json, time, threading
+import subprocess, json, time, threading, sys, os
+
+# UTF-8 根治(2026-07-10):被 daemon/dispatch 复用;独立跑或父未修时兜住自身 stdout/stderr。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+os.environ.setdefault("PYTHONUTF8", "1")
 
 # 起 claude -p 不弹控制台窗口(claude_bin 多是 .cmd,无此标志会弹窗;daemon/dispatch 跑任务时尤其扰人)
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)

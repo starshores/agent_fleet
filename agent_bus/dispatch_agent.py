@@ -13,6 +13,14 @@
 import sys, os, json, subprocess, argparse
 from pathlib import Path
 
+# UTF-8 根治(2026-07-10):派发路径原本零 reconfigure → CJK garble。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+os.environ.setdefault("PYTHONUTF8", "1")   # 传给本进程起的子 python
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentbus as ab
 

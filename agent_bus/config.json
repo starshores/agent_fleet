@@ -6,5 +6,7 @@
  "memory_index": "~/.claude/projects/XXX/memory/MEMORY.md",
  "agent_fleet_home": "C:/apphome/agent_fleet",
  "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
- "usage_db": "~/.claude/agent_bus/usage.db"
+ "usage_db": "~/.claude/agent_bus/usage.db",
+ "env": {"PYTHONUTF8": "1"},
+ "_env_comment": "bus 启动环境(2026-07-10 UTF-8 根治):PYTHONUTF8=1 让 bus 起的 python 一律 UTF-8 I/O,从源头免 GBK 乱码。各 python 入口已 os.environ.setdefault 兜住子进程;launcher(start_worker.ps1 等)可读此块 export 到 shell 覆盖 ad-hoc。"
 }
