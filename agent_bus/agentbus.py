@@ -2822,9 +2822,21 @@ def _role_groups(role):
     return out
 
 
-def _save_group(g, members, caps):
-    _write_json(_group_members_file(g), {"group": g, "members": members,
-                                         "caps": sorted(caps or []), "updated": _now()})
+def _save_group(g, members, caps, target=None):
+    """写组 members.json。target_size(可选软目标·WebUI 激活进度分母):显式传则设,否则保留原值
+    (leave/send 等不带 target 的调用不会抹掉已设的软目标)。members 动态 join/leave·无硬 roster。"""
+    f = _group_members_file(g)
+    prev = {}
+    if f.exists():
+        try:
+            prev = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            prev = {}
+    rec = {"group": g, "members": members, "caps": sorted(caps or []), "updated": _now()}
+    tgt = target if target is not None else (prev.get("target_size") if isinstance(prev, dict) else None)
+    if tgt is not None:
+        rec["target_size"] = tgt
+    _write_json(f, rec)
 
 
 def cmd_join_group(args):
@@ -2841,10 +2853,11 @@ def cmd_join_group(args):
         sys.exit(2)
     if role not in members:
         members.append(role)
-    _save_group(g, members, base if base is not None else my_caps)
+    _save_group(g, members, base if base is not None else my_caps, target=getattr(args, "target", None))
     _audit("join_group", role=role, group=g)
-    print("✓ %s 已加入组「%s」(成员 %d:%s)。下次 wait 重挂即开始 pull 该组 inbox。"
-          % (role, g, len(members), ", ".join(members)))
+    tgt = getattr(args, "target", None)
+    print("✓ %s 已加入组「%s」(成员 %d%s:%s)。下次 wait 重挂即开始 pull 该组 inbox。"
+          % (role, g, len(members), ("/软目标%d" % tgt) if tgt else "", ", ".join(members)))
 
 
 def cmd_leave_group(args):
@@ -2954,7 +2967,7 @@ def main():
     p = sub.add_parser("register"); p.add_argument("--role", required=True); p.add_argument("--desc", default=""); p.set_defaults(fn=cmd_register)
     p = sub.add_parser("send"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send)
     # 工作组池化(Phase 1a):join/leave 组(运行时·不改配置)、send-group 丢共享组 inbox(谁空谁 pull)
-    p = sub.add_parser("join-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_join_group)
+    p = sub.add_parser("join-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.add_argument("--target", type=int, default=None, help="可选软目标成员数(WebUI 激活进度分母,如 示例组=3)"); p.set_defaults(fn=cmd_join_group)
     p = sub.add_parser("leave-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_leave_group)
     p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
     p = sub.add_parser("wait"); p.add_argument("--role", required=True); p.add_argument("--timeout", type=float, default=110.0); p.add_argument("--include-approval", action="store_true", dest="include_approval"); p.set_defaults(fn=cmd_wait)
