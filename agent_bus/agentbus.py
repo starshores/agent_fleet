@@ -2624,10 +2624,32 @@ def cmd_sessions(args):
     print("筛选:--live / --dead / --tagged / --non-bus(只看个人)/ --bus   ·   标记:ab sessions --tag <id> [--label 可恢复]")
 
 
+def _is_bus_member(role):
+    """bus 成员判定(2026-07-10 门禁):有 presence.json(hello 过)或在 agents.json 注册。
+    非成员(如与 bus 无关的编码项目会话)不得往共享待办池投 ask-user——防非 bus 决策泄漏污染
+    bus 协调视图(曾有无关项目会话读全局 CLAUDE.md 后,把其项目内的问题灌进了 bus)。
+    非成员应在自己项目里征询用户。"""
+    if not role or role in ("unknown", "用户"):
+        return False
+    if (BUS / role / "presence.json").exists():
+        return True
+    try:
+        return role in _load_agents()
+    except Exception:
+        return False
+
+
 def cmd_ask_user(args):
     """agent 把一条【待用户确认】项投进 UI 待办池(todos.json),不滚走。capture-only,无自动回路。
     结构与 WebUI todo_add 对齐(todos.json 是 list;status 用合法值"待办"让用户照常能在 UI 标完成);
-    额外带 confirm_from/ref 供将来回路。source 标"确认·<谁问的>"便于 UI 筛选。"""
+    额外带 confirm_from/ref 供将来回路。source 标"确认·<谁问的>"便于 UI 筛选。
+    门禁(2026-07-10):--from 必须是 bus 注册成员,否则拒——防非 bus 项目泄漏进共享待办池。"""
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    if not _is_bus_member(frm):
+        print("✗ ask-user 拒绝:'%s' 不是 bus 注册成员(无 presence、不在 agents.json)。\n"
+              "  bus 待办池只接受 bus 成员的待确认项;与 bus 无关的项目/会话请用你自己项目的方式征询用户。\n"
+              "  若你确是 bus 角色:先 `agentbus.py hello --role <你>` 注册后再 ask-user。" % frm)
+        sys.exit(2)
     f = BUS / "todos.json"
     try:
         items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
@@ -2635,7 +2657,6 @@ def cmd_ask_user(args):
             items = []
     except Exception:
         items = []
-    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
     tid = "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex())
     prio = args.priority if args.priority in ("高", "中", "低") else "中"
     item = {

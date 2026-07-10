@@ -92,6 +92,11 @@ def main():
         return  # 非目标工具 → 无输出 = 正常放行
 
     frm = _resolve_role(data.get("session_id"))
+    if not frm:
+        # 门禁(2026-07-10 用户):本 session 在 bus 无 presence 绑定 = 非 bus 成员(如无关的
+        # 编码项目会话)。绝不拦它、绝不投 bus —— fail-open 放行,让它的 AskUserQuestion 卡片
+        # 正常可用。只有 bus 注册成员(hello 过、presence 里有本 session_id)才转投待办池。
+        return
     try:
         questions = (data.get("tool_input", {}) or {}).get("questions", []) or []
     except Exception:

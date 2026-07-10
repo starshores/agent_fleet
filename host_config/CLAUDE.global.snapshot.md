@@ -10,17 +10,14 @@
 
 **原因**:2026-06-01 用户 explicit — "对话框任务多不好处理"。事件级 toast 非阻塞,通知中心可累积,用户按节奏回看。
 
-## 需用户拍板/选择 → 走非阻塞待办池,禁用 AskUserQuestion 卡片
+## 需用户拍板/选择 → 【仅 agent bus 注册成员】走非阻塞待办池
 
-**规则**:任何"要用户拍板/二选一/确认"的场景,**一律**跑
-`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> --title "<问题>" --detail "<背景+选项如 A=… / B=…>"`
-把决策投进**非阻塞待办池**(todos.json / WebUI),投完**继续手头的活、别等**;用户按自己节奏批量看、回填,你下轮再看结果。
+**适用范围(2026-07-10 收窄)**:下面这条是 **agent bus 协调体系专用**规则,**只对 bus 注册成员生效**(用 `python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami` 能查到自己 role 的会话)。
 
-- **禁用 `AskUserQuestion` 交互卡片** —— 它是【阻塞式】:问了若用户没及时点,发问 agent 的会话就被**占住干等**。用户一般没时间实时看 cc 询问。
-- **已机制层硬拦**:PreToolUse hook `C:/apphome/agent_fleet/hooks/block_askuser.py`(settings.json 注册·matcher=AskUserQuestion)会拦下任何 AskUserQuestion → 自动把问题转投待办池 + deny,并提示"已代投、继续别等"。**所以就算你忘了这条约定,卡片也会被拦并转投**,别依赖硬拦、优先自己走 ask-user。
-- 这是 [[ask-user-standard]] 记忆 + 上面「禁用模态对话框」的合并强化。
+- **你是 bus 成员** → 需用户拍板时走 `agentbus.py ask-user --from <你的role> ...` 投非阻塞待办池;完整规则见 bus 项目 CLAUDE.md(`C:\apphome\agent_fleet\CLAUDE.md` 的「bus 待办池/ask-user」节)。
+- **你不是 bus 成员**(与 bus 无关的编码/其它项目会话)→ **别碰 bus 待办池**,用你自己项目的方式征询用户即可;`ab ask-user` 对非成员 `--from` 已【硬拒】(防污染共享池)。通用原则仍适用:优先非阻塞事件通知、别用模态对话框(见上「禁用 MessageBox/模态对话框」)。
 
-**原因**:2026-07-06 用户 explicit — "AskUserQuestion 会占用会话,要想办法优化掉"(展示了 agent 用卡片阻塞会话的实例)。
+**原因**:2026-07-06 用户令优化掉 AskUserQuestion 阻塞卡片;2026-07-10 用户发现**无关项目读了此全局规则后把问题灌进了 bus 待办池** → 收窄为仅 bus 成员适用、规则本体迁进 bus 项目 CLAUDE.md、全局层不再叫无关项目投 bus。
 
 ## 等本地长任务 / 文件变化 → 事件机制,不要 sleep polling
 
@@ -57,7 +54,10 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 
 AppID 已通过 HKCU:\SOFTWARE\Classes\AppUserModelId\ClaudeCode.NotifyTest 注册(DisplayName=Claude Code, ShowInSettings=1)。
 
-## Compact Instructions(bus 通用·压缩时套用)
+## Compact Instructions(压缩时套用;③④⑤ 的 bus 部分仅 bus 成员适用)
+
+> 通用部分(①②目标/待办/下一步、压后重读自己的 CLAUDE.md)对任何会话都适用;
+> ③ 的 bus 操作命令、role/caps 口径仅 **agent bus 注册成员** 需要,非 bus 会话忽略即可。
 
 压缩(/compact 或 auto)时尽量逐字保留:
 ① 我的 role 身份 + cwd + 职责边界(caps);

@@ -73,3 +73,28 @@ python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
 > **基座的版本库 ≠ 对外交付仓**:基座的 git 是【内部工程演进追踪】、只有内部看,不是对外交付仓;所以基座 git 里出现真实技术术语正常、无需脱敏。脱敏只发生在【基座→对外交付】那一层。唯一硬约束:**凭据/密钥**(secret 本身)不进任何 git=防机密外泄,这与术语脱敏是两回事。
 
 > 恢复完,先 `recover.py` 看有没有在飞的活(inbox 待领 / done 待读),再继续协调。
+
+## bus 待办池 / ask-user(需用户拍板 → 非阻塞待办池;仅 bus 成员)
+
+> 2026-07-10 从全局 `~/.claude/CLAUDE.md` 迁入此处(bus 专用规则,收窄为仅 bus 注册成员适用;
+> 起因:无关项目读全局规则后把问题灌进了 bus 待办池)。你是 bus 成员才照此做。
+
+**规则**:任何"要用户拍板/二选一/确认"的场景,**一律**跑
+`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> --title "<问题>" --detail "<背景+选项如 A=… / B=…>"`
+把决策投进**非阻塞待办池**(todos.json / WebUI),投完**继续手头的活、别等**;用户按自己节奏批量看、回填,你下轮再看结果。
+
+- **禁用 `AskUserQuestion` 交互卡片** —— 它是【阻塞式】:问了若用户没及时点,发问 agent 的会话就被**占住干等**。用户一般没时间实时看 cc 询问。
+- **已机制层硬拦**:PreToolUse hook `C:/apphome/agent_fleet/hooks/block_askuser.py`(settings.json 注册·matcher=AskUserQuestion)拦下 AskUserQuestion → 转投待办池 + deny + 提示"已代投、继续别等"。**门禁(2026-07-10)**:hook 只对【本 session 在 bus 有 presence 绑定的成员】生效;非 bus 会话 fail-open 放行(不拦、不投)。`ab ask-user` 对非成员 `--from` 也【硬拒】(`_is_bus_member` 判 presence/agents.json)。
+- 这是 [[ask-user-standard]] 记忆 + 全局「禁用模态对话框」的合并强化。
+- **原因**:2026-07-06 用户 explicit — "AskUserQuestion 会占用会话,要想办法优化掉"。
+
+## Compact Instructions(bus 成员·压缩时套用)
+
+> 从全局迁入(2026-07-10)。bus 成员压缩(/compact 或 auto)时尽量逐字保留:
+① 我的 role 身份 + cwd + 职责边界(caps);
+② 当前目标 + 在做的事 + 未尽任务/待办 + 下一步;
+③ bus 操作确切命令(hello / wait --role / done --id --role / peek / selfwake / send --to --from --task)+ 自醒铁律(重挂后 selfwake 验、空唤醒静默不 dump、done 带 --role);
+④ 被用户纠正过的约定/口径/偏好;
+⑤ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
+砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
+压后第一动作:复述①②③自检,答不全就重读【你自己的 CLAUDE.md + 相关记忆】补回再干活。
