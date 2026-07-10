@@ -46,7 +46,8 @@
    - 原则:状态外置越彻底 → 粘连越少 → 池化越纯。
 
 ### 实现分层(架构一步到位·1a 地基须能长出 1b/1c·不搭 MVP 捷径)
-- **1a 地基(先落地验收)** = 组注册(**运行时 join/leave**)+ 共享组 inbox + **原子 pull-claim** + 成员双听(自己 inbox + 所属组 inbox,watchdog 加监视目录,复用 `_wait_core`)+ `ab send --to-group <g>` 丢组 inbox。**并须在 1a 就定**:①**组任务 schema**(强制自带/引用上下文,不许依赖脑内状态)②**共享上下文存储契约** `BUS/<组>/shared/`(即使富功能留到 1c)③会话粘连的 affinity 字段 + 超时回落组池的语义。`ab join-group` 时按 caps 核一致(不一致拒/警)。**仅 1a 即治负载不均 + 让新成员真分担**(空闲即 pull)。
+- **⚠ claim 原语实证修正(2026-07-10 gate① 压测)**:并发 pull-claim **必须用 `os.open(<task>.lock, O_CREAT|O_EXCL)` 独占创建锁**(谁建成锁谁赢→再移 task 到自己 processing;败者 FileExistsError=干净落空续等)。**实测本机 Windows 上 `os.replace` 争同源并非单胜(200-300 轮出 2-8 胜者=会双跑)**,O_EXCL 恒 1 胜。现有 `_claim` 的 os.replace 手法只在单消费者/幂等wait下没暴露,多消费者组 inbox 绝不能沿用。
+- **1a 地基(先落地验收)** = 组注册(**运行时 join/leave**)+ 共享组 inbox + **O_EXCL 原子 pull-claim**(上条)+ 成员双听(自己 inbox + 所属组 inbox,watchdog 加监视目录,复用 `_wait_core`)+ `ab send --to-group <g>` 丢组 inbox。**并须在 1a 就定**:①**组任务 schema**(强制自带/引用上下文,不许依赖脑内状态)②**共享上下文存储契约** `BUS/<组>/shared/`(即使富功能留到 1c)③会话粘连的 affinity 字段 + 超时回落组池的语义。`ab join-group` 时按 caps 核一致(不一致拒/警)。**仅 1a 即治负载不均 + 让新成员真分担**(空闲即 pull)。
 - **1b fan-out / collect**:`ab fanout --group <g> --shards <json|->` N 分片打 `fanout_id` 撒组 inbox;`ab fanout-collect --id <id> [--wait]` 收齐 N 个 done;`ab scatter`=不收尾的批量异步派发糖。
 - **1c 共享组上下文富化**:组记忆/工件/分片 manifest（契约已在 1a 定,此处填实现）。
 
