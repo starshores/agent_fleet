@@ -2855,10 +2855,33 @@ def cmd_leave_group(args):
     print("✓ %s 已离开组「%s」(剩 %d 成员:%s)。" % (role, g, len(members), ", ".join(members) or "无"))
 
 
+_GROUP_LOCK_TTL = 60   # 正常持锁=毫秒级(建锁→移 task→删锁);>60s 必是孤儿(锁主建锁后崩溃)
+
+def _group_lock_stale(lock):
+    """组 claim 锁是否【孤儿】:持锁 pid 已死,或超 ttl(正常持锁毫秒级)。复用 edge.lock 的 ttl/死持有者手法。
+    锁内容读不出(刚创建还没写/坏)→ 用 mtime 兜底(刚建=age小=非stale·不误抢;久孤=age大=判stale·可回收)。"""
+    try:
+        d = json.loads(lock.read_text(encoding="utf-8"))
+    except Exception:
+        try:
+            return (time.time() - lock.stat().st_mtime) > _GROUP_LOCK_TTL
+        except Exception:
+            return False
+    age = _age_seconds(d.get("acquired_at", ""))
+    if age is not None and age > _GROUP_LOCK_TTL:
+        return True
+    pid = d.get("pid")
+    if pid and psutil is not None:
+        return not psutil.pid_exists(pid)   # 持锁进程已死 → 孤儿锁,可回收
+    return False
+
+
 def _claim_group_task(role, g, include_approval=False):
     """从组 g 共享 inbox 用 O_EXCL 独占锁【并发安全】领一个任务到 role 的 processing。
     谁建成 <task>.lock 谁独占该 task(实测 os.replace 争同源本机会双跑,故必用 O_EXCL);
-    抢输/无任务返回 None(干净落空,惊群败者据此续等·gate②)。"""
+    抢输/无任务返回 None(干净落空,惊群败者据此续等·gate②)。
+    stale 回收(2026-07-10 使用方 flag B):锁主建锁后崩溃会留孤儿 .lock 令任务永久 claim 返 None;
+    遇已存在锁先判 stale(持锁 pid 死/超 ttl)→ 强清重抢一次,否则真被持有→落空。"""
     gin = _group_dir(g) / "inbox"
     if not gin.exists():
         return None
@@ -2866,13 +2889,29 @@ def _claim_group_task(role, g, include_approval=False):
     if not t:
         return None
     lock = t.with_name(t.name + ".lock")
-    try:
-        fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(fd)
-    except FileExistsError:
-        return None          # 别的成员已独占该 task → 干净落空
-    except OSError:
+    fd = None
+    for attempt in range(2):
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if attempt == 0 and _group_lock_stale(lock):   # 孤儿锁 → 强清重抢一次
+                try:
+                    lock.unlink()
+                except Exception:
+                    pass
+                continue
+            return None          # 真被别的成员独占(锁新鲜)→ 干净落空
+        except OSError:
+            return None
+    if fd is None:
         return None
+    try:
+        os.write(fd, json.dumps({"who": role, "pid": os.getpid(), "acquired_at": _now()},
+                                ensure_ascii=False).encode("utf-8"))   # 记 pid/时间供 stale 判定
+    except Exception:
+        pass
+    os.close(fd)
     try:
         obj = _claim(role, t)   # 此刻仅持锁者到达,os.replace 到 role/processing 无并发争用=安全
     finally:
