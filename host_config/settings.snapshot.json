@@ -43,6 +43,30 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
+            "timeout": 10,
+            "statusMessage": "turn状态:思考/执行中"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
+            "timeout": 10,
+            "statusMessage": "turn状态:空闲"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
