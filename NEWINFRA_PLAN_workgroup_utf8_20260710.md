@@ -60,6 +60,27 @@
 
 ---
 
+## Phase 2 · 弹性池工人(elastic pool worker)—— 设计(用户拍板·2026-07-10·待评审后建)
+
+**动机(使用方 实测)**:撞内存墙(31G/90%/swap 换出 15G 颠簸);持久 claude tab ~360MB/个 vs 空闲 daemon python ~33MB(11×);池并行率仅 ~13%、有效并行 1.14 → 池工人 90% 时间空等却按 ~0.4G 常驻 = 为"偶尔并行"付"永久常驻"内存价;每加一持久 tab +0.4G,可用仅剩 3G → 快 OOM/爆 swap。
+
+**核心:池成员从「持久 tab」改「按需弹性 worker」**——空闲近乎 0 内存,来分片才 spin `claude -p` 跑、跑完即释。**改用法/模式,不造新原语**(复用 dispatch_agent 一次性 claude -p / claude_run / 1a 的 O_EXCL 组 claim)。
+
+### 机制设计(MasterAgent lane)
+- **弹性派发器(每组一个·极轻)**:watchdog 监组共享 inbox(1a 已有),有分片 + 当前并发 < 上限 → spin `min(pending, headroom上限)` 个一次性 `claude -p` worker;每 worker 用 **O_EXCL 组 claim** 拉【一个】分片 → 处理 → done(结果按 from 路由回 fanouter,1b collect 流式收)→ 退出。空闲时只剩派发器(watchdog 阻塞·~0 token/极小内存),无持久成员 tab。
+- **内存感知并发上限(防爆 swap)**:spin 前查可用内存 headroom / 每 worker ~0.4–0.5G RSS 封顶(如可用 8G→上限 ~16 并发)。到顶则分片留组 inbox 等 worker 退让出内存再 spin(pull 背压天然配合)。**上限公式 + 实时内存/并发看板口径由使用方 定/做**;MasterAgent 实现"spin 前 headroom 闸"。
+- **与 1a/1b 整合**:`send-group`/`fanout` 撒分片 → 弹性派发器按上限 spin worker pull → `fanout-collect --stream` 边到边收。**状态外置(1a 契约)是前提**:worker 临时、任一 worker 靠分片自带上下文接任一活,跑完即弃无需脑内接续。
+- **执行体身份**:弹性 worker 是 ephemeral(不占 role tab);claim/done 复用现有路由(from=fanouter)。持久 tab 只留【协调者/交互/会话粘连】角色。
+
+### 权衡 & 边界(据实)
+- `claude -p` 冷启 ~数秒;业务任务 ~2min 级 → 冷启可忽略 = **小延迟换大并行 + 省内存**,划算。**仅秒级以下任务不适用**(那种保持粘连/常驻)。
+- 与前台化趋势不冲突:前台 tab 仍宜协调/交互/粘连;**纯可互换池工人走弹性 = 按内存墙 + 可互换性的合理例外**([[onboarding-execution-body-migration]] 的边界补充)。
+
+### 分期 & 待评审
+- **2a**:弹性派发器(watchdog 组 inbox → headroom 闸 spin claude -p worker → O_EXCL pull 一分片 → done → 退)。先小规模验"同内存下并行峰值升 + 空闲内存回落"(使用方 验收口径)。
+- **2b**:上限动态调参 + WebUI 实时内存/并发看板(使用方 口径)。
+- **待使用方/用户**:内存感知上限公式(每 worker RSS 基准 + headroom 保留)、哪些组走弹性 vs 保持持久 tab、冷启延迟可接受阈。
+
 ## 边界与关联
-- MasterAgent lane:上述全部机制+实现(bus 协调层)。使用方:上线后验并行系数是否提升、盲区是否消。
+- MasterAgent lane:上述全部机制+实现(bus 协调层)。使用方:出数据/并发上限公式/看板口径 + 上线后验并行系数是否提升、内存回落、盲区是否消。
 - 关联记忆:[[bus-serial-relay-vs-parallel-pool]] [[peak-steady-resource-philosophy]] [[bus-frequent-light-communication]] [[bus-iteration-1plus1-channel]] [[specialization-route-not-self-handle]]
