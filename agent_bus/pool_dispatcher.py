@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 """pool_dispatcher.py — 弹性池派发器(Phase 2a · 2026-07-10)。
 
+⏸ FUTURE·不自动运行(用户 2026-07-10 拍板改走【手动管理 tab 下线】,不建自动 offline 机制)。
+   运行时 join/leave 已支持手动缩放(关成员=presence掉=临时缩池·别人顶上;重开=rejoin),不需自动派发器。
+   本脚本【留档备 future】,当前【无 daemon 拉它、不激活】。决策支持改由 ab mem-cap + WebUI 内存/并发看板(使用方)提供。
+   dry-run 已验 gate/scaling 正确;future 若走自动弹性可直接启用。
+
+
 治内存墙:池成员不再是持久 claude tab(~360MB/个常驻),而是【按需 spin 一次性 claude -p worker 跑一分片即释】。
 空闲时只本派发器阻塞在 watchdog(~0 token、极小内存)。
 

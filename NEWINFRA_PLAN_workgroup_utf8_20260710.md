@@ -60,7 +60,12 @@
 
 ---
 
-## Phase 2 · 弹性池工人(elastic pool worker)—— 设计(用户拍板·2026-07-10·待评审后建)
+## Phase 2 · 弹性池工人(elastic pool worker)—— ⏸ 存档·future option(用户 2026-07-10 改走手动)
+
+> **状态变更(2026-07-10 用户拍板·使用方 转达)**:**不建自动弹性派发器**,改【手动管理 tab 下线】。理由:①自动"临时下线 tab"与 always-on 常开通道/自醒可靠性冲突(自动下线=不可达+重 spin+self-wake 边界复杂),用户宁可人判何时安全关;②**运行时 join/leave 已支持手动缩放**——关一个池成员=其 presence 掉=临时缩池、别的成员顶上(池容忍成员缺席=工作组池化红利),重开=rejoin,**不需要任何新自动机制**;③真实需求转为【决策支持看板】(哪些 tab idle-heavy 可安全关 + 实时内存压力 + 关了 cap 升多少)=使用方 做 WebUI 信号,**不需 MasterAgent 后台派发器**。
+> **已建但不激活**:`pool_dispatcher.py`(2a·commit a765d4b)+ `_mem_cap`/`ab mem-cap` 已实现并 dry-run 验证;**pool_dispatcher 降为 future option、不自动运行**(无 daemon 拉它);**`_mem_cap`/`ab mem-cap` 保留启用**——正是决策支持看板要的"实时内存压力 + 关了 cap 升多少"。下面设计留档,future 若走自动弹性可直接复用。
+
+### (存档·原设计·future)
 
 **动机(使用方 实测)**:撞内存墙(31G/90%/swap 换出 15G 颠簸);持久 claude tab ~360MB/个 vs 空闲 daemon python ~33MB(11×);池并行率仅 ~13%、有效并行 1.14 → 池工人 90% 时间空等却按 ~0.4G 常驻 = 为"偶尔并行"付"永久常驻"内存价;每加一持久 tab +0.4G,可用仅剩 3G → 快 OOM/爆 swap。
 
