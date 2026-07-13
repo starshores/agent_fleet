@@ -1035,6 +1035,13 @@ def _who_data():
             rec["pseudo"] = True; rec["verdict"] = "◇ " + plabel; out_roles.append(rec); continue
         if r in retired_set:
             rec["verdict"] = "⊘ 退役"; out_roles.append(rec); continue
+        pk = _is_parked(r)
+        if pk:   # 故意暂离(park/休眠)优先短路:与 selfwake 单一源一致,别把故意退出的会话当"崩溃残留"
+            rec["parked"] = True
+            ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
+            note = ("·" + pk["note"]) if pk.get("note") else ""
+            rec["verdict"] = "🅿️ 休眠(用户故意暂离%s%s)" % (ext, note)
+            out_roles.append(rec); continue
         pf = BUS / r / "presence.json"
         if not pf.exists():
             rec["verdict"] = "未声明(无 presence)"; out_roles.append(rec); continue
@@ -1406,6 +1413,8 @@ def _health_anomalies(stuck_min=90):
     for d in BUS.iterdir():
         if not d.is_dir() or d.name.startswith((".", "_")) or d.name == "unknown" or _is_test_role(d.name):
             continue
+        if _is_parked(d.name):   # 故意暂离(park/休眠):进程死是目的非崩溃,残留 processing 不报"卡死/owner死"
+            continue              # (与 selfwake/who 单一源一致·park 压误报);真需重派由 reap/unpark 后处理
         pd = d / "processing"
         if not pd.exists():
             continue
