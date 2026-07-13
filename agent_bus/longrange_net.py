@@ -228,6 +228,44 @@ def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="m
     return nid
 
 
+def fork(task_id, parent, labels, owner=None, author="machine", autonomy="auto"):
+    """分叉(§2.1 fork):一父节点撒 N 并行子。P1 只建【结构】——并行执行接工作组池是后补独立战线
+    (用户令 P1 并行度暂 ~1.1 不攻),故子节点先落网,由执行者取 ready 跑(池化后自然并行)。返回 [child_id]。"""
+    return [add_node(task_id, lbl, parent=parent, owner=owner, author=author, autonomy=autonomy)
+            for lbl in labels]
+
+
+def merge(task_id, label, parents, owner=None, acceptance=None, author="machine", autonomy="auto"):
+    """合并(§2.1 merge):建【多父】节点,gate on 所有父 done 才解锁(=fanout-collect barrier 语义)。
+    多父 gate 由 _node_status 天然实现(全父 done 前恒 pending)。加边守无环。返回 node_id。"""
+    net = _load_net(task_id)
+    if not net:
+        raise SystemExit("net 不存在: %s" % task_id)
+    if not parents:
+        raise SystemExit("merge 需至少一个父")
+    seg = net["current_segment"]
+    nid = ab._gen_id("lrn").replace("-", "_")
+    for p in parents:
+        if p not in net["nodes"]:
+            raise SystemExit("父节点不存在: %s" % p)
+        if _would_cycle(net["nodes"], p, nid):
+            raise SystemExit("加边 %s→%s 会成环,拒绝" % (p, nid))
+    net["nodes"][nid] = {
+        "id": nid, "label": label, "status": "pending", "owner": owner,
+        "acceptance": acceptance, "verdict": None, "parents": list(parents),
+        "author": author, "segment": seg, "created": ab._now(),
+        "autonomy": autonomy, "precheck": {"status": "pending", "findings": []},
+        "kind": "merge",
+    }
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "node_added", node=nid, label=label, segment=seg, author=author,
+                autonomy=autonomy, kind="merge")
+    for p in parents:
+        _emit_event(task_id, "edge_added", **{"from": p, "to": nid})
+    return nid
+
+
 def complete_node(task_id, nid, verdict="ok"):
     """标节点完成过验收 → done。之后由拆解者重判是否催生新节点(P0 手动 add_node / close_frontier)。"""
     net = _load_net(task_id)
@@ -522,6 +560,16 @@ def main():
     s.add_argument("--autonomy", default="auto", choices=["auto", "notify", "ask"],
                    help="auto只读可逆自动|notify做了报一声|ask不可逆/对客/DDL须合批请示")
 
+    s = sub.add_parser("fork", help="一父撒 N 并行子(结构·并行执行后补)")
+    s.add_argument("--id", required=True); s.add_argument("--parent", required=True)
+    s.add_argument("--labels", required=True, help="JSON数组 子节点label")
+    s.add_argument("--autonomy", default="auto", choices=["auto", "notify", "ask"])
+
+    s = sub.add_parser("merge", help="多父合并节点(gate on 所有父 done)")
+    s.add_argument("--id", required=True); s.add_argument("--label", required=True)
+    s.add_argument("--parents", required=True, help="JSON数组 父节点id")
+    s.add_argument("--acceptance"); s.add_argument("--autonomy", default="auto", choices=["auto", "notify", "ask"])
+
     s = sub.add_parser("done-node", help="标节点完成")
     s.add_argument("--id", required=True); s.add_argument("--node", required=True)
     s.add_argument("--verdict", default="ok")
@@ -555,6 +603,12 @@ def main():
         nid = add_node(a.id, a.label, parent=a.parent, owner=a.owner, acceptance=a.acceptance,
                        author=a.author, autonomy=a.autonomy)
         print("加节点: %s (autonomy=%s)" % (nid, a.autonomy))
+    elif a.cmd == "fork":
+        ids = fork(a.id, a.parent, json.loads(a.labels), autonomy=a.autonomy)
+        print("fork %d 子: %s" % (len(ids), ",".join(ids)))
+    elif a.cmd == "merge":
+        nid = merge(a.id, a.label, json.loads(a.parents), acceptance=a.acceptance, autonomy=a.autonomy)
+        print("merge 节点: %s (%d 父)" % (nid, len(json.loads(a.parents))))
     elif a.cmd == "done-node":
         complete_node(a.id, a.node, a.verdict); print("完成: %s" % a.node)
     elif a.cmd == "precheck":
