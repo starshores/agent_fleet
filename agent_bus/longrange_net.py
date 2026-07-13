@@ -41,6 +41,7 @@ import agentbus as ab   # 复用 _now / _write_json / _gen_id / BUS
 BUS = ab.BUS
 LR_ROOT = BUS / "_longrange"
 BOARD = BUS / "longrange_tasks.json"
+EVENTS = BUS / "longrange_events.jsonl"   # 全局成长史(append-only·同 metrics.jsonl 范式·使用方 算成长速率/审计回放)
 
 _NODE_ACTIVE = {"pending", "ready", "running", "blocked", "await_decision"}   # 仍占活工作集
 _NODE_TERMINAL = {"done", "failed"}
@@ -70,12 +71,14 @@ def _save_net(net):
     _rebuild_board()
 
 
-def _log(task_id, op, **detail):
-    """append-only 变更日志:每次图变动一行,可回放(§2.4 审计复盘)。best-effort。"""
+def _emit_event(task_id, event, **detail):
+    """全局 append-only 成长史:每次图变动一行到 BUS/longrange_events.jsonl(使用方 算成长速率时间序列+审计回放,
+    同 metrics.jsonl 范式·O_APPEND·带 task 字段·按 task 过滤即得单任务回放)。state json=当前快照,本文件=成长史,两者分开。
+    best-effort,绝不影响主流程。"""
     try:
-        rec = {"ts": ab._now(), "op": op}
+        rec = {"ts": ab._now(), "task": task_id, "event": event}
         rec.update(detail)
-        with open(_task_dir(task_id) / "changelog.jsonl", "a", encoding="utf-8") as f:
+        with open(EVENTS, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
         pass
@@ -159,7 +162,7 @@ def init_net(task_id, title, spine):
         a.setdefault("type", "start" if i == 0 else ("end" if i == len(spine) - 1 else "mid"))
         a.setdefault("acceptance", None)
         a.setdefault("decision_gate", False)
-        a["status"] = "reached" if i == 0 else ("active" if i == 1 else "pending")
+        a["status"] = "reached" if i == 0 else ("active" if i == 1 else "upcoming")
     net = {
         "id": task_id, "title": title, "created": ab._now(), "updated": ab._now(),
         "status": "growing",
@@ -168,7 +171,7 @@ def init_net(task_id, title, spine):
         "nodes": {}, "segment_meta": {}, "archived_segments": [],
     }
     _save_net(net)
-    _log(task_id, "init", title=title, anchors=[a["anchor"] for a in spine])
+    _emit_event(task_id, "task_created", title=title, anchors=[a["anchor"] for a in spine])
     return net
 
 
@@ -197,7 +200,9 @@ def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="m
     }
     _refresh_statuses(net)
     _save_net(net)
-    _log(task_id, "add_node", node=nid, label=label, parents=parents, segment=seg)
+    _emit_event(task_id, "node_added", node=nid, label=label, segment=seg, author=author)
+    for p in parents:
+        _emit_event(task_id, "edge_added", **{"from": p, "to": nid})
     return nid
 
 
@@ -210,7 +215,7 @@ def complete_node(task_id, nid, verdict="ok"):
     n["status"] = "done"; n["verdict"] = verdict
     _refresh_statuses(net)
     _save_net(net)
-    _log(task_id, "complete_node", node=nid, verdict=verdict)
+    _emit_event(task_id, "node_done", node=nid, verdict=verdict)
 
 
 def close_frontier(task_id, seg_index=None):
@@ -219,7 +224,7 @@ def close_frontier(task_id, seg_index=None):
     seg = net["current_segment"] if seg_index is None else seg_index
     net.setdefault("segment_meta", {}).setdefault(str(seg), {})["frontier_closed"] = True
     _save_net(net)
-    _log(task_id, "close_frontier", segment=seg)
+    _emit_event(task_id, "frontier_closed", segment=seg)
 
 
 def collapse_segment(task_id, summary=None):
@@ -230,16 +235,21 @@ def collapse_segment(task_id, summary=None):
         raise SystemExit("段 %d 未收敛(需 frontier_closed + 全节点 done),不能塌缩" % seg)
     seg_ns = _seg_nodes(net, seg)
     anchor = net["spine"][seg]
+    seg_edges = sum(len([p for p in n.get("parents", []) if p in seg_ns]) for n in seg_ns.values())
     collapsed = {
         "id": "seg%d_collapsed" % seg, "label": "[段%d归档] %s" % (seg, anchor["anchor"]),
         "summary": summary or ("%d 节点达锚'%s'收敛" % (len(seg_ns), anchor["anchor"])),
-        "verdict": "ok", "node_count": len(seg_ns),
+        "verdict": "ok",
+        # collapsed{nodes,edges}:归档段复杂度仍计入总量、但不占活内存(§2.2 资源设计核心·使用方 契约)
+        "collapsed": {"nodes": len(seg_ns), "edges": seg_edges},
+        "node_count": len(seg_ns),
     }
     for n in seg_ns.values():
         n["archived"] = True
     net["archived_segments"].append({
         "seg_index": seg, "to_anchor": anchor["anchor"],
-        "collapsed_node": collapsed, "node_count": len(seg_ns), "archived_at": ab._now(),
+        "collapsed_node": collapsed, "node_count": len(seg_ns), "edge_count": seg_edges,
+        "archived_at": ab._now(),
     })
     anchor["status"] = "reached"
     # 推进脊柱
@@ -251,8 +261,48 @@ def collapse_segment(task_id, summary=None):
     else:
         net["status"] = "done"
     _save_net(net)
-    _log(task_id, "collapse_segment", segment=seg, node_count=len(seg_ns), advanced_to=nxt)
+    _emit_event(task_id, "anchor_reached", anchor=anchor["anchor"], segment=seg)
+    _emit_event(task_id, "segment_collapsed", segment=seg, node_count=len(seg_ns),
+                edge_count=seg_edges, advanced_to=nxt)
     return collapsed
+
+
+# ── 复杂度标尺(raw·口径使用方 P1 定准)───────────────────────────────────
+def _complexity(net):
+    """task 级复杂度 raw 量:归档段计入总量(collapsed{nodes,edges}·§2.2)、宽深按当前活图。
+    使用方 P1 给准口径,这里先 emit raw 让它算(留 raw 优于留空)。"""
+    live = [n for nid, n in net["nodes"].items() if not n.get("archived")]
+    arch_nodes = sum(a.get("edge_count", 0) * 0 + a.get("node_count", 0) for a in net["archived_segments"])
+    arch_edges = sum(a.get("edge_count", 0) for a in net["archived_segments"])
+    live_edges = sum(len(n.get("parents", [])) for n in live)
+    # 活图分层:level(n)=0 无父 else 1+max(level(父));depth=最长路,width_max=同层最多节点
+    lvl, live_ids = {}, {n["id"] for n in live}
+    def _lvl(nid, seen=None):
+        seen = seen or set()
+        if nid in lvl:
+            return lvl[nid]
+        if nid in seen:
+            return 0
+        seen = seen | {nid}
+        ps = [p for p in net["nodes"][nid].get("parents", []) if p in live_ids]
+        v = 0 if not ps else 1 + max(_lvl(p, seen) for p in ps)
+        lvl[nid] = v
+        return v
+    for n in live:
+        _lvl(n["id"])
+    width = {}
+    for v in lvl.values():
+        width[v] = width.get(v, 0) + 1
+    merges = sum(1 for n in live if len([p for p in n.get("parents", []) if p in live_ids]) >= 2)
+    return {
+        "nodes_total": len(live) + arch_nodes,        # 含归档(塌缩计入总量)
+        "edges_total": live_edges + arch_edges,
+        "nodes_live": len(live), "edges_live": live_edges,
+        "width_max": max(width.values()) if width else 0,   # 并行度
+        "depth": (max(lvl.values()) + 1) if lvl else 0,      # 关键路径
+        "merges": merges, "cross_task_edges": 0,             # P2 跨任务边
+        "note": "raw·口径待使用方 P1 定准",
+    }
 
 
 # ── 看板聚合投影(MasterUI 读 BUS/longrange_tasks.json)────────────────────────
@@ -291,11 +341,13 @@ def _board_task_view(net):
             "seg_index": seg, "nodes": nodes_view, "edges": edges,
         },
         "archived_segments": [{"seg_index": a["seg_index"], "to_anchor": a["to_anchor"],
-                               "node_count": a["node_count"], "summary": a["collapsed_node"]["summary"]}
+                               "node_count": a["node_count"], "summary": a["collapsed_node"]["summary"],
+                               "collapsed": a["collapsed_node"].get("collapsed", {})}
                               for a in net["archived_segments"]],
         "progress": {"done_segments": done_seg, "total_segments": total_seg,
                      "seg_done_nodes": seg_done, "seg_total_nodes": seg_total,
                      "pct": pct, "growable": True},
+        "complexity": _complexity(net),
     }
 
 
@@ -313,9 +365,11 @@ def _rebuild_board():
                 continue
     ab._write_json(BOARD, {"updated": ab._now(), "tasks": tasks,
                            "schema": "longrange_v0",
+                           "cross_edges": [],   # 全局跨任务边(P2·现预留空·避免 P1/P2 重塑破坏 MasterUI render)
                            "status_colors": {"pending": "灰", "ready": "浅蓝", "running": "蓝",
                                              "blocked": "红", "await_decision": "黄",
-                                             "done": "绿", "failed": "深红"}})
+                                             "done": "绿", "failed": "深红"},
+                           "anchor_status_colors": {"upcoming": "灰", "active": "蓝", "reached": "绿"}})
 
 
 # ── CLI ────────────────────────────────────────────────────────────────
