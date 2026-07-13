@@ -295,13 +295,19 @@ def _complexity(net):
         width[v] = width.get(v, 0) + 1
     merges = sum(1 for n in live if len([p for p in n.get("parents", []) if p in live_ids]) >= 2)
     return {
-        "nodes_total": len(live) + arch_nodes,        # 含归档(塌缩计入总量)
+        # size(累计含归档)=使用方 P0 验收"对·不动"
+        "nodes_total": len(live) + arch_nodes,
         "edges_total": live_edges + arch_edges,
         "nodes_live": len(live), "edges_live": live_edges,
-        "width_max": max(width.values()) if width else 0,   # 并行度
-        "depth": (max(lvl.values()) + 1) if lvl else 0,      # 关键路径
-        "merges": merges, "cross_task_edges": 0,             # P2 跨任务边
-        "note": "raw·口径待使用方 P1 定准",
+        # shape·活跃段口径(我算·供调度/资源视图·使用方 令"别丢")
+        "depth_live": (max(lvl.values()) + 1) if lvl else 0,
+        "width_live": max(width.values()) if width else 0,
+        "merges_live": merges,
+        # shape·全网口径(读 longrange_events.jsonl 重建·使用方 complexity_snapshot 工具填)——留 null 占位,
+        # 别把活跃段 depth 误当全网复杂度(用户"网大小=复杂度"要全网 shape)
+        "depth": None, "width_max": None, "merges": None,
+        "cross_task_edges": 0,                               # P2 跨任务边
+        "note": "size=全网累计;_live=活跃段(MasterAgent算);depth/width_max/merges=全网口径待使用方 complexity_snapshot 填",
     }
 
 
