@@ -60,6 +60,23 @@ $LR show  --id demo-longrange-0713     # 权威态 JSON
 $LR board                            # 重建看板视图
 ```
 
+## 编辑/回退命令(网跑着改·2026-07-13 补·demo-feat-migrate 实战逼出)
+长程网跑起来难免标错/改目标,这些让你不用加占位节点绕:
+```bash
+# 改最终目标 / 任意锚点(index 支持负数·-1=终点)
+$LR set-goal      --id X --goal "新终点目标" [--acceptance "…"]
+$LR update-anchor --id X --index 2 [--anchor "…"] [--acceptance "…"] [--decision-gate true|false]
+# 重开已塌缩/误标达成的段(un-collapse·默认最后一段):status 回 growing·锚点回 active
+$LR reopen        --id X [--segment N]
+# 跳过被驳回/废弃的节点(status=skipped·不挡收敛,免它卡住 collapse);或直接删
+$LR skip-node     --id X --node <n> [--reason "…"]
+$LR remove-node   --id X --node <n>
+# 往【已 done 的网】加节点 → 自动把 status 翻回 growing + 重开末段(不用手动 reopen)
+$LR add           --id X --label "…"      # done 网上直接 add 即自动复活
+# show 现附 _complexity + _efficiency(看"已省 N 次反复确认")
+$LR show          --id X
+```
+
 ## 三顶帽子(§2.3·你怎么戴)
 - **拆解者**:播种脊柱 + 段内 `add` 续接节点(每节点带验收标准);节点完成后重判"要不要催生新节点",不长了就 `close-frontier`。
 - **执行者**:找 `ready` 节点跑;跑前对 ask 节点 `precheck`;干完 `done-node`。**按 autonomy 分层**:auto/notify 别问用户直接干,ask 才进合批请示。
