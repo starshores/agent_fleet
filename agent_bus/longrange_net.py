@@ -130,7 +130,7 @@ def _node_status(net, nid):
         · 其余(auto/notify,或 ask 待 precheck)→ ready(可执行/可先跑校验)。"""
     n = net["nodes"][nid]
     st = n["status"]
-    if st in ("running", "done", "failed"):
+    if st in ("running", "done", "failed", "skipped"):
         return st
     parents = n.get("parents", [])
     if not all(net["nodes"].get(p, {}).get("status") == "done" for p in parents):
@@ -149,7 +149,7 @@ def _refresh_statuses(net):
     for nid, n in net["nodes"].items():
         if n.get("archived"):
             continue
-        if n["status"] not in ("running", "done", "failed"):
+        if n["status"] not in ("running", "done", "failed", "skipped"):
             n["status"] = _node_status(net, nid)
 
 
@@ -166,7 +166,8 @@ def segment_converged(net, seg_index):
         return False
     if not net.get("segment_meta", {}).get(str(seg_index), {}).get("frontier_closed"):
         return False
-    return all(n["status"] == "done" for n in seg.values())
+    # done 或 skipped(被跳过/驳回后显式跳)都算"已了结"·不挡收敛;failed 未 skip 仍挡(逼显式处置)
+    return all(n["status"] in ("done", "skipped") for n in seg.values())
 
 
 # ── 核心操作 ───────────────────────────────────────────────────────────
@@ -201,6 +202,7 @@ def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="m
     net = _load_net(task_id)
     if not net:
         raise SystemExit("net 不存在: %s" % task_id)
+    _ensure_growing(net)   # 需求4:往 done 网加活 → 自动重开最后段·status 回 growing
     seg = net["current_segment"]
     nid = ab._gen_id("lrn").replace("-", "_")   # 稳作节点 id
     if parent is None:
@@ -243,6 +245,7 @@ def merge(task_id, label, parents, owner=None, acceptance=None, author="machine"
         raise SystemExit("net 不存在: %s" % task_id)
     if not parents:
         raise SystemExit("merge 需至少一个父")
+    _ensure_growing(net)   # 需求4:往 done 网加活 → 自动重开
     seg = net["current_segment"]
     nid = ab._gen_id("lrn").replace("-", "_")
     for p in parents:
@@ -388,6 +391,105 @@ def collapse_segment(task_id, summary=None):
     _emit_event(task_id, "segment_collapsed", segment=seg, node_count=len(seg_ns),
                 edge_count=seg_edges, advanced_to=nxt)
     return collapsed
+
+
+# ── 编辑/回退类(demo-feat-migrate 实战暴露·2026-07-13)──────────────────────
+def update_anchor(task_id, index, anchor=None, acceptance=None, decision_gate=None):
+    """编辑脊柱锚点(尤其【更新最终目标】)。index 支持负数(-1=终点)。长程网跑着改目标不用加占位节点绕。"""
+    net = _load_net(task_id)
+    sp = net["spine"]
+    if index < 0:
+        index += len(sp)
+    if not (0 <= index < len(sp)):
+        raise SystemExit("锚点下标越界: %d" % index)
+    a = sp[index]
+    before = dict(a)
+    if anchor is not None:
+        a["anchor"] = anchor
+    if acceptance is not None:
+        a["acceptance"] = acceptance
+    if decision_gate is not None:
+        a["decision_gate"] = bool(decision_gate)
+    _save_net(net)
+    _emit_event(task_id, "anchor_updated", index=index, before=before.get("anchor"), after=a["anchor"])
+    return a
+
+
+def set_goal(task_id, goal, acceptance=None):
+    """更新【终点锚点】(最终目标)——update_anchor 的便捷式。"""
+    net = _load_net(task_id)
+    return update_anchor(task_id, len(net["spine"]) - 1, anchor=goal, acceptance=acceptance)
+
+
+def _ensure_growing(net):
+    """若网已 done、又要往里加活(add/fork/merge):自动把最后塌缩的段重开(un-archive)+status→growing
+    (需求4:add 到 done 网状态机自动回退,不然加了节点 show 仍 done)。就地改 net,不落盘(调用方 save)。"""
+    if net.get("status") != "done":
+        return
+    seg = net["current_segment"]
+    for n in net["nodes"].values():
+        if n.get("segment") == seg:
+            n["archived"] = False
+    net["archived_segments"] = [x for x in net["archived_segments"] if x["seg_index"] != seg]
+    if seg < len(net["spine"]):
+        net["spine"][seg]["status"] = "active"
+    net.get("segment_meta", {}).get(str(seg), {}).pop("frontier_closed", None)
+    net["status"] = "growing"
+
+
+def reopen_segment(task_id, seg_index=None):
+    """重开已塌缩/已达成的锚点段(un-collapse·需求2):误标达成后回退。默认重开最后归档的段。
+    un-archive 该段节点 + 从 archived_segments 移除 + 锚点回 active + 清 frontier_closed + current_segment 指回 + status=growing。"""
+    net = _load_net(task_id)
+    arch = net["archived_segments"]
+    if not arch:
+        raise SystemExit("无已塌缩段可重开")
+    if seg_index is None:
+        seg_index = arch[-1]["seg_index"]
+    if not any(x["seg_index"] == seg_index for x in arch):
+        raise SystemExit("段 %d 未塌缩,无需重开" % seg_index)
+    for n in net["nodes"].values():
+        if n.get("segment") == seg_index:
+            n["archived"] = False
+    net["archived_segments"] = [x for x in arch if x["seg_index"] != seg_index]
+    if seg_index < len(net["spine"]):
+        net["spine"][seg_index]["status"] = "active"
+    # 该段及其后的锚点状态回退(后续锚点若已 reached 也应回 upcoming)
+    for i in range(seg_index + 1, len(net["spine"])):
+        net["spine"][i]["status"] = "upcoming"
+    net.get("segment_meta", {}).get(str(seg_index), {}).pop("frontier_closed", None)
+    net["current_segment"] = seg_index
+    net["status"] = "growing"
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "segment_reopened", segment=seg_index)
+    return seg_index
+
+
+def remove_node(task_id, nid):
+    """删节点(需求3):从网移除 + 从所有子节点的 parents 摘除该边(免悬空依赖)。"""
+    net = _load_net(task_id)
+    if nid not in net["nodes"]:
+        raise SystemExit("节点不存在: %s" % nid)
+    for c in net["nodes"].values():
+        if nid in c.get("parents", []):
+            c["parents"].remove(nid)
+    del net["nodes"][nid]
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "node_removed", node=nid)
+
+
+def skip_node(task_id, nid, reason=None):
+    """跳过节点(需求3):status=skipped·不挡收敛(被 reject/放弃的节点显式跳,免它卡住 collapse)。"""
+    net = _load_net(task_id)
+    n = net["nodes"].get(nid)
+    if not n:
+        raise SystemExit("节点不存在: %s" % nid)
+    n["status"] = "skipped"; n["verdict"] = "skipped" + (("·" + reason) if reason else "")
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "node_skipped", node=nid, reason=reason)
 
 
 # ── 复杂度标尺(raw·口径使用方 P1 定准)───────────────────────────────────
@@ -592,7 +694,24 @@ def main():
     s = sub.add_parser("collapse", help="达锚收敛塌缩推进")
     s.add_argument("--id", required=True); s.add_argument("--summary")
 
-    s = sub.add_parser("show", help="打印某任务网 JSON"); s.add_argument("--id", required=True)
+    s = sub.add_parser("update-anchor", help="编辑脊柱锚点(index 支持负数·-1=终点)")
+    s.add_argument("--id", required=True); s.add_argument("--index", type=int, required=True)
+    s.add_argument("--anchor"); s.add_argument("--acceptance")
+    s.add_argument("--decision-gate", dest="decision_gate", choices=["true", "false"])
+
+    s = sub.add_parser("set-goal", help="更新终点锚点(最终目标)")
+    s.add_argument("--id", required=True); s.add_argument("--goal", required=True); s.add_argument("--acceptance")
+
+    s = sub.add_parser("reopen", help="重开已塌缩段(un-collapse·默认最后一段)")
+    s.add_argument("--id", required=True); s.add_argument("--segment", type=int)
+
+    s = sub.add_parser("remove-node", help="删节点(摘除悬空边)")
+    s.add_argument("--id", required=True); s.add_argument("--node", required=True)
+
+    s = sub.add_parser("skip-node", help="跳过节点(status=skipped·不挡收敛)")
+    s.add_argument("--id", required=True); s.add_argument("--node", required=True); s.add_argument("--reason")
+
+    s = sub.add_parser("show", help="打印某任务网 JSON(附 complexity+efficiency)"); s.add_argument("--id", required=True)
     sub.add_parser("board", help="重建并打印看板视图")
 
     a = ap.parse_args()
@@ -623,8 +742,25 @@ def main():
         close_frontier(a.id); print("前沿封闭")
     elif a.cmd == "collapse":
         c = collapse_segment(a.id, a.summary); print("塌缩: %s" % c["label"])
+    elif a.cmd == "update-anchor":
+        dg = {"true": True, "false": False}.get(a.decision_gate)
+        an = update_anchor(a.id, a.index, anchor=a.anchor, acceptance=a.acceptance, decision_gate=dg)
+        print("锚点[%d]更新: %s" % (a.index, an["anchor"]))
+    elif a.cmd == "set-goal":
+        an = set_goal(a.id, a.goal, a.acceptance); print("终点目标更新: %s" % an["anchor"])
+    elif a.cmd == "reopen":
+        seg = reopen_segment(a.id, a.segment); print("重开段: %d (status→growing)" % seg)
+    elif a.cmd == "remove-node":
+        remove_node(a.id, a.node); print("删节点: %s" % a.node)
+    elif a.cmd == "skip-node":
+        skip_node(a.id, a.node, a.reason); print("跳过节点: %s" % a.node)
     elif a.cmd == "show":
-        print(json.dumps(_load_net(a.id), ensure_ascii=False, indent=1))
+        net = _load_net(a.id)
+        if net:                                   # 需求5:show 附 complexity+efficiency(看"已省N次反复确认")
+            net = dict(net)
+            net["_complexity"] = _fill_fullnet_complexity(_complexity(_load_net(a.id)), a.id)
+            net["_efficiency"] = _efficiency(a.id)
+        print(json.dumps(net, ensure_ascii=False, indent=1))
     elif a.cmd == "board":
         _rebuild_board(); print(BOARD.read_text(encoding="utf-8"))
 
