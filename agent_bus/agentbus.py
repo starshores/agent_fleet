@@ -1113,6 +1113,11 @@ def cmd_who(args):
             print("%-14s %-22s  %s" % (r, "◇ 伪角色", plabel)); continue
         if r in retired_set:        # 退役:标注、不当残留/异常(进程退是应该的)
             print("%-14s %-22s" % (r, "⊘ 退役")); continue
+        pk = _is_parked(r)          # 故意暂离(park/休眠):进程死是目的非崩溃,别显"残留"(与 _who_data/selfwake 单一源一致)
+        if pk:
+            ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
+            note = ("·" + pk["note"]) if pk.get("note") else ""
+            print("%-14s %-22s %s" % (r, "🅿️ 休眠", "用户故意暂离%s%s" % (ext, note))); continue
         pf = BUS / r / "presence.json"
         if not pf.exists():
             print("%-14s %-22s" % (r, "未声明(无 presence)"))
