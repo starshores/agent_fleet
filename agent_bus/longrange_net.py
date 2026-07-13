@@ -37,6 +37,12 @@ os.environ.setdefault("PYTHONUTF8", "1")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentbus as ab   # 复用 _now / _write_json / _gen_id / BUS
+try:
+    # 使用方 owns:全网 shape 复杂度(读 events 重建)+ 成长曲线 + 反复确认降幅(★验收口径)
+    from complexity_snapshot import (complexity_from_events, complexity_series_from_events,
+                                     confirmation_savings_from_events)
+except Exception:
+    complexity_from_events = complexity_series_from_events = confirmation_savings_from_events = None
 
 BUS = ab.BUS
 LR_ROOT = BUS / "_longrange"
@@ -433,10 +439,50 @@ def _board_task_view(net):
         "progress": {"done_segments": done_seg, "total_segments": total_seg,
                      "seg_done_nodes": seg_done, "seg_total_nodes": seg_total,
                      "pct": pct, "growable": True},
-        "complexity": _complexity(net),
+        "complexity": _fill_fullnet_complexity(_complexity(net), net["id"]),
+        # 成长曲线(使用方·MasterUI sparkline)+ 反复确认降幅(★验收·MasterUI 渲"已省N次反复确认"价值徽标)
+        "complexity_series": _series(net["id"]),
+        "efficiency": _efficiency(net["id"]),
         # 待批决策单(§2.4 合批·MasterUI 渲染成"一处点批"·null=当前无待批)
         "pending_decision_batch": net.get("pending_decision_batch"),
     }
+
+
+def _series(task_id):
+    """成长曲线 [{t,size,live}](使用方·MasterUI sparkline)。best-effort。"""
+    if complexity_series_from_events is None:
+        return []
+    try:
+        return complexity_series_from_events(str(EVENTS), task_id)
+    except Exception:
+        return []
+
+
+def _efficiency(task_id):
+    """反复确认降幅(★验收核·使用方):{confirmation_turns_saved,...}。MasterUI 渲"已省N次反复确认"。best-effort。"""
+    if confirmation_savings_from_events is None:
+        return None
+    try:
+        return confirmation_savings_from_events(str(EVENTS), task_id)
+    except Exception:
+        return None
+
+
+def _fill_fullnet_complexity(comp, task_id):
+    """用使用方 的 complexity_snapshot(读 events 重建全网)覆盖 depth/width_max/merges 的 null 占位;
+    保留 MasterAgent 侧 *_live。best-effort:events 缺/工具不可用 → 保留 null(不崩 board emit)。"""
+    if complexity_from_events is None:
+        return comp
+    try:
+        shape = complexity_from_events(str(EVENTS), task_id)
+        for k in ("nodes_total", "edges_total", "depth", "width_max", "merges"):
+            if k in shape:
+                comp[k] = shape[k]
+        comp["per_segment"] = shape.get("per_segment")
+        comp["note"] = shape.get("note", comp.get("note"))
+    except Exception:
+        pass
+    return comp
 
 
 def _rebuild_board():
