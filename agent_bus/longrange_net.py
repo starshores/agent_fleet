@@ -115,23 +115,35 @@ def _seg_nodes(net, seg_index):
 
 
 def _node_status(net, nid):
-    """派生就绪态:父全 done → ready(除非已 running/done/failed/blocked/await_decision);父未全完成 → pending。"""
+    """派生就绪态,含【自主分层 §2.3-3】+【校验闸】:
+    - running/done/failed 三终结/执行态 → 保持;
+    - 父未全完成 → pending;
+    - 父全完成后按自主等级 + 校验闸分流:
+        · precheck=fail → blocked(校验闸拦下·炸在提审批前,不去烦用户);
+        · autonomy=ask 且 precheck=pass → await_decision(进决策合批·等用户);
+        · 其余(auto/notify,或 ask 待 precheck)→ ready(可执行/可先跑校验)。"""
     n = net["nodes"][nid]
     st = n["status"]
-    if st in ("running", "done", "failed", "blocked", "await_decision"):
+    if st in ("running", "done", "failed"):
         return st
     parents = n.get("parents", [])
-    if all(net["nodes"].get(p, {}).get("status") == "done" for p in parents):
-        return "ready"
-    return "pending"
+    if not all(net["nodes"].get(p, {}).get("status") == "done" for p in parents):
+        return "pending"
+    pc = (n.get("precheck") or {}).get("status", "pending")
+    if pc == "fail":
+        return "blocked"
+    if n.get("autonomy", "auto") == "ask" and pc == "pass":
+        return "await_decision"
+    return "ready"
 
 
 def _refresh_statuses(net):
-    """把所有非终结、非人工态的节点按父完成度刷成 pending/ready。"""
+    """按父完成度 + 自主分层 + 校验闸重刷可变态(pending/ready/blocked/await_decision 互转)。
+    不动 running/done/failed 三态(执行/终结态,只由 complete_node / run 显式改)。"""
     for nid, n in net["nodes"].items():
         if n.get("archived"):
             continue
-        if n["status"] in ("pending", "ready"):
+        if n["status"] not in ("running", "done", "failed"):
             n["status"] = _node_status(net, nid)
 
 
@@ -175,9 +187,11 @@ def init_net(task_id, title, spine):
     return net
 
 
-def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="machine"):
+def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="machine",
+             autonomy="auto"):
     """拆解者在当前段续接一个节点。P0 线性:parent 默认=当前段最后一个节点(无则接段起点=空父)。
-    加边守无环。返回 node_id。"""
+    加边守无环。autonomy=auto(只读/可逆·自动推进)|notify(做了报一声)|ask(不可逆/对客/DDL·须合批请示)。
+    返回 node_id。"""
     net = _load_net(task_id)
     if not net:
         raise SystemExit("net 不存在: %s" % task_id)
@@ -197,10 +211,12 @@ def add_node(task_id, label, parent=None, owner=None, acceptance=None, author="m
         "id": nid, "label": label, "status": "pending", "owner": owner,
         "acceptance": acceptance, "verdict": None, "parents": parents,
         "author": author, "segment": seg, "created": ab._now(),
+        "autonomy": autonomy,                                   # §2.3-3 自主分层
+        "precheck": {"status": "pending", "findings": []},       # 执行前校验闸(炸在提审批前)
     }
     _refresh_statuses(net)
     _save_net(net)
-    _emit_event(task_id, "node_added", node=nid, label=label, segment=seg, author=author)
+    _emit_event(task_id, "node_added", node=nid, label=label, segment=seg, author=author, autonomy=autonomy)
     for p in parents:
         _emit_event(task_id, "edge_added", **{"from": p, "to": nid})
     return nid
@@ -216,6 +232,69 @@ def complete_node(task_id, nid, verdict="ok"):
     _refresh_statuses(net)
     _save_net(net)
     _emit_event(task_id, "node_done", node=nid, verdict=verdict)
+
+
+def precheck_node(task_id, nid, ok, findings=None):
+    """执行前校验闸(§2.3 执行者·owner 预检/引用扫描):在【请示/执行前】跑,让"炸"发生在提审批前。
+    ok=False → 节点 blocked(不去烦用户);ok=True + autonomy=ask → 转 await_decision 进合批。"""
+    net = _load_net(task_id)
+    n = net["nodes"].get(nid)
+    if not n:
+        raise SystemExit("节点不存在: %s" % nid)
+    n["precheck"] = {"status": "pass" if ok else "fail", "findings": findings or []}
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "precheck", node=nid, result=("pass" if ok else "fail"), findings=findings or [])
+    return n["status"]
+
+
+def decide_batch(task_id):
+    """决策合批(§2.4·反复确认头号杀手之二):把当前段所有 await_decision 节点【攒一张单】,
+    一次给用户批、不零售(直杀单表去留反复5来回 / 一批 DDL 拆 4 审批点)。
+    只建【一张】待批单存进 net(MasterUI 渲染成"待批决策单·一处点批");用户答后 resolve_batch 落。"""
+    net = _load_net(task_id)
+    seg = net["current_segment"]
+    pend = [n for n in _seg_nodes(net, seg).values() if n["status"] == "await_decision"]
+    if not pend:
+        return None
+    batch_id = ab._gen_id("lrb").replace("-", "_")
+    batch = {
+        "batch_id": batch_id, "segment": seg, "created": ab._now(),
+        "decisions": [{"node": n["id"], "label": n["label"], "acceptance": n.get("acceptance"),
+                       "autonomy": n.get("autonomy"), "precheck": n.get("precheck")}
+                      for n in pend],
+    }
+    net["pending_decision_batch"] = batch
+    _save_net(net)
+    _emit_event(task_id, "decision_batch_raised", batch=batch_id, count=len(pend),
+                nodes=[n["id"] for n in pend])
+    return batch
+
+
+def resolve_batch(task_id, approvals):
+    """用户在一处批完 → 落合批结果。approvals={node_id:"approve"|"reject"}。
+    approve → 节点解闸(precheck 已 pass·转 ready 交执行);reject → blocked。清空待批单。"""
+    net = _load_net(task_id)
+    batch = net.get("pending_decision_batch")
+    if not batch:
+        raise SystemExit("无待批决策单: %s" % task_id)
+    applied = {}
+    for d in batch["decisions"]:
+        nid = d["node"]
+        verdict = approvals.get(nid, "reject")   # 未答默认保守 reject(宁卡不误做不可逆)
+        n = net["nodes"].get(nid)
+        if not n:
+            continue
+        if verdict == "approve":
+            n["autonomy"] = "notify"              # 已获批→降级为 notify,不再 await_decision→转 ready
+        else:
+            n["status"] = "failed"; n["verdict"] = "user_rejected"
+        applied[nid] = verdict
+    net["pending_decision_batch"] = None
+    _refresh_statuses(net)
+    _save_net(net)
+    _emit_event(task_id, "decision_batch_resolved", batch=batch["batch_id"], applied=applied)
+    return applied
 
 
 def close_frontier(task_id, seg_index=None):
@@ -321,6 +400,7 @@ def _board_task_view(net):
             "id": nid, "label": n["label"], "status": n["status"],
             "owner": n.get("owner"), "acceptance": n.get("acceptance"),
             "verdict": n.get("verdict"), "author": n.get("author"),
+            "autonomy": n.get("autonomy", "auto"), "precheck": n.get("precheck"),
             "blocked_on": _blocked_on(net, nid),
         })
         for p in n.get("parents", []):
@@ -354,6 +434,8 @@ def _board_task_view(net):
                      "seg_done_nodes": seg_done, "seg_total_nodes": seg_total,
                      "pct": pct, "growable": True},
         "complexity": _complexity(net),
+        # 待批决策单(§2.4 合批·MasterUI 渲染成"一处点批"·null=当前无待批)
+        "pending_decision_batch": net.get("pending_decision_batch"),
     }
 
 
@@ -391,10 +473,24 @@ def main():
     s.add_argument("--id", required=True); s.add_argument("--label", required=True)
     s.add_argument("--parent"); s.add_argument("--owner"); s.add_argument("--acceptance")
     s.add_argument("--author", default="machine")
+    s.add_argument("--autonomy", default="auto", choices=["auto", "notify", "ask"],
+                   help="auto只读可逆自动|notify做了报一声|ask不可逆/对客/DDL须合批请示")
 
     s = sub.add_parser("done-node", help="标节点完成")
     s.add_argument("--id", required=True); s.add_argument("--node", required=True)
     s.add_argument("--verdict", default="ok")
+
+    s = sub.add_parser("precheck", help="执行前校验闸(炸在提审批前)")
+    s.add_argument("--id", required=True); s.add_argument("--node", required=True)
+    s.add_argument("--fail", action="store_true", help="校验失败(默认 pass)")
+    s.add_argument("--findings", default="", help="发现(逗号分隔)")
+
+    s = sub.add_parser("decide-batch", help="决策合批:攒当前段 await_decision 成一张单")
+    s.add_argument("--id", required=True)
+
+    s = sub.add_parser("resolve-batch", help="落合批结果")
+    s.add_argument("--id", required=True)
+    s.add_argument("--approvals", required=True, help='JSON {node_id:"approve"|"reject"}')
 
     s = sub.add_parser("close-frontier", help="声明当前段前沿封闭")
     s.add_argument("--id", required=True)
@@ -410,10 +506,19 @@ def main():
         net = init_net(a.id, a.title, json.loads(a.spine))
         print("初始化: %s 脊柱%d锚点 current_segment=%d" % (a.id, len(net["spine"]), net["current_segment"]))
     elif a.cmd == "add":
-        nid = add_node(a.id, a.label, parent=a.parent, owner=a.owner, acceptance=a.acceptance, author=a.author)
-        print("加节点: %s" % nid)
+        nid = add_node(a.id, a.label, parent=a.parent, owner=a.owner, acceptance=a.acceptance,
+                       author=a.author, autonomy=a.autonomy)
+        print("加节点: %s (autonomy=%s)" % (nid, a.autonomy))
     elif a.cmd == "done-node":
         complete_node(a.id, a.node, a.verdict); print("完成: %s" % a.node)
+    elif a.cmd == "precheck":
+        st = precheck_node(a.id, a.node, not a.fail, [x for x in a.findings.split(",") if x])
+        print("校验%s → 节点态=%s" % ("失败" if a.fail else "通过", st))
+    elif a.cmd == "decide-batch":
+        b = decide_batch(a.id)
+        print("待批单: %s (%d 决策)" % (b["batch_id"], len(b["decisions"])) if b else "无 await_decision 节点")
+    elif a.cmd == "resolve-batch":
+        ap2 = resolve_batch(a.id, json.loads(a.approvals)); print("已落: %s" % json.dumps(ap2, ensure_ascii=False))
     elif a.cmd == "close-frontier":
         close_frontier(a.id); print("前沿封闭")
     elif a.cmd == "collapse":
