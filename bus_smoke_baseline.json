@@ -1,0 +1,365 @@
+{
+  "commands": [
+    "answer",
+    "ask-user",
+    "caps",
+    "dispatch",
+    "done",
+    "edge-acquire",
+    "edge-release",
+    "fanout",
+    "fanout-collect",
+    "health",
+    "health-sweep",
+    "hello",
+    "join-group",
+    "leave-group",
+    "list",
+    "mem-cap",
+    "park",
+    "peek",
+    "prune",
+    "reap",
+    "register",
+    "replies",
+    "request",
+    "retire",
+    "retired",
+    "revive",
+    "roster",
+    "route",
+    "selfwake",
+    "selfwake-guard",
+    "send",
+    "send-group",
+    "serve",
+    "sessions",
+    "stale",
+    "supervise",
+    "tag",
+    "tasklines",
+    "unpark",
+    "wait",
+    "webui-guard",
+    "who",
+    "whoami"
+  ],
+  "command_count": 43,
+  "tests": [
+    {
+      "name": "who.json",
+      "cmd": "who",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "活体核对 JSON"
+    },
+    {
+      "name": "who.text",
+      "cmd": "who",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "who 人看表格"
+    },
+    {
+      "name": "list",
+      "cmd": "list",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "队列深度"
+    },
+    {
+      "name": "health.json",
+      "cmd": "health",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "健康总检 JSON"
+    },
+    {
+      "name": "health.text",
+      "cmd": "health",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "健康总检文本"
+    },
+    {
+      "name": "selfwake",
+      "cmd": "selfwake",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "自醒检测"
+    },
+    {
+      "name": "caps",
+      "cmd": "caps",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "能力池"
+    },
+    {
+      "name": "roster",
+      "cmd": "roster",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "花名册"
+    },
+    {
+      "name": "route",
+      "cmd": "route",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "路由助手"
+    },
+    {
+      "name": "retired",
+      "cmd": "retired",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "退役档案馆"
+    },
+    {
+      "name": "tasklines.json",
+      "cmd": "tasklines",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "任务线看板"
+    },
+    {
+      "name": "stale.json",
+      "cmd": "stale",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "停滞待办"
+    },
+    {
+      "name": "mem-cap",
+      "cmd": "mem-cap",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "内存感知并发上限"
+    },
+    {
+      "name": "whoami",
+      "cmd": "whoami",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "身份反查(未绑定 exit 2 也算跑通)"
+    },
+    {
+      "name": "sessions.json",
+      "cmd": "sessions",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "可恢复会话列表"
+    },
+    {
+      "name": "reap.dry",
+      "cmd": "reap",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "孤儿回收 dry"
+    },
+    {
+      "name": "supervise.dry",
+      "cmd": "supervise",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "舰队对账 dry(不起 daemon)"
+    },
+    {
+      "name": "webui-guard.dry",
+      "cmd": "webui-guard",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "WebUI 守卫 dry"
+    },
+    {
+      "name": "prune.dry",
+      "cmd": "prune",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "清空目录 dry"
+    },
+    {
+      "name": "selfwake-guard.dry",
+      "cmd": "selfwake-guard",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "自醒守卫 dry"
+    },
+    {
+      "name": "health-sweep.detect",
+      "cmd": "health-sweep",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "丢失巡检(不带 --apply=只检测)"
+    },
+    {
+      "name": "register",
+      "cmd": "register",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "注册测试角色"
+    },
+    {
+      "name": "send",
+      "cmd": "send",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "派活(打印 task id)"
+    },
+    {
+      "name": "peek",
+      "cmd": "peek",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "非侵入查看 inbox"
+    },
+    {
+      "name": "wait",
+      "cmd": "wait",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "阻塞等待/领取"
+    },
+    {
+      "name": "replies",
+      "cmd": "replies",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "收回填"
+    },
+    {
+      "name": "join-group",
+      "cmd": "join-group",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "运行时入组"
+    },
+    {
+      "name": "send-group",
+      "cmd": "send-group",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "发往工作组"
+    },
+    {
+      "name": "leave-group",
+      "cmd": "leave-group",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "运行时离组"
+    },
+    {
+      "name": "fanout",
+      "cmd": "fanout",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "拆片撒组 inbox"
+    },
+    {
+      "name": "park",
+      "cmd": "park",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "故意暂离"
+    },
+    {
+      "name": "unpark",
+      "cmd": "unpark",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "解除暂离"
+    },
+    {
+      "name": "edge-acquire",
+      "cmd": "edge-acquire",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "抢 Edge 锁(被占则 timeout 也算跑通)"
+    },
+    {
+      "name": "edge-release",
+      "cmd": "edge-release",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "释放 Edge 锁"
+    },
+    {
+      "name": "retire",
+      "cmd": "retire",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "退役归档"
+    },
+    {
+      "name": "revive",
+      "cmd": "revive",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "复用回路"
+    },
+    {
+      "name": "hello.preview",
+      "cmd": "hello",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "onboarding 预览(只读无副作用)"
+    },
+    {
+      "name": "ask-user.reject",
+      "cmd": "ask-user",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "非成员 ask-user 应硬拒(不崩)"
+    },
+    {
+      "name": "answer.notfound",
+      "cmd": "answer",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "答不存在 todo 优雅兜底"
+    }
+  ],
+  "test_count": 39,
+  "pass": 39,
+  "fail": 0
+}
