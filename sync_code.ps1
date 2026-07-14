@@ -1,8 +1,9 @@
-# sync_code.ps1 — 把 agent_bus 总线【源代码+配置】硬链镜像到 agent_fleet\agent_bus\
-# 目的:让 agent_fleet 自包含全部源码(只迁移本目录即带走总线本体),可自举/换机。
-# 只镜像源码+配置,绝不碰运行态(各 role 队列/presence/events.jsonl/fleet_status.json/pid_tags)。
-# 幂等:每次重建硬链(应对原子保存断链)。同卷(C:)NTFS,不占额外空间。
-# 用法:powershell -NoProfile -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_code.ps1
+# sync_code.ps1 - hardlink-mirror agent_bus source+config into agent_fleet\agent_bus\
+# Purpose: make agent_fleet self-contained (copy this dir = take the whole bus), bootstrappable.
+# Mirrors source+config only; never touches runtime state (per-role queues/presence/events/fleet_status/pid_tags).
+# Idempotent: rebuilds hardlinks each run (heals atomic-save link breaks). Same volume (C:) NTFS, no extra space.
+# ASCII-ONLY (PS 5.1 mis-parses non-BOM UTF-8 Chinese -> corrupts adjacent lines). Do not add non-ASCII.
+# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_code.ps1
 
 $src = Join-Path $env:USERPROFILE ".claude\agent_bus"
 $dst = "C:\apphome\agent_fleet\agent_bus"
@@ -21,4 +22,19 @@ foreach ($f in $files) {
   New-Item -ItemType HardLink -Path $lnk -Value $s | Out-Null
   $n++
 }
-Write-Output ("总线源代码硬链镜像完成: " + $n + " 个 -> " + $dst)
+
+# BUS 2.0 package: recursively mirror every .py under bus/ (incl future submodules bus/core, bus/health...),
+# preserving relative layout. *.py only (auto-excludes __pycache__/*.pyc). Same-volume NTFS hardlink.
+$busSrc = Join-Path $src "bus"
+if (Test-Path $busSrc) {
+  Get-ChildItem -Path $busSrc -Recurse -File -Filter *.py | ForEach-Object {
+    $rel = $_.FullName.Substring($src.Length).TrimStart('\')
+    $lnk = Join-Path $dst $rel
+    $lnkDir = Split-Path $lnk -Parent
+    New-Item -ItemType Directory -Force -Path $lnkDir | Out-Null
+    if (Test-Path $lnk) { Remove-Item $lnk -Force }
+    New-Item -ItemType HardLink -Path $lnk -Value $_.FullName | Out-Null
+    $n++
+  }
+}
+Write-Output ("bus source hardlink mirror done: " + $n + " files -> " + $dst)

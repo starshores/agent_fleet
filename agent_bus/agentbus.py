@@ -36,75 +36,17 @@ except Exception:
     pass
 os.environ.setdefault("PYTHONUTF8", "1")   # 传给 agentbus 起的子 python(dispatch/daemon/ad-hoc),从源头覆盖 GBK
 
-BUS = Path(os.path.expandvars(os.path.expanduser(os.environ.get("AGENTBUS_DIR", str(Path.home() / ".claude" / "agent_bus")))))
+# ---- 共享基础层(BUS 2.0 P1):config / io / roster 已抽到 bus/ 包,此处 re-export 保兼容公共面 ----
+# (dispatch_agent / longrange_net / pool_dispatcher / worker_daemon / ui.server 都 import agentbus as ab
+#  并用 ab.BUS / ab.cfg / ab._now / ab._write_json / ab._gen_id 等,名字经 re-export 不变。)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bus.config import BUS, METRICS, cfg, _now  # noqa: E402
+from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics  # noqa: E402
+from bus.roster import (  # noqa: E402
+    _agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
+    _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label,
+)
 
-_CONFIG_CACHE = None
-
-
-def cfg(key, default=None):
-    """读机器相关路径配置(集中在 agent_bus/config.json,迁移/换机改这一处即可)。
-    优先级:环境变量 AGENTBUS_<KEY大写> > config.json > default。
-    被 worker_daemon / ui.server / recover / hook 复用,避免硬编码绝对路径散落各处。"""
-    env = os.environ.get("AGENTBUS_" + key.upper())
-    if env:
-        return os.path.expandvars(os.path.expanduser(env))
-    global _CONFIG_CACHE
-    if _CONFIG_CACHE is None:
-        try:
-            _CONFIG_CACHE = json.loads((BUS / "config.json").read_text(encoding="utf-8"))
-        except Exception:
-            _CONFIG_CACHE = {}
-    value = _CONFIG_CACHE.get(key, default)
-    return os.path.expandvars(os.path.expanduser(value)) if isinstance(value, str) else value
-
-
-def _now():
-    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
-
-
-def _role_dir(role):
-    d = BUS / role
-    for sub in ("inbox", "processing", "archive", "done"):
-        (d / sub).mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _agents_file():
-    return BUS / "agents.json"
-
-
-def _list_roles():
-    """BUS 下的 role 目录(排除 __pycache__ / 以 . 或 _ 开头的非 role 目录)。"""
-    if not BUS.exists():
-        return []
-    return sorted([p.name for p in BUS.iterdir()
-                   if p.is_dir() and not p.name.startswith((".", "_"))])
-
-
-def _retired_roles():
-    """已退役 role 集合(agents.json 里 retired 字段为真)。退役语义:不再派活/onboarding、
-    不当"掉线/缺失"误报、supervise 不拉起、留痕不删(贡献档案在记忆)。succeeded_by 记接替者。"""
-    try:
-        return {r for r, v in _load_agents().items() if isinstance(v, dict) and v.get("retired")}
-    except Exception:
-        return set()
-
-
-# 伪角色/系统桶:有 mailbox 目录但本质【非执行体】——不是 CLI tab、永不 hello、无 presence=正常,
-# 不该在 selfwake/who 里被判"掉线/未醒"混进真 agent(用户 2026-07-02·数分 转)。显式名单为准,纯显示层标注。
-_PSEUDO_ROLE_LABELS = {
-    "用户": "伪角色·待办池(ask-user 投给人类的收件箱,人类永不 hello)",
-    "unknown": "伪角色·死信桶(role 解析不出的消息/回执落此,无害待清)",
-}
-def _pseudo_role_label(role):
-    """伪角色返回其标注串;真 agent 返回 None。"""
-    return _PSEUDO_ROLE_LABELS.get(role)
-
-
-def _is_test_role(name):
-    """测试/临时角色:zz* / __* / 单字符 ?。统计/健康/校验默认过滤,免测试 send 污染真实指标
-    (Master数分 实证:未claim 17 条里 6 条是 zztest_loss/__todotest 等测试,制造假"漏接")。"""
-    return bool(name) and (name.startswith(("zz", "__")) or name == "?")
 
 
 def _warn_unreachable(role):
@@ -122,115 +64,8 @@ def _warn_unreachable(role):
                              "换个在岗的 / 让它重挂自醒,或确认它是人值守 tab。(仍写入其 inbox)\n" % role)
 
 
-def _load_agents():
-    f = _agents_file()
-    if f.exists():
-        try:
-            return json.loads(f.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def _save_agents(a):
-    BUS.mkdir(parents=True, exist_ok=True)
-    _agents_file().write_text(json.dumps(a, ensure_ascii=False, indent=1), encoding="utf-8")
-
-
-def _gen_id(role):
-    return "%d-%s-%s" % (time.time_ns() // 1_000_000, role, os.urandom(3).hex())
-
-
-def _write_json(path, obj):
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
-    # 原子落地,避免 watcher 读到半截。os.replace 在 Windows 下若目标被 watcher/AV/另一 waiter
-    # 瞬时占用会抛 PermissionError(WinError 5)——短 backoff 重试,绝不让瞬时锁把调用方崩掉
-    # (尤其自醒 wait 进程:Master 报过 _claim 改写时撞 WinError 5 → wait exit 1 → 协调位掉线漏消息)。
-    for attempt in range(5):
-        try:
-            os.replace(tmp, path)
-            return
-        except OSError:
-            if attempt == 4:
-                try: tmp.unlink()           # 持久失败:清掉孤儿 .tmp 再抛
-                except Exception: pass
-                raise
-            time.sleep(0.05 * (attempt + 1))
-
-
-def _audit(event, **fields):
-    """append-only 审计日志:send/claim/done 各记一行到 BUS/events.jsonl。
-    全链路可追溯(replies 被 clear 后仍留痕);best-effort,绝不影响主流程。"""
-    try:
-        rec = {"ts": _now(), "event": event}
-        rec.update(fields)
-        with open(BUS / "events.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# ---------------- BI 资源消耗指标(token / 成本 / 耗时)----------------
-# 每个任务跑完(daemon / dispatch)往 BUS/metrics.jsonl 追一行,WebUI BI 模块按角色/全队聚合。
-METRICS = BUS / "metrics.jsonl"
-
-
-def record_metric(role, task_id, title, status, meta, kind="daemon"):
-    """任务完成后记一条资源消耗。meta 来自 claude_run.run_streaming 的第三个返回值。
-    best-effort,绝不影响主流程(埋点失败不能让任务回填失败)。"""
-    try:
-        meta = meta or {}
-        rec = {
-            "t": time.time(),                       # epoch 秒(给 BI 做时间窗聚合)
-            "ts": _now(),                           # 可读本地时间
-            "role": role,
-            "task_id": task_id,
-            "title": (title or "")[:80],            # 标题截断;私有 tab 不走 daemon 任务,不会入账
-            "status": status,
-            "kind": kind,                           # daemon / dispatch
-            "tokens_in": int(meta.get("tokens_in", 0) or 0),
-            "tokens_out": int(meta.get("tokens_out", 0) or 0),
-            "cache_read": int(meta.get("cache_read", 0) or 0),
-            "cache_creation": int(meta.get("cache_creation", 0) or 0),
-            "cost_usd": float(meta.get("cost_usd", 0) or 0),
-            "duration_ms": int(meta.get("duration_ms", 0) or 0),
-            "num_turns": int(meta.get("num_turns", 0) or 0),
-        }
-        line = json.dumps(rec, ensure_ascii=False) + "\n"
-        # O_APPEND 原子追加单行,避免并发 daemon 收尾时互相截断
-        fd = os.open(str(METRICS), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
-        try:
-            os.write(fd, line.encode("utf-8"))
-        finally:
-            os.close(fd)
-    except Exception:
-        pass
-
-
-def read_metrics(limit=8000):
-    """读 metrics.jsonl(尾部 limit 行),返回 dict 列表。文件不在/坏行跳过。"""
-    if not METRICS.exists():
-        return []
-    try:
-        lines = METRICS.read_text(encoding="utf-8", errors="replace").splitlines()
-    except Exception:
-        return []
-    out = []
-    for ln in lines[-limit:]:
-        ln = ln.strip()
-        if not ln:
-            continue
-        try:
-            out.append(json.loads(ln))
-        except Exception:
-            continue
-    return out
-
-
-def _oldest(folder):
-    files = sorted([p for p in folder.glob("*.json")])
-    return files[0] if files else None
+# ---- (_load_agents / _save_agents / _gen_id / _write_json / _oldest / _audit /
+#       record_metric / read_metrics 已抽到 bus/ 包 · 见文件头 import) ----
 
 
 # ---------------- identity / presence ----------------

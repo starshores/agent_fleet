@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+"""bus.roster —— agents.json 读写 / 角色目录 / 角色分类(叶子层,仅依赖 bus.config)。
+
+注:更上层的可达校验 _warn_unreachable 依赖 _self_wake_state,仍留在 agentbus.py,不在此。
+"""
+import json
+from bus.config import BUS
+
+
+def _agents_file():
+    return BUS / "agents.json"
+
+
+def _load_agents():
+    f = _agents_file()
+    if f.exists():
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_agents(a):
+    BUS.mkdir(parents=True, exist_ok=True)
+    _agents_file().write_text(json.dumps(a, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _role_dir(role):
+    d = BUS / role
+    for sub in ("inbox", "processing", "archive", "done"):
+        (d / sub).mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _list_roles():
+    """BUS 下的 role 目录(排除 __pycache__ / 以 . 或 _ 开头的非 role 目录)。"""
+    if not BUS.exists():
+        return []
+    return sorted([p.name for p in BUS.iterdir()
+                   if p.is_dir() and not p.name.startswith((".", "_"))])
+
+
+def _retired_roles():
+    """已退役 role 集合(agents.json 里 retired 字段为真)。退役语义:不再派活/onboarding、
+    不当"掉线/缺失"误报、supervise 不拉起、留痕不删(贡献档案在记忆)。succeeded_by 记接替者。"""
+    try:
+        return {r for r, v in _load_agents().items() if isinstance(v, dict) and v.get("retired")}
+    except Exception:
+        return set()
+
+
+def _is_test_role(name):
+    """测试/临时角色:zz* / __* / 单字符 ?。统计/健康/校验默认过滤,免测试 send 污染真实指标
+    (Master数分 实证:未claim 17 条里 6 条是 zztest_loss/__todotest 等测试,制造假"漏接")。"""
+    return bool(name) and (name.startswith(("zz", "__")) or name == "?")
+
+
+# 伪角色/系统桶:有 mailbox 目录但本质【非执行体】——不是 CLI tab、永不 hello、无 presence=正常,
+# 不该在 selfwake/who 里被判"掉线/未醒"混进真 agent(用户 2026-07-02·数分 转)。显式名单为准,纯显示层标注。
+_PSEUDO_ROLE_LABELS = {
+    "用户": "伪角色·待办池(ask-user 投给人类的收件箱,人类永不 hello)",
+    "unknown": "伪角色·死信桶(role 解析不出的消息/回执落此,无害待清)",
+}
+
+
+def _pseudo_role_label(role):
+    """伪角色返回其标注串;真 agent 返回 None。"""
+    return _PSEUDO_ROLE_LABELS.get(role)
