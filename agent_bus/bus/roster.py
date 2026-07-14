@@ -6,6 +6,9 @@
 import json
 from bus.config import BUS
 
+# 人值守角色:它们的回填才值得弹给人(toast 分级 + 可达校验豁免用)。角色分类,归 roster。
+HUMAN_ATTENDED = ("Master", "MasterAgent")
+
 
 def _agents_file():
     return BUS / "agents.json"
