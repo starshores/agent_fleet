@@ -492,6 +492,32 @@ def skip_node(task_id, nid, reason=None):
     _emit_event(task_id, "node_skipped", node=nid, reason=reason)
 
 
+def track(task_id, tracker=None, summary=None, watching=None, action=None, pending=None):
+    """跟踪者督办可观测性(2026-07-14·用户要"看得到跟踪者在盯什么"):把跟踪状态写进网 → 看板可读。
+    执行体无关(谁跟踪谁写·我/Master子agent/daemon 都行);不注册幻影 presence(方案②非①)。
+    summary=一句话在盯啥;watching=当前关注项[str];action=本次督办动作(追进 recent_actions·留最近10);pending=待办督办[str]。"""
+    net = _load_net(task_id)
+    if not net:
+        raise SystemExit("net 不存在: %s" % task_id)
+    ts = net.get("tracker_status") or {"recent_actions": []}
+    if tracker is not None:
+        ts["tracker"] = tracker
+    ts["last_scan"] = ab._now()
+    if summary is not None:
+        ts["summary"] = summary
+    if watching is not None:
+        ts["watching"] = watching
+    if pending is not None:
+        ts["pending"] = pending
+    if action:
+        ts.setdefault("recent_actions", []).append({"ts": ab._now(), "action": action})
+        ts["recent_actions"] = ts["recent_actions"][-10:]   # 留最近 10
+    net["tracker_status"] = ts
+    _save_net(net)
+    _emit_event(task_id, "tracker_scan", tracker=ts.get("tracker"), summary=summary, action=action)
+    return ts
+
+
 # ── 复杂度标尺(raw·口径使用方 P1 定准)───────────────────────────────────
 def _complexity(net):
     """task 级复杂度 raw 量:归档段计入总量(collapsed{nodes,edges}·§2.2)、宽深按当前活图。
@@ -585,6 +611,8 @@ def _board_task_view(net):
         "efficiency": _efficiency(net["id"]),
         # 待批决策单(§2.4 合批·MasterUI 渲染成"一处点批"·null=当前无待批)
         "pending_decision_batch": net.get("pending_decision_batch"),
+        # 跟踪者督办状态(2026-07-14·用户要可观测·MasterUI 渲"跟踪者"条:在盯啥/上次巡/督办动作/待办)
+        "tracker_status": net.get("tracker_status"),
     }
 
 
@@ -711,6 +739,11 @@ def main():
     s = sub.add_parser("skip-node", help="跳过节点(status=skipped·不挡收敛)")
     s.add_argument("--id", required=True); s.add_argument("--node", required=True); s.add_argument("--reason")
 
+    s = sub.add_parser("track", help="跟踪者写督办状态(看板可读·可观测性)")
+    s.add_argument("--id", required=True); s.add_argument("--tracker"); s.add_argument("--summary")
+    s.add_argument("--watching", help="JSON数组 当前关注项"); s.add_argument("--action", help="本次督办动作")
+    s.add_argument("--pending", help="JSON数组 待办督办")
+
     s = sub.add_parser("show", help="打印某任务网 JSON(附 complexity+efficiency)"); s.add_argument("--id", required=True)
     sub.add_parser("board", help="重建并打印看板视图")
 
@@ -754,6 +787,11 @@ def main():
         remove_node(a.id, a.node); print("删节点: %s" % a.node)
     elif a.cmd == "skip-node":
         skip_node(a.id, a.node, a.reason); print("跳过节点: %s" % a.node)
+    elif a.cmd == "track":
+        ts = track(a.id, tracker=a.tracker, summary=a.summary,
+                   watching=json.loads(a.watching) if a.watching else None,
+                   action=a.action, pending=json.loads(a.pending) if a.pending else None)
+        print("跟踪状态更新: %s | 最近动作 %d 条" % (ts.get("summary") or "-", len(ts.get("recent_actions") or [])))
     elif a.cmd == "show":
         net = _load_net(a.id)
         if net:                                   # 需求5:show 附 complexity+efficiency(看"已省N次反复确认")
