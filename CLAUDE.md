@@ -74,6 +74,15 @@ python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
 
 > 恢复完,先 `recover.py` 看有没有在飞的活(inbox 待领 / done 待读),再继续协调。
 
+## 🔒 数据默认不出本机(未授权禁止任何数据离开本机)— 见 global CLAUDE.md 同名红线
+
+> 2026-07-14 用户令。**这条是【全会话通用】最高优先级安全红线,已落 global `~/.claude/CLAUDE.md`**(bus 成员与非 bus 会话都适用);此处只做 bus 视角的收口。
+
+- **与洁净基准的关系**:洁净基准管【bus 核心不掺业务数据】、脱敏管【业务→客户远端仓】;**本条管【任何数据未授权不离开本机,claude.ai 云也算离开本机】**——三条互补、本条最上位(egress 层)。
+- **审计结论(2026-07-14)**:bus 代码本身**零外发口子**(Artifact/HTTP-POST/MCP 均无;EDGE CDP=本机调试口、SQL=文件协议、UI=127.0.0.1)——泄露口在 **CC 工具/skill 层**(某 agent 用了 `Artifact` 工具把旧 BI 设计稿发上 claude.ai),故只有**提示词层规则**能拦、代码修不到。
+- **规则按【动作】不按工具名**:凡把数据外发出本机的动作先停先问授权;**CC 未来新增的任何会外发数据的原生工具自动受约束**,无需逐个登记。已知口子示例:`Artifact`/`ShareOnboardingGuide`/MCP 外部连接器/任何 publish·分享链·上传。
+- **默认**:可视化走本机 WebUI(127.0.0.1)、留存走本机文件。详见记忆 `no-cloud-upload-unauthorized`。
+
 ## bus 待办池 / ask-user(需用户拍板 → 非阻塞待办池;仅 bus 成员)
 
 > 2026-07-10 从全局 `~/.claude/CLAUDE.md` 迁入此处(bus 专用规则,收窄为仅 bus 注册成员适用;

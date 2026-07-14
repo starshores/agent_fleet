@@ -33,5 +33,55 @@
   "registered": "2026-06-29T16:24:32",
   "desc": "数据分析口(接替 Master数分 session a4fe9191·2026-06-29):bus/用量/成本资源的数据分析与口径把关——usage.db/metrics 实测分析(配额利用率·产出价值·成本归因)、数据真实性核查、退役 agent 贡献溯源建档;协调/分析位,不 loop。",
   "caps": ["bus-comms", "self-wake", "confidentiality", "data-analysis", "bus-monitoring"]
+ },
+ "示例成员": {
+  "registered": "2026-07-03T14:57:13"
+ },
+ "安全分诊": {
+  "registered": "2026-07-06T11:13:35",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "confidentiality"
+  ],
+  "desc": "外部/不受信 skill 安全分诊(隔离审查):runner 二进制绝不执行、全程隔离scratchpad静态分析;Go/PE壳逆向(strings/nm/objdump取符号与VMA→文件偏移)、加密payload解密(AES-GCM·hex key·前置nonce)、解压真身扫危险面(网络/exec/生IP/base64)、只跑审计过的良性内核做同构复现;产物一律显式UTF-8、下载即改名QUARANTINE、未审清不入~/.claude/skills。判据:stub无害≠skill安全,decryptKey+payloadEnc+生IP verifyURL三件套=供应链投毒;分层定性(恶性可只在壳、内核良性)。外部下发件先审后用。"
+ },
+ "示例组员2": {
+  "registered": "2026-07-08T10:03:07",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "confidentiality",
+   "sql-fetch",
+   "high-risk"
+  ],
+  "desc": "示例组数据分析/数仓诊断:候选层/ETL/拉链表、跨库一致性核查、输出差异根因;写操作只设计+核验、走审批不绕过。路由'数据对不对/跨库对账/输出差异'找它 【示例组池·与示例组员同职互换成员】"
+ },
+ "示例组员3": {
+  "registered": "2026-07-08T10:12:50",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "confidentiality",
+   "sql-fetch",
+   "high-risk"
+  ],
+  "desc": "示例组数据分析/数仓诊断(示例组可互换复制体·与示例组员同能力池):候选层/ETL/拉链表、跨库一致性核查(键绑定指纹/段对账)、源库对账、字段迁移核对/落库复核;写操作只设计+核验走审批不绕过。可互换承接示例组池活。"
+ },
+ "__wgm1__": {
+  "registered": "2026-07-10T15:44:58",
+  "desc": "wgtest"
+ },
+ "__wgm2__": {
+  "registered": "2026-07-10T15:44:58",
+  "desc": "wgtest"
+ },
+ "__wgm3__": {
+  "registered": "2026-07-10T15:44:58",
+  "desc": "wgtest"
+ },
+ "__wgmB__": {
+  "registered": "2026-07-10T15:53:52",
+  "desc": "x"
  }
 }

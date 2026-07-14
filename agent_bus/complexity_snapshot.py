@@ -128,9 +128,86 @@ def complexity_from_events(events_path, task_id):
     }
 
 
+def complexity_series_from_events(events_path, task_id):
+    """成长曲线:按事件时间线累计,返回 [{t, size, live}](供 MasterUI sparkline·t.complexity_series)。
+    - size = 累计 node_added 总数(单调↑·=复杂度发现量·'网越大越复杂'的成长故事·主曲线)。
+    - live = 当前活网节点数(达锚塌缩:该段 N 节点并为 1 塌缩节点 → live 掉 N-1;反映活工作集/资源趋势)。
+    每个 node_added / segment_collapsed 事件产一个点。"""
+    size = 0
+    live = 0
+    pts = []
+    with open(events_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+            except Exception:
+                continue
+            if task_id is not None and e.get("task") != task_id:
+                continue
+            ev = e.get("event")
+            ts = e.get("ts") or e.get("timestamp") or ""
+            if ev == "node_added":
+                size += 1
+                live += 1
+                pts.append({"t": ts, "size": size, "live": live})
+            elif ev == "segment_collapsed":
+                nc = e.get("node_count") or 0
+                if nc > 1:
+                    live -= (nc - 1)          # N 节点 → 1 塌缩节点
+                    if live < 0:
+                        live = 0
+                pts.append({"t": ts, "size": size, "live": live})
+    return pts
+
+
+def confirmation_savings_from_events(events_path, task_id):
+    """★验收口径(使用方):量化机制吸收了多少"反复确认往返"(治 Master 停等病的硬证据)。
+    读 P1 事件:decision_batch_raised(count=攒进单的决策数)/precheck(result=fail=自动挡·免白批)。
+    - decisions_batched : 进合批单的决策总数(本该各自零售请示)
+    - batches           : 合批单张数(每张=1次用户交互)
+    - roundtrips_saved_by_batching = decisions_batched - batches(N决策攒1单省N-1次往返)
+    - precheck_fail_avoided : precheck 判 fail 自动 blocked 的节点数(炸在提审前=免"白批一次"+免打扰)
+    - confirmation_turns_saved = 合批省的 + precheck 免的(总"反复确认"回合削减·对照诊断 before 基线)"""
+    decisions_batched = 0
+    batches = 0
+    precheck_fail = 0
+    with open(events_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+            except Exception:
+                continue
+            if task_id is not None and e.get("task") != task_id:
+                continue
+            ev = e.get("event")
+            if ev == "decision_batch_raised":
+                batches += 1
+                decisions_batched += (e.get("count") or 0)
+            elif ev == "precheck" and e.get("result") == "fail":
+                precheck_fail += 1
+    saved_batch = max(0, decisions_batched - batches)
+    return {
+        "decisions_batched": decisions_batched,
+        "batches": batches,
+        "roundtrips_saved_by_batching": saved_batch,
+        "precheck_fail_avoided": precheck_fail,
+        "confirmation_turns_saved": saved_batch + precheck_fail,
+        "note": "反复确认降幅·使用方·合批省(decisions-batches)+precheck_fail免白批;对照诊断before(371待命/124'要我吗'/41审批)测机制降幅",
+    }
+
+
 if __name__ == "__main__":
     import sys
     from pathlib import Path
     ep = sys.argv[1] if len(sys.argv) > 1 else str(Path.home() / ".claude/agent_bus/longrange_events.jsonl")
     tid = sys.argv[2] if len(sys.argv) > 2 else "demo-feat-migrate"
+    print("=== complexity(全网shape) ===")
     print(json.dumps(complexity_from_events(ep, tid), ensure_ascii=False, indent=1))
+    print("=== complexity_series(成长曲线) ===")
+    print(json.dumps(complexity_series_from_events(ep, tid), ensure_ascii=False, indent=1))
