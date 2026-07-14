@@ -17,5 +17,26 @@
   ],
   "status": "archived",
   "archived_at": "2026-06-29T16:53:43"
+ },
+ {
+  "role": "Master数分2",
+  "session_ids": [
+   "bcf139d2"
+  ],
+  "registered": "2026-06-29T16:24:32",
+  "retired": "2026-07-14",
+  "succeeded_by": "Master数分",
+  "reason": "管理层轮换·数分线回归基名(数分→数分2累积后缀收回):数分2(bcf139d2)停+存档resume,数据分析职责回归基名【Master数分】;非失能非成本,正常编制轮换",
+  "contribution_memory": "infra-rotation-2026-07-14(轮换交接·shared store);用量token ETL/usage.db持久方舟/BI用量API/token_stats口径;数据真实性铁律(评估用token不用$·真实可溯源)",
+  "desc": "数据分析口(接替数分·数分2):bus/用量/成本资源数据分析与口径把关(评估用token不用$·真实可溯源):Claude全会话用量token增量ETL入usage.db(持久方舟·message_id幂等)、用量成本SQLite分析、BI用量JSON API、token_stats.py口径维护。管理层,cwd=agent_fleet。",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "data-analysis",
+   "bus-monitoring",
+   "token-usage-etl"
+  ],
+  "status": "archived",
+  "archived_at": "2026-07-14T16:27:09"
  }
 ]
