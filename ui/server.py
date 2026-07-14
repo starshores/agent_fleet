@@ -328,6 +328,76 @@ def compute_fleet_cached(force=False):
     return data  # 立即返回缓存(刷新线程保证 ≤interval 新鲜),绝不阻塞
 
 
+# =============================================================
+#  bus 托盘/健康指示器计数 —— 单一源(与运维面板同吃 compute_fleet_cached 缓存,口径不漂移)。
+#  由 bus_tray.py(系统托盘)与本 WebUI 共用:数据口径归 Master数分2、渲染/机制归 MasterUI。
+#  用户 2026-07-14 指名把托盘交 UI 维护,并要求托盘实时/口径对齐运维面板。
+# =============================================================
+_TRAY_RUN_TTL = int(os.environ.get("BUS_TRAY_RUN_TTL", "3600"))  # processing claim 超此秒=僵尸,不计在跑
+
+
+def _parse_claimed_epoch(s):
+    """bus 的 claimed 是本机本地时间 ISO(无时区)→ 本地时间戳(与 bus_tray 口径一致)。"""
+    try:
+        return time.mktime(time.strptime(str(s)[:19], "%Y-%m-%dT%H:%M:%S"))
+    except Exception:
+        return None
+
+
+def bus_tray_counts():
+    """运转指示计数(单一源=运维面板同款 compute_fleet_cached 缓存):
+      在岗N = 进程活着的真角色(vclass live/idle/warn·排除 dead/none/parked);
+      静默K = 在岗里 verdict 含"静默"(是 N 的子集);
+      休眠P = parked(故意暂离·不计在岗);
+      在跑M = processing/ 里 non-notice claim 新鲜(<RUN_TTL)且 owner 在岗 → 真执行;
+      卡死stale = processing/ 里超 RUN_TTL 的 non-notice 僵尸 claim(rot·单列告警不计在跑)。
+    不用 who.current_task 当在跑源(该字段滞留在已卡死旧 claim 上→虚报在跑·Master数分2 口径坑①)。"""
+    fl = compute_fleet_cached()
+    roles = fl.get("roles", []) or []
+    loading = bool(fl.get("loading"))
+    alive_names, n, k, p = set(), 0, 0, 0
+    for r in roles:
+        vc = r.get("vclass")
+        if r.get("parked") or vc == "parked":
+            p += 1
+            continue
+        if vc in ("live", "idle", "warn"):
+            n += 1
+            alive_names.add(r.get("role"))
+            if "静默" in (r.get("verdict") or ""):
+                k += 1
+    now = time.time()
+    running, stale = set(), 0
+    for d in glob.glob(str(BUS / "*")):
+        if not os.path.isdir(d):
+            continue
+        role = os.path.basename(d)
+        if role.startswith("_") or role in ("shared",):
+            continue
+        for f in glob.glob(os.path.join(d, "processing", "*.json")):
+            if "notice-" in os.path.basename(f):
+                continue
+            ts = None
+            try:
+                ts = _parse_claimed_epoch(json.loads(Path(f).read_text(encoding="utf-8")).get("claimed", ""))
+            except Exception:
+                ts = None
+            if ts is None:
+                try:
+                    ts = os.path.getmtime(f)
+                except Exception:
+                    ts = now
+            if now - ts < _TRAY_RUN_TTL:
+                if role in alive_names:
+                    running.add(role)
+            else:
+                stale += 1
+    return {"ok": True, "loading": loading, "present": n, "running": len(running),
+            "silent": k, "parked": p, "stale": stale,
+            "as_of": time.strftime("%H:%M:%S"),
+            "source": "webui-fleet-cache"}
+
+
 def start_fleet_refresher(interval=20):
     """唯一的舰队刷新者:后台线程,每 interval 秒跑一次子进程扫描刷新 _fleet_cache。
     - 子进程扫描在独立 GIL,本线程阻塞 ~4s 完全不影响 HTTP 请求线程。
@@ -4417,6 +4487,9 @@ class Handler(BaseHTTPRequestHandler):
             # 只读后台缓存(子进程刷新);冷启未就绪回 loading 占位,绝不现扫
             d = get_health()
             self._send(200, d if d is not None else {"loading": True})
+        elif path == "/api/tray":
+            # 运转指示计数(bus_tray.py 系统托盘 + WebUI 共用·单一源=fleet 缓存口径)
+            self._send(200, bus_tray_counts())
         elif path == "/api/reap":
             # 孤儿巡检:只读 dry-run,复用 agentbus reap --dry-run
             self._send(200, reap_dryrun())

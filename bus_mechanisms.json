@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total": 91,
+    "total": 92,
     "generated": "2026-07-10",
     "generated_by": "Master数分2 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
     "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -76,7 +76,8 @@
       {"name": "_maybe_toast 通知分级", "does": "never/always/auto(error必发·ok仅协调位+节流)", "carrier": "_maybe_toast()", "status": "在用"},
       {"name": "_toast_throttled 节流", "does": "距上次toast<45s跳过(防刷屏)", "carrier": "_toast_throttled()", "status": "在用"},
       {"name": "_edge_holder 持锁查询", "does": "读edge.lock得当前Edge焦点锁持有者", "carrier": "_edge_holder()", "status": "在用"},
-      {"name": "turn_state 转态观测hook", "does": "生命周期hook(UserPromptSubmit/PreToolUse/PostToolUse/Stop/Notification)async写<role>/turn_state.json:思考执行中/跑工具/空闲,供WebUI turn状态列;fail-open恒放行不碰presence·仅bus成员写·UTF-8强制", "carrier": "hooks/turn_state.py", "status": "新上·2026-07-10"}
+      {"name": "turn_state 转态观测hook", "does": "生命周期hook(UserPromptSubmit/PreToolUse/PostToolUse/Stop/Notification)async写<role>/turn_state.json:思考执行中/跑工具/空闲,供WebUI turn状态列;fail-open恒放行不碰presence·仅bus成员写·UTF-8强制", "carrier": "hooks/turn_state.py", "status": "新上·2026-07-10"},
+      {"name": "bus_tray 托盘常驻监控", "does": "Windows托盘指示器:图标数字=在跑任务agent数·色绿(有在跑)/蓝(在岗全idle)/橙(有静默超心跳)/红(全离线);悬停tooltip=在岗N·在跑M·静默K·休眠P;双击开WebUI(127.0.0.1:8799)·右键刷新/退出。who --json每20s轮询·纯本机不外发(符合数据不出本机红线);pythonw静默启动器(无黑窗)+开机自启+单实例mutex守卫。数据口径(在岗/在跑/静默/休眠)归Master数分2维护", "carrier": "bus_tray.py + bus_tray_start.vbs", "status": "新上·2026-07-14"}
     ]},
     {"id": 7, "name": "Edge互斥与云文档协调", "related_cap": "(基建层)", "mechanisms": [
       {"name": "edge-acquire 抢Edge锁", "does": "O_EXCL原子抢焦点互斥锁(watchdog等释放·stale回收)", "carrier": "cmd_edge_acquire()", "status": "在用·v1.2"},
