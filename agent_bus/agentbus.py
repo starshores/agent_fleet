@@ -71,6 +71,7 @@ from bus.roles import (  # noqa: E402
     _retired_roster_path, _load_retired_roster,
     cmd_retire, cmd_revive, cmd_retired,
 )
+from bus.exec import cmd_dispatch  # noqa: E402
 
 
 
@@ -1242,34 +1243,6 @@ def cmd_selfwake_guard(args):
         "" if args.dry_run else " + toast报警"))
     for role, detail in stale:
         print("   - %s%s:%s" % (role, "" if role in confirmed else "(待确认)", detail))
-
-
-def cmd_dispatch(args):
-    """派一个【一次性 ad-hoc agent】去做单条临时任务:有总线沟通能力、不监听队列、干完即逝、可重新派。
-    与 send(投进某 role 的队列等它领)不同 —— dispatch 立刻 detached 起一个一次性执行体(claude -p),
-    跑完把结果回填到派发方 <from>/done/<id>(用 `replies --role <from>` 收)。失败就再 dispatch 一个。"""
-    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
-    tid = _gen_id("adhoc")
-    cwd = args.cwd or cfg("default_worker_cwd")
-    rec = {
-        "id": tid, "from": frm, "name": args.name or "adhoc",
-        "title": args.title or "", "task": args.task, "cwd": cwd,
-        "timeout": args.timeout, "created": _now(), "kind": "adhoc",
-    }
-    dd = BUS / "_dispatch"
-    dd.mkdir(parents=True, exist_ok=True)
-    _write_json(dd / (tid + ".json"), rec)
-    _audit("dispatch", id=tid, frm=frm, name=rec["name"], title=rec["title"])
-    da = str(Path(__file__).parent / "dispatch_agent.py")
-    flags = 0
-    if os.name == "nt":
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
-    try:
-        subprocess.Popen([sys.executable, da, "--id", tid], creationflags=flags,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(BUS))
-    except Exception as e:
-        print(json.dumps({"error": "dispatch 起一次性 agent 失败: %s" % e}, ensure_ascii=False)); return
-    print(tid)
 
 
 # 会话标记(2026-07-07 用户提:ab sessions 仅元数据模块要能打标记·标"可恢复"等)。
