@@ -30,6 +30,7 @@
     "roster",
     "route",
     "selfwake",
+    "selfwake-exempt",
     "selfwake-guard",
     "send",
     "send-group",
@@ -45,7 +46,7 @@
     "who",
     "whoami"
   ],
-  "command_count": 44,
+  "command_count": 45,
   "tests": [
     {
       "name": "who.json",

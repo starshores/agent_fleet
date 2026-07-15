@@ -124,8 +124,9 @@ def teardown():
                 os.replace(tmp, p)
         except Exception:
             pass
-    # 目录 / parked / group
-    for sub in (SMOKE_ROLE, SMOKE_GRP, f"BUS/{SMOKE_GRP}", f"parked/{SMOKE_ROLE}.json"):
+    # 目录 / parked / group（组实际建在 _groups/<grp>；旧路径 BUS/<grp> 是历史遗留，一并清）
+    for sub in (SMOKE_ROLE, SMOKE_GRP, f"_groups/{SMOKE_GRP}", f"_groups/{SMOKE_ROLE}",
+                f"BUS/{SMOKE_GRP}", f"parked/{SMOKE_ROLE}.json"):
         path = os.path.join(BUS_DIR, sub)
         try:
             if os.path.isdir(path):
