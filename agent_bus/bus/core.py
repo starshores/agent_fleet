@@ -232,11 +232,36 @@ def _kill_prior_waits(role):
     return killed
 
 
+# 维护哨兵:稳定路径(agent_bus 之外),bus 计划内停摆(如目录迁移)时置位;wait 见之原地睡等。
+_MAINT_SENTINEL = BUS.parent / ".bus_maintenance"
+
+
 def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, include_approval=False):
+    # ── 中断 / 自恢复机制(用户 2026-07-15 令·好设计):遇不可恢复问题不崩溃、不空转,睡 5 分钟再自恢复 ──
+    # ① 维护窗口哨兵:计划内停摆(bus 目录迁移等)期间【原地睡等,绝不 mkdir 重建 bus】——
+    #    否则 _role_dir/_touch_presence 会在被搬走的路径上重建出一个空 bus、分裂状态。哨兵清除后继续正常 wait。
+    waited = 0
+    while _MAINT_SENTINEL.exists() and waited < 600:      # 最多守 10 分钟维护窗口
+        if waited == 0:
+            sys.stderr.write("🛠 bus 维护窗口(.bus_maintenance)——原地睡等,不重建 bus...\n")
+        time.sleep(15); waited += 15
+
     _kill_prior_waits(role)   # per-role 幂等:先清同 role 旧 wait,防累积(Master数分 2026-07-02)
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
-    _touch_presence(role, presence_mode, extra)  # 声明身份 + 心跳
-    obj = _wait_core(role, timeout, include_approval)
+    try:
+        _touch_presence(role, presence_mode, extra)       # 声明身份 + 心跳
+        obj = _wait_core(role, timeout, include_approval)
+    except Exception as e:
+        # ② 不可恢复问题(bus 路径暂失 / 迁移中 / 未预期异常):睡 300s 再自恢复一次,绝不崩溃/秒返空转。
+        #    睡眠期间后台 wait 仍"在跑"=agent 保持在岗、透明熬过瞬时故障,恢复后自动接上。
+        sys.stderr.write("⚠ wait 遇不可恢复问题:%s → 睡 300s 再自恢复重试...\n" % (str(e)[:150]))
+        time.sleep(300)
+        try:
+            _touch_presence(role, presence_mode, extra)
+            obj = _wait_core(role, timeout, include_approval)
+        except Exception as e2:
+            sys.stderr.write("⚠ 自恢复后仍异常:%s —— 返回 idle,交下一轮重挂。\n" % (str(e2)[:150]))
+            obj = None
     print(json.dumps(obj if obj is not None else {"idle": True, "role": role}, ensure_ascii=False))
 
 
