@@ -1894,9 +1894,39 @@ def cmd_caps(args):
 
 
 # ---------------- 工作组池化 / park / fan-out / mem-cap(已抽到 bus/pool.py · 见文件头 import)----------------
+# BUS 2.0 命令分组(对齐 bus/ 一体化模块;供 `ab`/`ab commands`/无参时分组呈现·治 43 命令扁平难发现)
+_CMD_GROUPS = [
+    ("消息任务流 core", "send wait serve request done peek replies answer"),
+    ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard"),
+    ("角色·能力 roles", "register retire revive retired caps roster route"),
+    ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
+    ("工作组池 pool", "join-group leave-group send-group fanout fanout-collect park unpark"),
+    ("派遣执行 exec", "dispatch"),
+    ("Edge 互斥", "edge-acquire edge-release"),
+    ("长期任务·待办 tasks", "tasklines ask-user"),
+    ("会话·标注", "sessions tag"),
+]
+
+
+def _print_grouped_help():
+    print("agentbus / ab —— bus 命令(BUS 2.0 · 按一体化模块分组)")
+    print("用法: ab <命令> [参数];`ab <命令> -h` 看某命令详情。短入口 ab 已固化正确 env python + 真实路径 + UTF-8。")
+    for title, cmds in _CMD_GROUPS:
+        print("\n  【%s】" % title)
+        print("    " + "  ".join(cmds.split()))
+    print("")
+
+
+def cmd_commands(args):
+    _print_grouped_help()
+
+
 def main():
+    if len(sys.argv) == 1:          # 无参 = 分组命令总览(UX:别抛 argparse 错)
+        _print_grouped_help(); return
     ap = argparse.ArgumentParser(prog="agentbus")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("commands", help="分组命令总览"); p.set_defaults(fn=cmd_commands)
 
     p = sub.add_parser("register"); p.add_argument("--role", required=True); p.add_argument("--desc", default=""); p.set_defaults(fn=cmd_register)
     p = sub.add_parser("send"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send)

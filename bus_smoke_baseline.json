@@ -3,6 +3,7 @@
     "answer",
     "ask-user",
     "caps",
+    "commands",
     "dispatch",
     "done",
     "edge-acquire",
@@ -44,7 +45,7 @@
     "who",
     "whoami"
   ],
-  "command_count": 43,
+  "command_count": 44,
   "tests": [
     {
       "name": "who.json",
