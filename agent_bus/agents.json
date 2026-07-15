@@ -89,5 +89,18 @@
    "bus-monitoring",
    "token-usage-etl"
   ]
+ },
+ "Masteragent": {
+  "registered": "2026-07-15T09:10:44"
+ },
+ "会话考古": {
+  "registered": "2026-07-15T09:48:55",
+  "desc": "归档会话深度价值提炼:逐个深读 jsonl 进 LLM 上下文,挖出 manifest 工具启发式漏掉的价值(决策/理由/踩坑/能力/被否方案),写 extracted/<sid>.md;raw jsonl 清理前的最后价值抢救,单开 tab 专职。方法/输出契约/清理闸见归档目录的 EXTRACTION_PLAYBOOK.md(语义分析全程在LLM不用工具·大文件分块滚读·删raw前逐会话闸控+用户抽检)。档案/清理口径归Master数分,协议层归培训师。",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "data-analysis",
+   "confidentiality"
+  ]
  }
 }
