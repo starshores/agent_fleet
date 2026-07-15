@@ -80,7 +80,7 @@ from bus.health import (  # noqa: E402
 )
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
 from bus.identity import (  # noqa: E402
-    cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard,
+    cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
 )
 
 
@@ -88,7 +88,7 @@ from bus.identity import (  # noqa: E402
 # BUS 2.0 命令分组(对齐 bus/ 一体化模块;供 `ab`/`ab commands`/无参时分组呈现·治 43 命令扁平难发现)
 _CMD_GROUPS = [
     ("消息任务流 core", "send wait serve request done peek replies answer"),
-    ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard"),
+    ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard selfwake-exempt"),
     ("角色·能力 roles", "register retire revive retired caps roster route"),
     ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
     ("工作组池 pool", "join-group leave-group send-group fanout fanout-collect park unpark"),
@@ -150,6 +150,7 @@ def main():
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("selfwake-guard"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_selfwake_guard)
+    p = sub.add_parser("selfwake-exempt"); p.add_argument("--role", default=None); p.add_argument("--off", action="store_true"); p.add_argument("--mode", default=None); p.add_argument("--reason", default=None); p.add_argument("--note", default=None); p.set_defaults(fn=cmd_selfwake_exempt)
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)

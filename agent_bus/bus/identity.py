@@ -12,8 +12,9 @@ from bus.config import BUS, _now
 from bus.io import _audit, _gen_id, _write_json
 from bus.roster import _load_agents, _save_agents, _list_roles, _retired_roles, _pseudo_role_label, _role_dir, _case_collision
 from bus.presence import _touch_presence, _load_pidtags, _pidtags_file
-from bus.selfwake import _ancestor_pids, _is_parked, _parked_path, _self_wake_state, _wait_proc_roles
+from bus.selfwake import _ancestor_pids, _is_parked, _parked_path, _self_wake_state, _wait_proc_roles, _is_guard_exempt, _guard_exempt_path
 from bus.notify import _fire_toast
+from bus.mailbox import _resolve_self_role
 
 
 def cmd_register(args):
@@ -169,7 +170,7 @@ def cmd_selfwake(args):
             print("%-14s %-8s %s" % (role, "⊘退役", "已退役" + ("·接替=" + sb if sb else "") + "(留痕不删,不派活)"))
             retired += 1; continue
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
-        mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}.get(st, "?")
+        mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠", "polling": "⏱轮询"}.get(st, "?")
         print("%-14s %-8s %s" % (role, mark, detail))
         armed += st == "armed"; recent += st == "recent"; stale += st == "stale"; off += st == "off"; parked += st == "parked"
     print("-" * 78)
@@ -213,8 +214,8 @@ def cmd_selfwake_guard(args):
     retired_set = _retired_roles()
     stale = []
     for role in _list_roles():
-        if _pseudo_role_label(role) or role in retired_set or _is_parked(role):
-            continue                          # parked=故意暂离 → 不巡检报警(用户手动关 tab 的关键配套)
+        if _pseudo_role_label(role) or role in retired_set or _is_parked(role) or _is_guard_exempt(role):
+            continue                          # parked=故意暂离 / guard_exempt=轮询模式在岗 → 不巡检报警
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
         if st == "stale":
             stale.append((role, detail))
@@ -258,8 +259,9 @@ def cmd_selfwake_guard(args):
             "id": tid, "from": "MasterAgent", "to": role,
             "title": marker + " 你掉了自醒",
             "task": ("自醒巡检【连续2次】发现你掉了自醒(%s)。看到即请【后台 run_in_background】跑 "
-                     "`python C:/apphome/agent_fleet/agent_bus/agentbus.py wait --role %s --timeout 3600`,"
-                     "再 selfwake 验在岗(别用 shell &)。" % (detail, role)),
+                     "`ab wait --role %s --timeout 3600`,再 `ab selfwake` 验在岗(别用 shell &)。"
+                     "★若你是【轮询模式在岗】(ScheduleWakeup 定时 drain·非 background wait),"
+                     "别重挂——放个豁免 marker 即可:`ab selfwake-exempt --role %s`(不再被巡检打扰)。" % (detail, role, role)),
             "created": _now(), "status": "pending",
         }
         _write_json(inbox / (tid + ".json"), task)
@@ -274,3 +276,27 @@ def cmd_selfwake_guard(args):
         "" if args.dry_run else " + toast报警"))
     for role, detail in stale:
         print("   - %s%s:%s" % (role, "" if role in confirmed else "(待确认)", detail))
+
+
+def cmd_selfwake_exempt(args):
+    """【轮询模式在岗·自愿豁免自醒巡检】给 role 放/撤 guard_exempt marker。
+    用于 ScheduleWakeup 定时 drain(非 background wait·心跳必陈旧)的 agent:声明后守卫不再判其掉线/发[请重挂],
+    selfwake/who 显示 ⏱轮询。与 park 区别=exempt 仍在岗收任务(任务 bus 排队·它定时 drain 取)、park 是暂离不收活。
+    --off 撤销(回到正常事件自醒巡检)。marker=<role>/guard_exempt.json,外部可写=agent 自行声明。"""
+    role = args.role or _resolve_self_role() or os.environ.get("AGENTBUS_ROLE", "")
+    if not role:
+        sys.stderr.write("需 --role(或本会话已 hello 绑定)。\n"); sys.exit(2)
+    p = _guard_exempt_path(role)
+    if args.off:
+        try:
+            p.unlink(); print("已撤销 %s 的巡检豁免(回到正常事件自醒巡检)。" % role)
+        except FileNotFoundError:
+            print("%s 本无豁免 marker,无需撤销。" % role)
+        _audit("selfwake_exempt_off", role=role)
+        return
+    rec = {"mode": args.mode or "polling", "reason": args.reason or "", "note": args.note or "",
+           "since": _now()}
+    _write_json(p, rec)
+    _audit("selfwake_exempt", role=role, mode=rec["mode"])
+    print("已给 %s 放巡检豁免 marker(mode=%s)。守卫不再判其掉线;selfwake/who 显示 ⏱轮询。撤销:ab selfwake-exempt --role %s --off"
+          % (role, rec["mode"], role))

@@ -45,6 +45,26 @@ def _park_expired(pk):
     return age is not None and age > 0
 
 
+def _guard_exempt_path(role):
+    return BUS / role / "guard_exempt.json"
+
+
+def _is_guard_exempt(role):
+    """role 是否【自愿豁免自醒巡检】——轮询模式在岗者(如 ScheduleWakeup 定时 drain bus·非 event-armed
+    background wait)。这类 agent 心跳必然陈旧(轮询间隔>心跳阈值),但【并非掉线】:任务在 bus 排队、
+    它每轮 drain 取到,不丢。与 parked(故意暂离·不收任务)区别=exempt 仍在岗收任务、只是自醒方式不同。
+    返回 exempt dict(mode/reason/since/note)或 None。marker 文件外部可写=agent 自行声明。
+    起因:2026-07-16 SQLAGent 请求(background wait 在对话 turn 边界被 SIGTERM·无法跨 turn 常驻心跳→
+    改 270s 轮询→守卫每周期误判掉线发[请重挂]=双方空耗)。"""
+    p = _guard_exempt_path(role)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"mode": "polling"}
+
+
 def _self_wake_state(role, alive_pids=None, wait_roles=None):
     """判一个 role 的事件自醒在不在岗。返回 (state, detail)。
     parked=🅿️休眠(用户故意暂离·独立态·不计掉线/不报警·与 stale 严格区分);
@@ -59,6 +79,10 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
         ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
         note = ("·" + pk["note"]) if pk.get("note") else ""
         return ("parked", "🅿️休眠(用户故意暂离%s%s)" % (ext, note))
+    ex = _is_guard_exempt(role)
+    if ex:   # 轮询模式在岗:自愿豁免事件自醒巡检(心跳必陈旧非掉线·任务 bus 排队定时 drain 取)
+        note = ("·" + ex["note"]) if ex.get("note") else ""
+        return ("polling", "⏱轮询模式在岗(定时 drain·豁免巡检%s)" % note)
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return ("off", "无 presence")
