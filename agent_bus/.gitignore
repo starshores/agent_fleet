@@ -1,0 +1,18 @@
+# agent_bus = 一体化 bus 家目录(~/.claude/agent_bus 现为 junction 指向此·2026-07-15)。
+# 只跟踪【源码+配置】;运行态(usage.db / 各 role 邮箱 / presence / 日志 / 状态 json / 备份)一律不进 git/快照。
+# 白名单式:默认忽略一切,显式放行——对动态 role 目录(Master/ 培训师/ …)鲁棒。
+*
+!.gitignore
+!*.py
+!bus/
+!bus/*.py
+!*.cmd
+!*.ps1
+!README.md
+!agents.json
+!config.json
+!fleet.json
+!capabilities.json
+!retired_roster.json
+# 配置备份即便匹配上面也排除(运行时生成的 .bak-时间戳)
+*.bak-*
