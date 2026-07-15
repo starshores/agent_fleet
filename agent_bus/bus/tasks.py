@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
-"""bus.tasks —— 长期任务线看板（tasklines）。ask-user/answer 待办池后续增量并入。
+"""bus.tasks —— 长期任务/待办域一体化:长期任务线看板(tasklines)+ 待办池(ask-user/answer)。
 
-tasklines.json = 运行态磁盘文件（gitignore·不进 bus 核心 git=洁净基准[含业务明细+owner]；
-落磁盘=防 compact+跨会话·Master 拍板存储方案A）。每条决策点带 ref → 对应 todos.json（ask-user 待办池）
-条目，看板据 ref 显示 已答/待答。展示:阶段1=本 CLI(ab tasklines)；阶段2=WebUI 面板。
+tasklines.json = 长期任务线看板运行态(gitignore)；决策点 ref → todos.json 条目显示已答/待答。
+todos.json = ask-user 待办池(非阻塞·capture-only)；cmd_ask_user 投池(bus 成员门禁 _is_bus_member)、
+cmd_answer 闭环回路(答复路由回提问 agent + 标完成)。落磁盘=防 compact+跨会话。
 
-依赖：config(BUS)。cmd_tasklines 只读展示（交叉 todos.json 状态）。无反向依赖=无环。
+依赖：config(BUS/_now)· io(_gen_id/_write_json/_audit)· core(_warn_unreachable)· roster(_load_agents)。无反向依赖=无环。
 """
-import json
+import json, os, sys, time
 
 from bus.config import BUS, _now
 from bus.io import _gen_id, _write_json, _audit
 from bus.core import _warn_unreachable
+from bus.roster import _load_agents
 
 
 def _tasklines_path():
@@ -125,3 +126,58 @@ def cmd_answer(args):
     item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
     _write_json(tf, todos)
     print("答复已路由给 %s(任务 %s),待办 %s 标完成。" % (target, tid, args.todo))
+
+
+def _is_bus_member(role):
+    """bus 成员判定(2026-07-10 门禁):有 presence.json(hello 过)或在 agents.json 注册。
+    非成员(如与 bus 无关的编码项目会话)不得往共享待办池投 ask-user——防非 bus 决策泄漏污染
+    bus 协调视图(曾有无关项目会话读全局 CLAUDE.md 后,把其项目内的问题灌进了 bus)。
+    非成员应在自己项目里征询用户。"""
+    if not role or role in ("unknown", "用户"):
+        return False
+    if (BUS / role / "presence.json").exists():
+        return True
+    try:
+        return role in _load_agents()
+    except Exception:
+        return False
+
+
+def cmd_ask_user(args):
+    """agent 把一条【待用户确认】项投进 UI 待办池(todos.json),不滚走。capture-only,无自动回路。
+    结构与 WebUI todo_add 对齐(todos.json 是 list;status 用合法值"待办"让用户照常能在 UI 标完成);
+    额外带 confirm_from/ref 供将来回路。source 标"确认·<谁问的>"便于 UI 筛选。
+    门禁(2026-07-10):--from 必须是 bus 注册成员,否则拒——防非 bus 项目泄漏进共享待办池。"""
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    if not _is_bus_member(frm):
+        print("✗ ask-user 拒绝:'%s' 不是 bus 注册成员(无 presence、不在 agents.json)。\n"
+              "  bus 待办池只接受 bus 成员的待确认项;与 bus 无关的项目/会话请用你自己项目的方式征询用户。\n"
+              "  若你确是 bus 角色:先 `agentbus.py hello --role <你>` 注册后再 ask-user。" % frm)
+        sys.exit(2)
+    f = BUS / "todos.json"
+    try:
+        items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
+    tid = "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex())
+    prio = args.priority if args.priority in ("高", "中", "低") else "中"
+    item = {
+        "id": tid,
+        "title": (args.title or "").strip() or "(待确认·无标题)",
+        "detail": (args.detail or "").strip(),
+        "source": "确认·" + frm,
+        "priority": prio,
+        "status": "待办",
+        "deadline": (args.deadline or "").strip(),
+        "created": _now(), "updated": _now(),
+        "task_id": None, "dispatched_to": None,
+        "confirm_from": frm, "ref": args.ref or None,
+    }
+    items.append(item)
+    tmp = f.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, f)
+    _audit("ask_user", id=tid, frm=frm, title=item["title"][:40])
+    print("已投入待办池(待用户确认):《%s》[%s] from %s" % (item["title"], tid, frm))
