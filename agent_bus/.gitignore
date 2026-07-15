@@ -9,6 +9,7 @@
 !*.cmd
 !*.ps1
 !README.md
+!ab
 !agents.json
 !config.json
 !fleet.json

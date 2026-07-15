@@ -1,12 +1,15 @@
 {
  "_comment": "agent bus 机器相关路径集中配置。迁移/换机/换用户名只改这一处。每项可被环境变量 AGENTBUS_<KEY大写> 覆盖(如 AGENTBUS_CLAUDE_BIN)。路径用正斜杠,Windows 也接受;支持 ~(用户目录)。",
  "claude_bin": "~/AppData/Roaming/npm/claude.cmd",
+ "python_bin": "C:/path/to/python.exe",
  "default_worker_cwd": "C:/BaseSpace/XXX",
  "repo": "C:/BaseSpace/XXX",
  "memory_index": "~/.claude/projects/XXX/memory/MEMORY.md",
  "agent_fleet_home": "C:/apphome/agent_fleet",
  "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
  "usage_db": "~/.claude/agent_bus/usage.db",
- "env": {"PYTHONUTF8": "1"},
+ "env": {
+  "PYTHONUTF8": "1"
+ },
  "_env_comment": "bus 启动环境(2026-07-10 UTF-8 根治):PYTHONUTF8=1 让 bus 起的 python 一律 UTF-8 I/O,从源头免 GBK 乱码。各 python 入口已 os.environ.setdefault 兜住子进程;launcher(start_worker.ps1 等)可读此块 export 到 shell 覆盖 ad-hoc。"
 }
