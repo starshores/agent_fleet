@@ -8,9 +8,9 @@
 
 ## 命令(任一 tab)
 
-调用方式二选一:
-- `python C:/apphome/agent_fleet/agent_bus/agentbus.py <cmd> ...`
-- 或把 `C:\apphome\agent_fleet\agent_bus` 加进 PATH 后:`ab <cmd> ...`
+调用(BUS 2.0 一律用短入口 `ab`):
+- `ab <cmd> ...`（`ab`/`ab.cmd` 启动器已固化正确 env python + 真实项目根路径 + UTF-8;`agent_bus` 目录已在用户 PATH）
+- 回退（新 shell PATH 未刷到时）：`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <cmd> ...`
 
 ```
 ab register --role SQLAGent                                  # 注册 role(建目录)
@@ -46,11 +46,11 @@ OS 里所有 `claude.exe` 进程**长得一模一样**(同名、同命令行),�
 ```
 你是 agent bus 上的 worker,role=SQLAGent。每轮只做一件事:
 1) 用 Bash(超时设 600000ms)运行:
-   python C:/apphome/agent_fleet/agent_bus/agentbus.py wait --role SQLAGent --timeout 590
+   ab wait --role SQLAGent --timeout 590
 2) 它会阻塞到有人派任务,然后打印一段 JSON(含 id / from / task)。
    - 输出是 {"idle":true} → 本轮什么都不做,直接结束(loop 自动再起一轮继续等)。
    - 是任务 → 严格按 task 字段执行(用本 tab 的工具/sql_agent 等);完成后运行:
-     python C:/apphome/agent_fleet/agent_bus/agentbus.py done --id <那个id> --role SQLAGent --result "<简洁结果或产物路径>" --status ok
+     ab done --id <那个id> --role SQLAGent --result "<简洁结果或产物路径>" --status ok
      失败则 --status error,把错误写进 --result。
 3) 不要做任务以外的事。
 ```
@@ -65,3 +65,17 @@ ab send --to SQLAGent --from Master --title "问题目标1" \
   --task "问题说明"
 ab replies --role Master        # 过会儿看 SQLAGent 回填的结果
 ```
+
+## 内部结构(BUS 2.0 一体化包)
+
+`agentbus.py` 现为**薄 CLI 分发器**(~170 行:re-export 公共面 + `_CMD_GROUPS` 分组 + `main` 解析);
+全部逻辑在 `bus/` 包(内部模块化、对外一体·`ab.*` 公共面经 re-export 不变)。依赖分层(叶→上·无环):
+
+- **叶层**:`config`(路径/时间)· `io`(原子落地/id/审计)· `roster`(agents.json/角色分类)· `proc`(进程扫描/psutil)
+- **中层**:`presence`(心跳/身份绑定)· `selfwake`(事件自醒/park)· `notify`(toast/notice)· `mailbox`(原子领取原语)
+- **命令层**:`core`(send/wait/done/serve/request/peek/replies)· `pool`(工作组/fan-out)· `sessions`(会话元数据)·
+  `tasks`(tasklines+ask-user+answer)· `edge`(CDP 互斥)· `roles`(retire/revive/route/roster/caps)· `exec`(dispatch)·
+  `health`(reap/prune/health/supervise/webui-guard/stale)· `status`(_who_data/who/list)· `identity`(hello/whoami/selfwake/register/tag)
+
+外部 importer(dispatch_agent / longrange_net / pool_dispatcher / worker_daemon / ui.server)`import agentbus as ab`
+用 `ab.BUS`/`ab._now`/`ab.cmd_*` 等,名字经 re-export 全部不变。

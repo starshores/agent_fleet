@@ -21,7 +21,7 @@
   list                           所有 role 的队列深度
 用法约定:role 名可含中文;--from 缺省取环境变量 AGENTBUS_ROLE,再缺省 "unknown"。
 """
-import argparse, json, os, sys, time, threading, socket, subprocess
+import argparse, os, sys  # 薄分发器:仅 main 解析/退出码用;json/time/threading/socket/subprocess 随各命令抽入 bus/ 后不再需
 from pathlib import Path
 
 try:
