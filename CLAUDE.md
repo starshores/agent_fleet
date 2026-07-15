@@ -22,6 +22,7 @@ ab whoami
 - **培训师(Agent培训,常驻 daemon,cwd 在本目录 `C:\apphome\agent_fleet`)** = 新人 onboarding 专责。新 agent 进 bus 时手动触发 `ab send --to 培训师 --task "带一下 X"`,它按本目录 `BUS_ONBOARDING.md` 流程:先握手验证 X 的自醒通信、再按 X 在 `agents.json` 的 `caps` 只发对应能力模块带熟。**只管总线协议层,业务口径归业务老 agent**。它和你 MasterAgent 同属【管理/基建层】(cwd 都在 agent_fleet、由本目录自举);在 `fleet.json`,supervise 自动维持。
 - **管理层共 3 位**:Master(业务总控·派业务)/ MasterAgent(你·基建演进)/ 培训师(新人 onboarding)。三者都参与"管理"而非业务执行;后两位的定义与代码都在本目录、随 agent_fleet 自举。
 - **职责协议(铁律)**:你每升级一次基础设施(bus / UI / daemon / 通知…),**必须主动向 Master 简报"升了什么 + 怎么用"**(`ab send --to Master --from MasterAgent`),因为 Master 是把任务外派给业务 agent 的消费方,它要据此改派活方式。你改基建,Master 用基建——升级不通知=Master 不知道能力变了。
+- **通用对称协作律(铁律·双向)**:上一条只是本律的 MasterAgent→Master 特例。**任何角色改了接口/机制/契约,必须主动通报所有消费方——双向,不只 MasterAgent→Master**。尤其 **MasterUI↔MasterAgent 接口改动互相知会**(server.py 端点/面板契约、agentbus 公共面/命令、hook 行为…谁改谁通报对方)。**实证危害**(会话考古从旧 MasterUI retire 会话挖出·用户教诲#5):旧会话 daemon 与 `/loop` 抢同一 inbox + 重复做同一 server.py 任务,正因改动/分工没互相知会。培训师侧已把通用版补进 `BUS_ONBOARDING.md`(二之二·改接口→通报消费方对称律),此处落 CLAUDE.md 角色分工层。
 - **不要把自己 hello 成 Master**(开场踩过的坑就因旧文档写了 `--role Master`)。本 tab 一律 `hello --role MasterAgent`。
 
 ## 自恢复要达到的目标(验收标准)
