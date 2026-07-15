@@ -70,3 +70,23 @@ _PSEUDO_ROLE_LABELS = {
 def _pseudo_role_label(role):
     """伪角色返回其标注串;真 agent 返回 None。"""
     return _PSEUDO_ROLE_LABELS.get(role)
+
+
+def _case_collision(role):
+    """返回与 role【仅大小写不同】的既有角色名,无则 None。
+    Windows 文件系统大小写不敏感 → Masteragent 与 MasterAgent 会共用同一 mailbox 目录,
+    但 agents.json 是大小写敏感 dict → 两个 key 指同一目录 = 幽灵重复 + 路由错乱。
+    register / hello 前调用拦截,强制用既有 exact 名(2026-07-15 大小写碰撞事故根治)。
+    检既有 agents.json 注册名 + BUS 下物理目录名;exact 相等不算碰撞。"""
+    if not role:
+        return None
+    rl = role.lower()
+    seen = set(_load_agents().keys())
+    try:
+        seen |= {p.name for p in BUS.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))}
+    except Exception:
+        pass
+    for name in seen:
+        if name != role and name.lower() == rl:
+            return name
+    return None

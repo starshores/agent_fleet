@@ -44,7 +44,7 @@ from bus.config import BUS, METRICS, cfg, _now  # noqa: E402
 from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics  # noqa: E402
 from bus.roster import (  # noqa: E402
     _agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
-    _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label,
+    _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, _case_collision,
 )
 from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds  # noqa: E402
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live  # noqa: E402
@@ -69,6 +69,10 @@ from bus.core import (  # noqa: E402
 # ---------------- 目标可达校验 _warn_unreachable(已抽到 bus/core.py)----------------
 def cmd_register(args):
     role = args.role
+    dup = _case_collision(role)
+    if dup:
+        sys.stderr.write("⚠ 拒绝注册:角色名 %r 与既有 %r 仅大小写不同——Windows 文件系统不区分大小写、会共用同一 mailbox 目录(agents.json 却当两个角色→幽灵重复+路由错乱)。请改用既有名 %r,或换个真正不同的名。\n" % (role, dup, dup))
+        sys.exit(2)
     _role_dir(role)
     a = _load_agents()
     a[role] = {"registered": _now(), "desc": args.desc or ""}
@@ -104,6 +108,10 @@ def cmd_hello(args):
     role = args.role
     if not role:
         sys.stderr.write("hello 需要 --role(仅预览可省:hello --preview)\n"); return
+    dup = _case_collision(role)
+    if dup:
+        sys.stderr.write("⚠ 拒绝 hello:角色名 %r 与既有 %r 仅大小写不同——Windows 文件系统不区分大小写、会共用同一 mailbox(致幽灵重复+绑定错乱)。你多半想声明 %r,请用它的准确大小写重跑。\n" % (role, dup, dup))
+        sys.exit(2)
     _role_dir(role)
     a = _load_agents()
     a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
