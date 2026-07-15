@@ -70,7 +70,7 @@ from bus.edge import (  # noqa: E402
 from bus.roles import (  # noqa: E402
     _retired_roster_path, _load_retired_roster,
     cmd_retire, cmd_revive, cmd_retired,
-    cmd_route,
+    cmd_route, cmd_roster, cmd_caps,
 )
 from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions  # noqa: E402
@@ -343,69 +343,6 @@ def cmd_selfwake_guard(args):
         "" if args.dry_run else " + toast报警"))
     for role, detail in stale:
         print("   - %s%s:%s" % (role, "" if role in confirmed else "(待确认)", detail))
-
-
-def _load_caps_pool():
-    f = BUS / "capabilities.json"
-    if f.exists():
-        try:
-            return json.loads(f.read_text(encoding="utf-8")).get("capabilities", {})
-        except Exception:
-            return {}
-    return {}
-
-
-def cmd_roster(args):
-    """花名册:列每个 agent 的 在岗状态 / 能力(caps) / 专长(desc) / 注册时间。
-    agents.json 是花名册真相源;在岗按自醒检测(armed=在岗 / stale=掉线 / off=未醒)。"""
-    agents = _load_agents()
-    kw = (getattr(args, "grep", None) or "").strip().lower()
-    if kw:  # 路由助手:按关键词在 role/专长(desc)/caps 里筛"谁管这事"→ 直接派给它,不广播
-        agents = {r: v for r, v in agents.items()
-                  if not (isinstance(v, dict) and v.get("retired"))   # 退役不进路由(别把活派给退役的)
-                  and (kw in r.lower() or kw in (v.get("desc", "") or "").lower()
-                       or kw in " ".join(v.get("caps", [])).lower())}
-    wait_roles = _wait_proc_roles()
-    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}
-    hdr = ("花名册·匹配「%s」(%d):" % (kw, len(agents))) if kw else ("花名册(agents.json · %d 个角色):" % len(agents))
-    print(hdr)
-    print("-" * 78)
-    if not agents:
-        print("(无匹配——可能无此专责;考虑广播,或 register 新专家)"); return
-    for role, v in agents.items():
-        if isinstance(v, dict) and v.get("retired"):   # 退役:标注、不显示在岗状态(它本就不该在岗)
-            sb = v.get("succeeded_by")
-            print("● %-12s ⊘退役  retired=%s%s" % (role, v.get("retired"), ("  接替=" + sb if sb else "")))
-            print("   专长(存档): %s" % ((v.get("desc", "") or "").strip()[:100]))
-            continue
-        st = _self_wake_state(role, wait_roles=wait_roles)[0]
-        caps = "/".join(v.get("caps", [])) or "(无)"
-        desc = (v.get("desc", "") or "(专长未填)").strip()
-        print("● %-12s %s  reg=%s" % (role, mark.get(st, "?"), (v.get("registered", "") or "")[:10]))
-        print("   能力: %s" % caps)
-        print("   专长: %s" % desc[:100])
-    print("-" * 78)
-    print("把会话里训出的专家入册:ab register --role <名> --desc \"<专长/分管>\"(再按需 ab caps 配能力)")
-
-
-def cmd_caps(args):
-    """能力池查询:`caps` 看全池+谁持有;`caps --role X` 看某角色被分配的能力。"""
-    pool = _load_caps_pool()
-    agents = _load_agents()
-    if args.role:
-        caps = (agents.get(args.role) or {}).get("caps") or []
-        print("【%s】的能力(caps,最小授权):" % args.role)
-        if not caps:
-            print("  (未分配 caps,或角色不存在)"); return
-        for c in caps:
-            print("  - %-16s %s" % (c, pool.get(c, {}).get("desc", "(未在能力池登记)")))
-        return
-    print("能力池(capabilities.json)+ 现持有者:")
-    for name, info in pool.items():
-        holders = [r for r, v in agents.items() if name in ((v or {}).get("caps") or [])]
-        print("  %-16s %s" % (name, info.get("desc", "")))
-        print("       默认给: %s" % info.get("default_for", "-"))
-        print("       现持有(%d): %s" % (len(holders), ", ".join(holders) if holders else "无"))
 
 
 # ---------------- 工作组池化 / park / fan-out / mem-cap(已抽到 bus/pool.py · 见文件头 import)----------------
