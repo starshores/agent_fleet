@@ -14,7 +14,6 @@ from bus.roster import _load_agents, _save_agents, _list_roles, _retired_roles, 
 from bus.presence import _touch_presence, _load_pidtags, _pidtags_file
 from bus.selfwake import _ancestor_pids, _is_parked, _parked_path, _self_wake_state, _wait_proc_roles, _is_guard_exempt, _guard_exempt_path
 from bus.notify import _fire_toast
-from bus.mailbox import _resolve_self_role
 
 
 def cmd_register(args):
@@ -282,10 +281,25 @@ def cmd_selfwake_exempt(args):
     """【轮询模式在岗·自愿豁免自醒巡检】给 role 放/撤 guard_exempt marker。
     用于 ScheduleWakeup 定时 drain(非 background wait·心跳必陈旧)的 agent:声明后守卫不再判其掉线/发[请重挂],
     selfwake/who 显示 ⏱轮询。与 park 区别=exempt 仍在岗收任务(任务 bus 排队·它定时 drain 取)、park 是暂离不收活。
-    --off 撤销(回到正常事件自醒巡检)。marker=<role>/guard_exempt.json,外部可写=agent 自行声明。"""
-    role = args.role or _resolve_self_role() or os.environ.get("AGENTBUS_ROLE", "")
-    if not role:
-        sys.stderr.write("需 --role(或本会话已 hello 绑定)。\n"); sys.exit(2)
+    --off 撤销(回到正常事件自醒巡检)。marker=<role>/guard_exempt.json,外部可写=agent 自行声明。
+    ★裸跑(无 --role)=【只读列出】当前豁免者(防手滑自豁免:本命令会改状态,与只读的 `ab selfwake` 易混·
+    使用方 2026-07-16 踩坑);要放/撤豁免【必须显式 --role】(不再默认当前角色·静默改自己状态)。"""
+    if not args.role:
+        # 只读:列当前豁免者(裸跑安全·不改任何状态)
+        ex = [(r, _is_guard_exempt(r)) for r in _list_roles()]
+        ex = [(r, m) for r, m in ex if m]
+        if not ex:
+            print("当前无豁免巡检的 role。放豁免(轮询模式在岗者):ab selfwake-exempt --role <角色> [--mode polling] [--note ..]"); return
+        print("巡检豁免中(⏱轮询·%d):" % len(ex))
+        for r, m in ex:
+            print("  %-14s mode=%s since=%s %s" % (r, m.get("mode", "?"), (m.get("since", "") or "")[:19],
+                                                    ("· " + m["note"]) if m.get("note") else ""))
+        print("撤销:ab selfwake-exempt --role <角色> --off")
+        return
+    role = args.role
+    if not (BUS / role).is_dir():
+        sys.stderr.write("角色 %r 无 bus 目录(未 hello/register)——不能对不存在的角色放/撤豁免。先 `ab hello --role %s` 或 `ab register --role %s`。\n" % (role, role, role))
+        sys.exit(2)
     p = _guard_exempt_path(role)
     if args.off:
         try:
