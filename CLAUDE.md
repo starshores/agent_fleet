@@ -53,7 +53,7 @@ python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
 - `agent_bus\` —— **总线本体源码**的硬链镜像(agentbus.py/worker_daemon.py/dispatch_agent.py/claude_run.py/start_stop_worker.ps1/config.json/fleet.json/agents.json/ab.cmd/README),`sync_code.ps1` 维护、PostToolUse hook 改代码时自动重链(同卷 NTFS;只镜像源码+配置,不含运行态队列)。
 - `memory\` —— **基座运行记忆**硬链镜像,`sync_memory.ps1` 维护、hook 自动重链。**不含业务知识**(业务记忆随业务留在原处,不随基座迁移)。
 - `host_config\` —— **宿主全局配置快照**(`~/.claude/CLAUDE.md` + `settings.json`):含 Compact 指令 keep-list、65% 早压 env、PostToolUse hook 注册、model。这些 bus 相关配置住宿主全局(要对所有会话生效)、只迁 agent_fleet 会丢,故在此存**快照**(配置类改动少、快照即可,用户定调 2026-06-30);`sync_host_config.ps1` 刷新。
-- 其余(CLAUDE/AGENTS/CAPABILITIES/SESSION_RELIABILITY/SPECIALIZATION/ARCH_EVAL/recover.py/ui/hooks)本目录原生。
+- 其余本目录原生:根锚 `CLAUDE.md`/`AGENTS.md`/`CAPABILITIES.md`/`recover.py` + `ui/`/`hooks/`;**设计/评审/简报类文档(ARCHITECTURE_REVIEW/ARCH_EVAL/NEWINFRA_*/LONGRANGE_HOWTO/BUS_2.0_PLAN 等)已归入 `docs/`**(BUS 2.0 目录整理·2026-07-15);`SESSION_RELIABILITY.md`/`SPECIALIZATION.md`/`BUS_ONBOARDING.md` 因被 hook/server 运行时引用暂留根,后续连引用一并迁 `docs/`。
 **换机迁移清单**:
 - ① **新机装运行依赖**:Python 3 + `pip install watchdog psutil`(总线代码的运行依赖,不在源码目录里;watchdog 跑事件等待、psutil 探活/身份)。
 - ② 复制 `C:\apphome\agent_fleet\` 整个目录到新机。

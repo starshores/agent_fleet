@@ -47,7 +47,7 @@ ab done --id <id> [--role X] --result "..." [--status ok|error] [--notify auto|a
 ab replies --role Master [--clear]              # (Master 收)读回填给我的结果
 ```
 
-### 新增原语(2026-06-22 落地,见 ARCHITECTURE_REVIEW.md)
+### 新增原语(2026-06-22 落地,见 docs/ARCHITECTURE_REVIEW.md)
 ```
 ab request --to B --from A --task "..." [--chain "..." --timeout 300]  # 发子任务给 B 并【阻塞等 B 应答】(请求-应答);自请求/环/超时三防
 ab send ... --requires-approval                 # 标高风险:任何自动监听者(tab serve/daemon/wait)都不会自动领取,留 inbox 待审
