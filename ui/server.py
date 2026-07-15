@@ -4052,17 +4052,20 @@ function renderGroups(d){
         return '<div class="bar-row"><div class="lbl" title="'+esc(x.role)+'">'+esc(x.role)+'</div>'
           +'<div class="bar-track"><div class="bar-fill" style="width:'+w+'%"></div></div>'
           +'<div class="num">'+esc(''+x.share_pct)+'% · '+esc(''+x.claims)+'活/'+Math.round(x.busy_s/60)+'m</div></div>';
-      }).join('') : '<div class="muted" style="font-size:11px">窗口内无组任务活动</div>';
+      }).join('') : '<div class="muted" style="font-size:11px">窗口内无 send_group 组路由(成员活动走直发·见舰队面板)</div>';
       const ep=m.effective_parallelism, ipr=m.intra_parallel_rate;
+      const noAct=!(m.tasks_in_window>0);
+      const epHtml= noAct ? '<b class="mono muted" title="窗口内无组任务·无并行可算">N/A</b>' : '<b class="mono" style="color:var(--'+(ep>=2?'live':ep>1?'warn':'dim')+')">'+esc(''+ep)+'×</b>';
+      const iprHtml= noAct ? '<b class="mono muted" title="窗口内无组任务·无并行可算">N/A</b>' : '<b class="mono" style="color:var(--'+(ipr>=40?'live':ipr>0?'warn':'dim')+')">'+esc(''+ipr)+'%</b>';
       const kpis='<div style="display:flex;gap:16px;flex-wrap:wrap;margin:6px 0">'
-        +'<span title="Σ成员busy/≥1busy墙钟;=1串行,→成员数理想"><b class="mono" style="color:var(--'+(ep>=2?'live':ep>1?'warn':'dim')+')">'+esc(''+ep)+'×</b> <span class="muted" style="font-size:11px">有效并行系数</span></span>'
-        +'<span title="≥2成员同时busy占≥1busy时长"><b class="mono" style="color:var(--'+(ipr>=40?'live':ipr>0?'warn':'dim')+')">'+esc(''+ipr)+'%</b> <span class="muted" style="font-size:11px">组内并行率</span></span>'
+        +'<span title="Σ成员busy/≥1busy墙钟;=1串行,→成员数理想">'+epHtml+' <span class="muted" style="font-size:11px">有效并行系数</span></span>'
+        +'<span title="≥2成员同时busy占≥1busy时长">'+iprHtml+' <span class="muted" style="font-size:11px">组内并行率</span></span>'
         +'<span class="muted" style="font-size:11px">窗口内组任务 '+esc(''+(m.tasks_in_window||0))+'(done '+esc(''+(m.done_in_window||0))+')· 活跃墙钟 '+Math.round((m.active_wall_s||0)/60)+'m</span></div>';
       metricsHtml=kpis+'<div class="bars">'+bars+'</div>';
     }
     return '<div class="tl-card" data-key="grp-'+esc(g.group)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
       +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent)">🧩 '+esc(g.group)+'</b>'+act+ib
-      +'<span class="spacer" style="flex:1"></span><span class="muted" style="font-size:11px">更新 '+esc(g.updated||'')+'</span></div>'
+      +'<span class="spacer" style="flex:1"></span><span class="muted" style="font-size:11px" title="成员名单最后变更时间(members.json·非数据新鲜度)">成员更新于 '+esc(g.updated||'')+'</span></div>'
       +'<div style="margin-top:6px;font-size:12px"><b class="muted">成员:</b> '+mem+' <b class="muted" style="margin-left:6px">caps:</b> '+caps+'</div>'
       +'<div style="margin-top:6px"><b class="muted" style="font-size:11.5px">③负载分布 / ④有效并行 / ⑤组内并行率(使用方口径·仅组任务·24h窗):</b>'+metricsHtml+'</div>'
       +'</div>';
