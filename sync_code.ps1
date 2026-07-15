@@ -7,6 +7,18 @@
 
 $src = Join-Path $env:USERPROFILE ".claude\agent_bus"
 $dst = "C:\apphome\agent_fleet\agent_bus"
+
+# 2026-07-15 junction migration: ~/.claude/agent_bus is now a JUNCTION -> agent_fleet\agent_bus
+# (project root is the single physical home). Mirroring is obsolete + harmful (would hardlink files to themselves).
+# Guard: if $src is a reparse point (junction), no-op exit. Retained only for pre-migration safety.
+try {
+  $srcItem = Get-Item $src -Force -ErrorAction Stop
+  if ($srcItem.LinkType -eq 'Junction' -or ($srcItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Write-Output "junction detected ($src -> $($srcItem.Target)); single home, mirror obsolete - no-op."
+    exit 0
+  }
+} catch {}
+
 New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
 $files = @("agentbus.py","worker_daemon.py","dispatch_agent.py","claude_run.py","external_msg.py",
