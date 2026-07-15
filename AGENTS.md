@@ -2,8 +2,8 @@
 
 多个 Claude Code tab(各跑一个 role)互相派活的文件总线。让 worker 在各自 tab 里**活的、可旁观**地执行(子代理做不到)。无服务端,纯文件 + watchdog 事件(不 sleep polling)。
 
-- 代码:`C:\apphome\agent_fleet\agent_bus\`(`agentbus.py` + `ab.cmd` + 自带 README;运行时规范路径 `~/.claude/agent_bus`)。
-- 调用:`python C:/apphome/agent_fleet/agent_bus/agentbus.py <cmd>`,或把该目录加 PATH 后 `ab <cmd>`。
+- 代码:`C:\apphome\agent_fleet\agent_bus\`(`agent_fleet`=物理家;`~/.claude/agent_bus` 是指向它的 junction)。`agentbus.py` + `ab`/`ab.cmd` + 自带 README(运行时规范路径 `~/.claude/agent_bus`)。
+- 调用:`ab <cmd>`(bus 短入口 — 固化正确 env python + 真实项目根路径 + UTF-8;BUS 2.0 使用体验)。**回退**(PATH 未刷到 agent_bus):`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <cmd>`。
 
 ---
 
@@ -18,13 +18,13 @@ ab hello --role <这个tab的角色名>          # 例:ab hello --role worker-a�
 ```
 你是 agent bus 上的 worker(已 hello 声明过身份)。每轮只做一件事:
 1) 用 Bash(超时 600000ms)运行:
-   python C:/apphome/agent_fleet/agent_bus/agentbus.py serve --timeout 590
+   ab serve --timeout 590
    它自动认出本 tab 的角色并阻塞等任务。
 2) 看输出:
    - {"idle":true,...}  → 本轮什么都不做(loop 自动再起一轮继续等)。
    - {"error":...}      → 还没声明身份,先跑一次 ab hello --role <本tab名>,本轮结束。
    - 任务 JSON(含 id/from/task)→ 严格按 task 执行;完成后运行:
-     python C:/apphome/agent_fleet/agent_bus/agentbus.py done --id <那个id> --result "<结果/产物路径>" --status ok
+     ab done --id <那个id> --result "<结果/产物路径>" --status ok
 3) 不做任务以外的事。
 ```
 **语义**:`serve` 阻塞守 watchdog 等任务(等待期间几乎不烧 token,最多 ~10min),任务一来自动领取→按 task 执行→`done` 回填→空闲继续守。起了之后 `who` 显示 `✓worker在听`,干活时显示 `▶在做:<标题>`,全程可见。
@@ -108,13 +108,13 @@ ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code �
 ```
 你是 agent bus 上的 worker(已 hello 声明过身份)。每轮只做一件事:
 1) 用 Bash(超时 600000ms)运行:
-   python C:/apphome/agent_fleet/agent_bus/agentbus.py serve --timeout 590
+   ab serve --timeout 590
    它自动认出本 tab 的角色并阻塞等任务。
 2) 看输出:
    - {"idle":true,...}  → 本轮什么都不做(loop 自动再起一轮继续等)。
    - {"error":...}      → 还没声明身份,先跑一次 ab hello --role <本tab名>,本轮结束。
    - 任务 JSON(含 id/from/task)→ 严格按 task 执行;完成后运行:
-     python C:/apphome/agent_fleet/agent_bus/agentbus.py done --id <那个id> --result "<结果/产物路径>" --status ok
+     ab done --id <那个id> --result "<结果/产物路径>" --status ok
      (done 不填 --role,自动识别;失败用 --status error,错误写进 --result)
 3) 不做任务以外的事。
 ```

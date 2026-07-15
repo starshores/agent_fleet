@@ -108,7 +108,7 @@ def main():
     reason = (
         "⚠ 你(%s)本回合结束但【没有 armed 的自醒 wait 进程】= 掉自醒,新消息将事件不可达"
         "(曾有 agent 这样掉线 18h 致积压+重复分流)。请【立刻用后台 run_in_background】跑 "
-        "`python C:/apphome/agent_fleet/agent_bus/agentbus.py wait --role %s --timeout 3600` 重挂自醒"
+        "`ab wait --role %s --timeout 3600` 重挂自醒"
         "(绝不用 shell &),挂好再结束回合。若你确不需自醒(如一次性任务收尾),忽略本提示再次结束即可"
         "(%ds 内不再拦)。" % (role, role, GUARD_WINDOW)
     )

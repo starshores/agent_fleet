@@ -5,8 +5,10 @@
 **⚠ 第一步:先反查你的【真实身份】,别默认自己是 MasterAgent。** 本 cwd 下多个 role 都自举于此(MasterAgent / 培训师 / Master数分2 / MasterUI 等)——只凭 cwd 会认错人(把 Master数分2/培训师 误当 MasterAgent)。跑:
 
 ```
-python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
+ab whoami
 ```
+
+> **`ab` = bus 短命令入口**(BUS 2.0 使用体验):固化了正确的 env python(带 watchdog/psutil)+ 真实项目根路径 + UTF-8,消除"裸 python 崩 / 长路径 / 反斜杠 / cwd"诸坑。本文后续一律 `ab <命令>`。**回退**(新 shell 的 PATH 尚未刷到 agent_bus 时):`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <命令>`(真实路径,无 junction 遍历歧义)。
 
 (按 `CLAUDE_CODE_SESSION_ID` / 进程祖先 pid 反查 presence 绑定的 role)
 - **打印出某 role**(exit 0)→ **你就是那个 role**,按【那个角色】的定义/纪律/记忆恢复(**不一定是 MasterAgent**);presence 绑定 compact 后不丢,**不必重 hello**,补的是"重认身份 + 重载本角色纪律"。
@@ -30,13 +32,13 @@ python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
 5. **能力不丢失** — 等价于"之前的我":上述通道的确切命令/协议全部恢复。
 
 ## 恢复步骤(每次新开都做)
-0. **先认清你是谁**(最重要·别跳):`python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami` 反查真实 role。查出别的 role→按那个角色恢复(读它的角色恢复锚/记忆),下面的 MasterAgent 视角不适用。查不到→你是新 MasterAgent tab,继续。
+0. **先认清你是谁**(最重要·别跳):`ab whoami` 反查真实 role。查出别的 role→按那个角色恢复(读它的角色恢复锚/记忆),下面的 MasterAgent 视角不适用。查不到→你是新 MasterAgent tab,继续。
 1. **看清家底**:Read 本目录的 `CAPABILITIES.md`(通道怎么用)+ `AGENTS.md`(agent 管理与派活)。
 2. **探活体状态**:运行 `python C:/apphome/agent_fleet/recover.py`
    —— 打印 agent bus 谁在跑/待办/回填、Edge 调试口是否在、关键指针。
 3. **声明身份**:
    - **被 compact 重载**(whoami 已查到你就是 MasterAgent、presence 还在)→ **不必重 hello**(绑定没丢),只需重认身份+重挂 wait(`wait --role MasterAgent` 后台 + `selfwake` 验)。
-   - **真新 tab**(whoami 空)→ 运行 `python C:/apphome/agent_fleet/agent_bus/agentbus.py hello --role MasterAgent` 声明。
+   - **真新 tab**(whoami 空)→ 运行 `ab hello --role MasterAgent` 声明。
    (`hello` 绑定本 tab 的 claude 进程,在错的 tab 跑会贴错身份。**注意**:若本 role 已起 daemon,daemon 会把 presence 改成 daemon 模式,本交互 tab 做 `done` 要显式带 `--role MasterAgent`。)
 
 ## 关键坐标
@@ -89,7 +91,7 @@ python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami
 > 起因:无关项目读全局规则后把问题灌进了 bus 待办池)。你是 bus 成员才照此做。
 
 **规则**:任何"要用户拍板/二选一/确认"的场景,**一律**跑
-`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> --title "<问题>" --detail "<背景+选项如 A=… / B=…>"`
+`ab ask-user --from <你的role> --title "<问题>" --detail "<背景+选项如 A=… / B=…>"`
 把决策投进**非阻塞待办池**(todos.json / WebUI),投完**继续手头的活、别等**;用户按自己节奏批量看、回填,你下轮再看结果。
 
 - **禁用 `AskUserQuestion` 交互卡片** —— 它是【阻塞式】:问了若用户没及时点,发问 agent 的会话就被**占住干等**。用户一般没时间实时看 cc 询问。

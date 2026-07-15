@@ -112,13 +112,13 @@ def main():
             "(用户 2026-07-06 explicit 令优化掉:一般没时间实时看 cc 询问)。已【自动代你把 %d 个问题"
             "投入非阻塞待办池 todos.json】(WebUI 待办池可见),无需你重复投。现在请【继续你手头的活、"
             "别等用户】——用户按自己节奏答复后回填,你下轮再看结果。以后要用户拍板一律直接跑 "
-            "`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> "
+            "`ab ask-user --from <你的role> "
             "--title \"<问题>\" --detail \"<背景+选项>\"`(非阻塞),别再用 AskUserQuestion。" % n
         )
     else:
         reason = (
             "AskUserQuestion 已被基建禁用(阻塞会话·用户 2026-07-06 令优化掉)。请改用非阻塞待办池:"
-            "`python C:/apphome/agent_fleet/agent_bus/agentbus.py ask-user --from <你的role> "
+            "`ab ask-user --from <你的role> "
             "--title \"<问题>\" --detail \"<背景+选项如 A=… / B=…>\"`,投完【继续干活别等】,"
             "用户按节奏在 WebUI 待办池回填。"
         )

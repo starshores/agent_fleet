@@ -88,7 +88,7 @@ def main():
             "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
             "**你的操作铁律**:%s\n\n"
             "**本角色特有**:%s\n\n"
-            "**立即做**:① 跑 `python C:/apphome/agent_fleet/agent_bus/agentbus.py selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `wait --role %s --timeout 3600` 再 selfwake 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
+            "**立即做**:① 跑 `ab selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `ab wait --role %s --timeout 3600` 再 `ab selfwake` 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
             "**深恢复**:cwd=C:\\apphome\\agent_fleet 的读 CLAUDE.md 恢复入口;先 `whoami` 已确认身份=%s。"
         ) % (role, _COMMON_RULES.format(role=role), rule, role, role, role)
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}, ensure_ascii=False))
@@ -97,7 +97,7 @@ def main():
         ctx = (
             "## ⚠ compact 后自定位失败\n"
             "无法按 session_id 反查到你绑定的 bus role(可能 presence 丢失/未 hello 过)。\n"
-            "**别默认自己是 MasterAgent**——先跑 `python C:/apphome/agent_fleet/agent_bus/agentbus.py whoami` 确认;仍空则按 CLAUDE.md 恢复入口判定真实身份再干活。"
+            "**别默认自己是 MasterAgent**——先跑 `ab whoami` 确认;仍空则按 CLAUDE.md 恢复入口判定真实身份再干活。"
         )
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}, ensure_ascii=False))
         _toast("Claude Code · compact 后身份反查失败", "有 tab compact 后 whoami 查不到 role,请确认其身份/presence")
