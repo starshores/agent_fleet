@@ -45,30 +45,29 @@ ab whoami
 - **项目记忆索引(深度知识在此)**:`~/.claude/projects/XXX/memory/MEMORY.md` —— 用 Read 看,按需展开单条。
 - **全局规则**:`~/.claude/CLAUDE.md`(已自动加载:事件通知不弹窗、不 sleep polling)。
 - **干活的代码仓**:`C:\BaseSpace\XXX`(业务代码/文档;通道工具按部署环境配置)。
-- **agent bus**:`C:\apphome\agent_fleet\agent_bus\`(项目内源码;运行时规范路径 `~/.claude/agent_bus`;send/wait/done/who/hello 见 AGENTS.md)。
+- **agent bus**:物理家 `C:\apphome\agent_fleet\agent_bus\`;`~/.claude/agent_bus` 是指向它的 **junction**(2026-07-15 起,非第二份)。命令一律 `ab <cmd>`(send/wait/done/who/hello,见 AGENTS.md);`ab` 已在用户 PATH。
 - **记忆硬链备份**:`C:\apphome\agent_fleet\memory\` —— **基座运行记忆**(源=当前会话记忆库 `~/.claude/projects/XXX/memory`)硬链自此(同卷 NTFS,共享 inode,防误删)。**只镜像基座/协调运行记忆,不镜像业务知识**(业务知识属业务侧、随业务留在原处不迁)。
   原子保存(Write/Edit)会断链 → 改过记忆后跑 `powershell -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_memory.ps1` 刷新即可。
-- **机器相关路径集中配置**:`C:\apphome\agent_fleet\agent_bus\config.json`(claude_bin / default_worker_cwd / repo / memory_index / agent_fleet_home / sync_memory_script)。worker_daemon / ui.server / recover / hook 都从这读;每项可被 `AGENTBUS_<KEY大写>` 环境变量覆盖。**换机/换用户名只改这一处。**
+- **机器相关路径集中配置**:`C:\apphome\agent_fleet\agent_bus\config.json`(claude_bin / **python_bin**(ab 启动器用·带 watchdog/psutil 的 env python)/ default_worker_cwd / repo / memory_index / agent_fleet_home / sync_memory_script / **usage_db**)。worker_daemon / ui.server / recover / hook 都从这读;每项可被 `AGENTBUS_<KEY大写>` 环境变量覆盖。**换机/换用户名只改这一处。**
 
-## 迁移 / 换机(本目录现已自包含、可自举)
-`agent_fleet\` 现在**硬链镜像了全部源码+记忆**,只迁本目录即带走全部:
-- `agent_bus\` —— **总线本体源码**的硬链镜像(agentbus.py/worker_daemon.py/dispatch_agent.py/claude_run.py/start_stop_worker.ps1/config.json/fleet.json/agents.json/ab.cmd/README),`sync_code.ps1` 维护、PostToolUse hook 改代码时自动重链(同卷 NTFS;只镜像源码+配置,不含运行态队列)。
+## 迁移 / 换机(项目根=唯一物理家,只迁本目录 + 建 junction + 回填宿主配置)
+**2026-07-15 起架构变更**:`agent_bus\` 已从"硬链镜像"改为 **项目根唯一物理家 + `~/.claude` junction**(用户令)。收益:换机复制 `C:\apphome\agent_fleet\` 即带走**全部含 `usage.db` 方舟**(原方舟不在迁移包=缺口已根治),并消除硬链镜像的分叉/断链/`sync_code.ps1` 复杂度。本目录构成:
+- `agent_bus\` —— **总线本体**(源码 agentbus.py + `bus/` 包 + worker_daemon/dispatch_agent/claude_run + `ab`/`ab.cmd` 启动器 + config/fleet/agents/capabilities.json + 运行态队列 + `usage.db` 方舟)。**这是物理原件**,`~/.claude/agent_bus` 只是指向它的 junction。`sync_code.ps1` 已退化为 junction 守卫(检测到 reparse 点即 no-op,防 hook 误把文件硬链回自己)。
 - `memory\` —— **基座运行记忆**硬链镜像,`sync_memory.ps1` 维护、hook 自动重链。**不含业务知识**(业务记忆随业务留在原处,不随基座迁移)。
-- `host_config\` —— **宿主全局配置快照**(`~/.claude/CLAUDE.md` + `settings.json`):含 Compact 指令 keep-list、65% 早压 env、PostToolUse hook 注册、model。这些 bus 相关配置住宿主全局(要对所有会话生效)、只迁 agent_fleet 会丢,故在此存**快照**(配置类改动少、快照即可,用户定调 2026-06-30);`sync_host_config.ps1` 刷新。
-- 其余本目录原生:根锚 `CLAUDE.md`/`AGENTS.md`/`CAPABILITIES.md`/`recover.py` + `ui/`/`hooks/`;**设计/评审/简报类文档(ARCHITECTURE_REVIEW/ARCH_EVAL/NEWINFRA_*/LONGRANGE_HOWTO/BUS_2.0_PLAN 等)已归入 `docs/`**(BUS 2.0 目录整理·2026-07-15);`SESSION_RELIABILITY.md`/`SPECIALIZATION.md`/`BUS_ONBOARDING.md` 因被 hook/server 运行时引用暂留根,后续连引用一并迁 `docs/`。
+- `host_config\` —— **宿主全局配置快照**(`~/.claude/CLAUDE.md` + `settings.json`):含 Compact 指令 keep-list、65% 早压 env、PostToolUse hook 注册、model。住宿主全局(要对所有会话生效)、只迁 agent_fleet 会丢,故在此存**快照**;`sync_host_config.ps1` 刷新。
+- 其余本目录原生:根锚 `CLAUDE.md`/`AGENTS.md`/`CAPABILITIES.md`/`recover.py` + `ui/`/`hooks/`;设计/评审/简报类文档已归 `docs/`(BUS 2.0 目录整理·2026-07-15);`SESSION_RELIABILITY.md`/`SPECIALIZATION.md`/`BUS_ONBOARDING.md` 因被 hook/server 运行时引用暂留根。
 **换机迁移清单**:
-- ① **新机装运行依赖**:Python 3 + `pip install watchdog psutil`(总线代码的运行依赖,不在源码目录里;watchdog 跑事件等待、psutil 探活/身份)。
-- ② 复制 `C:\apphome\agent_fleet\` 整个目录到新机。
-- ③ 把 `agent_bus\*` 放回新机 `~/.claude/agent_bus\`(总线运行的规范路径)。
-- ④ 编辑 `agent_bus\config.json` 6 路径改成新机实际值(或设 `AGENTBUS_*` 环境变量);尤其 `claude_bin` 指向新机的 claude.cmd(daemon/dispatch 起 claude -p 要用)。
-- ④b **回填宿主全局配置**:把 `host_config\` 快照并进新机 `~/.claude/CLAUDE.md`(尤其 **Compact Instructions 节**)+ `settings.json`(`env` 的 65% 早压、PostToolUse hook 注册按新机路径改、`model`)。详见 `host_config/README.md`。**不回填=丢 compact 自举层+早压。**
-- ⑤ 跑 `recover.py` 自检;`agentbus selfwake` 看自醒;按需 `start_worker.ps1` / fleet.json 拉起 daemon。
-- ⑥ **发版自动 snapshot 钩子**:`git config core.hooksPath githooks`(打 vX tag 时 `githooks/reference-transaction` 自动 zip 一份到同级 `agent_fleet_releases/`)。若整目录连 `.git` 一起复制则该 config 已随 `.git/config` 带过来;重新 clone 才需手动设。**注**:钩子里 tar 路径 `/c/Windows/System32/tar.exe` 是 Windows bsdtar,换非 Windows 机要改。
+- ① **新机装运行依赖**:Python 3(带 watchdog/psutil 的 env,ab 启动器 `python_bin` 指它)—— `pip install watchdog psutil`(watchdog 跑事件等待、psutil 探活/身份)。
+- ② 复制 `C:\apphome\agent_fleet\` 整个目录到新机(**含 agent_bus 物理原件 + usage.db**)。
+- ③ **建 junction**(不是拷贝!):`cmd /c mklink /J "%USERPROFILE%\.claude\agent_bus" "C:\apphome\agent_fleet\agent_bus"`(mklink /J 免管理员;总线运行仍从规范路径 `~/.claude/agent_bus\` 走,经 junction 落到项目根原件)。
+- ④ 编辑 `agent_bus\config.json` 各路径改成新机实际值(或设 `AGENTBUS_*` 环境变量);尤其 `claude_bin`(daemon/dispatch 起 claude -p)、`python_bin`(ab 启动器用)指向新机实际路径。
+- ④b **把 agent_bus 加进用户 PATH**(`ab` 全局可用):注册 `C:\apphome\agent_fleet\agent_bus` 进用户级 PATH(用项目根物理路径,无 junction 遍历歧义);新 shell 生效。**不加=`ab` 命令找不到**(可临时用全路径回退:`"<python_bin>" "C:\apphome\agent_fleet\agent_bus\agentbus.py" <cmd>`)。
+- ④c **回填宿主全局配置**:把 `host_config\` 快照并进新机 `~/.claude/CLAUDE.md`(尤其 **Compact Instructions 节**)+ `settings.json`(`env` 的 65% 早压、PostToolUse hook 注册按新机路径改、`model`)。详见 `host_config/README.md`。**不回填=丢 compact 自举层+早压。**
+- ⑤ 跑 `recover.py` 自检;`ab selfwake` 看自醒;按需 `start_worker.ps1` / fleet.json 拉起 daemon。
+- ⑥ **发版自动 snapshot 钩子**:`git config core.hooksPath githooks`(打 vX tag 时 `githooks/reference-transaction` 自动 zip 到同级 `agent_fleet_releases/`)。整目录连 `.git` 复制则已随 `.git/config` 带过来;重新 clone 才需手动设。**注**:钩子里 tar 路径 `/c/Windows/System32/tar.exe` 是 Windows bsdtar,换非 Windows 机要改。
 - (WebUI 另需:`ui\start_ui.ps1` 拉起常驻控制台。)
 
-> 注:总线**运行**仍从规范路径 `~/.claude/agent_bus\` 跑;`agent_fleet\agent_bus\` 是同 inode 的可迁移快照,不是第二份运行实例。
-> **已实测自举**(2026-06-23):复制 agent_fleet 到干净目录、仅用副本即跑通 list/send/wait/done/reap/selfwake/recover.py;副本文件独立(非空链)。
-> **迁移基准复验**(2026-06-30):源码镜像 9/9 hash 一致(含当日改动)、memory 90 md 齐、运行态正确排除=✅;唯一缺口=宿主全局的 compact 指令+65%+hook 注册逸出到 `~/.claude/`,已建 `host_config\` 快照 + ④b 回填步骤补回。**只迁 agent_fleet + 按清单回填 host_config = 基准通过。**
+> **junction 化验证**(2026-07-15):`fsutil reparsepoint query` 确认 `~/.claude/agent_bus` 为正规 junction(tag 0xa0000003);原生 python 经反/正斜杠均能解析 canonical 返回正确 role;canonical agentbus.py 全程可跑保持。旧 canonical 存 `~/.claude/agent_bus.bak`(稳定后删)。**踩坑**:迁移窗口(rename→junction 那 ~1 分钟)其他 agent 会瞬时报 canonical No-such-file → 是瞬时、非 junction 真坏;重挂优先用真实路径 `C:/apphome/agent_fleet/agent_bus/agentbus.py`(无 junction 遍历歧义)。
 
 > **基准②·基础设施洁净**:bus = **基础设施、非业务**,与业务负载解耦(业务可插拔)。核心(`agent_bus/` 源码 + config + fleet/agents/capabilities.json)**只放协调机制本身**,不掺【业务数据/口径/客户明细/业务分析结果】——这些属业务、不进 bus 核心。运行态队列里的业务消息是过境流量、不算污染;但**核心文件必须干净**。
 > ⚠ **别把「对外脱敏」误套到内部**:脱敏是【对外】的事——对外交付物(对外仓/对客材料)的规范管理,由业务侧把关。**基座内部文档保留工程细节与真实技术术语、不做内部脱敏**——内部脱敏只会丢掉需要的信息。洁净 = 不掺业务,≠ 内部脱敏。
