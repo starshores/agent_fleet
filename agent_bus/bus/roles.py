@@ -11,7 +11,8 @@ import json, os
 
 from bus.config import BUS, _now
 from bus.io import _write_json, _audit
-from bus.roster import _load_agents, _save_agents
+from bus.roster import _load_agents, _save_agents, _retired_roles, _is_test_role
+from bus.selfwake import _self_wake_state, _wait_proc_roles
 
 
 def _retired_roster_path():
@@ -117,3 +118,32 @@ def cmd_retired(args):
         print("   贡献记忆: %s | 专长: %s" % (r.get("contribution_memory", "") or "-", (r.get("desc", "") or "-")[:50]))
     print("-" * 78)
     print("复用某番号:ab revive --role <名>(从档案馆调回 agents.json 活跃在册)")
+
+
+def cmd_route(args):
+    """对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,
+    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。"""
+    terms = [t.lower() for t in (args.keywords or []) if t.strip()]
+    if not terms:
+        print("用法: ab route <关键词...>(按专长/能力找对口角色)"); return
+    agents = _load_agents()
+    retired = _retired_roles()
+    wait_roles = _wait_proc_roles()
+    scored = []
+    for role, v in agents.items():
+        if role in retired or _is_test_role(role) or not isinstance(v, dict):
+            continue
+        hay = (role + " " + (v.get("desc") or "") + " " + " ".join(v.get("caps", []))).lower()
+        score = sum(hay.count(t) for t in terms)
+        if score > 0:
+            st = _self_wake_state(role, wait_roles=wait_roles)[0]
+            scored.append((score, 0 if st == "armed" else 1, role, st, (v.get("desc") or "")[:58]))
+    if not scored:
+        print("无对口专责命中「%s」——考虑广播,或 ab register 新专家。" % " ".join(terms)); return
+    scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先
+    mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}
+    print("对口路由推荐(命中「%s」):" % " ".join(terms))
+    for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):
+        tag = " ← 推荐(对口+在岗)" if i == 0 and st == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
+        print("  %-12s %s 命中%d  %s%s" % (role, mark.get(st, "?"), sc, desc, tag))
+    print("→ 对口直派:ab send --to <角色> --from <你> ...(别自接跨领域、别乱广播)")
