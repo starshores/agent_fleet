@@ -73,7 +73,7 @@ from bus.roles import (  # noqa: E402
 )
 from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions  # noqa: E402
-from bus.tasks import cmd_tasklines  # noqa: E402
+from bus.tasks import cmd_tasklines, cmd_answer  # noqa: E402
 
 
 
@@ -937,40 +937,6 @@ def cmd_supervise(args):
         print("supervise: fleet.json 无 daemon 条目,且无孤儿 daemon / 陈旧 WebUI / 健康异常"); return
     for a, r in actions:
         print("[%s] %s" % (a, r))
-
-
-def cmd_answer(args):
-    """待办回路(闭环 ask-user,补 capture-only 缺口):用户答复某条🙋待确认项 →
-    答复【自动路由回提问的 agent】(confirm_from)让它接着干 + 标该待办完成。
-    谁替用户跑:协调位(Master/MasterAgent)转达,或 WebUI 回复框(MasterUI 接 /api 调本命令)。"""
-    tf = BUS / "todos.json"
-    try:
-        todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
-        if not isinstance(todos, list):
-            todos = []
-    except Exception:
-        todos = []
-    item = next((t for t in todos if t.get("id") == args.todo), None)
-    if not item:
-        print(json.dumps({"error": "无此待办 id: %s" % args.todo}, ensure_ascii=False)); return
-    target = item.get("confirm_from")
-    if not target or target in ("bus健康", "unknown"):
-        print(json.dumps({"error": "该待办无可回的提问方(confirm_from=%s),无处回路" % target}, ensure_ascii=False)); return
-    frm = args.frm or "用户"
-    _warn_unreachable(target)   # 提问方不在岗就告警;答复仍写进它 inbox,它上线即见
-    tid = _gen_id(target)
-    ref = item.get("ref")
-    task = {"id": tid, "from": frm, "to": target,
-            "title": "[待办答复] " + (item.get("title") or "")[:60],
-            "task": "用户对你提问《%s》的答复:%s%s" % (
-                item.get("title") or "", args.reply, ("\n(原任务 ref: %s)" % ref) if ref else ""),
-            "created": _now(), "status": "pending", "answer_of": item.get("id"), "ref": ref}
-    _write_json(BUS / target / "inbox" / (tid + ".json"), task)
-    _audit("answer", todo=args.todo, to=target, frm=frm)
-    item["status"] = "完成"; item["updated"] = _now()
-    item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
-    _write_json(tf, todos)
-    print("答复已路由给 %s(任务 %s),待办 %s 标完成。" % (target, tid, args.todo))
 
 
 def cmd_route(args):
