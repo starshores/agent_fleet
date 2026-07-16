@@ -2323,6 +2323,7 @@ tr.role-row{cursor:default}
 tr.role-row.clickable{cursor:pointer}
 tr.role-row.clickable:hover{background:var(--panel2)}
 .badge{font-size:11px;padding:2px 9px;border-radius:6px;white-space:nowrap;font-weight:600}
+.badge.vbadge{display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .badge.live{background:rgba(62,207,142,.15);color:var(--live)}
 .badge.warn{background:rgba(245,166,35,.15);color:var(--warn)}
 .badge.dead{background:rgba(255,93,93,.15);color:var(--dead)}
@@ -3046,7 +3047,7 @@ function render(){
     const open=lastTasksOpen.has(r.role);
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
       <td><b>${esc(r.role)}</b></td>
-      <td><span class="badge ${r.vclass}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
+      <td><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
       <td>${turnBadge(r.turn, r.self_wake)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
