@@ -19,7 +19,7 @@ from bus.proc import _age_seconds, _alive_claude_pids
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
 from bus.edge import _edge_holder
-from bus.selfwake import _is_parked, _park_expired
+from bus.selfwake import _self_wake_state, _wait_proc_roles
 
 
 def _who_data():
@@ -28,6 +28,7 @@ def _who_data():
     每个 role 记 registered/caps(花名册真相)+ present/mode/claude_pid/daemon_pid/alive/age_s/verdict/cwd/current_*。
     注:presence 只存 claude_pid+cwd,不存 session-jsonl id —— 会话↔角色的对齐由 WebUI 侧按 cwd 关联(同 cwd 多 agent 时标注歧义,不猜)。"""
     alive = _alive_claude_pids()
+    wait_roles = _wait_proc_roles()   # 2a 步骤2:预扫一次·供 _self_wake_state 判自醒态(免每 role 全扫)
     roles = _list_roles()
     retired_set = _retired_roles()
     try:
@@ -52,13 +53,12 @@ def _who_data():
             rec["pseudo"] = True; rec["verdict"] = "◇ " + plabel; out_roles.append(rec); continue
         if r in retired_set:
             rec["verdict"] = "⊘ 退役"; out_roles.append(rec); continue
-        pk = _is_parked(r)
-        if pk:   # 故意暂离(park/休眠)优先短路:与 selfwake 单一源一致,别把故意退出的会话当"崩溃残留"
-            rec["parked"] = True
-            ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
-            note = ("·" + pk["note"]) if pk.get("note") else ""
-            rec["verdict"] = "🅿️ 休眠(用户故意暂离%s%s)" % (ext, note)
-            out_roles.append(rec); continue
+        sw_state, sw_detail = _self_wake_state(r, wait_roles=wait_roles)
+        rec["self_wake"] = sw_state    # 2a 步骤2:自醒态单一源=_self_wake_state(消 _who_data 自查 parked 重复;polling 等态供消费者读此字段)
+        if sw_state == "parked":       # 故意暂离:短路(与 selfwake 同串·别当崩溃残留;parked pid 已死·不影响 claimed 计数)
+            rec["parked"] = True; rec["verdict"] = sw_detail; out_roles.append(rec); continue
+        # polling(guard_exempt)【不短路】:进程活着·照常走 presence 流程被 claimed(否则从 fleet 挤成"未声明"=count 漂移)
+        # →presence verdict 保原样(✓worker在听 等),polling 区分只放 self_wake 字段,消费者按需显 ⏱
         pf = BUS / r / "presence.json"
         if not pf.exists():
             rec["verdict"] = "未声明(无 presence)"; out_roles.append(rec); continue
