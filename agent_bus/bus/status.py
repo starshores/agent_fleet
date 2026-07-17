@@ -114,88 +114,38 @@ def _who_data():
 
 
 def cmd_who(args):
-    """谁在跑 + 是谁:交叉核对 presence 心跳 与 实际 claude 进程。"""
+    """谁在跑 + 是谁:交叉核对 presence 心跳 与 实际 claude 进程。
+    表格与 --json 同源 `_who_data()`(2a 收敛:原表格自算 verdict=#2 分叉,已并入 _who_data 单一源)。"""
+    d = _who_data()
     if getattr(args, "json", False):
-        print(json.dumps(_who_data(), ensure_ascii=False)); return
-    fresh = args.max_age
-    alive = _alive_claude_pids()
-    roles = _list_roles()
-    retired_set = _retired_roles()
-    claimed = set()
+        print(json.dumps(d, ensure_ascii=False)); return
     print("%-14s %-22s %-9s %8s  %s" % ("role", "verdict", "claude_pid", "心跳age", "cwd"))
     print("-" * 88)
-    for r in roles:
-        plabel = _pseudo_role_label(r)
-        if plabel:                  # 伪角色/系统桶:非执行体,不当掉线/未醒,单列标注
-            print("%-14s %-22s  %s" % (r, "◇ 伪角色", plabel)); continue
-        if r in retired_set:        # 退役:标注、不当残留/异常(进程退是应该的)
-            print("%-14s %-22s" % (r, "⊘ 退役")); continue
-        pk = _is_parked(r)          # 故意暂离(park/休眠):进程死是目的非崩溃,别显"残留"(与 _who_data/selfwake 单一源一致)
-        if pk:
-            ext = "·已到期待unpark" if _park_expired(pk) else ((("·%s天" % pk.get("days")) if pk.get("days") else ""))
-            note = ("·" + pk["note"]) if pk.get("note") else ""
-            print("%-14s %-22s %s" % (r, "🅿️ 休眠", "用户故意暂离%s%s" % (ext, note))); continue
-        pf = BUS / r / "presence.json"
-        if not pf.exists():
-            print("%-14s %-22s" % (r, "未声明(无 presence)"))
-            continue
-        try:
-            pr = json.loads(pf.read_text(encoding="utf-8"))
-        except Exception:
-            print("%-14s %-22s" % (r, "presence 损坏")); continue
-        pid = pr.get("claude_pid")
-        age = _age_seconds(pr.get("last_seen", ""))
-        mode = pr.get("mode", "?")
-        wt = pr.get("wait_timeout") or 110
-        listen_fresh = (age is not None and age <= wt + 60)
-        if mode == "daemon":
-            # 无可见 tab 的后台守护进程:按 daemon_pid 判活(不算进 claude 认领集)
-            dpid = pr.get("daemon_pid")
-            d_alive = psutil.pid_exists(dpid) if (dpid and psutil is not None) else None
-            verdict = ("✓ daemon在听" if d_alive else ("✗ daemon已退" if dpid else "daemon?"))
-            cur = pr.get("current_task")
-            last = ("▶ 在做:%s" % (pr.get("current_title") or cur)) if cur else (pr.get("cwd") or "-")
-            print("%-14s %-22s %-9s %7ss  %s" % (
-                r, verdict, "d:%s" % (dpid or "?"), str(age if age is not None else "?"), last))
-            continue
-        proc_alive = (pid in alive) if (pid and psutil is not None) else None
-        if pid:
-            claimed.add(pid)
-        if psutil is None:
-            verdict = "心跳%ss前(mode=%s)" % (age if age is not None else "?", mode)
-        elif pid and not proc_alive:
-            verdict = "✗ 进程已退(残留)"
-        elif mode == "listening" and proc_alive and listen_fresh:
-            verdict = "✓ worker在听"
-        elif mode == "listening" and proc_alive:
-            verdict = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
-        elif proc_alive:
-            verdict = "已声明(hello),未起循环"
-        else:
-            verdict = "心跳%ss前(无pid)" % (age if age is not None else "?")
-        cur = pr.get("current_task")
-        last = (pr.get("cwd") or "-") + (("  ▶ 在做:%s" % (pr.get("current_title") or cur)) if cur else "")
-        print("%-14s %-22s %-9s %7ss  %s" % (
-            r, verdict, str(pid or "-"), str(age if age is not None else "?"), last))
-    # 在跑但没认领的 claude 进程:区分"已标注(非fleet)"和"真未声明"
-    if psutil is not None:
-        tags = _load_pidtags()
-        rest = sorted(alive - claimed)
-        tagged = [(pid, tags[str(pid)]) for pid in rest if str(pid) in tags]
-        unknown = [pid for pid in rest if str(pid) not in tags]
-        print("-" * 88)
+    for rec in d["roles"]:
+        r = rec["role"]; verdict = rec.get("verdict") or "?"
+        age = rec.get("age_s"); age_s = str(age if age is not None else "?")
+        cur = rec.get("current_task")
+        if not rec.get("present"):          # 伪角色/退役/休眠/未声明/损坏:无进程·短行(note 已在 verdict 内)
+            print("%-14s %-22s" % (r, verdict)); continue
+        piddisp = ("d:%s" % (rec.get("daemon_pid") or "?")) if rec.get("mode") == "daemon" else str(rec.get("claude_pid") or "-")
+        last = (rec.get("cwd") or "-") + (("  ▶ 在做:%s" % (rec.get("current_title") or cur)) if cur else "")
+        print("%-14s %-22s %-9s %7ss  %s" % (r, verdict, piddisp, age_s, last))
+    print("-" * 88)
+    if d["psutil"]:
+        tagged = d.get("tagged", [])
         if tagged:
             print("已标注(非fleet):", ", ".join(
-                "%s=%s%s" % (pid, t.get("label", "?"), "🔒" if t.get("private") else "")
-                for pid, t in tagged))
+                "%s=%s%s" % (t["pid"], t.get("label", "?"), "🔒" if t.get("private") else "")
+                for t in tagged))
+        uc = d.get("unclaimed_pids", [])
         print("在跑的 claude 进程: %d 个;fleet角色: %d;已标注: %d;未声明: %d %s" % (
-            len(alive), len(claimed), len(tagged), len(unknown), unknown if unknown else ""))
+            len(d["alive_claude"]), len(d["claimed_pids"]), len(tagged), len(uc), uc if uc else ""))
     else:
         print("(psutil 不可用,无法核对进程;仅凭心跳)")
-    h = _edge_holder()
+    h = d.get("edge_lock")
     if h:
-        age = _age_seconds(h.get("acquired_at", ""))
-        print("Edge 锁: %s 持有(%ss%s)" % (h.get("who"), age, "·疑似陈旧" if (age and age > 300) else ""))
+        a = h.get("age_s")
+        print("Edge 锁: %s 持有(%ss%s)" % (h.get("who"), a, "·疑似陈旧" if (a and a > 300) else ""))
 
 
 def cmd_list(args):
