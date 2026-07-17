@@ -75,6 +75,7 @@ from bus.roles import (  # noqa: E402
 from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions  # noqa: E402
 from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user  # noqa: E402
+from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
 )
@@ -94,7 +95,7 @@ _CMD_GROUPS = [
     ("工作组池 pool", "join-group leave-group send-group fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
     ("Edge 互斥", "edge-acquire edge-release"),
-    ("长期任务·待办 tasks", "tasklines ask-user"),
+    ("长期任务·待办 tasks", "tasklines ask-user refs"),
     ("会话·标注", "sessions tag"),
 ]
 
@@ -147,6 +148,7 @@ def main():
     p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--todo-stale-min", type=int, default=1440, dest="todo_stale_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
     p = sub.add_parser("stale"); p.add_argument("--hours", type=int, default=24); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_stale)
     p = sub.add_parser("tasklines"); p.add_argument("--id", default=None); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_tasklines)
+    p = sub.add_parser("refs"); p.add_argument("--check", action="store_true"); p.set_defaults(fn=cmd_refs)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)
     p = sub.add_parser("selfwake"); p.set_defaults(fn=cmd_selfwake)
     p = sub.add_parser("selfwake-guard"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_selfwake_guard)
