@@ -262,6 +262,7 @@ def cmd_selfwake_guard(args):
                      "★若你是【轮询模式在岗】(ScheduleWakeup 定时 drain·非 background wait),"
                      "别重挂——放个豁免 marker 即可:`ab selfwake-exempt --role %s`(不再被巡检打扰)。" % (detail, role, role)),
             "created": _now(), "status": "pending",
+            "no_receipt": True,   # 系统 nudge·fire-and-forget:完成不回执给 from(MasterAgent),消守卫回执洪水噪声
         }
         _write_json(inbox / (tid + ".json"), task)
         reminded.append(role)

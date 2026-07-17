@@ -335,12 +335,12 @@ def cmd_done(args):
     p = _find_task(role, tid)
     sender = "unknown"; title = ""
     real_id = tid
-    reply_mode = None; task_kind = None
+    reply_mode = None; task_kind = None; no_receipt = False
     if p:
         try:
             obj = json.loads(p.read_text(encoding="utf-8"))
             sender = obj.get("from", "unknown"); title = obj.get("title", ""); real_id = obj.get("id", tid)
-            reply_mode = obj.get("reply_mode"); task_kind = obj.get("kind")
+            reply_mode = obj.get("reply_mode"); task_kind = obj.get("kind"); no_receipt = obj.get("no_receipt", False)
         except Exception:
             pass
     if getattr(args, "to", None):     # 显式指定回执目标——任务已被归档/reap/移走、_find_task 找不到原 from 时用
@@ -368,7 +368,7 @@ def cmd_done(args):
     # v1.1: 完成通知触发发起方【自醒】—— 若 sender 是自醒在岗的协调位,往其 inbox 投一条轻量 notice,
     # 触发其后台 wait 自醒(它醒来读 <sender>/done/<id> 取完整结果)。sync 应答/never 不投;只对协调位(防环)。
     # 防环铁律:done 一个 notice 不再生 notice(否则协调位↔协调位 done 各自的 notice 会乒乓无限循环——实测踩过)
-    if reply_mode != "sync" and task_kind != "notice" and args.notify != "never":
+    if reply_mode != "sync" and task_kind != "notice" and args.notify != "never" and not no_receipt:
         _emit_completion_notice(sender, role, real_id, args.status, title)
     print("done -> %s (status=%s)" % (sender, args.status))
     # D(2026-07-08·防自醒-loss):done 后若本 role 无 armed wait 进程 → 提示重挂(前台CLI干完活易忘)
