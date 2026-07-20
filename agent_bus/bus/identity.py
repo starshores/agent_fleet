@@ -91,7 +91,7 @@ def _print_onboarding(role):
     print("  ③ 确认 ✓在岗后,才开始做你被交代的任务;之后每次被唤起、处理完,都要【再挂一次】wait(不重挂=掉线)。")
     print("  " + fb)
     print("  (注:hello 只登记身份+打印本说明,【不会替你把自醒跑起来】——必须你自己执行①②③。下面是完整能力说明。)")
-    print("\n==== 你的基本能力(每个 agent 都该会;详见 agent_fleet/AGENTS.md + BUS_ONBOARDING.md)====")
+    print("\n==== 你的基本能力(每个 agent 都该会;详见 agent_fleet/AGENTS.md + agent_fleet/BUS_ONBOARDING.md)====")
     print("\n[基本能力 1] 事件自醒(可对话又不漏消息;交互 tab 建议挂上):")
     print("把下面这条当【后台任务】跑(别前台阻塞):有人给你发消息/派活时它就完成 → 你的会话被自动唤起去处理:")
     print('  ab wait --role %s --timeout 3600' % role)
