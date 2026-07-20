@@ -68,7 +68,7 @@ from bus.edge import (  # noqa: E402
     cmd_edge_acquire, cmd_edge_release,
 )
 from bus.roles import (  # noqa: E402
-    _retired_roster_path, _load_retired_roster,
+    _retired_roster_path, _load_retired_roster, _load_caps_pool,
     cmd_retire, cmd_revive, cmd_retired,
     cmd_route, cmd_roster, cmd_caps,
 )
