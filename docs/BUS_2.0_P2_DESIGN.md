@@ -45,3 +45,15 @@
 5. 全绿 → P3(busctl 别名)已部分/P5 文档/P6 切版+tag。
 
 > 数据不出本机;每项:使用方验优化前后行为/计数一致 + git commit + canonical 恒可跑。
+
+---
+
+## 推进结论(2026-07-20·用户令「按序推」)
+
+- **2a 步骤1+2 ✅**(前两步·使用方 count 闸绿):verdict 收敛到 `_who_data` 单一源 + `self_wake` 字段·逐字节 24/24。
+- **2a 步骤3 → MasterUI lane**:server.py/tray 改吃 `ab._who_data()` 的契约已发 MasterUI(字段:role/verdict/present/mode/claude_pid/alive/age_s/cwd/session_id/current_task/**self_wake**/**pseudo**/retired)。★caveat:消费方读 `self_wake` 必同读 `pseudo`(伪角色行 present=False·verdict 已含 ◇ 标注·不要再判在线/掉线)。这是灭 4 处分叉的最终验收点(使用方逐视图核 WebUI count 对齐 agentbus)。
+- **2b ✅**(refs 契约两提交·使用方签 B 绿):三 store 契约化 `bus/refs.py` + 3 类数据卫生口径 + `ab refs --purge-smoke`。附带修 `_retired_roles()` archive-aware(前一提交·培训师诊断)。
+- **2c → 决议 B(保留 dormant·不删)**:daemon 路径(health.py supervise/reap + roles.py + fleet.json)是**刻意保留的休眠能力**(用户 2026-07-01 令 + fleet.json `_comment` 已明载恢复方法),非死代码 → **不删**。`fleet_status.json` 是 server.py 的运行态快照(daemon→agent 定时战报)、`fleet.json` 是配置,二者**非冗余**(一配置一派生缓存)→ 无可合并。fleet_status 若要精简归 MasterUI lane(server.py)。**结论:2c 在 B 下无 MasterAgent 侧删改动作,已闭。**
+- **2d → 核心去重已满足**:异常检测已单一源 `_health_anomalies`,被 `_collect_health`(只读汇总)与 `_health_sweep_core`(检测+处置)共用 = 无重复实现。两者对 role_dirs 各扫一遍但抽取不同信号(自醒/队列 vs 孤儿/卡死)且 skip 规则不同(park/test-role 处理有别),强并=高风险低收益 → 不并。守卫回执噪声已退役(no_receipt)。**结论:2d 高价值低风险去重已尽,已闭。**
+- **P3 ✅**:`ab`(无参)/ `ab commands` 已按一体化模块分组呈现(core/presence/roles/health/pool/exec/edge/tasks/sessions),扁平命令全保留 = 「单一入口·看着不散」达成。
+- **剩余到完成**:① 2a 步骤3(MasterUI 实现 server.py + 使用方逐视图核)② P5 文档收敛(15→~4·部分被 hook/server 运行时引用需连改)③ P6 正式切 2.0 + 给 Master 发能力简报 + 打 tag v2.0。
