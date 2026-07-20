@@ -42,6 +42,7 @@ bus_mechanisms.json 机制注册表(单一源·供 WebUI 🔧机制 tab)
 ## 迁移 / 换机
 本目录已自包含(源码+记忆硬链镜像),按 `CLAUDE.md` 的「迁移/换机清单」走。
 
-> **BUS 2.0**(重组 + 机制优化·检查点 `v2.0-p1`):`agentbus.py` 单体已抽成 20 个 `agent_bus/bus/` 模块(3267→175 行);
-> 机制优化(verdict 4处归一 / 跨引用契约化 / 退役 archive-aware)已 partner 验证。计划见 `docs/BUS_2.0_PLAN.md`、
-> 改进详情见 `docs/BUS_2.0_P2_DESIGN.md`,回归闸 `bus_smoke.py` 每阶段守。剩 P5 文档收敛 / P6 正式定版 `v2.0`。
+> **BUS 2.0 已定版**(`v2.0`·重组 + 机制优化):`agentbus.py` 单体已抽成 20 个 `agent_bus/bus/` 模块(3267→175 行);
+> 机制优化(verdict 4处归一 / 跨引用契约化 / 退役 archive-aware)+ 分组入口 `ab` 全部 partner 验证。
+> 计划见 `docs/BUS_2.0_PLAN.md`、改进详情见 `docs/BUS_2.0_P2_DESIGN.md`、变更清单见 `docs/BUS_2.0_CHANGELOG.md`,回归闸 `bus_smoke.py`。
+> 后续小项(非阻塞·post-2.0):P4 server.py→ui/ 子模块拆分(MasterUI lane)/ P5 剩余文档收敛。
