@@ -19,10 +19,12 @@
 - **连接路由**: 见协议
 - 自动执行类:SELECT / WITH...SELECT / EXPLAIN(无 ANALYZE)/ SHOW / CREATE TEMP;其余审批。
 
-## 2. 操作Edge
-- 机制:Edge 必须带调试口启动(启动器在桌面 `启动Edge-可自动化.bat`,端口 9222)。
-- 探活:`curl http://localhost:9222/json/version`。
-- 连接:Playwright `connect_over_cdp("http://localhost:9222")` → `b.contexts[0]`(用户真实登录态)→ 找已开页面(别新开)。**绝不 `b.close()`**(会关掉用户 Edge),只断开。
+## 2. Web 自动化 CDP — 通用(云文档/读消息只是其一)
+- 定位:**任意 web 任务**的 CDP 入口,非仅云文档。
+- 机制:Edge 带调试口启动(桌面 `启动Edge-可自动化.bat`,端口 9222)。
+- **★2026-07-20 变更(必读,别再踩)**:Edge 已到 150,**136+ 禁止在【默认用户档】上开 CDP**(安全新政:防本机进程借用你登录态 + app-bound cookie 加密)。故自动化改用**专用档 `C:\apphome\edge_cdp_profile`**(`--user-data-dir` 指它 + `--profile-directory=Default`);bat 已按此配。**代价**:专用档 = 与你日常浏览**不共享 cookie**,要自动化的站点须在此档**各登录一次**(登录态常驻该目录)。想恢复"共享 live session"只能回退 Edge<136(动主浏览器+关安全闸,已评估否决)。
+- 探活:`curl http://localhost:9222/json/version`(Browser 应为 Edg/…)。
+- 连接:Playwright `connect_over_cdp("http://localhost:9222")` → `b.contexts[0]`(**专用档**登录态,非你日常档)→ 找已开页面(别新开)。**别 `b.close()`**(会关掉自动化 Edge;它是独立实例,关它【不】影响你日常 Edge,但也别中途关),只断开。
 - 写表格:OS 剪贴板若被锁(本机常见),改**逐行键入**(每行 Tab 分列、行末 Enter 后 ArrowLeft 回 A 列);整块 TSV 粘贴要 Set-Clipboard,本机不稳。
 - 读消息:连 messenger 页,点会话,从 DOM 提取(截图常太小)。
 - 隐私:仅在本机操作其本人会话,**表/消息内容不外发**。

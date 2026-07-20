@@ -50,7 +50,9 @@ def check_edge_cdp():
             d = json.loads(r.read().decode("utf-8"))
             return "✓ 在(%s)" % d.get("Browser", "?")
     except Exception:
-        return "✗ 不在(需用桌面『启动Edge-可自动化.bat』带 9222 调试口开 Edge)"
+        return ("✗ 不在(用桌面『启动Edge-可自动化.bat』开带 9222 的 Edge。"
+                "★2026-07-20:Edge 136+ 已禁【默认档】CDP,必须用【专用档】"
+                "C:\\apphome\\edge_cdp_profile;bat 已按此配。通用 web 自动化用,非仅云文档)")
 
 
 def main():
