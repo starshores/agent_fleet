@@ -115,19 +115,59 @@ def _turn_state(role):
             "age": ab._age_seconds(d.get("ts", ""))}
 
 
-def compute_fleet():
-    """舰队总览 —— 复刻 cmd_who 的判据(presence 心跳 × 实际 claude 进程)。"""
-    psutil_ok = ab.psutil is not None
-    alive = ab._alive_claude_pids() if psutil_ok else set()
-    sw_roles = ab._wait_proc_roles() if psutil_ok else set()   # 一次性预扫"有 wait 进程的 role"
-    tags = ab._load_pidtags()
-    roles = _roles()
-    rows = []
-    claimed = set()
+def _vclass_of(rec):
+    """从 _who_data 的 rec 派生【显示类】vclass(badge 颜色)—— 纯 UI 派生,非 verdict 判定。
+    复刻旧 compute_fleet 的 verdict→vclass 映射,保 tray/count 口径不漂(使用方 role-verdict 收敛铁律)。
+    tray 计数据此:live/idle/warn=在岗·parked=休眠·dead/none=不计在岗。"""
+    if rec.get("pseudo") or rec.get("retired"):
+        return "none"          # 伪角色/退役:不判在线掉线,不计在岗
+    if rec.get("parked"):
+        return "parked"
+    v = rec.get("verdict") or ""
+    if "损坏" in v:
+        return "dead"          # presence 损坏
+    if v.startswith("未声明"):
+        return "none"
+    if v.startswith("✓"):
+        return "live"          # ✓worker在听 / ✓daemon在听
+    if v.startswith("✗"):
+        return "dead"          # ✗进程已退(残留) / ✗daemon已退
+    if "静默" in v:
+        return "warn"          # ⚠worker静默(超心跳)
+    if v.startswith("已声明"):
+        return "idle"          # 已声明(hello),未起循环
+    if "(无pid)" in v or v == "daemon?":
+        return "warn"
+    return "idle"              # daemon(心跳)/心跳前(mode=) 等 psutil-off 兜底
 
-    for r in roles:
-        pf = BUS / r / "presence.json"
-        _sw = ab._self_wake_state(r, alive, sw_roles)    # 自醒检测(传入预扫集合,免每 role 全扫)
+
+def compute_fleet():
+    """舰队总览 —— 2a 步骤3(2026-07-20·灭 role-verdict 4处分叉之 WebUI 侧):
+    verdict/present/alive/mode/pid/cwd/pseudo/retired/parked 等【状态判定】权威源 = ab._who_data()
+    (与 who/selfwake 同一单一源,不再本地自算 verdict)。本函数只做 UI 派生:
+      · vclass 显示类(_vclass_of)· pid_display · 任务计数(inbox…)· turn · self_wake(state+detail)。
+    self_wake 是与 verdict 正交的另一维度、其单一源=ab._self_wake_state(此处调它取 detail 供 tooltip,非 verdict 分叉);
+    伪角色/退役无自醒态(按 _who_data 口径抑制)。"""
+    wd = ab._who_data()
+    psutil_ok = bool(wd.get("psutil"))
+    alive = set(wd.get("alive_claude") or [])                 # 复用 _who_data 已扫的 alive(不重扫)
+    claimed = set(wd.get("claimed_pids") or [])
+    sw_roles = ab._wait_proc_roles() if psutil_ok else set()  # 供 _scan(fleet_status 推送复用)+ 自醒 detail
+    rows = []
+    for rec in wd.get("roles", []):
+        r = rec["role"]
+        # 自醒态(与 verdict 正交):伪角色/退役无自醒(_who_data 口径),其余取单一源 _self_wake_state
+        if rec.get("pseudo") or rec.get("retired"):
+            sw_state, sw_detail = None, ""
+        else:
+            sw_state, sw_detail = ab._self_wake_state(r, alive, sw_roles)
+        # pid_display 派生
+        if rec.get("mode") == "daemon":
+            pid_display = "d:%s" % (rec.get("daemon_pid") or "?")
+        elif rec.get("claude_pid"):
+            pid_display = str(rec.get("claude_pid"))
+        else:
+            pid_display = None
         row = {
             "role": r,
             "inbox": _count(r, "inbox"),
@@ -135,108 +175,33 @@ def compute_fleet():
             "done": _count(r, "done"),
             "held": _count(r, "held"),      # 高风险待批(requires_approval 留 inbox;held 为显式批前暂存)
             "failed": _count(r, "failed"),  # 毒任务(reap 超 max-requeue)
-            "pid": None, "pid_display": None, "age": None, "mode": None, "cwd": None,
+            "pid": rec.get("claude_pid"), "pid_display": pid_display,
+            "age": rec.get("age_s"), "mode": rec.get("mode"), "cwd": rec.get("cwd"),
             "started": None, "host": None,
-            "verdict": "未声明(无 presence)", "vclass": "none",
-            "self_wake": _sw[0], "self_wake_detail": _sw[1],   # armed=在岗 stale=掉线 off=未醒
+            "verdict": rec.get("verdict") or "未声明(无 presence)",   # ← 权威源(灭本地自算)
+            "vclass": _vclass_of(rec),                                  # 派生显示类
+            "self_wake": sw_state, "self_wake_detail": sw_detail,
             "turn": _turn_state(r),   # 实时 turn 状态(hook 盖):thinking/tool/idle + 时长
         }
-        # 🅿️ park 短路(使用方 2026-07-13):角色故意暂离(parked.json)时,别落进下面 daemon/tab
-        # 的 pid 死活判定(会把故意 park 误显"进程已退/残留")。单一源=parked.json(与 agentbus who/selfwake 口径一致)。
-        # 放在 daemon/tab 分支【共同上游】(role 定后、分支前),两种执行体都覆盖。
-        _pk = ab._is_parked(r)
-        if _pk:
-            _note = (_pk.get("note") or "").strip()
-            row["verdict"] = "🅿️ 休眠" + (" · " + _note if _note else "")
-            row["vclass"] = "parked"
+        if rec.get("parked"):
             row["parked"] = True
-            rows.append(row)
-            continue
-        if not pf.exists():
-            rows.append(row)
-            continue
-        try:
-            pr = json.loads(pf.read_text(encoding="utf-8"))
-        except Exception:
-            row["verdict"] = "presence 损坏"
-            row["vclass"] = "dead"
-            rows.append(row)
-            continue
-        pid = pr.get("claude_pid")
-        age = ab._age_seconds(pr.get("last_seen", ""))
-        mode = pr.get("mode", "?")
-        wt = pr.get("wait_timeout") or 110
-        listen_fresh = (age is not None and age <= wt + 60)
-        row.update({
-            "age": age, "mode": mode,
-            "cwd": pr.get("cwd"), "started": pr.get("started"),
-            "host": pr.get("host"),
-        })
-
-        if mode == "daemon":
-            # 无可见 tab 的后台守护进程:按 daemon_pid 判活(psutil.pid_exists)。
-            # daemon_pid 不是 claude 进程 —— 绝不计入 claimed(不污染"在跑 claude"统计)。
-            dpid = pr.get("daemon_pid")
-            row["pid_display"] = "d:%s" % (dpid or "?")
-            d_alive = ab.psutil.pid_exists(dpid) if (dpid and psutil_ok) else None
-            if not psutil_ok:
-                row["verdict"] = "daemon(心跳%ss)" % (age if age is not None else "?")
-                row["vclass"] = "idle"
-            elif d_alive:
-                row["verdict"] = "✓ daemon在听"
-                row["vclass"] = "live"
-            elif dpid:
-                row["verdict"] = "✗ daemon已退"
-                row["vclass"] = "dead"
-            else:
-                row["verdict"] = "daemon?"
-                row["vclass"] = "warn"
-            rows.append(row)
-            continue
-
-        # 普通可见 tab(claude 进程)
-        row["pid"] = pid
-        row["pid_display"] = str(pid) if pid else None
-        proc_alive = (pid in alive) if (pid and psutil_ok) else None
-        if pid:
-            claimed.add(pid)
-        if not psutil_ok:
-            row["verdict"] = "心跳%ss前(mode=%s)" % (age if age is not None else "?", mode)
-            row["vclass"] = "idle"
-        elif pid and not proc_alive:
-            row["verdict"] = "✗ 进程已退(残留)"
-            row["vclass"] = "dead"
-        elif mode == "listening" and proc_alive and listen_fresh:
-            row["verdict"] = "✓ worker在听"
-            row["vclass"] = "live"
-        elif mode == "listening" and proc_alive:
-            row["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
-            row["vclass"] = "warn"
-        elif proc_alive:
-            row["verdict"] = "已声明(hello),未起循环"
-            row["vclass"] = "idle"
-        else:
-            row["verdict"] = "心跳%ss前(无pid)" % (age if age is not None else "?")
-            row["vclass"] = "warn"
+        if rec.get("pseudo"):
+            row["pseudo"] = True
         rows.append(row)
 
-    # 在跑但未认领的 claude 进程:区分 已标注(非fleet) vs 真未声明
+    # 在跑但未认领的 claude 进程:_who_data 已分好(tagged/unclaimed_pids),此处仅补 cwd(display 层)
+    tags = ab._load_pidtags()
     tagged, unknown = [], []
-    if psutil_ok:
-        rest = sorted(alive - claimed)
-        for pid in rest:
-            t = tags.get(str(pid))
-            if t and t.get("private"):
-                # opt-in 隐藏(用户显式 pid_tags private=true):只 pid+label,不探 cwd/细节。
-                # 这是【用户主动选择藏】(如截图/投屏给外部那刻),唯一保留的遮罩。
-                tagged.append({"pid": pid, "label": t.get("label", "?"), "private": True})
-            elif t:
-                # 已标注但非 private:label + cwd(如实)。
-                tagged.append({"pid": pid, "label": t.get("label", "?"),
-                               "private": False, "cwd": _safe_cwd(pid)})
-            else:
-                # 未标记:如实显 cwd(洁净基准=自看控制台无外部方,默认不脱敏)。
-                unknown.append({"pid": pid, "cwd": _safe_cwd(pid)})
+    for t in (wd.get("tagged") or []):
+        pid = t.get("pid")
+        if t.get("private"):
+            # opt-in 隐藏(用户显式 pid_tags private=true):只 pid+label,不探 cwd/细节。
+            tagged.append({"pid": pid, "label": t.get("label", "?"), "private": True})
+        else:
+            tagged.append({"pid": pid, "label": t.get("label", "?"),
+                           "private": False, "cwd": _safe_cwd(pid)})
+    for pid in (wd.get("unclaimed_pids") or []):
+        unknown.append({"pid": pid, "cwd": _safe_cwd(pid)})
 
     return {
         "psutil": psutil_ok,
