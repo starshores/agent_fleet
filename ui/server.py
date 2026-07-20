@@ -20,58 +20,30 @@
     无外部方→默认不脱敏;掩码只丢信息,如看不出哪个个人会话吃上下文)。旧「自动掩码个人会话」已去除。
 """
 import argparse
-import glob
-import json
-import os
-import re
 import subprocess
 import sys
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from http.server import ThreadingHTTPServer
 
-# ---- 共享基础层(BUS 2.0 P4 · Phase A):agentbus 引导 + 基础 helper 抽到 ui/common.py ----
-# ABDIR/ab/BUS 由 common 单一源引导;此处 re-export 保对外兼容(子进程 import server; server.* 路径,
-# 及本模块内以裸名调用)。common 在 ui/ 目录,子进程已把 ui/ 塞进 sys.path 故可达。
-from common import ABDIR, ab, BUS  # noqa: E402,F401
+# ---- ui/ 子模块(BUS 2.0 P4 拆分·2026-07-20)----
+# server.py 4575 行 → 拆为 ui/ 子模块:common(共享基础层)/ api(数据·build_*/get_*/compute_*/缓存/
+# refresher/notify/send/todos)/ page(前端 INDEX_HTML 常量)/ routes(HTTP Handler)。本文件只做【装配入口】。
+from common import ABDIR, ab, BUS  # noqa: F401
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
-
-# =============================================================
-#  数据采集 —— 全部复用 agentbus 的 helper,不复制其逻辑
-# =============================================================
-
-# 基础 helper 已抽到 ui/common.py(P4·Phase A),re-export 保裸名调用 + 子进程 server.* 兼容。
-from common import (  # noqa: E402,F401
-    _roles, _count, _read_tasks, _safe_cwd, _turn_state, _vclass_of,
-)
-
-
-# =============================================================
-#  数据/API 层 —— 全部 build_*/get_*/compute_* + 缓存/refresher/notify/send/todos 抽到 ui/api.py(P4·Phase C)。
-#  server.py 变 facade:import api 后把 api 全部名字并入本模块命名空间,保:
-#   ① Handler/main 裸名调用不变 ② 子进程 import server; server.compute_fleet() 兼容 ③ SSE 用的 _change_cv 等下划线名/缓存对象也在。
-# =============================================================
+# facade:import api 后把其全部名字(含 _change_cv 等下划线名 + 缓存对象 + compute_fleet)并入本命名空间,
+# 保:① main 裸名调 start_*_refresher / build_bi ② 子进程 `import server; server.compute_fleet()` 兼容
+#     ③ start_supervisor / start_selfwake_guard 用的 _NO_WINDOW 也来自 api;子进程解释器沿用 sys.executable。
 import api  # noqa: E402
-for _k, _v in vars(api).items():  # facade 完整 re-export(含 _ 前缀名与缓存对象)
+for _k, _v in vars(api).items():
     if not _k.startswith("__"):
         globals()[_k] = _v
 
-
-# =============================================================
-#  HTTP
-# =============================================================
-# INDEX_HTML(前端页面 ~2159 行)抽到 ui/page.py(P4·Phase B);re-export 保 server.INDEX_HTML 兼容 + do_GET 裸名引用。
-from page import INDEX_HTML  # noqa: E402,F401
-
-
-# class Handler(HTTP 路由)抽到 ui/routes.py(P4·Phase D)
 from routes import Handler  # noqa: E402
 
 
