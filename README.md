@@ -13,8 +13,8 @@ AGENTS.md          总线操作手册(命令/执行模型/边界)      ┐ 根�
 CAPABILITIES.md    已打通的对外通道(sql_agent/EDGE CDP/Airflow) ┘ (自恢复要读)
 recover.py         活体自检:谁在跑/待办/回填/Edge 锁/fleet 期望态
 
-agent_bus/         总线本体(源码硬链镜像;运行态从 ~/.claude/agent_bus/ 跑)
-  agentbus.py      CLI 入口 + 命令分发(~40 子命令)
+agent_bus/         总线本体(物理原件;~/.claude/agent_bus 是指向它的 junction)
+  agentbus.py      CLI 入口 + 薄命令分发器(175 行·46 子命令)
   bus/             ← BUS 2.0 一体化包(内部模块化)
       config·io·roster·proc·presence·selfwake·notify·mailbox …
   worker_daemon.py / dispatch_agent.py / claude_run.py / longrange_net.py / pool_dispatcher.py …
@@ -27,18 +27,21 @@ memory/            基座运行记忆硬链镜像(源=~/.claude/projects/XXX/mem
 host_config/       宿主全局配置快照(~/.claude/CLAUDE.md + settings.json)
 githooks/          发版 tag 时自动 zip 快照
 scripts (根)       sync_code.ps1 / sync_memory.ps1 / sync_host_config.ps1(硬链镜像维护)
-bus_smoke.py       回归冒烟金标准(43 命令面 + 39 用例·2.0 重构回归闸)
+bus_smoke.py       回归冒烟金标准(46 命令面 + 39 用例·2.0 重构回归闸)
 bus_mechanisms.json 机制注册表(单一源·供 WebUI 🔧机制 tab)
 ```
 
+> **逐文件详版**:`docs/DIRECTORY_MAP.md` —— 每个目录/文件/bus 模块的作用一览。
+
 ## 常用入口
 - 自检活体:`python recover.py`
-- 总线命令:`python ~/.claude/agent_bus/agentbus.py <cmd>`(hello / wait / done / who / send / health / selfwake …)
+- 总线命令:`ab <cmd>`(hello / wait / done / who / send / health / selfwake …;`ab` 或 `ab commands` 看分组总览)
 - 启 WebUI:`powershell -File ui/start_ui.ps1`(幂等·CIM 后台常驻)
 - 回归冒烟:`python bus_smoke.py`
 
 ## 迁移 / 换机
 本目录已自包含(源码+记忆硬链镜像),按 `CLAUDE.md` 的「迁移/换机清单」走。
 
-> **BUS 2.0 重构进行中**(重组 + 机制优化):`agentbus.py` 单体正逐层抽入 `agent_bus/bus/` 包;
-> 计划见 `docs/BUS_2.0_PLAN.md`,回归闸 `bus_smoke.py` 每阶段守。
+> **BUS 2.0**(重组 + 机制优化·检查点 `v2.0-p1`):`agentbus.py` 单体已抽成 20 个 `agent_bus/bus/` 模块(3267→175 行);
+> 机制优化(verdict 4处归一 / 跨引用契约化 / 退役 archive-aware)已 partner 验证。计划见 `docs/BUS_2.0_PLAN.md`、
+> 改进详情见 `docs/BUS_2.0_P2_DESIGN.md`,回归闸 `bus_smoke.py` 每阶段守。剩 P5 文档收敛 / P6 正式定版 `v2.0`。
