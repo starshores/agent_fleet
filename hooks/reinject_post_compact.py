@@ -23,7 +23,8 @@ _COMMON_RULES = (
     "自醒 wait 只用【后台 run_in_background】重挂、绝不用 shell `&`、上一个没 completed 前别重复挂(俩 wait 抢同一 notice 竞态);"
     "被唤起若 inbox 无新活→静默重挂+最多一行、绝不重 dump selfwake/who/状态(自灌上下文=加速 compact 降智);"
     "notice 读它 notice_of 指向的 done/<id>.json 取结果后 done 掉即弃;"
-    "被 wait 领进 processing 的消息必须当轮 done 闭合。"
+    "被 wait 领进 processing 的消息必须当轮 done 闭合;"
+    "需用户拍板/二选一→走 `ab ask-user --from {role} ...` 投非阻塞待办池、禁用 AskUserQuestion(已被 block_askuser.py 硬拦),投完继续干活别等。"
 )
 # 角色特有铁律(按需补;没列的角色走通用块 + 读自己的角色恢复锚记忆)
 _ROLE_RULES = {
