@@ -21,6 +21,7 @@
     "peek",
     "prune",
     "reap",
+    "refs",
     "register",
     "replies",
     "request",
@@ -46,7 +47,7 @@
     "who",
     "whoami"
   ],
-  "command_count": 45,
+  "command_count": 46,
   "tests": [
     {
       "name": "who.json",
@@ -359,9 +360,17 @@
       "exit": 0,
       "tb": false,
       "note": "答不存在 todo 优雅兜底"
+    },
+    {
+      "name": "reexport.completeness",
+      "cmd": "reexport",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "外部 ab.* re-export 完整性(C5)"
     }
   ],
-  "test_count": 39,
-  "pass": 39,
+  "test_count": 40,
+  "pass": 40,
   "fail": 0
 }

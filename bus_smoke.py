@@ -93,6 +93,49 @@ def chk_contains(*subs):
     return _c
 
 
+def check_reexports():
+    """C5(2026-07-21):验所有【外部导入方】(import agentbus as ab)引用的 ab.<name> 都在 agentbus 顶层可达。
+    起因=_load_caps_pool 教训:P1 抽层把 helper 搬进 bus/ 但漏 re-export → 命令面冒烟测不到、只在
+    server.py 那条代码路径真跑时才 500 炸。命令面盘点覆盖不到 helper re-export 缺口,故补此 in-process 检查。
+    动态扫 agent_bus/ + ui/ 下 import agentbus 的 .py 里的 ab.<name>/agentbus.<name> 属性引用 + hasattr 断言。
+    返回 (ok, missing:[(file,name)])。纯本地静态扫 + import·不外发。"""
+    import importlib
+    if BUS_DIR not in sys.path:
+        sys.path.insert(0, BUS_DIR)
+    try:
+        ab = importlib.import_module("agentbus")
+    except Exception as e:
+        return (False, [("<import agentbus>", str(e)[:100])])
+    files = []
+    for d in (BUS_DIR, os.path.join(HERE, "ui")):
+        if os.path.isdir(d):
+            for fn in os.listdir(d):
+                if fn.endswith(".py") and fn != "agentbus.py":
+                    files.append(os.path.join(d, fn))
+    ref_re = re.compile(r"\b(?:ab|agentbus)\.([A-Za-z_]\w*)")
+    NOISE = {"py"}
+    missing, seen = [], set()
+    for fp in files:
+        try:
+            src = open(fp, encoding="utf-8").read()
+        except Exception:
+            continue
+        if "import agentbus" not in src:
+            continue
+        # 跳过整行注释,减少注释里 ab.xxx 的假阳性
+        code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+        for name in set(ref_re.findall(code)):
+            if name in NOISE:
+                continue
+            key = (os.path.basename(fp), name)
+            if key in seen:
+                continue
+            seen.add(key)
+            if not hasattr(ab, name):
+                missing.append(key)
+    return (len(missing) == 0, sorted(missing))
+
+
 def setup():
     run(["register", "--role", SMOKE_ROLE, "--desc", "smoke test role"])
 
@@ -223,6 +266,11 @@ def main():
             r = run(argv, timeout=to)
             ok = bool(checker(r))
             results.append({"name": name, "cmd": argv[0], "ok": ok, "exit": r["exit"], "tb": r["tb"], "note": note})
+        # C5:外部导入方 ab.* 引用的 re-export 完整性(命令面盘点覆盖不到的 helper re-export 缺口)
+        rx_ok, rx_missing = check_reexports()
+        results.append({"name": "reexport.completeness", "cmd": "reexport", "ok": rx_ok,
+                        "exit": 0 if rx_ok else 1, "tb": False,
+                        "note": "外部 ab.* re-export 完整性(C5)" + ("" if rx_ok else " 缺:%s" % (rx_missing[:6]))})
     finally:
         teardown()
 
