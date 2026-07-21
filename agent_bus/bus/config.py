@@ -35,3 +35,19 @@ def cfg(key, default=None):
 
 def _now():
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+
+
+def _idle_timeout_policy():
+    """自醒 idle timeout 按【日/夜】返回秒数(用户 2026-07-21 令:日间 2h·夜间 6h)。
+    ★真任务事件【即时接活】:watchdog Observer 对 inbox 事件的响应与 timeout 无关,有活立刻触发。
+    本策略只调"没活时多久空返一次 idle"= 砍闲置协调位的 idle 空唤醒重读,【不牺牲接活】。
+    `ab wait --timeout 0`(哨兵)走此策略;显式正 timeout 仍覆盖。边界/时长可 config.json
+    的 idle_timeout_policy 覆盖(换机/调整改一处)。本机 local time(Shanghai)。"""
+    p = cfg("idle_timeout_policy", {}) or {}
+    day_start = int(p.get("day_start_hour", 7))
+    night_start = int(p.get("night_start_hour", 23))
+    day_s = int(p.get("day_timeout_s", 7200))       # 日间 2h
+    night_s = int(p.get("night_timeout_s", 21600))  # 夜间 6h
+    h = time.localtime().tm_hour
+    is_day = (day_start <= h < night_start) if day_start < night_start else not (night_start <= h < day_start)
+    return day_s if is_day else night_s

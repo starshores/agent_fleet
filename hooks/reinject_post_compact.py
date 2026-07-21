@@ -88,7 +88,7 @@ def main():
             "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
             "**你的操作铁律**:%s\n\n"
             "**本角色特有**:%s\n\n"
-            "**立即做**:① 跑 `ab selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `ab wait --role %s --timeout 3600` 再 `ab selfwake` 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
+            "**立即做**:① 跑 `ab selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `ab wait --role %s --timeout 0`(0=自动日2h/夜6h) 再 `ab selfwake` 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
             "**深恢复**:cwd=C:\\apphome\\agent_fleet 的读 CLAUDE.md 恢复入口;先 `whoami` 已确认身份=%s。"
         ) % (role, _COMMON_RULES.format(role=role), rule, role, role, role)
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}, ensure_ascii=False))

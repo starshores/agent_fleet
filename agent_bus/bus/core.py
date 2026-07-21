@@ -9,7 +9,7 @@ try:
 except Exception:
     psutil = None
 
-from bus.config import BUS, METRICS, cfg, _now
+from bus.config import BUS, METRICS, cfg, _now, _idle_timeout_policy
 from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
@@ -267,7 +267,10 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
 
 def cmd_wait(args):
     # --include-approval:有人值守的 tab 显式领取 requires_approval 高风险任务(默认不领,留 inbox 待审)
-    _serve_wait(args.role, args.timeout, include_approval=args.include_approval)
+    to = args.timeout
+    if to is None or to <= 0:               # 哨兵 --timeout 0 → 日/夜 idle 策略(日2h/夜6h·真事件仍即时接活)
+        to = _idle_timeout_policy()
+    _serve_wait(args.role, to, include_approval=args.include_approval)
 
 
 def cmd_serve(args):
@@ -375,7 +378,7 @@ def cmd_done(args):
     try:
         if role and role not in ("用户", "unknown") and role not in _wait_proc_roles():
             print("⚠ 自醒提示:你(%s)当前无 armed wait 进程,done 后请【后台 run_in_background】重挂 "
-                  "`wait --role %s --timeout 3600`,否则空闲后新消息事件唤不醒你。" % (role, role))
+                  "`wait --role %s --timeout 0`(0=自动日2h/夜6h),否则空闲后新消息事件唤不醒你。" % (role, role))
     except Exception:
         pass
 

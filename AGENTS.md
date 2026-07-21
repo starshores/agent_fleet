@@ -137,7 +137,7 @@ ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code �
 ## 协调层交流协议(2026-06-23):后台 wait 自醒(回调唤起)+ 兜底自查
 协调位(Master/MasterAgent)**不 loop、不起 daemon**(给协调位起 daemon 实测不稳且会抢它的活),但要能收 Master↔MasterAgent 的消息。**正解:用"自己启动的后台任务完成→回调唤起本会话"做事件自醒**:
 
-**机制**:协调位**挂一个后台 `agentbus wait --role <自己> --timeout 3600`**(run_in_background)阻塞等自己 inbox;消息一到 → 该后台任务完成 → **harness 用 task-notification 回调唤起本会话** → 读出消息处理 → **再挂一个后台 wait 继续等**。于是【可对话 + 事件自醒】兼得:后台任务不锁对话、消息一来就把我唤起处理,**不用 toast 喊人、不用 daemon、不用 /loop 锁对话**。
+**机制**:协调位**挂一个后台 `ab wait --role <自己> --timeout 0`**(run_in_background;`--timeout 0`=按日/夜 idle 策略,日 2h/夜 6h,砍闲置空唤醒重读)阻塞等自己 inbox;**真消息一到 watchdog 事件即时触发**(与 timeout 长短无关)→ 该后台任务完成 → **harness 用 task-notification 回调唤起本会话** → 读出消息处理 → **再挂一个后台 wait 继续等**。于是【可对话 + 事件自醒 + 少空转】兼得:后台任务不锁对话、消息一来就把我唤起处理、没活时不再每小时空唤醒重读,**不用 toast 喊人、不用 daemon、不用 /loop 锁对话**。`--timeout 0` 走 config.json idle_timeout_policy(日/夜边界+时长可调)。
 - 触发是"**自己启的后台任务完成**"(协调位合法唤醒途径之一),不是"外部消息直接唤醒 idle 会话"——这是绕过"叫不醒 idle 会话"那堵墙的正解。把人喊回来(toast)不是本意,只作可选旁路。
 - **每次被唤起、处理完,必须重新挂一个后台 wait** 保持耳朵开着(否则后续消息就收不到)。
 - **兜底**:用户开口唤起时也先 `peek` 自己 inbox(防后台 wait 恰好在 idle-timeout 间隙)。

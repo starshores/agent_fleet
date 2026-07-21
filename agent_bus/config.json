@@ -8,6 +8,13 @@
  "agent_fleet_home": "C:/apphome/agent_fleet",
  "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
  "usage_db": "~/.claude/agent_bus/usage.db",
+ "idle_timeout_policy": {
+  "_comment": "协调位自醒 idle timeout(秒)按日/夜(用户 2026-07-21 令:日 2h·夜 6h)。真任务事件即时接活不受此影响,只砍没活时的 idle 空唤醒重读。ab wait --timeout 0 走此策略;显式正 timeout 覆盖。日间=[day_start_hour, night_start_hour)。",
+  "day_start_hour": 7,
+  "night_start_hour": 23,
+  "day_timeout_s": 7200,
+  "night_timeout_s": 21600
+ },
  "env": {
   "PYTHONUTF8": "1"
  },
