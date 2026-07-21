@@ -17,26 +17,36 @@ except Exception:
 
 BUS = Path(os.environ.get("AGENTBUS_DIR") or (Path.home() / ".claude" / "agent_bus"))
 
-# 通用操作铁律(所有 bus role 都适用;深版在 AGENTS.md / SPECIALIZATION.md / 各角色记忆锚)
-_COMMON_RULES = (
-    "done 回填必带 --role {role};"
-    "自醒 wait 只用【后台 run_in_background】重挂、绝不用 shell `&`、上一个没 completed 前别重复挂(俩 wait 抢同一 notice 竞态);"
-    "被唤起若 inbox 无新活→静默重挂+最多一行、绝不重 dump selfwake/who/状态(自灌上下文=加速 compact 降智);"
-    "notice 读它 notice_of 指向的 done/<id>.json 取结果后 done 掉即弃;"
-    "被 wait 领进 processing 的消息必须当轮 done 闭合;"
-    "需用户拍板/二选一→走 `ab ask-user --from {role} ...` 投非阻塞待办池、禁用 AskUserQuestion(已被 block_askuser.py 硬拦),投完继续干活别等。"
-)
-# 角色特有铁律:从 role_profiles.json(canonical 单一源·无镜像)读,不再硬编码 dict
-# (可扩展=加角色只改注册表;灭 dict 分叉;顺带修旧名 stale 问题)。
-def _role_profile(role):
-    """取本 role 的 one_liner + boundary(compact 该留的身份+边界/反面锚/记忆slug)。
-    读法:Path(__file__).parent.parent/role_profiles.json、显式 utf-8。
-    文件缺失 / role 未注册 / json 解析失败 → 返回 None(调用方回落 generic)。
-    绝不抛异常(hook 恒 exit 0,不因注册表崩掉自定位)。"""
+# compact 注入两层【全注册表化】(2026-07-21):全局层铁律 + 角色层身份/边界都读
+# role_profiles.json(canonical 单一源·无镜像)。Python 只留【极简降级 fallback】(非全量影子
+# 副本·避免二次飘);正常态注册表唯一源,坏才吐降级串并明示降级。hook 恒 exit 0。
+_PROFILES = Path(__file__).resolve().parent.parent / "role_profiles.json"
+
+def _load_profiles():
+    """读 role_profiles.json → dict;文件缺失/json 失败返 {}。绝不抛。"""
     try:
-        pf = Path(__file__).resolve().parent.parent / "role_profiles.json"
-        data = json.loads(pf.read_text(encoding="utf-8"))
-        for r in data.get("roles", []):
+        return json.loads(_PROFILES.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+def render_common(role):
+    """全局通用操作铁律(所有 role 适用)——读 meta.common_rules→join→.format(role=role)。
+    注册表缺失/空/json 失败 → 回落【极简硬编码降级串】(仅保命+明示降级·非全量影子副本)。"""
+    try:
+        rules = _load_profiles().get("meta", {}).get("common_rules")
+        if isinstance(rules, list) and rules:
+            return ("；".join(str(x) for x in rules) + "。").format(role=role)
+    except Exception:
+        pass
+    return (
+        "done 回填必带 --role {role};自醒 wait 只用后台 run_in_background 重挂并 ab selfwake 验;"
+        "⚠ role_profiles.json 不可读·铁律降级·请修复注册表恢复完整铁律"
+    ).format(role=role)
+
+def render_role(role):
+    """角色特有:取本 role 的 (one_liner, boundary);未注册/文件坏 → None(调用方回落 generic)。"""
+    try:
+        for r in _load_profiles().get("roles", []):
             if r.get("role") == role:
                 ol = (r.get("one_liner") or "").strip()
                 bd = (r.get("boundary") or "").strip()
@@ -45,6 +55,26 @@ def _role_profile(role):
     except Exception:
         pass
     return None
+
+def build_context(role):
+    """组装 compact 后注入的完整 additionalContext 字符串(身份 + 全局层 + 角色层 + 立即做 + 深恢复)。
+    ★ server.py「角色」页面可 import 本函数渲染(WYSIWYG=页面所见即 hook 所注)。
+    签名:build_context(role: str) -> str;role 为已反查到的非空 bus role 名。绝不抛。"""
+    common = render_common(role)
+    prof = render_role(role)
+    if prof:
+        ol, bd = prof
+        rule = "(role_profiles.json·单一源)%s。边界:%s" % (ol, bd)
+    else:
+        rule = "读你的角色恢复锚记忆(在 MEMORY.md 索引里搜你的 role)。"
+    return (
+        "## ⚡ compact 后自定位(SessionStart·source=compact 自动注入)\n"
+        "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
+        "**你的操作铁律**:%s\n\n"
+        "**本角色特有**:%s\n\n"
+        "**立即做**:① 跑 `ab selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `ab wait --role %s --timeout 0`(0=自动日2h/夜6h) 再 `ab selfwake` 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
+        "**深恢复**:cwd=C:\\apphome\\agent_fleet 的读 CLAUDE.md 恢复入口;先 `whoami` 已确认身份=%s。"
+    ) % (role, common, rule, role, role, role)
 
 def _resolve_role(sid):
     """按 session_id 反查绑定 role。stdin.session_id(hook 权威提供)为准;仅其缺失才用 env 兜底
@@ -95,20 +125,7 @@ def main():
     sid = data.get("session_id")
     role = _resolve_role(sid)
     if role:
-        prof = _role_profile(role)
-        if prof:
-            ol, bd = prof
-            rule = "(role_profiles.json·单一源)%s。边界:%s" % (ol, bd)
-        else:
-            rule = "读你的角色恢复锚记忆(在 MEMORY.md 索引里搜你的 role)。"
-        ctx = (
-            "## ⚡ compact 后自定位(SessionStart·source=compact 自动注入)\n"
-            "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
-            "**你的操作铁律**:%s\n\n"
-            "**本角色特有**:%s\n\n"
-            "**立即做**:① 跑 `ab selfwake` 看【%s】是否 ✓在岗;没在岗就【后台 run_in_background】挂 `ab wait --role %s --timeout 0`(0=自动日2h/夜6h) 再 `ab selfwake` 验。② 继续被 compact 打断前的活(工作态见你最近的 done/记忆)。\n"
-            "**深恢复**:cwd=C:\\apphome\\agent_fleet 的读 CLAUDE.md 恢复入口;先 `whoami` 已确认身份=%s。"
-        ) % (role, _COMMON_RULES.format(role=role), rule, role, role, role)
+        ctx = build_context(role)
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}, ensure_ascii=False))
     else:
         # 反查不到 role:注入告警 + toast 提醒用户
