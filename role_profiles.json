@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "version": "1.0",
+  "updated": "2026-07-21",
+  "owner": "MasterAgent",
+  "scope": "管理/基建层 3 角色(Master / MasterAgent / 培训师);业务角色后续扩",
+  "note": "每角色:启动流程 + 明式输入(显式给的:CLI args/bus任务/用户话)+ 隐式输入(自动注入·没显式要:CLAUDE.md/hooks/记忆/presence/caps/onboarding)。单一真相源,供 WebUI「角色」tab 渲染。3 角色现均为【前台 listening cli】(mode=listening·无 daemon·前台化后)。"
+ },
+ "roles": [
+  {
+   "role": "MasterAgent",
+   "layer": "基建层",
+   "one_liner": "对 Master 自身的 Master——只演进 agent_fleet 协调基建(bus / 协调 WebUI / worker daemon / 完成通知 / 记忆备份)本身",
+   "cwd": "C:\\apphome\\agent_fleet",
+   "mode": "前台 listening cli(mode=listening·无 daemon)",
+   "caps": ["bus-comms", "self-wake"],
+   "startup_flow": [
+    "① 在 agent_fleet tab 开会话 → `ab whoami` 反查真实身份(同 cwd 多 role,防误认成培训师或其他角色)",
+    "② `python recover.py` 探活(谁在跑/待办/回填/Edge锁)+ 读 CLAUDE.md/AGENTS.md/CAPABILITIES.md 恢复",
+    "③ 新 tab:`ab hello --role MasterAgent` 声明;被 compact 重载:presence 绑定未丢 → 免 hello,只重认身份",
+    "④ 后台 `ab wait --role MasterAgent --timeout 0`(run_in_background)→ `ab selfwake` 验 ✓在岗",
+    "⑤ 看 inbox 有无派来的基建升级任务,接着干"
+   ],
+   "explicit_inputs": [
+    "CLI args:`--role MasterAgent`",
+    "bus 派来的基建升级任务:`ab send --to MasterAgent --task \"...\"`(Master/用户派)",
+    "用户在本 tab 直接下达的指令"
+   ],
+   "implicit_inputs": [
+    "全局 `~/.claude/CLAUDE.md` + 项目 `agent_fleet/CLAUDE.md`(Claude Code 自动加载)",
+    "`MEMORY.md` 前 200 行(compact 后自动重注入)",
+    "SessionStart hook `reinject_post_compact`(compact 后 whoami 自定位 + 操作铁律回灌)",
+    "PreToolUse `block_askuser` / Stop `enforce_selfwake` / `turn_state` / PostToolUse `on_memory_write` hooks",
+    "`presence.json` 身份绑定 · `agents.json` 的 caps · 培训师 onboarding(BUS_ONBOARDING)带过的能力模块"
+   ],
+   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师"
+  },
+  {
+   "role": "Master",
+   "layer": "业务总控(bus 消费方·不属核心)",
+   "one_liner": "业务总控——把业务任务外派给各业务 agent(按业务域分工…)并收结果",
+   "cwd": "C:\\BaseSpace\\XXX",
+   "mode": "前台 listening cli(mode=listening·无 daemon)",
+   "caps": ["bus-comms", "self-wake", "confidentiality"],
+   "startup_flow": [
+    "① 在业务项目 tab 开会话(业务总控的家在业务仓,非 agent_fleet)",
+    "② `ab hello --role Master`(或 presence 已绑,compact 重载免 hello)",
+    "③ 后台 `ab wait --role Master --timeout 0` → `ab selfwake` 验 ✓在岗",
+    "④ 读 inbox:业务 agent 回填结果(done/replies)+ 用户新业务目标"
+   ],
+   "explicit_inputs": [
+    "用户下达的业务目标/需求",
+    "各业务 agent 的回填结果(`ab done` → Master 的 done/replies)",
+    "CLI args:`--role Master`"
+   ],
+   "implicit_inputs": [
+    "全局 CLAUDE.md + 业务项目 CLAUDE.md(自动加载)",
+    "业务记忆库(MEMORY.md 前 200 行重注入)",
+    "SessionStart reinject hook + block_askuser/enforce_selfwake hooks",
+    "`presence.json` 绑定 · caps(含 `confidentiality`=对外脱敏授权)"
+   ],
+   "boundary": "业务总控·派活给业务 agent;消费基建、不演进基建(基建归 MasterAgent);confidentiality=对外脱敏(业务→客户远端仓/对客),非内部"
+  },
+  {
+   "role": "培训师",
+   "layer": "管理/基建层(onboarding 专责)",
+   "one_liner": "新人 onboarding 专责——按 BUS_ONBOARDING 流程带新 agent;只管总线协议层,业务口径归业务老 agent",
+   "cwd": "C:\\apphome\\agent_fleet",
+   "mode": "前台 listening cli(mode=listening·无 daemon;CLAUDE.md 旧称『常驻 daemon』已随前台化过时)",
+   "caps": ["bus-comms", "self-wake"],
+   "startup_flow": [
+    "① 在 agent_fleet tab 开会话 → `ab whoami` 反查身份(与 MasterAgent 同 cwd,靠 whoami 区分)",
+    "② `ab hello --role 培训师`(或 presence 已绑)",
+    "③ 后台 `ab wait --role 培训师 --timeout 0` → `ab selfwake` 验 ✓在岗",
+    "④ 触发式工作:收到手动派的 `ab send --to 培训师 --task \"带一下 X\"` 才启动带新人流程"
+   ],
+   "explicit_inputs": [
+    "「带一下 X」onboarding 任务(手动触发)",
+    "新人 X 的握手 ACK 回复(验自醒通信通了)",
+    "读 `agents.json` 里 X 的 caps(决定只教哪些能力模块)",
+    "CLI args:`--role 培训师`"
+   ],
+   "implicit_inputs": [
+    "全局 CLAUDE.md + 项目 CLAUDE.md(自动加载)",
+    "`BUS_ONBOARDING.md`(onboarding 流程本体·运行时读)",
+    "`SPECIALIZATION.md` / `SESSION_RELIABILITY.md`(带新人必灌的专一性/可靠性纪律)",
+    "SessionStart reinject hook + block_askuser/enforce_selfwake hooks · presence · caps"
+   ],
+   "boundary": "只总线协议层·业务口径归业务老 agent;caps 登记/roster 管理归它;改接口/机制必通报消费方(对称协作律)"
+  }
+ ]
+}
