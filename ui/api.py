@@ -1829,7 +1829,8 @@ def build_prompts():
             content = p.read_text(encoding="utf-8", errors="replace")
             sections.append({"key": key, "title": title, "path": str(p),
                              "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
-                             "bytes": st.st_size, "lines": content.count("\n") + 1, "content": content})
+                             "bytes": st.st_size, "lines": content.count("\n") + 1, "content": content,
+                             "openable": True})  # 真实文件 → 允许 📂开文件(白名单源见 open_file)
         except Exception as e:
             sections.append({"key": key, "title": title, "path": str(p), "error": str(e)})
 
@@ -1870,6 +1871,26 @@ def build_prompts():
         add("base:" + fn, "④ 基座 · " + fn, str(BASE / fn))
 
     return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"), "sections": sections}
+
+
+def open_file(path):
+    """📂开文件端点后端(POST /api/open-file)。
+    ★★安全硬约束(infra 红线):只允许 build_prompts() 当前 openable 的【真实文件 path】白名单内的路径,
+    绝不接受任意路径(否则 127.0.0.1 WebUI 变任意文件打开器=攻击面)。os.startfile=Windows 默认程序打开,
+    纯本机行为无外发·合规。白名单每次请求现算(跟随当前 sections)。"""
+    try:
+        allow = {s.get("path") for s in build_prompts().get("sections", []) if s.get("openable")}
+    except Exception as e:
+        return {"ok": False, "error": "白名单构建失败:" + str(e)}
+    if not path:
+        return {"ok": False, "error": "缺 path"}
+    if path not in allow:
+        return {"ok": False, "error": "path 不在白名单(拒绝任意路径打开):" + str(path)}
+    try:
+        os.startfile(path)  # noqa: S606  # Windows 默认程序;path 已过白名单
+        return {"ok": True, "opened": path}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # =============================================================

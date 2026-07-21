@@ -138,6 +138,14 @@ textarea{min-height:120px;resize:vertical;font-family:"Cascadia Code",Consolas,m
 .pmt-meta{font-size:11px;color:var(--dim);margin-left:auto;text-align:right;word-break:break-all}
 .pmt-b{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg);
   font:12px/1.55 Consolas,monospace;color:var(--txt);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto}
+.pmt-code{margin:0;border-top:1px solid var(--line);background:var(--bg);font:12px/1.55 Consolas,monospace;
+  color:var(--txt);max-height:60vh;overflow:auto;padding:8px 0}
+.pmt-code .pln{display:flex;align-items:flex-start}
+.pmt-code .pln:hover{background:rgba(91,157,255,.06)}
+.pmt-code .lno{flex:0 0 auto;min-width:44px;padding:0 12px 0 8px;text-align:right;color:var(--dim);
+  user-select:none;opacity:.6}
+.pmt-code .lco{flex:1;white-space:pre-wrap;word-break:break-word;padding-right:14px}
+.pmt-open{margin-left:10px;flex:0 0 auto}
 .ctx-kpis{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px 6px}
 .ctx-kpis .k{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-width:96px}
 .ctx-kpis .k .v{font-size:18px;font-weight:700}
@@ -1649,23 +1657,41 @@ document.getElementById('ctxRefresh').onclick=()=>loadCtx();
 document.getElementById('ctxBadge').onclick=()=>showTab('ctx');
 
 // ===== 📝 提示词审核(只读·手动刷新)=====
-let _promptsLoaded=false;
+let _promptsLoaded=false, _promptsData=null;
 function renderPrompts(d){
   const box=document.getElementById('promptsBox'); const meta=document.getElementById('promptsMeta');
   if(!box) return;
   if(!d||!d.ok){ box.innerHTML='<div class="muted">读取失败:'+esc((d&&d.error)||'?')+'</div>'; return; }
+  _promptsData=d;
   meta.textContent='共 '+d.sections.length+' 节 · 读取于 '+esc(d.as_of||'');
   box.innerHTML=d.sections.map((s,i)=>{
+    // 📂开文件按钮:仅【真实文件 path】section(server 标 openable);白名单在 server 端二次校验
+    const openBtn = s.openable
+      ? '<button class="btn ghost mini pmt-open" onclick="event.stopPropagation();openPromptFile('+i+')" title="在本机默认程序打开该文件">📂开文件</button>'
+      : '';
     const head='<div class="pmt-h" onclick="togglePrompt('+i+')"><span class="pmt-t">'+esc(s.title)+'</span>'
       +'<span class="pmt-meta mono">'+esc(s.path||'')+(s.mtime?(' · '+esc(s.mtime)):'')
-      +(s.bytes!=null?(' · '+fmtN(s.bytes)+'B/'+ (s.lines||0) +'行'):'')+'</span></div>';
-    const body = s.error
-      ? '<div class="pmt-b muted" id="pmt-'+i+'" style="display:none">⚠ '+esc(s.error)+'</div>'
-      : '<pre class="pmt-b" id="pmt-'+i+'" style="display:none">'+esc(s.content||'')+'</pre>';
+      +(s.bytes!=null?(' · '+fmtN(s.bytes)+'B/'+ (s.lines||0) +'行'):'')+'</span>'+openBtn+'</div>';
+    let body;
+    if(s.error){
+      body='<div class="pmt-b muted" id="pmt-'+i+'" style="display:none">⚠ '+esc(s.error)+'</div>';
+    }else{
+      // 行号 gutter:每逻辑行一 flex 行(行号顶对齐·内容 wrap 不打乱行号)
+      const lines=(s.content||'').split('\n');
+      const rows=lines.map((ln,n)=>'<div class="pln"><span class="lno">'+(n+1)+'</span><span class="lco">'+esc(ln)+'</span></div>').join('');
+      body='<div class="pmt-code" id="pmt-'+i+'" style="display:none">'+rows+'</div>';
+    }
     return '<div class="pmt-sec'+(s.error?' err':'')+'">'+head+body+'</div>';
   }).join('')||'<div class="muted">无内容</div>';
 }
 function togglePrompt(i){ const el=document.getElementById('pmt-'+i); if(el) el.style.display = el.style.display==='none'?'block':'none'; }
+function openPromptFile(i){
+  const s=_promptsData&&_promptsData.sections&&_promptsData.sections[i];
+  if(!s||!s.path){ toast('无有效 path',1); return; }
+  fetch('/api/open-file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:s.path})})
+    .then(r=>r.json()).then(d=>{ toast(d&&d.ok?('已在默认程序打开:'+esc(s.title||'')):('打开失败:'+esc((d&&d.error)||'?')), d&&d.ok?0:1); })
+    .catch(e=>toast('打开失败:'+esc(e),1));
+}
 async function loadPrompts(){
   const box=document.getElementById('promptsBox'); if(box&&!box.innerHTML) box.innerHTML='<div class="muted">读取中…</div>';
   try{ const r=await fetch('/api/prompts'); renderPrompts(await r.json()); _promptsLoaded=true; }

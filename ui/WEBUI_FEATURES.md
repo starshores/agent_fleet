@@ -21,7 +21,7 @@
 | `usage` | 📈 历史用量 | usage.db 历史用量(ETL·token_stats) | `/api/usage` |
 | `caps` | 🧬 能力池 | 能力池(谁被授权哪些 cap·登记归培训师) | `/api/caps` |
 | `ctx` | 🧠 上下文 | 各会话上下文占用(proj 如实显·不掩码) | `/api/ctx` `/api/ctxpanel` |
-| `prompts` | 📝 提示词审核 | 提示词审核 | `/api/prompts` |
+| `prompts` | 📝 提示词审核 | 提示词审核(每节**行号 gutter**·左侧等宽行号列/每逻辑行一行·内容 wrap 不打乱行号;真实文件节带 **📂开文件** 按钮→默认程序打开) | `/api/prompts` + POST `/api/open-file` |
 | `tasklines` | 🎯 任务线看板 | 长期任务线卡片 + 待决策徽标 | `/api/tasklines` |
 | `groups` | 🧩 工作组 | 工作组池化 + 组内并行度指标 | `/api/groups` |
 | `mechanisms` | 🔧 机制 | bus 机制注册表(13 类·`bus_mechanisms.json`)·related_cap 交叉链 | `/api/mechanisms` |
@@ -47,7 +47,7 @@
 
 ## 后端 API 一览
 - **GET**:`/api/state` `/api/events`(SSE) `/api/health` `/api/tray` `/api/reap`(dry-run) `/api/todos` `/api/live` `/api/tasklines` `/api/groups` `/api/mechanisms` `/api/longrange` `/api/bi` `/api/caps` `/api/usage` `/api/dispatch_metrics` `/api/sessions` `/api/ctx` `/api/ctxpanel` `/api/prompts`
-- **POST**:`/api/send` `/api/supervise` `/api/clear_replies` `/api/todos/{add,update,delete,dispatch,answer}` `/api/lr-decide`(决策合批写回)
+- **POST**:`/api/send` `/api/supervise` `/api/clear_replies` `/api/todos/{add,update,delete,dispatch,answer}` `/api/lr-decide`(决策合批写回) `/api/open-file`(📂开文件·**白名单硬约束**:只允许 `build_prompts()` 当前 openable 的真实文件 path·`os.startfile` 本机默认程序打开·127.0.0.1 only·拒任意路径=防 WebUI 变任意文件打开器攻击面)
 
 ## 运维
 - 起:`ui/start_ui.ps1`(pythonw 后台)。停:`ui/stop_ui.ps1`。改代码后:`py_compile` 自检 → stop → start。

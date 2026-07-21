@@ -162,6 +162,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/lr-decide":
             b = self._body_json()
             self._send(200, resolve_lr_batch((b.get("task_id") or "").strip(), b.get("approvals") or {}))
+        elif path == "/api/open-file":
+            # 📂开文件:白名单硬约束在 open_file 内(只允许 build_prompts openable 的真实文件·127.0.0.1 only)
+            b = self._body_json()
+            self._send(200, open_file((b.get("path") or "").strip()))
         else:
             self._send(404, {"error": "not found"})
 
