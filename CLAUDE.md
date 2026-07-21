@@ -48,7 +48,7 @@ ab whoami
 - **干活的代码仓**:`C:\BaseSpace\XXX`(业务代码/文档;通道工具按部署环境配置)。
 - **agent bus**:物理家 `C:\apphome\agent_fleet\agent_bus\`;`~/.claude/agent_bus` 是指向它的 **junction**(2026-07-15 起,非第二份)。命令一律 `ab <cmd>`(send/wait/done/who/hello,见 AGENTS.md);`ab` 已在用户 PATH。
 - **记忆硬链备份**:`C:\apphome\agent_fleet\memory\` —— **基座运行记忆**(源=当前会话记忆库 `~/.claude/projects/XXX/memory`)硬链自此(同卷 NTFS,共享 inode,防误删)。**只镜像基座/协调运行记忆,不镜像业务知识**(业务知识属业务侧、随业务留在原处不迁)。
-  原子保存(Write/Edit)会断链 → 改过记忆后跑 `powershell -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_memory.ps1` 刷新即可。
+  原子保存(Write/Edit)会断链 → 改过记忆后跑 `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\sync_memory.ps1` 刷新即可(`-NonInteractive -NoProfile` 标准化·防 profile 交互卡挂·Master数分 2026-07-21 口径;`-WindowStyle Hidden` 实测也能跑但非交互更稳)。
 - **机器相关路径集中配置**:`C:\apphome\agent_fleet\agent_bus\config.json`(claude_bin / **python_bin**(ab 启动器用·带 watchdog/psutil 的 env python)/ default_worker_cwd / repo / memory_index / agent_fleet_home / sync_memory_script / **usage_db**)。worker_daemon / ui.server / recover / hook 都从这读;每项可被 `AGENTBUS_<KEY大写>` 环境变量覆盖。**换机/换用户名只改这一处。**
 
 ## 迁移 / 换机(项目根=唯一物理家,只迁本目录 + 建 junction + 回填宿主配置)

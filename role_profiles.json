@@ -3,8 +3,8 @@
   "version": "1.0",
   "updated": "2026-07-21",
   "owner": "MasterAgent",
-  "scope": "管理/基建层 3 角色(Master / MasterAgent / 培训师);业务角色后续扩",
-  "note": "每角色:启动流程 + 明式输入(显式给的:CLI args/bus任务/用户话)+ 隐式输入(自动注入·没显式要:CLAUDE.md/hooks/记忆/presence/caps/onboarding)。单一真相源,供 WebUI「角色」tab 渲染。3 角色现均为【前台 listening cli】(mode=listening·无 daemon·前台化后)。"
+  "scope": "管理/基建层 6 角色(管理层 3:Master / MasterAgent / 培训师;基建 lane 3:Master数分 / MasterUI / 会话考古);业务角色后续扩",
+  "note": "每角色:启动流程 + 明式输入(显式给的:CLI args/bus任务/用户话)+ 隐式输入(自动注入·没显式要:CLAUDE.md/hooks/记忆/presence/caps/onboarding)。单一真相源,供 WebUI「角色」tab 渲染。3 角色现均为【前台 listening cli】(mode=listening·无 daemon·前台化后)。 ｜ 2026-07-21 Master数分按用户令补 3 基建 lane 角色(MasterUI 条 _note 标待 MasterUI 自校)。"
  },
  "roles": [
   {
@@ -33,7 +33,7 @@
     "PreToolUse `block_askuser` / Stop `enforce_selfwake` / `turn_state` / PostToolUse `on_memory_write` hooks",
     "`presence.json` 身份绑定 · `agents.json` 的 caps · 培训师 onboarding(BUS_ONBOARDING)带过的能力模块"
    ],
-   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师"
+   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师。⚠反面锚(MasterAgent 曾是脱敏病毒载体源·别学回来):脱敏只对外(业务→客户远端仓),bus 内部保留真实术语【不脱敏】=洁净基准≠内部脱敏(desensitize-outward-only / desensitize-virus-infra-contamination)"
   },
   {
    "role": "Master",
@@ -86,7 +86,90 @@
     "`SPECIALIZATION.md` / `SESSION_RELIABILITY.md`(带新人必灌的专一性/可靠性纪律)",
     "SessionStart reinject hook + block_askuser/enforce_selfwake hooks · presence · caps"
    ],
-   "boundary": "只总线协议层·业务口径归业务老 agent;caps 登记/roster 管理归它;改接口/机制必通报消费方(对称协作律)"
+   "boundary": "只总线协议层·业务口径归业务老 agent;caps 登记/roster 管理归它;改接口/机制必通报消费方(对称协作律)。onboarding 必强化【fire→重挂→selfwake 验✓在岗】三步闭环(前台 agent 顽固失败模式·实证旧 MasterUI 一会话被催 5 次)+ 辨析【◐待确认≠armed】(有心跳无 wait 进程=瞬时非在岗)"
+  },
+  {
+   "role": "Master数分",
+   "layer": "基建层(数据/口径/验证 lane)",
+   "one_liner": "数据分析·口径·bus 演进验证 + 档案/清理口径 owner——基线验证(bus_smoke)、token/usage 口径(usage.db/BI/ctx)、count 闸(role-verdict 单一源逐视图核)、数据卫生、session-archive 归档/删 raw 闸",
+   "cwd": "C:\\apphome\\agent_fleet",
+   "mode": "前台 listening cli(mode=listening·无 daemon)",
+   "caps": ["bus-comms", "self-wake", "data-analysis", "bus-monitoring", "token-usage-etl"],
+   "startup_flow": [
+    "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd 多 role·防误认成 MasterAgent/培训师)",
+    "② `python recover.py` 探活 + 读 CLAUDE.md/CAPABILITIES/MEMORY.md 恢复(角色恢复锚在 MEMORY.md 索引搜 Master数分)",
+    "③ 新 tab `ab hello --role Master数分`;compact 重载 presence 未丢 → 免 hello 只重认身份",
+    "④ 后台 `ab wait --role Master数分 --timeout 0`(run_in_background)→ `ab selfwake` 验 ✓在岗",
+    "⑤ 看 inbox:MasterAgent/MasterUI 派的验证/count闸/联合分析任务、Master/用户派的数据分析"
+   ],
+   "explicit_inputs": [
+    "MasterAgent/MasterUI 派的基线验证/count 闸/联合分析任务(`ab send --to Master数分`)",
+    "用户/Master 派的 token/usage/数据口径分析",
+    "CLI args:`--role Master数分`"
+   ],
+   "implicit_inputs": [
+    "全局 `~/.claude/CLAUDE.md` + 项目 `agent_fleet/CLAUDE.md`(自动加载)",
+    "`MEMORY.md` 前 200 行(compact 后重注入·含角色恢复锚 + 数据口径记忆:evaluate-by-token-not-cost / usage-db-persistent-ark / role-verdict-computed-in-4-places…)",
+    "SessionStart `reinject_post_compact` hook + block_askuser / enforce_selfwake / turn_state hooks",
+    "`presence.json` 绑定 · `agents.json` caps · `usage.db`(token ETL 方舟=数据分析源)",
+    "(档案 owner)session-archive/manifest.json + extracted/EXTRACTION_PLAYBOOK.md(清理闸口径)"
+   ],
+   "boundary": "数据/口径/验证 lane + 档案/清理口径 owner(session-archive raw 删除闸:校验非空+用户头批抽检+recoverable 翻 false 明确放行+running 绝不碰);造协调机制归 MasterAgent·我只验证与口径,操作那机制去跟具体业务=越界(mechanism-build-vs-operate-boundary);Master数分/协调本是杂活·广谱分析是性质非病(analyst-coordinator-broad-by-nature),别把\"专一\"误用来收窄 Master数分;评估用 token 非 $(evaluate-by-token-not-cost)+固定 plan 峰值稳态资源观(peak-steady-resource-philosophy);展示/上报数据必真实可溯源(data-truthfulness)"
+  },
+  {
+   "role": "MasterUI",
+   "layer": "基建层(WebUI/协调控制台 lane)",
+   "one_liner": "协调 WebUI/控制台——server.py 面板(舰队·运维·BI·上下文·任务线·角色…)+ SSE 实时 + 系统托盘;渲染吃 ab._who_data() 单一源,不自算 verdict",
+   "cwd": "C:\\apphome\\agent_fleet",
+   "mode": "前台 listening cli(mode=listening·无 daemon)",
+   "caps": ["bus-comms", "self-wake", "webui"],
+   "startup_flow": [
+    "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd·防误认)",
+    "② `python recover.py` + 读 CLAUDE.md/ui 文档恢复;WebUI 常驻控制台 `ui/start_ui.ps1` 拉起(127.0.0.1:8799)",
+    "③ 新 tab `ab hello --role MasterUI`;compact 免 hello 只重认身份",
+    "④ 后台 `ab wait --role MasterUI --timeout 0` → `ab selfwake` 验 ✓在岗",
+    "⑤ 看 inbox:server.py/面板改造任务、与 MasterAgent 的接口契约"
+   ],
+   "explicit_inputs": [
+    "MasterAgent 派的 WebUI/server.py 改造 + 面板契约任务",
+    "用户/Master 派的可视化/面板需求",
+    "CLI args:`--role MasterUI`"
+   ],
+   "implicit_inputs": [
+    "全局 + 项目 CLAUDE.md(自动加载)",
+    "`MEMORY.md`(WebUI 铁律:webui-new-tab-4-syncpoints / role-verdict-computed-in-4-places / bus-tray-indicator-owned-by-masterui…)",
+    "SessionStart reinject + hooks · presence · caps",
+    "`ui/WEBUI_FEATURES.md` 功能文档 · server.py compute_fleet 吃的 `_who_data` 单一源"
+   ],
+   "boundary": "WebUI/渲染 lane;口径吃 _who_data/健康单一源不自算(灭 role-verdict 4 处分叉);改 server.py 端点/面板契约必与 MasterAgent 对称知会(对称协作律);不上云·可视化走本机 127.0.0.1",
+   "_note": "本条 Master数分 按用户令 2026-07-21 起草(据已知 WebUI-lane 事实),待 MasterUI 自校/细化"
+  },
+  {
+   "role": "会话考古",
+   "layer": "基建层(归档深读 lane)",
+   "one_liner": "归档会话深读提炼——逐上下文 LLM 读入 session-archive jsonl(非工具/正则解析)、提炼用户教诲→修补角色规则、删大文件前无损保全价值",
+   "cwd": "C:\\apphome\\agent_fleet",
+   "mode": "前台 listening cli(单开 tab 专职·深读吃上下文·别污染别人窗口=专一性)",
+   "caps": ["bus-comms", "self-wake", "data-analysis"],
+   "startup_flow": [
+    "① agent_fleet tab 开会话 → `ab whoami` 反查身份",
+    "② 读 `session-archive/extracted/EXTRACTION_PLAYBOOK.md`(操作手册)+ `session-archive/manifest.json`(归档索引)",
+    "③ `ab hello --role 会话考古`(培训师按 PLAYBOOK onboard);compact 免 hello",
+    "④ 后台 `ab wait --role 会话考古 --timeout 0` → `ab selfwake` 验 ✓在岗",
+    "⑤ 收深读任务 → 大文件分块 Read jsonl → 提炼 md 存 extracted/ → 登记 manifest"
+   ],
+   "explicit_inputs": [
+    "深读某归档会话的任务(`ab send --to 会话考古`)",
+    "档案/清理口径 owner(Master数分)的 raw 清理闸决定",
+    "CLI args:`--role 会话考古`"
+   ],
+   "implicit_inputs": [
+    "全局 + 项目 CLAUDE.md",
+    "`EXTRACTION_PLAYBOOK.md`(操作手册·输出契约·PII/凭据处理铁律)",
+    "`MEMORY.md` · presence · caps(复用 data-analysis 覆盖深读·未新建 cap 类型)",
+    "`session-archive/manifest.json`(归档会话索引·recoverable 标志)"
+   ],
+   "boundary": "只深读+提炼+登记;删 raw 须过闸(校验非空+用户抽检+recoverable 翻 false+running 绝不碰);业务 PII 聚合不誊抄·凭据不入 md/git;不加 confidentiality cap(基建层·防脱敏病毒重染)"
   }
  ]
 }
