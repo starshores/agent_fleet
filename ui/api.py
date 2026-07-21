@@ -2042,6 +2042,24 @@ def build_mechanisms():
 
 
 # =============================================================
+#  👤 角色注册表(纯静态文档型·读 role_profiles.json·MasterAgent 维护单一真相源·仿 build_mechanisms)。
+#  用户令细化管理角色:每角色 layer/one_liner/cwd/mode/caps + 启动流程 + 明式/隐式输入 + 边界。
+#  静态读·只读文件·无实时 telemetry·无 refresher 线程·数据不出本机。
+# =============================================================
+_ROLE_PROFILES = Path(r"C:\apphome\agent_fleet\role_profiles.json")
+
+
+def build_role_profiles():
+    try:
+        d = json.loads(_ROLE_PROFILES.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e), "meta": {}, "roles": []}
+    return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "meta": d.get("meta", {}), "roles": d.get("roles", []) or [],
+            "n_roles": len(d.get("roles", []) or [])}
+
+
+# =============================================================
 #  🗂️ 长程任务·锚定生长网看板(P0:脊柱+当前段+进度)——使用方简报/MasterAgent出生长引擎+数据、MasterUI render。
 #  数据源=longrange_tasks.json(schema 与 MasterAgent 对齐中·P0提案);文件缺=优雅显"待MasterAgent数据引擎产出"不崩。
 #  静态读·只读元数据。P0只渲①脊柱②当前活跃段节点(状态色/blocked-on)④进度%;三角色/决策合批/复杂度曲线留 P1/P2。

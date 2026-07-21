@@ -111,6 +111,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, build_groups())
         elif path == "/api/mechanisms":
             self._send(200, build_mechanisms())
+        elif path == "/api/role-profiles":
+            self._send(200, build_role_profiles())
         elif path == "/api/longrange":
             self._send(200, build_longrange())
         elif path == "/api/prompts":

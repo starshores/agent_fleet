@@ -393,6 +393,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="tasklines">🎯 任务线看板</button>
   <button class="tab" data-t="groups">🧩 工作组</button>
   <button class="tab" data-t="mechanisms">🔧 机制</button>
+  <button class="tab" data-t="roles">👤 角色</button>
   <button class="tab" data-t="longrange">🗂️ 长程任务</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
@@ -675,6 +676,16 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
       <button class="btn ghost mini" id="mechRefresh">刷新</button>
     </div>
     <div class="sec-b"><div id="mechBox" style="padding:6px 0"></div></div>
+  </section>
+
+  <section data-tab="roles">
+    <div class="sec-h">👤 角色注册表
+      <span class="sub">管理/基建角色的<b>单一真相源</b> · 数据 <span class="mono">role_profiles.json</span> · 每角色:层级/一句话/cwd·mode·caps + 启动流程 + <b>明式输入</b>(用户/Master 显式派)/ <b>隐式输入</b>(自举时读的锚点) + 边界</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="rolesMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="rolesRefresh">刷新</button>
+    </div>
+    <div class="sec-b"><div id="rolesBox" style="padding:6px 0"></div></div>
   </section>
 
   <!-- 🗂️ 长程任务·锚定生长网(P0:脊柱+当前段+进度·使用方简报/MasterAgent引擎+数据/MasterUI render) -->
@@ -1837,6 +1848,38 @@ function renderMechanisms(d){
   }).join(''));
 }
 
+// ===== 👤 角色注册表(纯静态文档型·读 role_profiles.json·MasterAgent 单一真相源·MasterUI render)=====
+{const _rr=document.getElementById('rolesRefresh'); if(_rr) _rr.onclick=()=>loadRoles();}
+async function loadRoles(){
+  const box=document.getElementById('rolesBox'); if(box&&!box.innerHTML) box.innerHTML='<div class="muted" style="padding:8px 16px">读取中…</div>';
+  try{ const r=await fetch('/api/role-profiles'); renderRoles(await r.json()); }
+  catch(e){ if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(e)+'</div>'; }
+}
+function renderRoles(d){
+  const box=document.getElementById('rolesBox'); const meta=document.getElementById('rolesMeta'); if(!box) return;
+  if(!d||!d.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败:'+esc((d&&d.error)||'?')+'</div>'); if(meta)meta.textContent=''; return; }
+  const roles=d.roles||[], m=d.meta||{};
+  if(meta) meta.textContent=(d.n_roles||0)+' 角色 · v'+esc(m.version||'?')+' · 更新 '+esc(m.updated||'')+(m.owner?(' · owner '+esc(m.owner)):'');
+  const head=(m.note?'<div class="muted" style="font-size:12px;padding:2px 16px 8px">'+esc(m.note)+(m.scope?(' · 范围:'+esc(m.scope)):'')+'</div>':'');
+  const col=(title,items,ic)=>'<div style="flex:1;min-width:150px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:3px">'+ic+' '+title+'</div>'
+    +((items&&items.length)?('<ol style="margin:0;padding-left:16px;font-size:11.5px;line-height:1.55">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>')
+      :'<div class="muted" style="font-size:11px">—</div>')+'</div>';
+  morphInto(box, head+roles.map(r=>{
+    const caps=(r.caps||[]).map(c=>'<span class="cap-chip">'+esc(c)+'</span>').join('');
+    return '<div class="tl-card" data-key="role-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
+      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">👤 '+esc(r.role)+'</b>'
+      +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span></div>'
+      +(r.one_liner?'<div style="font-size:12.5px;margin-top:4px">'+esc(r.one_liner)+'</div>':'')
+      +'<div class="muted" style="font-size:11px;margin-top:5px">cwd <span class="mono">'+esc(r.cwd||'?')+'</span> · mode '+esc(r.mode||'?')+' · caps '+(caps||'—')+'</div>'
+      +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">'
+      +col('启动流程',r.startup_flow,'🚀')
+      +col('明式输入(显式派)',r.explicit_inputs,'📥')
+      +col('隐式输入(自举读锚)',r.implicit_inputs,'🧭')+'</div>'
+      +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
+      +'</div>';
+  }).join(''));
+}
+
 // ===== 🗂️ 长程任务·锚定生长网(P0:脊柱+当前段+进度·使用方简报/MasterAgent数据/MasterUI render)=====
 {const _lr=document.getElementById('lrRefresh'); if(_lr) _lr.onclick=()=>loadLongrange();}
 // 节点状态→CSS(MasterAgent longrange_v0 口径:pending灰/ready浅蓝/running蓝/blocked红/await_decision黄/done绿/failed深红)
@@ -2038,7 +2081,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2056,6 +2099,7 @@ function showTab(t){
   else if(t==='tasklines') loadTasklines();
   else if(t==='groups') loadGroups();
   else if(t==='mechanisms') loadMechanisms();
+  else if(t==='roles') loadRoles();
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
 }
