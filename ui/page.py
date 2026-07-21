@@ -1885,13 +1885,43 @@ function renderRoles(d){
   const box=document.getElementById('rolesBox'); const meta=document.getElementById('rolesMeta'); if(!box) return;
   if(!d||!d.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败:'+esc((d&&d.error)||'?')+'</div>'); if(meta)meta.textContent=''; return; }
   const roles=d.roles||[], m=d.meta||{};
+  const cj=d.compact||{}, cby=(cj.by_role)||{};   // compact hook 注入(单一源·reinject_post_compact 导出)
   if(meta) meta.textContent=(d.n_roles||0)+' 角色 · v'+esc(m.version||'?')+' · 更新 '+esc(m.updated||'')+(m.owner?(' · owner '+esc(m.owner)):'');
   const head=(m.note?'<div class="muted" style="font-size:12px;padding:2px 16px 8px">'+esc(m.note)+(m.scope?(' · 范围:'+esc(m.scope)):'')+'</div>':'');
+  // 全局层(compact 后所有角色共用·展示一次)——meta.common_rules verbatim,{role} 占位保留为模板样;hook 不可读→降级提示不塌页
+  let glob='';
+  if(cj.ok===false){
+    glob+='<div style="margin:8px 16px;padding:8px 12px;border:1px solid var(--warn);border-radius:8px;background:rgba(245,166,35,.10);font-size:12px"><b class="muted">⚠ compact hook 模块不可读:</b>'+esc(cj.error||'?')+'<span class="muted">(仅 compact 注入区块降级·注册表展示不受影响)</span></div>';
+  }
+  const cr=m.common_rules||[];
+  if(cr.length){
+    glob+='<div style="margin:8px 16px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'
+      +'<div style="font-weight:600;color:var(--accent);font-size:13px">🌐 全局层 · compact 后所有角色共用</div>'
+      +'<div class="muted" style="font-size:11px;margin:2px 0 6px">'+esc(m.common_rules_note||'compact hook 全局通用操作铁律;{role} 为模板占位(实注时按角色插值)')+'</div>'
+      +'<ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">'+cr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol></div>';
+  }
   const col=(title,items,ic)=>'<div style="flex:1;min-width:150px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:3px">'+ic+' '+title+'</div>'
     +((items&&items.length)?('<ol style="margin:0;padding-left:16px;font-size:11.5px;line-height:1.55">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>')
       :'<div class="muted" style="font-size:11px">—</div>')+'</div>';
-  morphInto(box, head+roles.map(r=>{
+  morphInto(box, head+glob+roles.map(r=>{
     const caps=(r.caps||[]).map(c=>'<span class="cap-chip">'+esc(c)+'</span>').join('');
+    // compact 注入区块:角色层(render_role)+ 完整注入折叠(build_context·WYSIWYG=hook 实注同一串)
+    const ci=cby[r.role]||{}; let cblock='';
+    if(cj.ok!==false){
+      if(ci.error){
+        cblock='<div class="muted" style="font-size:11px;margin-top:8px">⚠ 本角色 compact 注入产出失败:'+esc(ci.error)+'</div>';
+      }else{
+        const rl=ci.role_layer;
+        const rlHtml=rl
+          ? '<div style="font-size:11.5px"><b class="muted">one_liner:</b> '+esc(rl.one_liner||'')+'</div><div style="font-size:11.5px;margin-top:2px"><b class="muted">boundary:</b> '+esc(rl.boundary||'')+'</div>'
+          : '<div class="muted" style="font-size:11.5px">render_role 返 None · 未注册回落态(compact 时回落「读你的角色恢复锚记忆」)</div>';
+        cblock='<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:6px">'
+          +'<div class="muted" style="font-size:11px;font-weight:600">🧩 角色层(render_role · compact 注入)</div>'+rlHtml
+          +(ci.full?('<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11.5px;color:var(--accent)">▸ 查看完整 compact 注入(build_context · 所见即所注)</summary>'
+             +'<pre style="white-space:pre-wrap;word-break:break-word;font:11.5px/1.5 Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0 0;max-height:50vh;overflow:auto">'+esc(ci.full)+'</pre></details>'):'')
+          +'</div>';
+      }
+    }
     return '<div class="tl-card" data-key="role-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
       +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">👤 '+esc(r.role)+'</b>'
       +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span></div>'
@@ -1902,6 +1932,7 @@ function renderRoles(d){
       +col('明式输入(显式派)',r.explicit_inputs,'📥')
       +col('隐式输入(自举读锚)',r.implicit_inputs,'🧭')+'</div>'
       +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
+      +cblock
       +'</div>';
   }).join(''));
 }

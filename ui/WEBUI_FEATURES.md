@@ -25,6 +25,7 @@
 | `tasklines` | 🎯 任务线看板 | 长期任务线卡片 + 待决策徽标 | `/api/tasklines` |
 | `groups` | 🧩 工作组 | 工作组池化 + 组内并行度指标 | `/api/groups` |
 | `mechanisms` | 🔧 机制 | bus 机制注册表(13 类·`bus_mechanisms.json`)·related_cap 交叉链 | `/api/mechanisms` |
+| `roles` | 👤 角色 | 角色注册表(`role_profiles.json`·MasterAgent owns):每角色启动流程/明式·隐式输入/边界 + **compact hook 注入两层**(🌐全局层=`meta.common_rules` verbatim 展示一次;每卡🧩角色层 render_role + 「完整 compact 注入」折叠=`build_context(role)` **WYSIWYG 逐字**)。★单一源硬口径:调 `hooks/reinject_post_compact.py` 导出函数产出、**绝不手抄副本**(防第三处飘);hook 不可读→降级横幅不塌页 | `/api/role-profiles` |
 | `longrange` | 🗂️ 长程任务 | **锚定生长网**:脊柱锚点 / 活跃段 fork-merge DAG / ★决策合批单(approve/reject 一次批·`/api/lr-decide`→`longrange_net.resolve_batch`)/ 三角色 / 🔭跟踪者活动 / 复杂度曲线 / 💡已省N次确认徽标 | `/api/longrange` |
 | `tasks` | 📋 任务/协作 | 派任务/收结果/待办池(ask-user) | `/api/todos` + POST `/api/send`·`/api/todos/*` |
 | `live` | 🔴 实时 | 实时事件流 | `/api/live` |

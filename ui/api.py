@@ -2068,6 +2068,32 @@ def build_mechanisms():
 #  静态读·只读文件·无实时 telemetry·无 refresher 线程·数据不出本机。
 # =============================================================
 _ROLE_PROFILES = Path(r"C:\apphome\agent_fleet\role_profiles.json")
+_HOOKS_DIR = Path(r"C:\apphome\agent_fleet\hooks")
+
+
+def _compact_inject(role_names):
+    """compact hook 注入内容(供「角色」tab 渲染)。★硬口径:调 hooks/reinject_post_compact.py
+    的导出函数产出(build_context / render_role)——【绝不手抄副本】(单一源·防第三处飘·
+    参 role-verdict-computed-in-4-places 教训)。WYSIWYG=页面 full 串==hook 实注同一串。
+    import 失败/hook 不可读 → {ok:False,error}(前端降级不塌页·非白屏非整页崩)。
+    render_role 返 None(未注册/文件坏)→ role_layer=None,前端显回落态。函数契约恒不抛。"""
+    try:
+        if str(_HOOKS_DIR) not in sys.path:
+            sys.path.insert(0, str(_HOOKS_DIR))
+        import reinject_post_compact as ric
+    except Exception as e:
+        return {"ok": False, "error": "hook 模块不可读(reinject_post_compact):" + str(e), "by_role": {}}
+    by_role = {}
+    for rn in role_names:
+        try:
+            prof = ric.render_role(rn)  # (one_liner, boundary) | None
+            by_role[rn] = {
+                "role_layer": ({"one_liner": prof[0], "boundary": prof[1]} if prof else None),
+                "full": ric.build_context(rn),  # 完整注入串·逐字==hook additionalContext
+            }
+        except Exception as e:
+            by_role[rn] = {"error": str(e)}
+    return {"ok": True, "by_role": by_role}
 
 
 def build_role_profiles():
@@ -2075,9 +2101,10 @@ def build_role_profiles():
         d = json.loads(_ROLE_PROFILES.read_text(encoding="utf-8"))
     except Exception as e:
         return {"ok": False, "error": str(e), "meta": {}, "roles": []}
+    roles = d.get("roles", []) or []
     return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "meta": d.get("meta", {}), "roles": d.get("roles", []) or [],
-            "n_roles": len(d.get("roles", []) or [])}
+            "meta": d.get("meta", {}), "roles": roles, "n_roles": len(roles),
+            "compact": _compact_inject([r.get("role") for r in roles if r.get("role")])}
 
 
 # =============================================================
