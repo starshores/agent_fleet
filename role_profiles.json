@@ -119,30 +119,30 @@
   {
    "role": "MasterUI",
    "layer": "基建层(WebUI/协调控制台 lane)",
-   "one_liner": "协调 WebUI/控制台——server.py 面板(舰队·运维·BI·上下文·任务线·角色…)+ SSE 实时 + 系统托盘;渲染吃 ab._who_data() 单一源,不自算 verdict",
+   "one_liner": "协调 WebUI/控制台——server.py 面板(舰队·运维·BI·上下文·任务线·机制·角色…)+ SSE 实时 + 系统托盘 + bus 维护心跳(start_maint);渲染吃 ab._who_data() 单一源不自算 verdict",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(mode=listening·无 daemon)",
    "caps": ["bus-comms", "self-wake", "webui"],
    "startup_flow": [
-    "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd·防误认)",
-    "② `python recover.py` + 读 CLAUDE.md/ui 文档恢复;WebUI 常驻控制台 `ui/start_ui.ps1` 拉起(127.0.0.1:8799)",
+    "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd·防误认成 MasterAgent/培训师/Master数分)",
+    "② `python recover.py` + 读 CLAUDE.md/ui 文档恢复;WebUI 常驻控制台 `ui/start_ui.ps1` 幂等拉起(WMI/CIM 脱壳常驻 127.0.0.1:8799)",
     "③ 新 tab `ab hello --role MasterUI`;compact 免 hello 只重认身份",
-    "④ 后台 `ab wait --role MasterUI --timeout 0` → `ab selfwake` 验 ✓在岗",
-    "⑤ 看 inbox:server.py/面板改造任务、与 MasterAgent 的接口契约"
+    "④ 后台 `ab wait --role MasterUI --timeout 0`(run_in_background·别 shell &)→ `ab selfwake` 验 ✓在岗(◐待确认≠armed)",
+    "⑤ 看 inbox:server.py/面板改造任务、与 MasterAgent 的端点/面板契约"
    ],
    "explicit_inputs": [
-    "MasterAgent 派的 WebUI/server.py 改造 + 面板契约任务",
+    "MasterAgent 派的 WebUI/server.py 改造 + 面板契约任务(如 2a 步骤3 吃 _who_data、新 tab)",
+    "Master数分(口径 owner)派的渲染文案/口径修法",
     "用户/Master 派的可视化/面板需求",
     "CLI args:`--role MasterUI`"
    ],
    "implicit_inputs": [
     "全局 + 项目 CLAUDE.md(自动加载)",
-    "`MEMORY.md`(WebUI 铁律:webui-new-tab-4-syncpoints / role-verdict-computed-in-4-places / bus-tray-indicator-owned-by-masterui…)",
+    "`MEMORY.md`(WebUI 铁律:webui-new-tab-4-syncpoints=新 tab 必同步 4 处 / role-verdict-computed-in-4-places / bus-tray-indicator-owned-by-masterui;操作纪律:idle-output-discipline 空唤醒静默 / capture-before-done / 重挂只用 run_in_background 别 shell &)",
     "SessionStart reinject + hooks · presence · caps",
-    "`ui/WEBUI_FEATURES.md` 功能文档 · server.py compute_fleet 吃的 `_who_data` 单一源"
+    "`ui/WEBUI_FEATURES.md` 功能文档 · server.py compute_fleet 吃的 `_who_data` 单一源 · role_profiles.json(本注册表·我渲染)"
    ],
-   "boundary": "WebUI/渲染 lane;口径吃 _who_data/健康单一源不自算(灭 role-verdict 4 处分叉);改 server.py 端点/面板契约必与 MasterAgent 对称知会(对称协作律);不上云·可视化走本机 127.0.0.1",
-   "_note": "本条 Master数分 按用户令 2026-07-21 起草(据已知 WebUI-lane 事实),待 MasterUI 自校/细化"
+   "boundary": "WebUI/渲染 lane;口径吃 _who_data/健康单一源不自算(灭 role-verdict 4 处分叉);★改 server.py 端点/面板结构必与 MasterAgent 对称知会(对称协作律);不上云·可视化走本机 127.0.0.1。代码结构=P4(v2.1·2026-07-20)后 server.py 4899→135 行拆为 ui/{common(基础层引导+helper)/api(数据 build_*/get_*/compute_*+缓存+refresher)/page(INDEX_HTML 前端常量)/routes(HTTP Handler)}+server.py(装配入口 facade+main);★改代码需重启部署(stop_ui+start_ui·INDEX_HTML/模块启动时载入内存·改文件不重启不生效)。owns:server.py 全套 + bus_tray 系统托盘(渲染归我·口径归 Master数分·★不开机自启=用户令 2026-07-15·要用手动 wscript bus_tray_start.vbs)+ start_maint 维护心跳(30min reap+todos-archive)"
   },
   {
    "role": "会话考古",
