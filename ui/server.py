@@ -85,22 +85,24 @@ def start_selfwake_guard(interval=180):
     threading.Thread(target=loop, daemon=True).start()
 
 
-def start_reap(interval=1800):
-    """常驻孤儿/卡死回收(B2·2026-07-21·MasterAgent 联合分析升级):每 ~interval 秒后台跑 `ab reap`,把 owner
-    死/超 ttl 的滞留 processing 退回 inbox(requeue+1·毒任务超 max-requeue 进 failed/)。跟
-    start_selfwake_guard 一个模子:由 8799 always-on 驱动;首轮先 sleep;失败静默 try/except 绝不掀翻 8799;
-    子进程带 CREATE_NO_WINDOW 免弹窗(见记忆 popen-claude-no-window)。
-    安全:reap 只动【owner 不在听且 age>120s·或 age>4000s ttl】的真卡死,正常长任务不误伤;
-    poison 超限进 failed/ 不无限重派 → 无人值守周期跑安全。cadence 30min=dead-owner 任务 30min 内回收、
-    不碰 alive 的 <67min 长任务(治此前 stuck/孤儿攒数周·手动清 25 条那类)。"""
+def start_maint(interval=1800):
+    """常驻 bus 维护心跳(B2+B3·2026-07-21·MasterAgent 联合分析):每 ~interval 秒后台跑【两件】——
+    ① reap:退回 owner 死/超 ttl 的滞留 processing 到 inbox(requeue+1·poison 超 max-requeue 进 failed/);
+    ② todos-archive --older-min 1440 --apply:归档完成>24h 的待办(近期完成态留用户过目·防池膨胀·
+       落地前备份 todos.json.pre-archive.bak)。
+    跟 start_selfwake_guard 一个模子:8799 always-on 驱动;首轮先 sleep;各自 try/except 静默不掀翻 8799;
+    子进程带 CREATE_NO_WINDOW 免弹窗(见记忆 popen-claude-no-window)。二者都幂等只读判据、静默失败不影响 8799。
+    安全:reap 只动真卡死(owner 不在听且 age>120s·或 age>4000s ttl),正常长任务(<67min alive)不误伤;
+    todos-archive 只动完成>24h。治此前 stuck/孤儿 + 完成态待办攒数周(手动清 25 条那类)。"""
     def loop():
         while True:
             time.sleep(interval)
-            try:
-                subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "reap"],
-                               capture_output=True, timeout=90, creationflags=_NO_WINDOW)
-            except Exception:
-                pass
+            for argv in (["reap"], ["todos-archive", "--older-min", "1440", "--apply"]):
+                try:
+                    subprocess.run([sys.executable, str(ABDIR / "agentbus.py")] + argv,
+                                   capture_output=True, timeout=90, creationflags=_NO_WINDOW)
+                except Exception:
+                    pass
     threading.Thread(target=loop, daemon=True).start()
 
 
@@ -124,7 +126,7 @@ def main():
     if not args.no_supervise:
         start_supervisor()
     start_selfwake_guard(180)         # 常驻自醒探测网(Master令·B):180s 跑 ab selfwake-guard,掉自醒→inbox提醒+toast(8799 always-on 驱动,不依赖 agent 醒着)
-    start_reap(1800)                  # B2(2026-07-21):30min 周期 reap,stuck/孤儿不再累积(仅动真卡死:owner死/age>ttl·poison→failed/·安全无人值守)
+    start_maint(1800)                 # B2+B3(2026-07-21):30min 维护心跳=reap(退卡死/孤儿)+ todos-archive(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态·安全无人值守
     # 预热缓存(后台线程,不阻塞启动):
     #  · build_bi() 跑一遍 → 填充 _proc_cache(psutil.Process 对象 + cpu_percent 基线),
     #    使【首个真实 /api/bi】~220ms 而非冷启 ~4.5s(_proc_cache 无 TTL,长期受益,首屏 BI 关键)。
