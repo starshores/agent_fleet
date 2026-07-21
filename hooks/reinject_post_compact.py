@@ -26,13 +26,25 @@ _COMMON_RULES = (
     "被 wait 领进 processing 的消息必须当轮 done 闭合;"
     "需用户拍板/二选一→走 `ab ask-user --from {role} ...` 投非阻塞待办池、禁用 AskUserQuestion(已被 block_askuser.py 硬拦),投完继续干活别等。"
 )
-# 角色特有铁律(按需补;没列的角色走通用块 + 读自己的角色恢复锚记忆)
-_ROLE_RULES = {
-    "MasterAgent": "每升级一次基建(bus/UI/daemon/通知)必主动【简报 Master】;洁净基准=不掺业务、内部术语不脱敏(脱敏只对外、非你的活);caps 登记归培训师(你只管 caps 系统机制)。深版读 AGENTS.md/SPECIALIZATION.md/SESSION_RELIABILITY.md + memory。",
-    "培训师": "只管总线协议层 onboarding,业务口径归业务老 agent;caps 登记/管理归你(配 caps/desc/dormant)。读你的角色记忆锚。",
-    "Master数分2": "数分/用量/bus 监控验证;写库走 sql_agent 审批。读你的角色记忆锚。",
-    "MasterUI": "WebUI 控制台维护;读你的角色记忆锚。",
-}
+# 角色特有铁律:从 role_profiles.json(canonical 单一源·无镜像)读,不再硬编码 dict
+# (可扩展=加角色只改注册表;灭 dict 分叉;顺带修旧名 stale 问题)。
+def _role_profile(role):
+    """取本 role 的 one_liner + boundary(compact 该留的身份+边界/反面锚/记忆slug)。
+    读法:Path(__file__).parent.parent/role_profiles.json、显式 utf-8。
+    文件缺失 / role 未注册 / json 解析失败 → 返回 None(调用方回落 generic)。
+    绝不抛异常(hook 恒 exit 0,不因注册表崩掉自定位)。"""
+    try:
+        pf = Path(__file__).resolve().parent.parent / "role_profiles.json"
+        data = json.loads(pf.read_text(encoding="utf-8"))
+        for r in data.get("roles", []):
+            if r.get("role") == role:
+                ol = (r.get("one_liner") or "").strip()
+                bd = (r.get("boundary") or "").strip()
+                if ol or bd:
+                    return ol, bd
+    except Exception:
+        pass
+    return None
 
 def _resolve_role(sid):
     """按 session_id 反查绑定 role。stdin.session_id(hook 权威提供)为准;仅其缺失才用 env 兜底
@@ -83,7 +95,12 @@ def main():
     sid = data.get("session_id")
     role = _resolve_role(sid)
     if role:
-        rule = _ROLE_RULES.get(role, "读你的角色恢复锚记忆(在 MEMORY.md 索引里搜你的 role)。")
+        prof = _role_profile(role)
+        if prof:
+            ol, bd = prof
+            rule = "(role_profiles.json·单一源)%s。边界:%s" % (ol, bd)
+        else:
+            rule = "读你的角色恢复锚记忆(在 MEMORY.md 索引里搜你的 role)。"
         ctx = (
             "## ⚡ compact 后自定位(SessionStart·source=compact 自动注入)\n"
             "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
