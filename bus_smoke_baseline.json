@@ -41,13 +41,14 @@
     "supervise",
     "tag",
     "tasklines",
+    "todos-archive",
     "unpark",
     "wait",
     "webui-guard",
     "who",
     "whoami"
   ],
-  "command_count": 46,
+  "command_count": 47,
   "tests": [
     {
       "name": "who.json",
@@ -218,6 +219,14 @@
       "note": "丢失巡检(不带 --apply=只检测)"
     },
     {
+      "name": "todos-archive.dry",
+      "cmd": "todos-archive",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "完成态归档 dry(不带 --apply=只报)"
+    },
+    {
       "name": "register",
       "cmd": "register",
       "ok": true,
@@ -370,7 +379,7 @@
       "note": "外部 ab.* re-export 完整性(C5)"
     }
   ],
-  "test_count": 40,
-  "pass": 40,
+  "test_count": 41,
+  "pass": 41,
   "fail": 0
 }

@@ -181,3 +181,68 @@ def cmd_ask_user(args):
     os.replace(tmp, f)
     _audit("ask_user", id=tid, frm=frm, title=item["title"][:40])
     print("已投入待办池(待用户确认):《%s》[%s] from %s" % (item["title"], tid, frm))
+
+
+# ── B3(2026-07-21):todos.json 完成态 auto-archive ───────────────────────────
+# Master数分定位:todos.json 膨胀根因=完成态条目从不清出(191/235 是完成态)→ 文件胖 + "待办停滞"看板虚高。
+# 归档=把完成态移到 todos_archive.json(留痕不删),池只留活的(待办/进行中)。防复堆。
+_DONE_STATUSES = ("完成", "已完成")
+
+
+def _todo_age_min(ts, now):
+    """ISO(_now 格式 %Y-%m-%dT%H:%M:%S)→ 距 now 的分钟;解析不出返 None。"""
+    try:
+        return (now - time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%S"))) / 60.0
+    except Exception:
+        return None
+
+
+def _archive_done_todos(older_than_min=0, apply=False):
+    """把 todos.json 完成态(完成/已完成)移到 todos_archive.json(append·留痕)。
+    older_than_min>0 只归档 updated 早于该阈值的(近期完成态留给用户过目);0=全部完成态。
+    先落 archive 再瘦 todos(原子写 + 备份 todos.json.pre-archive.bak)。返回处置报告。只动完成态·不碰活的。"""
+    tf = BUS / "todos.json"
+    try:
+        todos = json.loads(tf.read_text(encoding="utf-8"))
+        if not isinstance(todos, list):
+            todos = []
+    except Exception:
+        return {"before": 0, "archived": 0, "after": 0, "dry": not apply, "err": "todos.json 读失败"}
+    now = time.time()
+
+    def _archivable(t):
+        if t.get("status") not in _DONE_STATUSES:
+            return False
+        if older_than_min <= 0:
+            return True
+        age = _todo_age_min(t.get("updated") or t.get("created") or "", now)
+        return age is None or age >= older_than_min
+
+    done = [t for t in todos if _archivable(t)]
+    kept = [t for t in todos if not _archivable(t)]
+    rep = {"before": len(todos), "archived": len(done), "after": len(kept), "dry": not apply}
+    if apply and done:
+        af = BUS / "todos_archive.json"
+        try:
+            arch = json.loads(af.read_text(encoding="utf-8")) if af.exists() else []
+            if not isinstance(arch, list):
+                arch = []
+        except Exception:
+            arch = []
+        arch.extend(done)
+        (BUS / "todos.json.pre-archive.bak").write_text(
+            json.dumps(todos, ensure_ascii=False, indent=1), encoding="utf-8")
+        _write_json(af, arch)   # 先落归档(留痕)
+        _write_json(tf, kept)   # 再瘦待办池
+        _audit("todos_archive", archived=len(done), after=len(kept))
+    return rep
+
+
+def cmd_todos_archive(args):
+    """B3:归档 todos.json 完成态到 todos_archive.json(池只留活的·防完成态堆积膨胀 + 消"待办停滞"虚高)。
+    --older-min N 只归档完成早于 N 分钟的(默认 0=全部完成态);默认 dry-run,--apply 才落地。"""
+    rep = _archive_done_todos(older_than_min=getattr(args, "older_min", 0) or 0,
+                              apply=getattr(args, "apply", False))
+    print(json.dumps(rep, ensure_ascii=False, indent=1))
+    if rep.get("dry"):
+        print("(dry-run·加 --apply 落地;落地会备份 todos.json.pre-archive.bak)")

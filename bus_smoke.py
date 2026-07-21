@@ -216,6 +216,7 @@ def build_tests():
     T.append(("prune.dry", ["prune", "--dry-run"], chk_no_tb, "清空目录 dry"))
     T.append(("selfwake-guard.dry", ["selfwake-guard", "--dry-run"], chk_no_tb, "自醒守卫 dry"))
     T.append(("health-sweep.detect", ["health-sweep"], chk_no_tb, "丢失巡检(不带 --apply=只检测)"))
+    T.append(("todos-archive.dry", ["todos-archive"], chk_no_tb, "完成态归档 dry(不带 --apply=只报)"))
     # ---- 有态:测试角色核心任务流 send→peek→wait→done ----
     T.append(("register", ["register", "--role", SMOKE_ROLE, "--desc", "smoke"], chk_no_tb, "注册测试角色"))
     T.append(("send", ["send", "--to", SMOKE_ROLE, "--from", SMOKE_ROLE, "--title", "smoke", "--task", "smoke task body"], chk_contains(SMOKE_ROLE, "id", "-"), "派活(打印 task id)"))

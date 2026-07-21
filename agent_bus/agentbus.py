@@ -74,7 +74,7 @@ from bus.roles import (  # noqa: E402
 )
 from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions  # noqa: E402
-from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user  # noqa: E402
+from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
@@ -95,7 +95,7 @@ _CMD_GROUPS = [
     ("工作组池 pool", "join-group leave-group send-group fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
     ("Edge 互斥", "edge-acquire edge-release"),
-    ("长期任务·待办 tasks", "tasklines ask-user refs"),
+    ("长期任务·待办 tasks", "tasklines ask-user refs todos-archive"),
     ("会话·标注", "sessions tag"),
 ]
 
@@ -158,6 +158,7 @@ def main():
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
     p = sub.add_parser("answer"); p.add_argument("--todo", required=True); p.add_argument("--reply", required=True); p.add_argument("--from", dest="frm", default=None); p.set_defaults(fn=cmd_answer)
+    p = sub.add_parser("todos-archive"); p.add_argument("--older-min", type=int, default=0, dest="older_min"); p.add_argument("--apply", action="store_true"); p.set_defaults(fn=cmd_todos_archive)
     p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)
