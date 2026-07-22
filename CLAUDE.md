@@ -68,7 +68,7 @@ ab whoami
 - ⑥ **发版自动 snapshot 钩子**:`git config core.hooksPath githooks`(打 vX tag 时 `githooks/reference-transaction` 自动 zip 到同级 `agent_fleet_releases/`)。整目录连 `.git` 复制则已随 `.git/config` 带过来;重新 clone 才需手动设。**注**:钩子里 tar 路径 `/c/Windows/System32/tar.exe` 是 Windows bsdtar,换非 Windows 机要改。
 - (WebUI 另需:`ui\start_ui.ps1` 拉起常驻控制台。)
 
-> **junction 化验证**(2026-07-15):`fsutil reparsepoint query` 确认 `~/.claude/agent_bus` 为正规 junction(tag 0xa0000003);原生 python 经反/正斜杠均能解析 canonical 返回正确 role;canonical agentbus.py 全程可跑保持。旧 canonical 存 `~/.claude/agent_bus.bak`(稳定后删)。**踩坑**:迁移窗口(rename→junction 那 ~1 分钟)其他 agent 会瞬时报 canonical No-such-file → 是瞬时、非 junction 真坏;重挂优先用真实路径 `C:/apphome/agent_fleet/agent_bus/agentbus.py`(无 junction 遍历歧义)。
+> **junction 化验证**(2026-07-15):`fsutil reparsepoint query` 确认 `~/.claude/agent_bus` 为正规 junction(tag 0xa0000003);原生 python 经反/正斜杠均能解析 canonical 返回正确 role;canonical agentbus.py 全程可跑保持。旧 canonical 曾存 `~/.claude/agent_bus.bak`,**已于 2026-07-22 删除**(junction 稳定一周·全 agent 经 junction 运行·其 agentbus.py=1951 行旧单体 vs 活源 176 行·usage.db 59392 行是活源 81153 行的陈旧子集无独有数据)→「`~/.claude` 目录以外均为引用」不变量已洁净成立。**踩坑**:迁移窗口(rename→junction 那 ~1 分钟)其他 agent 会瞬时报 canonical No-such-file → 是瞬时、非 junction 真坏;重挂优先用真实路径 `C:/apphome/agent_fleet/agent_bus/agentbus.py`(无 junction 遍历歧义)。
 
 > **基准②·基础设施洁净**:bus = **基础设施、非业务**,与业务负载解耦(业务可插拔)。核心(`agent_bus/` 源码 + config + fleet/agents/capabilities.json)**只放协调机制本身**,不掺【业务数据/口径/客户明细/业务分析结果】——这些属业务、不进 bus 核心。运行态队列里的业务消息是过境流量、不算污染;但**核心文件必须干净**。
 > ⚠ **别把「对外脱敏」误套到内部**:脱敏是【对外】的事——对外交付物(对外仓/对客材料)的规范管理,由业务侧把关。**基座内部文档保留工程细节与真实技术术语、不做内部脱敏**——内部脱敏只会丢掉需要的信息。洁净 = 不掺业务,≠ 内部脱敏。
