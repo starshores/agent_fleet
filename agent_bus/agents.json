@@ -96,8 +96,7 @@
   "caps": [
    "bus-comms",
    "self-wake",
-   "data-analysis",
-   "confidentiality"
+   "data-analysis"
   ]
  },
  "示例成员2": {
