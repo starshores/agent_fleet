@@ -50,6 +50,14 @@
 - **GET**:`/api/state` `/api/events`(SSE) `/api/health` `/api/tray` `/api/reap`(dry-run) `/api/todos` `/api/live` `/api/tasklines` `/api/groups` `/api/mechanisms` `/api/longrange` `/api/bi` `/api/caps` `/api/usage` `/api/dispatch_metrics` `/api/sessions` `/api/ctx` `/api/ctxpanel` `/api/prompts`
 - **POST**:`/api/send` `/api/supervise` `/api/clear_replies` `/api/todos/{add,update,delete,dispatch,answer}` `/api/lr-decide`(决策合批写回) `/api/open-file`(📂开文件·**白名单硬约束**:只允许 `build_prompts()` 当前 openable 的真实文件 path·`os.startfile` 本机默认程序打开·127.0.0.1 only·拒任意路径=防 WebUI 变任意文件打开器攻击面)
 
+## 后台常驻线程(8799 always-on 驱动·不依赖任何 agent 醒着·main() 启动)
+- `start_fleet_refresher(20)` / `start_health_refresher(25)` / `start_ctx_refresher(12)` / `start_who_refresher(20)`:唯一刷新者·子进程扫描填缓存(请求路径零扫描)。
+- `start_status_pusher(15)`:刷 `fleet_status.json`(daemon→agent 定时通信·复用缓存)。
+- `start_selfwake_guard(180)`:3min 跑 `ab selfwake-guard`·扫掉自醒(stale)→inbox 提醒+WinRT toast(把「18h 没人发现掉线」变「3min 内报警」)。
+- `start_maint(1800)`:30min 维护心跳=`reap`(退卡死/孤儿 processing→inbox)+ `todos-archive --older-min 1440 --apply`(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态。
+- `start_route_reap(300)`:**5min 独立 tick** 跑 `ab route-reap`(工作组路由超时自愈·超15min未done路由任务re-route)·**不搭 30min start_maint**(任务池太粗)·幂等 no-op(MasterAgent令·2026-07-23)。
+- 全部同模子:首轮先 sleep·各自 try/except 静默不掀翻 8799·子进程 CREATE_NO_WINDOW 免弹窗。
+
 ## 运维
 - 起:`ui/start_ui.ps1`(pythonw 后台)。停:`ui/stop_ui.ps1`。改代码后:`py_compile` 自检 → stop → start。
 - 改 `server.py` 一律 **Edit**(禁整文件覆盖)。改 JS 后必**实测点击可达**(端点通≠tab 能开)。
