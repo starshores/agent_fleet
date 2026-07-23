@@ -67,6 +67,13 @@
 - **两法交叉验证一致**:会话考古(载入全上下文)得根因+机制;Master数分(lean targeted-grep·不载全文)独立复核三支柱(2 次 compact✓ / 两约定文本在✓ / 3 处「又」逐字✓ / 时间线序 教10:10→compact11:31→重犯14:36+ 成立✓)= **CORROBORATED**。方法论收获:审计型发现**不必把 24MB 全塞上下文**(会话考古当初读爆的坑),lean grep 够用且与全上下文法互证。
 - **对 A 的修正(补盲区)**:keep-list 保「文本 survive」,但**文本 survive ≠ 遵守**——对程序性/文体约束不够。**推论(铁律)**:程序性/文体约定要活过 compact,须进【每轮自动重注入 + 指令语气】层(= `hooks/reinject_post_compact.py` 的 `_COMMON_RULES`/角色 boundary·presence-keyed·每 compact 重注入·指令口吻;或 turn system-reminder),**而非只埋进一次性 compact 摘要(被动)**。→ 本会话把 compact hook 做成两层注册表驱动(每 compact 重注入角色 boundary + 通用铁律)正是对症。五例「keep-list 够用」只覆盖【事实/操作层继承】、**不覆盖程序约束遵守力**,本发现补此盲区。
 
+**约定该进哪个重注入层(按 role 类型分流·2026-07-23 MasterAgent 评估培训师路由后定)**:reinject hook 的机制职责=【忠实重注入各持久层已有的东西】,它**无法**自动捕获「用户 mid-session 刚下达、尚未落任何注册表」的约定(hook 无渠道知道用户刚说了啥)。所以根治不是「让 hook 自动抓用户的话」(做不到),而是【约定给出的当下,agent 就把它落进对应持久重注入层】:
+  - **通用 bus 铁律**(所有 role 都守)→ `role_profiles.json` `meta.common_rules`(hook render_common 每 compact 重注入)·Master数分口径 lane;
+  - **bus 角色专属约定**(某基建/管理 role 特有)→ `role_profiles.json` 该 role 的 `boundary`(hook render_role 重注入)·role 自校 lane;
+  - **业务角色约定**(如某业务 agent 的文体约定)→ **该 agent 自己项目仓的 CLAUDE.md 角色节 / 记忆**(Claude Code 每会话含 compact 后自动加载)·业务 owner lane·**不进 bus hook/caps**(bus hook 是基建、不知也不该知业务口径);
+  - **兜底 nudge(2026-07-23 MasterAgent 加)**:hook `build_context` 加了一条【每 compact 对所有 role 注入的「compact 自检·程序约束」】——提醒"若用户给过程序性/文体约定,现在确认它们在你的自动重注入层、不在就补进去"。这不替代上面的分流(hook 仍不知道具体约定内容),只是每 compact 主动戳一下 agent 去自查落位,把"衰减"在行为层补回一道。
+  - **enforcement/机制以本 doc + `reinject_post_compact.py` 为准**;onboarding 侧培训师已在 `BUS_ONBOARDING` 二之一 加精简指针(管理层新人「程序性约定记进自己 CLAUDE.md 角色节、别只靠摘要」)且显式指回本 doctrine 免漂移。
+
 ### PostCompact hook 决策(2026-06-30 MasterAgent·基建定夺:**暂不上**)
 - **理由**:① 证据=带 keep-list 的 4/4 全成功(含纯 bare 自动压 Master数分2),**主力机制(keep-list 进全局 CLAUDE.md)已实测够用**——hook 在解一个我们目前没有的问题(同 L4 判断:别为未观测的问题预建)。② hook 的设想兜底角色(把 keep-list 补进摘要)**很可能机制上做不到**——PostCompact hook 跑的是【代码】、在摘要【已生成后】,既改不动摘要、也强迫不了模型重读;其输出能否注入上下文 = **未经 primary source 核实,不能假设**(本主线铁律)。
 - **触发阈值(再议时)**:仅当**实际观测到"keep-list 在场却仍压后失能/掉操作层"**才重评;且届时只有【确定性副作用】(压后必重挂 selfwake、落 state-marker 文件)是 hook 可靠做得到的,"注入内容"须先核实 hook 能力。
