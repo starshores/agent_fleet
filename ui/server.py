@@ -106,6 +106,24 @@ def start_maint(interval=1800):
     threading.Thread(target=loop, daemon=True).start()
 
 
+def start_route_reap(interval=300):
+    """工作组路由超时自愈 tick(MasterAgent 令·commit 15441c4·Master数分定 5min cadence·2026-07-23)。
+    每 ~interval 秒后台跑 `ab route-reap`:扫所有组 assignments·超 15min 未 done 的路由任务回收 re-route。
+    ★独立于 start_maint(30min):路由任务池对 30min 太粗(排队最坏等 30min 才补超时),故单开 5min tick。
+    命令幂等·恒 exit0·无组/无超时=干净 no-op(有超时才动);活跃期 MasterAgent 用 send-route lazy 扫兜即时性,
+    本 tick 只兜 parked 静默期。同 start_maint 模子:8799 always-on 驱动·首轮先 sleep·try/except 静默不掀翻 8799·
+    CREATE_NO_WINDOW 免弹窗(popen-claude-no-window)。"""
+    def loop():
+        while True:
+            time.sleep(interval)
+            try:
+                subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "route-reap"],
+                               capture_output=True, timeout=90, creationflags=_NO_WINDOW)
+            except Exception:
+                pass
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")
@@ -127,6 +145,7 @@ def main():
         start_supervisor()
     start_selfwake_guard(180)         # 常驻自醒探测网(Master令·B):180s 跑 ab selfwake-guard,掉自醒→inbox提醒+toast(8799 always-on 驱动,不依赖 agent 醒着)
     start_maint(1800)                 # B2+B3(2026-07-21):30min 维护心跳=reap(退卡死/孤儿)+ todos-archive(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态·安全无人值守
+    start_route_reap(300)             # 工作组路由超时自愈(MasterAgent令·2026-07-23):5min 独立 tick 跑 ab route-reap(超15min未done路由任务re-route)·不搭30min start_maint(任务池太粗)·幂等no-op
     # 预热缓存(后台线程,不阻塞启动):
     #  · build_bi() 跑一遍 → 填充 _proc_cache(psutil.Process 对象 + cpu_percent 基线),
     #    使【首个真实 /api/bi】~220ms 而非冷启 ~4.5s(_proc_cache 无 TTL,长期受益,首屏 BI 关键)。
