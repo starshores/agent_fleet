@@ -18,7 +18,7 @@ from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _loa
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.notify import _toast_throttled, _fire_toast, _maybe_toast, _emit_completion_notice
 from bus.mailbox import _claim, _claim_and_print, _resolve_self_role, _oldest_claimable
-from bus.pool import _role_groups, _group_dir, _claim_group_task
+from bus.pool import _role_groups, _group_dir, _claim_group_task, route_on_member_done
 
 
 def _warn_unreachable(role):
@@ -338,12 +338,13 @@ def cmd_done(args):
     p = _find_task(role, tid)
     sender = "unknown"; title = ""
     real_id = tid
-    reply_mode = None; task_kind = None; no_receipt = False
+    reply_mode = None; task_kind = None; no_receipt = False; route_grp = None
     if p:
         try:
             obj = json.loads(p.read_text(encoding="utf-8"))
             sender = obj.get("from", "unknown"); title = obj.get("title", ""); real_id = obj.get("id", tid)
             reply_mode = obj.get("reply_mode"); task_kind = obj.get("kind"); no_receipt = obj.get("no_receipt", False)
+            route_grp = obj.get("route_group")   # 路由任务留痕:done 后触发该组补投(成员空出=事件驱动)
         except Exception:
             pass
     if getattr(args, "to", None):     # 显式指定回执目标——任务已被归档/reap/移走、_find_task 找不到原 from 时用
@@ -374,6 +375,12 @@ def cmd_done(args):
     if reply_mode != "sync" and task_kind != "notice" and args.notify != "never" and not no_receipt:
         _emit_completion_notice(sender, role, real_id, args.status, title)
     print("done -> %s (status=%s)" % (sender, args.status))
+    # 状态路由(2026-07-23):done 一条 routed 组任务=该成员空出 → 即时 drain 该组 route_queue 补投下一条(事件驱动·非轮询)
+    if route_grp:
+        try:
+            route_on_member_done(role, real_id)
+        except Exception:
+            pass
     # D(2026-07-08·防自醒-loss):done 后若本 role 无 armed wait 进程 → 提示重挂(前台CLI干完活易忘)
     try:
         if role and role not in ("用户", "unknown") and role not in _wait_proc_roles():

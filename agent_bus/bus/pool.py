@@ -246,9 +246,281 @@ def cmd_send_group(args):
         task["affinity"] = args.affinity   # 会话粘连提示(优先某成员;掉线/超时由 reap 回落组池)
     if args.requires_approval:
         task["requires_approval"] = True
-    _write_json(gin / (tid + ".json"), task)
+    if getattr(args, "route", False):
+        # 状态路由 push 模式(2026-07-23):按成员 available 挑一个 push 进其 inbox(单通道),无候选留 route_queue
+        _route_send(g, tid, task, frm, affinity=getattr(args, "affinity", None))
+        print(tid); return
+    _write_json(gin / (tid + ".json"), task)   # 默认 pull 模型:丢组共享 inbox 谁空谁 pull
     _audit("send_group", id=tid, frm=frm, group=g, title=args.title or "")
     print(tid)
+
+
+# ========================= 工作组【状态路由】push-by-state(2026-07-23·MasterAgent建/MasterMaster数分口径·1+1定稿) =========================
+# 现阶段组=按成员状态自动路由的路由器·单通道 push(不碰多路听·pull模型搁置到"多路听"解决=升级路B)。
+# 全事件驱动不建常驻daemon:① send-group --route 当场 push-or-queue ② cmd_done 钩子=成员空出即时补投
+# ③ route-reap tick(5min·MasterUI心跳跑)+ 每次 send-route 顺带 lazy 扫 兜 parked-but-armed 盲区。
+# ★route_state.json 的 RMW 必须 O_EXCL 加锁(send/done-drain/route-reap 三者并发·裸写会丢更新→双派/漏排队·
+#   os-replace-not-atomic-single-winner 教训)。★超时回收目标=组 route_queue(换人·排除失败成员)·非成员自己inbox。
+_ROUTE_TTL = int(cfg("route_timeout_s", 900) or 900)          # T=15min:业务任务~2min级,15min不误杀正常长任务
+_ROUTE_MAX_REQUEUE = int(cfg("route_max_requeue", 3) or 3)    # 超限=毒任务:park+notify from,别无限re-route打爆
+
+
+def _route_state_path(g):
+    return _group_dir(g) / "route_state.json"
+
+def _route_queue_dir(g):
+    # 路由排队区:独立于组 inbox(pull模型的区)——避免成员 pull 路径绕过 RR 抢走路由排队任务
+    return _group_dir(g) / "route_queue"
+
+def _acquire_route_lock(g, tries=100, sleep=0.03):
+    """O_EXCL 锁守 route_state 的 RMW。返回 (fd, lockpath) 或 (None, lockpath)。
+    复用 _group_lock_stale 的孤儿判据(持锁 pid 死/超 ttl)回收残锁。"""
+    lock = _group_dir(g) / ".route_state.lock"
+    _group_dir(g).mkdir(parents=True, exist_ok=True)
+    for _ in range(tries):
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, json.dumps({"pid": os.getpid(), "acquired_at": _now()}, ensure_ascii=False).encode("utf-8"))
+            except Exception:
+                pass
+            return fd, lock
+        except FileExistsError:
+            if _group_lock_stale(lock):
+                try: lock.unlink()
+                except Exception: pass
+                continue
+            time.sleep(sleep)
+        except OSError:
+            time.sleep(sleep)
+    return None, lock
+
+def _release_route_lock(fd, lock):
+    try: os.close(fd)
+    except Exception: pass
+    try: lock.unlink()
+    except Exception: pass
+
+def _load_route_state(g):
+    f = _route_state_path(g)
+    if not f.exists():
+        return {"last_assigned": {}, "assignments": {}}
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            d = {}
+    except Exception:
+        d = {}
+    d.setdefault("last_assigned", {}); d.setdefault("assignments", {})
+    return d
+
+def _save_route_state(g, st):
+    _write_json(_route_state_path(g), st)
+
+def _processing_count(role):
+    d = BUS / role / "processing"
+    try:
+        return len(list(d.glob("*.json")))
+    except Exception:
+        return 0
+
+def _presence_current_task(role):
+    pf = BUS / role / "presence.json"
+    try:
+        return (json.loads(pf.read_text(encoding="utf-8")) or {}).get("current_task")
+    except Exception:
+        return None
+
+def _member_available(m, wait_roles=None):
+    """available(m) = armed AND processing空 AND presence无current_task。返回 (ok, load)。
+    ⚠已知盲区:armed≠真在turn(parked-but-armed)预筛拦不住→靠 route-timeout 自愈兜(Master数分口径)。"""
+    load = _processing_count(m)
+    try:
+        state = _self_wake_state(m, wait_roles=wait_roles)[0]
+    except Exception:
+        state = "off"
+    if state != "armed":
+        return (False, load)
+    if load > 0:
+        return (False, load)
+    if _presence_current_task(m):
+        return (False, load)
+    return (True, load)
+
+def _pick_candidate(g, st, exclude=None):
+    """组内 available 成员里挑 last_assigned 最旧者(never-assigned 排最前=天然RR公平·根治通吃)。
+    exclude=本任务已失败的成员(别再投给卡住的它)。无候选返 None。"""
+    exclude = set(exclude or [])
+    wait_roles = None
+    try:
+        wait_roles = _wait_proc_roles()
+    except Exception:
+        wait_roles = None
+    la = st.get("last_assigned", {})
+    avail = []
+    for m in _load_group_members(g):
+        if m in exclude:
+            continue
+        ok, _ = _member_available(m, wait_roles)
+        if ok:
+            avail.append(m)
+    if not avail:
+        return None
+    avail.sort(key=lambda m: la.get(m, ""))   # "" (never) 排最前;否则最旧 ts 优先
+    return avail[0]
+
+def _route_assign(g, st, tid, task, member):
+    """把 task push 进 member 自己 inbox(单通道)+ 记 assignment/last_assigned。调用方须持 route 锁。"""
+    task = dict(task)
+    task["routed_to"] = member; task["routed_at"] = _now(); task["route_group"] = g
+    _role_dir(member)
+    _write_json(BUS / member / "inbox" / (tid + ".json"), task)
+    st["last_assigned"][member] = _now()
+    st["assignments"][tid] = {"member": member, "assigned_at": _now(),
+                              "requeue": int(task.get("requeue_count", 0)),
+                              "group": g, "title": task.get("title", ""),
+                              "failed_members": sorted(task.get("route_failed_members", []))}
+
+def _route_send(g, tid, task, frm, affinity=None):
+    """send-group --route 热路径:先 lazy 扫超时(活跃期即时自愈),再锁内 pick→push 或 queue。"""
+    _route_reap_group(g)                                   # 活跃期顺带扫 stuck(不靠 tick)
+    fd, lock = _acquire_route_lock(g)
+    if fd is None:
+        gin = _route_queue_dir(g); gin.mkdir(parents=True, exist_ok=True)   # 抢不到锁→保守排队,不丢
+        _write_json(gin / (tid + ".json"), task)
+        sys.stderr.write("→ route: 抢锁失败,排队 %s(route_queue)\n" % tid); return
+    try:
+        st = _load_route_state(g)
+        cand = None
+        if affinity and _member_available(affinity)[0]:
+            cand = affinity                                # --affinity 且它 available → 优先
+        else:
+            cand = _pick_candidate(g, st)
+        if cand:
+            _route_assign(g, st, tid, task, cand)
+            _save_route_state(g, st)
+            _audit("route_group", id=tid, group=g, to=cand, frm=frm)
+            sys.stderr.write("→ routed %s → %s(single-channel push)\n" % (tid, cand))
+        else:
+            gin = _route_queue_dir(g); gin.mkdir(parents=True, exist_ok=True)
+            _write_json(gin / (tid + ".json"), task)       # 全忙/无armed → 留 route_queue 排队(不push忙成员)
+            _audit("route_group_queued", id=tid, group=g, frm=frm)
+            sys.stderr.write("→ route: 无 available 成员,排队 %s(route_queue·待空出/tick补投)\n" % tid)
+    finally:
+        _release_route_lock(fd, lock)
+
+def _route_drain_group(g):
+    """把 route_queue 里排队任务按 oldest-first 补投给现 available 成员(排除各自失败成员)。
+    cmd_done 钩子(成员空出)+ route-reap 后调用。无 available 就留着。"""
+    rq = _route_queue_dir(g)
+    if not rq.exists():
+        return
+    fd, lock = _acquire_route_lock(g)
+    if fd is None:
+        return
+    try:
+        st = _load_route_state(g)
+        for p in sorted(rq.glob("*.json")):                # oldest first(_gen_id 时间前缀)
+            try:
+                obj = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            tid = obj.get("id", p.stem)
+            exclude = set(obj.get("route_failed_members", []))
+            cand = _pick_candidate(g, st, exclude=exclude)
+            if not cand:
+                break                                       # 现无 available → 剩下留队(下次空出/tick再补)
+            _route_assign(g, st, tid, obj, cand)
+            try: p.unlink()
+            except Exception: pass
+            _save_route_state(g, st)
+            _audit("route_drain", id=tid, group=g, to=cand)
+    finally:
+        _release_route_lock(fd, lock)
+
+def _route_reap_group(g):
+    """route-timeout 自愈:扫 assignments·成员 T 内没 done(parked/卡)→回收到 route_queue 换人·排除失败成员。
+    复用 reap 的 age/stuck 判据 + max-requeue 毒任务上限(超限=park+notify from·防无限re-route打爆)。"""
+    if not _route_state_path(g).exists():
+        return
+    fd, lock = _acquire_route_lock(g)
+    if fd is None:
+        return
+    changed = False
+    try:
+        st = _load_route_state(g)
+        for tid, a in list(st.get("assignments", {}).items()):
+            member = a.get("member")
+            in_proc = (BUS / member / "processing" / (tid + ".json")).exists()
+            in_inbox = (BUS / member / "inbox" / (tid + ".json")).exists()
+            if not in_proc and not in_inbox:
+                del st["assignments"][tid]; changed = True   # 成员已 done/消费 → 结束跟踪
+                continue
+            age = _age_seconds(a.get("assigned_at", ""))
+            if age is None or age <= _ROUTE_TTL:
+                continue                                      # 未超 T,正常在跑
+            src = (BUS / member / "processing" / (tid + ".json")) if in_proc else (BUS / member / "inbox" / (tid + ".json"))
+            try:
+                obj = json.loads(src.read_text(encoding="utf-8"))
+            except Exception:
+                del st["assignments"][tid]; changed = True; continue
+            try: src.unlink()
+            except Exception: pass
+            rq = int(a.get("requeue", 0)) + 1
+            failed = sorted(set(a.get("failed_members", [])) | {member})
+            del st["assignments"][tid]; changed = True
+            if rq > _ROUTE_MAX_REQUEUE:                       # 毒任务:park + notify 原 from
+                pdir = _group_dir(g) / "route_poison"; pdir.mkdir(parents=True, exist_ok=True)
+                obj["status"] = "route_poison"; obj["reaped"] = _now(); obj["route_failed_members"] = failed
+                _write_json(pdir / (tid + ".json"), obj)
+                frm = obj.get("from")
+                if frm and frm not in ("unknown", ""):
+                    _role_dir(frm)
+                    ntid = "notice-routepoison-" + tid
+                    _write_json(BUS / frm / "inbox" / (ntid + ".json"), {
+                        "id": ntid, "from": "bus-router", "to": frm, "kind": "notice",
+                        "title": "⚠ 路由任务毒化(超%d次re-route仍未完成)" % _ROUTE_MAX_REQUEUE,
+                        "task": "[通知] 你发到组「%s」的路由任务 %s(%s)连续 %d 个成员各超 %ds 未完成,已判毒任务 park 到 %s/route_poison/,不再re-route。失败成员:%s。请人工看是任务本身卡死还是全组不可用。"
+                                % (g, tid, obj.get("title", ""), rq - 1, _ROUTE_TTL, g, "、".join(failed)),
+                        "created": _now(), "status": "pending", "no_receipt": True})
+                _audit("route_poison", id=tid, group=g, member=member, rq=rq)
+            else:                                             # 回收到 route_queue 换人(排除已失败成员)
+                obj["requeue_count"] = rq; obj.pop("routed_to", None); obj.pop("routed_at", None)
+                obj["requeued_at"] = _now(); obj["route_failed_members"] = failed
+                rqd = _route_queue_dir(g); rqd.mkdir(parents=True, exist_ok=True)
+                _write_json(rqd / (tid + ".json"), obj)
+                _audit("route_reap", id=tid, group=g, member=member, rq=rq)
+        if changed:
+            _save_route_state(g, st)
+    finally:
+        _release_route_lock(fd, lock)
+    _route_drain_group(g)                                     # 回收后立即尝试补投(锁已释放)
+
+def route_on_member_done(role, tid):
+    """cmd_done 钩子:成员 done 一条 routed 组任务后清其 assignment + drain 该成员所属组队列(空出即时补投)。
+    core.cmd_done 调用(core→pool 允许·pool 不反依赖 core)。非路由任务/无队列时廉价 no-op。"""
+    try:
+        groups = _role_groups(role)
+    except Exception:
+        return
+    for g in groups:
+        fd, lock = _acquire_route_lock(g)
+        if fd is not None:
+            try:
+                st = _load_route_state(g)
+                if tid in st.get("assignments", {}):
+                    del st["assignments"][tid]; _save_route_state(g, st)
+            finally:
+                _release_route_lock(fd, lock)
+        _route_drain_group(g)
+
+def cmd_route_reap(args):
+    """route-timeout tick(5min·MasterUI心跳跑):扫所有组的 assignments,超 T 未 done 的回收 re-route。"""
+    groups = [args.group] if getattr(args, "group", None) else (
+        [d.name for d in _GROUPS_ROOT.iterdir() if d.is_dir()] if _GROUPS_ROOT.exists() else [])
+    for g in groups:
+        _route_reap_group(g)
+    print(json.dumps({"route_reap": "done", "groups": groups}, ensure_ascii=False))
 
 
 # ---- 2a:弹性池工人 —— 内存感知并发上限(使用方 2026-07-10 公式)+ 派发器 spin 前闸 ----

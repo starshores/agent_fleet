@@ -57,6 +57,7 @@ from bus.pool import (  # noqa: E402
     _role_groups, _save_group, cmd_join_group, cmd_leave_group, cmd_park, cmd_unpark,
     _GROUP_LOCK_TTL, _group_lock_stale, _claim_group_task, cmd_send_group, _mem_cap, cmd_mem_cap,
     _fanout_dir, _find_fanout_manifest, cmd_fanout, cmd_fanout_collect,
+    cmd_route_reap, route_on_member_done, _route_send, _route_drain_group, _route_reap_group,
 )
 from bus.core import (  # noqa: E402
     _warn_unreachable, cmd_send, _wait_core, _wait_for_reply, _kill_prior_waits, _serve_wait,
@@ -92,7 +93,7 @@ _CMD_GROUPS = [
     ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard selfwake-exempt"),
     ("角色·能力 roles", "register retire revive retired caps roster route"),
     ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
-    ("工作组池 pool", "join-group leave-group send-group fanout fanout-collect park unpark"),
+    ("工作组池 pool", "join-group leave-group send-group(--route) route-reap fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
     ("Edge 互斥", "edge-acquire edge-release"),
     ("长期任务·待办 tasks", "tasklines ask-user refs todos-archive"),
@@ -127,7 +128,8 @@ def main():
     p = sub.add_parser("leave-group"); p.add_argument("--role", required=True); p.add_argument("--group", required=True); p.set_defaults(fn=cmd_leave_group)
     p = sub.add_parser("park"); p.add_argument("--role", required=True); p.add_argument("--days", type=int, default=None); p.add_argument("--note", default=""); p.add_argument("--by", default=None); p.set_defaults(fn=cmd_park)
     p = sub.add_parser("unpark"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_unpark)
-    p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
+    p = sub.add_parser("send-group"); p.add_argument("--group", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--affinity", default=None, help="会话粘连:优先某成员(掉线/超时由 reap 回落组池)"); p.add_argument("--route", action="store_true", help="状态路由 push 模式:按成员 available(armed+空闲)自动挑一个 RR push 进其 inbox(单通道·无候选则排队);默认不带=pull 模型(丢组共享 inbox 谁空谁 pull)"); p.add_argument("--requires-approval", action="store_true", dest="requires_approval"); p.set_defaults(fn=cmd_send_group)
+    p = sub.add_parser("route-reap"); p.add_argument("--group", default=None, help="指定组;不带=扫全部组"); p.set_defaults(fn=cmd_route_reap)
     p = sub.add_parser("fanout"); p.add_argument("--group", required=True); p.add_argument("--shards", required=True, help="JSON数组 / 换行分隔 / -(stdin)"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.set_defaults(fn=cmd_fanout)
     p = sub.add_parser("fanout-collect"); p.add_argument("--id", required=True); p.add_argument("--group", default=None); p.add_argument("--wait", action="store_true", help="barrier:攒齐N个再返(默认流式边到边·barrier是例外)"); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_fanout_collect)
     p = sub.add_parser("mem-cap"); p.add_argument("--per-worker-gb", type=float, default=0.5, dest="per_worker_gb"); p.add_argument("--reserve-gb", type=float, default=2.0, dest="reserve_gb"); p.set_defaults(fn=cmd_mem_cap)

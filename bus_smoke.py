@@ -217,6 +217,7 @@ def build_tests():
     T.append(("selfwake-guard.dry", ["selfwake-guard", "--dry-run"], chk_no_tb, "自醒守卫 dry"))
     T.append(("health-sweep.detect", ["health-sweep"], chk_no_tb, "丢失巡检(不带 --apply=只检测)"))
     T.append(("todos-archive.dry", ["todos-archive"], chk_no_tb, "完成态归档 dry(不带 --apply=只报)"))
+    T.append(("route-reap", ["route-reap"], chk_no_tb, "状态路由超时回收 tick(无组=干净 no-op)"))
     # ---- 有态:测试角色核心任务流 send→peek→wait→done ----
     T.append(("register", ["register", "--role", SMOKE_ROLE, "--desc", "smoke"], chk_no_tb, "注册测试角色"))
     T.append(("send", ["send", "--to", SMOKE_ROLE, "--from", SMOKE_ROLE, "--title", "smoke", "--task", "smoke task body"], chk_contains(SMOKE_ROLE, "id", "-"), "派活(打印 task id)"))
@@ -226,7 +227,8 @@ def build_tests():
     T.append(("replies", ["replies", "--role", SMOKE_ROLE], chk_no_tb, "收回填"))
     # ---- 有态:工作组池化 ----
     T.append(("join-group", ["join-group", "--role", SMOKE_ROLE, "--group", SMOKE_GRP], chk_no_tb, "运行时入组"))
-    T.append(("send-group", ["send-group", "--group", SMOKE_GRP, "--from", SMOKE_ROLE, "--title", "g", "--task", "grp task"], chk_no_tb, "发往工作组"))
+    T.append(("send-group", ["send-group", "--group", SMOKE_GRP, "--from", SMOKE_ROLE, "--title", "g", "--task", "grp task"], chk_no_tb, "发往工作组(pull 模型)"))
+    T.append(("send-group.route", ["send-group", "--group", SMOKE_GRP, "--from", SMOKE_ROLE, "--route", "--title", "gr", "--task", "route task"], chk_no_tb, "状态路由 push(无 available→排队·测不崩)"))
     T.append(("leave-group", ["leave-group", "--role", SMOKE_ROLE, "--group", SMOKE_GRP], chk_no_tb, "运行时离组"))
     T.append(("fanout", ["fanout", "--group", SMOKE_GRP, "--from", SMOKE_ROLE, "--title", "f", "--shards", '["a","b"]'], chk_no_tb, "拆片撒组 inbox"))
     # ---- 有态:park / unpark 测试角色 ----
