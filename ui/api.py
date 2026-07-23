@@ -2080,7 +2080,10 @@ def _compact_inject(role_names):
     try:
         if str(_HOOKS_DIR) not in sys.path:
             sys.path.insert(0, str(_HOOKS_DIR))
+        import importlib
         import reinject_post_compact as ric
+        importlib.reload(ric)  # 每次刷新重载:坐实 WYSIWYG=页面 build_context 恒==hook 当前版
+        # (否则函数内 import 命中 sys.modules 缓存:hook 改动前若已被 import 则 stale 到重启·消除该脆弱点)
     except Exception as e:
         return {"ok": False, "error": "hook 模块不可读(reinject_post_compact):" + str(e), "by_role": {}}
     by_role = {}
