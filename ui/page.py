@@ -224,8 +224,12 @@ canvas{display:block;width:100%}
 .sess-tags{display:inline-flex;gap:5px;flex-wrap:wrap}
 .tag-chip{font-size:11px;padding:1px 8px;border-radius:20px;background:rgba(91,157,255,.15);color:var(--accent);border:1px solid rgba(91,157,255,.3)}
 /* 会话筛选钮 + 筛选组 */
-.sess-filt,.sess-own{margin:0;padding:3px 11px;font-size:12px}
-.sess-filt.active,.sess-own.active{background:var(--accent);color:#06112a;border-color:var(--accent);font-weight:600}
+.sess-filt,.sess-own,.sess-sort{margin:0;padding:3px 11px;font-size:12px}
+.sess-filt.active,.sess-own.active,.sess-sort.active{background:var(--accent);color:#06112a;border-color:var(--accent);font-weight:600}
+/* 会话 大小徽标(大=越吃上下文/越接近compact/越该归档清) */
+.sz-chip{font-family:Consolas,monospace;font-size:11px;padding:0 5px;border-radius:4px;background:var(--panel2);color:var(--dim)}
+.sz-chip.warn{color:var(--warn);background:rgba(245,166,35,.12)}
+.sz-chip.red{color:#ff6b6b;background:rgba(255,93,93,.14);font-weight:600}
 .filt-grp{display:inline-flex;align-items:center;gap:4px;margin-left:8px}
 .filt-lbl{font-size:11px;color:var(--dim);margin-right:2px}
 /* 归属 chip:bus / 个人 */
@@ -646,6 +650,9 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
         <button class="btn ghost mini sess-filt" data-f="live" id="sessFLive">▶ 运行中</button>
         <button class="btn ghost mini sess-filt" data-f="dead" id="sessFDead">· 死(可 resume)</button>
         <button class="btn ghost mini sess-filt" data-f="tagged" id="sessFTag">🏷 已标记</button></span>
+      <span class="filt-grp"><span class="filt-lbl">排序</span>
+        <button class="btn ghost mini sess-sort active" data-s="recent">最近</button>
+        <button class="btn ghost mini sess-sort" data-s="size" title="按会话 jsonl 大小降序:大=越吃上下文/越接近 compact/越该归档清">大小▼</button></span>
       <button class="btn ghost mini" id="sessRefresh">刷新</button>
     </div>
     <div class="hint" style="padding:8px 16px 0;color:var(--dim)">⚠ 运行中的会话正在跑、别 resume。<b>死的才是真·可恢复</b> —— 点【复制】拿到 <span class="mono">claude --resume &lt;id&gt;</span>,到终端执行续会话(WebUI 跑不了交互式 resume)。</div>
@@ -1212,6 +1219,10 @@ document.getElementById('liveBottom').onclick=()=>{const b=document.getElementBy
 
 // ===== BI · 资源消耗 =====
 function fmtN(n){ n=n||0; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'k'; return ''+n; }
+// 会话 jsonl 大小(输入=KB)→ 人类可读:>=1024KB 显 xxM,否则 xxK。
+function fmtSize(kb){ kb=+kb||0; if(kb>=1024)return (kb/1024).toFixed(1)+'M'; if(kb>=1)return Math.round(kb)+'K'; return '0'; }
+// 大小徽标(彩色强调):>=5M red / >=1M warn / else 常规
+function szChip(kb){ kb=+kb||0; if(!kb)return ''; const c=kb>=5120?'red':(kb>=1024?'warn':''); return '<span class="sz-chip '+c+'" title="会话 jsonl 大小;大=越吃上下文/越接近 compact/越该归档清">'+fmtSize(kb)+'</span>'; }
 function fmtDur(s){ s=s||0; if(s>=60){const m=Math.floor(s/60);return m+'m'+Math.round(s%60)+'s';} return s+'s'; }
 function renderBI(bi){
   if(!bi) return;
@@ -1700,7 +1711,7 @@ async function loadPrompts(){
 document.getElementById('promptsRefresh').onclick=()=>loadPrompts();
 
 // ===== 可恢复会话 =====
-let _sessData=null, _sessFilter='all', _sessOwner='all';
+let _sessData=null, _sessFilter='all', _sessOwner='all', _sessSort='recent';
 function renderSessions(){
   const box=document.getElementById('sessBox'); if(!_sessData) return;
   if(!_sessData.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败:'+esc(_sessData.error||'?')+'</div>'); return; }
@@ -1712,6 +1723,8 @@ function renderSessions(){
   if(_sessFilter==='live')   list=list.filter(s=>s.state==='运行中');
   else if(_sessFilter==='dead')   list=list.filter(s=>s.state==='死');
   else if(_sessFilter==='tagged') list=list.filter(s=>s.tags&&s.tags.length);
+  // 排序:size=按 jsonl 大小降序(surfacing 最吃上下文/最该清的);recent=保持 --json 原序(运行中置顶再最近)
+  if(_sessSort==='size') list.sort((a,b)=>(+b.size_kb||0)-(+a.size_kb||0));
   const oname={all:'全部',bus:'bus',nonbus:'个人'}[_sessOwner]||'全部';
   const fname={all:'全部',live:'运行中',dead:'死',tagged:'已标记'}[_sessFilter]||'全部';
   document.getElementById('sessCount').textContent=
@@ -1740,7 +1753,7 @@ function renderSessions(){
         <div class="sess-meta">
           <span title="${esc(s.cwd)}">${esc(projShort(s.project||s.cwd))}</span>
           <span>最近 ${esc(s.last)}</span>
-          ${s.size_kb!=null?`<span>${esc(''+s.size_kb)}KB</span>`:''}
+          ${s.size_kb!=null?szChip(s.size_kb):''}
           ${s.archived?'<span title="jsonl 已移出 projects/">📦已归档</span>':''}
           ${s.note?`<span class="dnote" title="${esc(s.note)}">📝${esc(s.note)}</span>`:''}
           <span class="mono">${esc((s.id||'').slice(0,8))}…</span>
@@ -1760,6 +1773,11 @@ function setSessOwner(o){
   document.querySelectorAll('.sess-own').forEach(b=>b.classList.toggle('active', b.getAttribute('data-o')===o));
   renderSessions();
 }
+function setSessSort(s){
+  _sessSort=s;
+  document.querySelectorAll('.sess-sort').forEach(b=>b.classList.toggle('active', b.getAttribute('data-s')===s));
+  renderSessions();
+}
 function copyResume(id,btn){
   const cmd='claude --resume '+id;
   const done=()=>{const o=btn.textContent;btn.textContent='已复制✓';setTimeout(()=>btn.textContent=o,1500);toast('已复制:'+cmd);};
@@ -1777,6 +1795,7 @@ document.getElementById('sessRefresh').onclick=()=>loadSessions();
 {const _tlr=document.getElementById('tlRefresh'); if(_tlr) _tlr.onclick=()=>loadTasklines();}
 document.querySelectorAll('.sess-filt').forEach(b=>b.onclick=()=>setSessFilter(b.getAttribute('data-f')));
 document.querySelectorAll('.sess-own').forEach(b=>b.onclick=()=>setSessOwner(b.getAttribute('data-o')));
+document.querySelectorAll('.sess-sort').forEach(b=>b.onclick=()=>setSessSort(b.getAttribute('data-s')));
 {const _gr=document.getElementById('grpRefresh'); if(_gr) _gr.onclick=()=>loadGroups();}
 
 // ===== 🧩 工作组看板(使用方出口径·MasterUI出可视化)=====
