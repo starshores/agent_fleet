@@ -287,9 +287,14 @@ def cmd_sessions(args):
         out = [s for s in out if not s.get("is_bus")]
     if only_bus:
         out = [s for s in out if s.get("is_bus")]
-    out.sort(key=lambda x: (x.get("state") != "运行中", -x["last_epoch"]))   # 运行中置顶,再按最近
+    if getattr(args, "by_size", False):
+        out.sort(key=lambda x: -x.get("size_kb", 0))                          # --by-size:按 resume 大小降序(辅助判断谁最大/该归档清)
+    else:
+        out.sort(key=lambda x: (x.get("state") != "运行中", -x["last_epoch"]))   # 默认:运行中置顶,再按最近
     n_live = sum(1 for s in out if s.get("state") == "运行中")
     n_nonbus = sum(1 for s in out if not s.get("is_bus"))
+    n_total = len(out)                                        # 全量计数/合计在 limit 截断【前】算(否则被 --limit 扭曲)
+    tot_mb = sum(s.get("size_kb", 0) for s in out) / 1024
     if args.limit and args.limit > 0:
         out = out[:args.limit]
     if args.json:
@@ -298,15 +303,22 @@ def cmd_sessions(args):
     hdr = ("非bus会话" if only_nonbus else ("bus会话" if only_bus else
            ("已标记会话" if only_tagged else ("运行中会话" if only_live else
             ("死/可恢复会话" if only_dead else "Claude Code 历史会话")))))
-    print("%s(~/.claude/projects/,共 %d · 运行中 %d · 死 %d · 非bus %d):" % (hdr, len(out), n_live, len(out) - n_live, n_nonbus))
-    print("%-8s %-6s %-9s %-38s %-11s %s" % ("状态", "归属", "最近", "会话id", "🏷标签", "标题"))
+    def _fmt_kb(kb):
+        if not kb:
+            return "-"
+        return ("%.1fM" % (kb / 1024)) if kb >= 1024 else ("%dK" % int(round(kb)))
+    shown = ("·显示前 %d" % len(out)) if (args.limit and args.limit > 0 and n_total > len(out)) else ""
+    print("%s(~/.claude/projects/,共 %d · 运行中 %d · 死 %d · 非bus %d · resume 合计 %.1fM%s):"
+          % (hdr, n_total, n_live, n_total - n_live, n_nonbus, tot_mb, shown))
+    print("%-8s %-6s %-9s %-7s %-38s %-11s %s" % ("状态", "归属", "最近", "大小", "会话id", "🏷标签", "标题"))
     for s in out:
         tagstr = ("/".join(s["tags"]))[:11] if s.get("tags") else "-"
         last = s["last"][5:] if s["last"] else "(归档)"
         state = ("▶运行·" + (s.get("live_role") or "?")) if s.get("state") == "运行中" else "·死"
         owner = "bus" if s.get("is_bus") else "个人"
-        print("%-8s %-6s %-9s %-38s %-11s %s" % (state[:8], owner, last, s["id"], tagstr, s["title"]))
+        print("%-8s %-6s %-9s %-7s %-38s %-11s %s" % (state[:8], owner, last, _fmt_kb(s.get("size_kb", 0)), s["id"], tagstr, s["title"]))
         if s.get("note"):
-            print("%48s ↳ %s" % ("", s["note"]))
+            print("%56s ↳ %s" % ("", s["note"]))
     print("\n▶运行中=有活claude进程(bus在岗agent);·死=无活进程(真可恢复)。归属:bus=agent会话/个人=非bus(你自己的会话)。")
+    print("大小=resume jsonl 体积(越大越吃上下文/越接近压缩·辅助判断该归档/清理);--by-size 按大小降序。")
     print("筛选:--live / --dead / --tagged / --non-bus(只看个人)/ --bus   ·   标记:ab sessions --tag <id> [--label 可恢复]")
