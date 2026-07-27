@@ -130,13 +130,13 @@
    "layer": "基建层(WebUI/协调控制台 lane)",
    "one_liner": "协调 WebUI/控制台——server.py 面板(舰队·运维·BI·上下文·任务线·机制·角色…)+ SSE 实时 + 系统托盘 + bus 维护心跳(start_maint);渲染吃 ab._who_data() 单一源不自算 verdict",
    "cwd": "C:\\apphome\\agent_fleet",
-   "mode": "前台 listening cli(mode=listening·无 daemon)",
+   "mode": "前台 listening cli(无 daemon)·自醒=ScheduleWakeup 轮询模式(guard_exempt polling·不挂 background wait·2026-07-27 用户令防前台掉线)",
    "caps": ["bus-comms", "self-wake", "webui"],
    "startup_flow": [
     "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd·防误认成 MasterAgent/培训师/Master数分)",
     "② `python recover.py` + 读 CLAUDE.md/ui 文档恢复;WebUI 常驻控制台 `ui/start_ui.ps1` 幂等拉起(WMI/CIM 脱壳常驻 127.0.0.1:8799)",
     "③ 新 tab `ab hello --role MasterUI`;compact 免 hello 只重认身份",
-    "④ 后台 `ab wait --role MasterUI --timeout 0`(run_in_background·别 shell &)→ `ab selfwake` 验 ✓在岗(◐待确认≠armed)",
+    "④ ★自醒=ScheduleWakeup 轮询(非 ab wait·2026-07-27 起):设 `ab selfwake-exempt --role MasterUI --mode polling` 豁免 marker + ScheduleWakeup 270s 定时 drain inbox(每 fire 必重排·见记忆 masterui-polling-mode-selfwake);selfwake 显 ⏱轮询=在岗。绝不挂 background wait(前台空闲会掉线)",
     "⑤ 看 inbox:server.py/面板改造任务、与 MasterAgent 的端点/面板契约"
    ],
    "explicit_inputs": [
