@@ -414,6 +414,19 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <span class="spacer" style="flex:1"></span>
   <span class="muted" style="font-size:11.5px;align-self:center" id="tabHint"></span>
 </nav>
+<div id="fleetStateBar" style="display:none;padding:5px 16px;font-size:12.5px;background:var(--card);border-bottom:1px solid var(--line);gap:12px;align-items:center;flex-wrap:wrap">
+  <span id="fsIcon" style="font-size:15px"></span>
+  <b id="fsState"></b>
+  <span class="muted">|</span>
+  <span>守卫: <span id="fsGuard"></span></span>
+  <span class="muted">|</span>
+  <span>在岗 <span id="fsArmed"></span>/<span id="fsExpected"></span></span>
+  <span id="fsStaleWrap" style="display:none">
+    <span class="muted">|</span>
+    <span class="badge warn" id="fsStaleBtn" style="cursor:pointer" onclick="toggleFleetStale(this)">⚠ 掉线 <span id="fsStaleN"></span> ▾</span>
+    <span id="fsStaleDetail" style="display:none;font-size:11px;color:var(--warn);margin-left:4px"></span>
+  </span>
+</div>
 
 <main>
   <section data-tab="fleet">
@@ -2404,6 +2417,39 @@ setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);
 setInterval(()=>{ if(curTab==='caps') loadCaps(); }, 10000);
 // 首屏一次性预热(各自独立懒加载,不拖首屏);之后按 tab 进入再刷(见 showTab)
 setTimeout(()=>loadUsage(true), 800); setTimeout(loadSessions, 1200);
+// ===== 🛰 舰队整体状态顶栏 =====
+async function loadFleetState(){
+  try{
+    const r=await fetch('/api/fleet-state');
+    renderFleetState(await r.json());
+  }catch(e){}
+}
+function renderFleetState(d){
+  const bar=document.getElementById('fleetStateBar');
+  if(!d||d.rule==='error'){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  document.getElementById('fsIcon').textContent=d.icon||'';
+  document.getElementById('fsState').textContent=d.state||'';
+  document.getElementById('fsGuard').textContent=d.guard||'–';
+  const c=d.counts||{};
+  document.getElementById('fsArmed').textContent=c.armed!=null?c.armed:'–';
+  document.getElementById('fsExpected').textContent=c.expected!=null?c.expected:'–';
+  const stale=d.stale_roles||[];
+  const sw=document.getElementById('fsStaleWrap');
+  if(stale.length){ sw.style.display=''; document.getElementById('fsStaleN').textContent=stale.length; document.getElementById('fsStaleDetail').textContent=stale.join('、'); }
+  else { sw.style.display='none'; }
+  // 维修模式:顶栏底色变暖
+  bar.style.background=d.rule==='maintenance'?'rgba(255,165,0,.08)':'var(--card)';
+}
+function toggleFleetStale(btn){
+  const d=document.getElementById('fsStaleDetail');
+  const open=d.style.display!=='none';
+  d.style.display=open?'none':'';
+  const n=document.getElementById('fsStaleN').textContent;
+  btn.textContent=open?('⚠ 掉线 '+n+' ▾'):'⚠ 折叠 ▴';
+}
+loadFleetState(); setInterval(loadFleetState, 30000); // 30s 轮询(fleet_state_rules.json·零 psutil)
+
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 loadCtx(); setInterval(loadCtx, 15000);          // 🧠 上下文占用徽标+看板:15s 轮询(后端缓存,请求零现读)— 全局告警,不分 tab
 </script>

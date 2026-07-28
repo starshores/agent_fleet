@@ -1687,6 +1687,15 @@ def _fleet_enrich_model(data):
         r["model"] = sid_model.get(sid, "") if sid else ""
 
 
+def get_fleet_state():
+    """调 ab.fleet_state() —— 按 fleet_state_rules.json 判定舰队整体状态(state/icon/guard/counts)。"""
+    try:
+        return ab.fleet_state()
+    except Exception as e:
+        return {"state": "未知", "icon": "?", "desc": str(e), "rule": "error",
+                "guard": "–", "counts": {}, "stale_roles": [], "maint": {}}
+
+
 def get_maintenance():
     """读 agent_bus/maintenance.json。active=True 表示维修模式开启。"""
     fp = ABDIR / "maintenance.json"

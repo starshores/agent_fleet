@@ -127,6 +127,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/fleet-log":
             # 舰队日志:fleet_log.jsonl 倒序(请求路径直读·手动刷新)
             self._send(200, build_fleet_log())
+        elif path == "/api/fleet-state":
+            # 舰队整体状态(fleet_state_rules.json 判定·顶栏徽标数据源)
+            self._send(200, get_fleet_state())
         else:
             self._send(404, {"error": "not found"})
 
