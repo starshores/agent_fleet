@@ -13,6 +13,7 @@ def _write_json(path, obj):
     # tmp 名带 pid+随机:两进程同写同目标时,固定 .tmp 名会让 B 的半截文件被 A replace 进正式位
     # (P0·doc-blind 2026-07-28);随机化后各写各的 tmp,replace 仍原子=后写者胜、绝无半截。
     tmp = path.parent / (path.name + ".%d-%s.tmp" % (os.getpid(), os.urandom(2).hex()))
+    tmp.parent.mkdir(parents=True, exist_ok=True)   # 父目录保障:全新 role 首个 wait 写 trace 曾因目录未建而崩(P1 实测抓获)
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
     # 原子落地,避免 watcher 读到半截。os.replace 在 Windows 下若目标被 watcher/AV/另一 waiter
     # 瞬时占用会抛 PermissionError(WinError 5)——短 backoff 重试,绝不让瞬时锁把调用方崩掉

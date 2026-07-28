@@ -15,6 +15,7 @@ except Exception:
 
 from bus.config import BUS, _now
 from bus.io import _audit, _steal_stale_lock
+from bus.watch import arm_watch
 from bus.proc import _age_seconds
 from bus.mailbox import _resolve_self_role
 
@@ -63,25 +64,20 @@ def _edge_stale(holder, ttl):
 def _wait_file_gone(path, timeout):
     if not path.exists():
         return
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-    ev = threading.Event(); name = path.name
-
-    class H(FileSystemEventHandler):
-        def on_deleted(self, e):
-            if str(e.src_path).endswith(name):
-                ev.set()
-        def on_moved(self, e):
-            if str(getattr(e, "src_path", "")).endswith(name):
-                ev.set()
-
-    obs = Observer(); obs.schedule(H(), str(path.parent), recursive=False); obs.start()
+    # 公共样板(P1·bus/watch.py):等文件【消失】=deleted/moved-away(moved 看 src_path 端)
+    ev, _stop_watch, ok = arm_watch([path.parent], suffix=path.name,
+                                    on=("deleted", "moved"), moved_field="src_path")
     try:
         if not path.exists():
             return
-        ev.wait(timeout=timeout)
+        if ok:
+            ev.wait(timeout=timeout)
+        else:                          # 降级:轮询阻塞等释放(别秒返)
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline and path.exists():
+                time.sleep(0.5)
     finally:
-        obs.stop(); obs.join()
+        _stop_watch()
 
 
 def cmd_edge_acquire(args):

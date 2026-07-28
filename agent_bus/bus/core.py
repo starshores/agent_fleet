@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """bus.core —— 消息任务流核心:send / wait / done / request / serve / peek / replies + 目标可达校验。
 全员自醒命脉(wait/done/hello 每回合 shell)。依赖下层全部 bus 模块;无环(mailbox/pool 领取原语已下沉)。
-_wait_core 内部按需 import watchdog(随函数走)。"""
+watchdog 监听走公共样板 bus.watch.arm_watch(P1 抽公共)。"""
 import os, sys, json, time, threading, socket, subprocess
 
 try:
@@ -18,6 +18,7 @@ from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _loa
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.notify import _toast_throttled, _fire_toast, _maybe_toast, _emit_completion_notice
 from bus.mailbox import _claim, _claim_and_print, _resolve_self_role, _oldest_claimable
+from bus.watch import arm_watch
 from bus.pool import _role_groups, _group_dir, _claim_group_task, route_on_member_done
 
 
@@ -109,34 +110,10 @@ def _wait_core(role, timeout, include_approval=False):
     if obj:
         return obj
 
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-
-    ev = threading.Event()
-
-    class H(FileSystemEventHandler):
-        def on_created(self, e):
-            if str(e.src_path).endswith(".json"):
-                ev.set()
-        def on_moved(self, e):
-            if str(getattr(e, "dest_path", "")).endswith(".json"):
-                ev.set()
-
-    obs = Observer()
-    obs.schedule(H(), str(inbox), recursive=False)
-    for gin in group_inboxes:                         # 双听:所属组共享 inbox 的新任务也唤醒本成员来 pull
-        try:
-            gin.mkdir(parents=True, exist_ok=True)
-            obs.schedule(H(), str(gin), recursive=False)
-        except Exception:
-            pass
-    # 兜底(2026-07-08 Master 提):Observer.start() 若抛异常(watchdog 装坏/资源限),原来会崩溃传播;
-    # 现捕获→降级【轮询式阻塞】(每 2s 查一次 到 deadline),【绝不秒返 idle】(秒返=事件自醒失效)。
-    obs_ok = True
-    try:
-        obs.start()
-    except Exception:
-        obs_ok = False
+    # 公共 watchdog 样板(P1 抽公共·bus/watch.py):监听自己 inbox + 所属组共享 inbox(双听)。
+    # 兜底(2026-07-08 Master 提):Observer 起不来(watchdog 装坏/资源限)ok=False
+    # → 降级【轮询式阻塞】(每 2s 查一次到 deadline),【绝不秒返 idle】(秒返=事件自醒失效)。
+    ev, _stop_watch, obs_ok = arm_watch([inbox] + group_inboxes)
     try:
         obj = _try_claim()                            # 启动 observer 后再查一次,消除竞态
         if not obj:
@@ -161,11 +138,7 @@ def _wait_core(role, timeout, include_approval=False):
                     if obj:
                         break
     finally:
-        if obs_ok:
-            try:
-                obs.stop(); obs.join()
-            except Exception:
-                pass
+        _stop_watch()
 
     return obj
 
@@ -191,29 +164,18 @@ def _wait_for_reply(from_role, tid, timeout):
     if target.exists():
         return _read_consume()
 
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-
-    ev = threading.Event()
-    suffix = tid + ".json"
-
-    class H(FileSystemEventHandler):
-        def on_created(self, e):
-            if str(e.src_path).endswith(suffix):
-                ev.set()
-        def on_moved(self, e):
-            if str(getattr(e, "dest_path", "")).endswith(suffix):
-                ev.set()
-
-    obs = Observer()
-    obs.schedule(H(), str(done_dir), recursive=False)
-    obs.start()
+    ev, _stop_watch, obs_ok = arm_watch([done_dir], suffix=tid + ".json")   # 公共样板(P1)
     try:
         if target.exists():            # 起 observer 后再查一次,消竞态(同 _wait_core)
             return _read_consume()
-        ev.wait(timeout=timeout)
+        if obs_ok:
+            ev.wait(timeout=timeout)
+        else:                          # 降级:轮询阻塞等目标文件(别秒返)
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline and not target.exists():
+                time.sleep(1.0)
     finally:
-        obs.stop(); obs.join()
+        _stop_watch()
 
     return _read_consume() if target.exists() else None
 

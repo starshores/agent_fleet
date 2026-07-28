@@ -367,14 +367,21 @@ def _health_sweep_core(stuck_min=90, apply=False):
     return rep
 
 
-def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14):
-    """消息/文件卫生代谢(2026-07-28 用户令·2.0 收尾:bus 会自己变脏,给它代谢;之前 sweep 只
-    重路由/投待办、从不归档物理文件 → 孤儿回执/死信/bak 永久堆积)。默认 dry-run 只报数,apply 才动:
-    ① 各 role done/ 回执超 done_days 天 → 移 <role>/done_archive/(replies 只看近窗;events.jsonl 审计仍全量;
-       retire 移 mailbox 时 archive 随目录走);
+def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14,
+                  tmp_hours=24, lock_hours=1, jsonl_mb=20, terminal_days=90, trash_days=30):
+    """消息/文件卫生代谢(2026-07-28 用户令·2.0 收尾 + P1 扩容:bus 会自己变脏,给它代谢)。
+    默认 dry-run 只报数,apply 才动:
+    ① 各 role done/ 回执超 done_days 天 → 移 <role>/done_archive/(replies 只看近窗;events.jsonl 审计仍全量);
     ② unknown 死信桶(inbox/processing/done)超 dead_days 天 → 移 unknown/_dead_letter/;
-    ③ 运行态根 *.bak* 超 bak_days 天 → 移 BUS/.trash/(白名单 gitignore 本就不进 git)。"""
-    rep = {"done_archived": 0, "dead_lettered": 0, "bak_trashed": 0, "apply": apply}
+    ③ 运行态根 *.bak* 超 bak_days 天 → 移 BUS/.trash/;
+    ④ 孤儿 *.tmp(>tmp_hours 小时·崩溃残渣,_write_json 正常毫秒级)→ 直接删;
+    ⑤ 孤儿 *.lock / *.steal-*(>lock_hours 小时·持锁毫秒级,stale 夺取通常已自愈,此为终兜底)→ 直接删;
+    ⑥ pid_tags.json 死 pid 条目 → 摘除(标注进程早已退,留着=who 视图僵尸);
+    ⑦ events.jsonl / metrics.jsonl 超 jsonl_mb MB → 轮转为 <名>.<日期>.1(append-only 只会涨,留档不丢审计);
+    ⑧ 终点站保留期:done_archive//_dead_letter/ 超 terminal_days 天 → 移 .trash;.trash 超 trash_days 天 → 真删
+      (两段式:任何东西进 .trash 后仍有 trash_days 反悔窗,唯一真删点)。"""
+    rep = {"done_archived": 0, "dead_lettered": 0, "bak_trashed": 0, "tmp_gone": 0, "lock_gone": 0,
+           "pidtag_gone": 0, "jsonl_rotated": 0, "terminal_trashed": 0, "trash_purged": 0, "apply": apply}
     now = time.time()
 
     def _old(p, days):
@@ -389,6 +396,14 @@ def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14):
             try:
                 dst_dir.mkdir(exist_ok=True)
                 shutil.move(str(f), str(dst_dir / f.name))
+            except Exception:
+                rep[key] -= 1
+
+    def _rm(f, key):
+        rep[key] += 1
+        if apply:
+            try:
+                f.unlink()
             except Exception:
                 rep[key] -= 1
 
@@ -411,9 +426,58 @@ def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14):
     for f in BUS.glob("*.bak*"):             # ③ bak 清扫
         if f.is_file() and _old(f, bak_days):
             _mv(f, BUS / ".trash", "bak_trashed")
-    if apply and (rep["done_archived"] or rep["dead_lettered"] or rep["bak_trashed"]):
-        _audit("hygiene_sweep", done_archived=rep["done_archived"],
-               dead_lettered=rep["dead_lettered"], bak_trashed=rep["bak_trashed"])
+    # ④⑤ 孤儿 tmp/lock 残渣(根 + 各 role 目录及其子队列 + 组目录;崩溃才会留下)
+    for pat, hours, key in (("*.tmp", tmp_hours, "tmp_gone"),
+                            ("*.lock", lock_hours, "lock_gone"),
+                            ("*.steal-*", lock_hours, "lock_gone")):
+        for f in BUS.rglob(pat):
+            if f.is_file() and _old(f, hours / 24.0):
+                _rm(f, key)
+    # ⑥ pid_tags 死 pid(psutil 可用才判;不可用跳过=不误删)
+    try:
+        import psutil
+        ptf = BUS / "pid_tags.json"
+        if ptf.exists():
+            tags = json.loads(ptf.read_text(encoding="utf-8"))
+            dead = [k for k in tags if not psutil.pid_exists(int(k))]
+            if dead:
+                rep["pidtag_gone"] = len(dead)
+                if apply:
+                    for k in dead:
+                        tags.pop(k, None)
+                    _write_json(ptf, tags)
+    except Exception:
+        pass
+    # ⑦ 审计/埋点 jsonl 轮转(超限改名留档,新文件从零涨;全史=当前+轮转档)
+    for name in ("events.jsonl", "metrics.jsonl"):
+        f = BUS / name
+        try:
+            if f.exists() and f.stat().st_size > jsonl_mb * 1024 * 1024:
+                rep["jsonl_rotated"] += 1
+                if apply:   # 时间戳到秒:同日多次轮转不互相覆盖
+                    os.replace(str(f), str(BUS / ("%s.%s.1" % (name, time.strftime("%Y%m%d-%H%M%S")))))
+        except Exception:
+            rep["jsonl_rotated"] = max(0, rep["jsonl_rotated"] - 1)
+    # ⑧ 终点站保留期:done_archive / _dead_letter 超期 → .trash;.trash 超期 → 真删(唯一真删点)
+    for d in sorted(BUS.iterdir()):
+        if d.is_dir() and not d.name.startswith((".", "_")):
+            da = d / "done_archive"
+            if da.is_dir():
+                for f in da.glob("*.json"):
+                    if _old(f, terminal_days):
+                        _mv(f, BUS / ".trash", "terminal_trashed")
+    dl = BUS / "unknown" / "_dead_letter"
+    if dl.is_dir():
+        for f in dl.glob("*.json"):
+            if _old(f, terminal_days):
+                _mv(f, BUS / ".trash", "terminal_trashed")
+    tr = BUS / ".trash"
+    if tr.is_dir():
+        for f in tr.iterdir():
+            if f.is_file() and _old(f, trash_days):
+                _rm(f, "trash_purged")
+    if apply and any(rep[k] for k in rep if k != "apply"):
+        _audit("hygiene_sweep", **{k: v for k, v in rep.items() if k != "apply" and v})
     return rep
 
 

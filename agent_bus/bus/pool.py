@@ -17,6 +17,7 @@ from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seco
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.mailbox import _claim, _claim_and_print, _resolve_self_role, _oldest_claimable
+from bus.watch import arm_watch
 
 
 # ========================= 工作组池化(Phase 1a · 2026-07-10) =========================
@@ -635,25 +636,7 @@ def cmd_fanout_collect(args):
     if stream:
         _emit(ready)
     if len(got) < n:
-        from watchdog.observers import Observer
-        from watchdog.events import FileSystemEventHandler
-        ev = threading.Event()
-
-        class H(FileSystemEventHandler):
-            def on_created(self, e):
-                if str(e.src_path).endswith(".json"):
-                    ev.set()
-            def on_moved(self, e):
-                if str(getattr(e, "dest_path", "")).endswith(".json"):
-                    ev.set()
-
-        done_dir.mkdir(parents=True, exist_ok=True)
-        obs = Observer(); obs.schedule(H(), str(done_dir), recursive=False)
-        obs_ok = True
-        try:
-            obs.start()
-        except Exception:
-            obs_ok = False
+        ev, _stop_watch, obs_ok = arm_watch([done_dir])   # 公共样板(P1;此处正是复制丢 import 崩过的现场)
         try:
             deadline = time.monotonic() + args.timeout
             while len(got) < n:
@@ -669,11 +652,7 @@ def cmd_fanout_collect(args):
                 else:
                     _collect_ready()
         finally:
-            if obs_ok:
-                try:
-                    obs.stop(); obs.join()
-                except Exception:
-                    pass
+            _stop_watch()
     if not stream:
         print(json.dumps(list(got.values()), ensure_ascii=False))
     sys.stderr.write("[fanout-collect] %s:收到 %d/%d%s\n" % (fid, len(got), n, "" if len(got) >= n else "(超时,余未回)"))

@@ -79,12 +79,33 @@ from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
+    _daemon_alive,   # ui/api.py fleet 面板用 ab._daemon_alive——此前漏 re-export(fleet 空未炸的活雷·P1 补)
 )
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
 from bus.identity import (  # noqa: E402
     cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
     cmd_train_done,
 )
+
+# ---- 稳定公共面契约(P1·2026-07-28):外部消费方(dispatch_agent / worker_daemon /
+# pool_dispatcher / longrange_net / ui.api)经 `import agentbus as ab` 只应使用下列名字——
+# 按 2026-07-28 全量 grep 实际使用面圈定。__all__ 之外的 re-export 仅为 bus/ 包内部兼容,
+# 不承诺稳定,消费方新增依赖请先把名字加进这里(名单即契约·MasterUI↔MasterAgent 对称律:改动要知会消费方)。
+__all__ = [
+    # 路径/配置/时间
+    "BUS", "METRICS", "cfg", "_now",
+    # 原子IO/审计/BI指标
+    "_write_json", "_gen_id", "_audit", "record_metric", "read_metrics",
+    # 花名册/角色目录
+    "_load_agents", "_list_roles", "_role_dir", "_is_test_role", "_load_caps_pool", "_load_retired_roster",
+    # 进程/存在感/自醒
+    "psutil", "_age_seconds", "_alive_claude_pids", "_touch_presence", "_load_pidtags",
+    "_self_wake_state", "_wait_proc_roles", "_daemon_alive",
+    # 消息流/通知
+    "_wait_core", "_emit_completion_notice", "_fire_toast",
+    # 组池/状态面
+    "_group_dir", "_group_lock_stale", "_mem_cap", "_who_data",
+]
 
 
 
