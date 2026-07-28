@@ -6,7 +6,7 @@
 _retired_roles/_pseudo_role_label/_role_dir/_case_collision)· presence(_touch_presence/_load_pidtags/_pidtags_file)
 · selfwake(_ancestor_pids/_is_parked/_parked_path/_self_wake_state/_wait_proc_roles)· notify(_fire_toast)。无反向依赖=无环。
 """
-import json, os, sys, time
+import json, os, re, sys, time
 from pathlib import Path
 
 from bus.config import BUS, _now, cfg
@@ -171,6 +171,18 @@ def _print_role_feed(role):
         for c in caps:
             print("  - %s:%s" % (c, (pool.get(c) or {}).get("desc", "(池中无此能力描述)")))
         print("  (能力模块详解按需向培训师要,对应 BUS_ONBOARDING.md 各节)")
+    # 角色记忆索引指针(记忆随角色走·2026-07-28 用户令:CC 记忆按 cwd 定位=同 cwd 多角色共锅,
+    # 索引按角色分锅 <role>.MEMORY.md,根 MEMORY.md=路由器+公共段)
+    try:
+        slug = re.sub(r"[:\\/_. ]", "-", os.getcwd())
+        pot = Path.home() / ".claude" / "projects" / slug / "memory"
+        ri = pot / (role + ".MEMORY.md")
+        if ri.exists():
+            print("【角色记忆索引】读 %s(上岗/压后必读;你的新记忆也写这份,全角色公共纪律在同目录根 MEMORY.md)" % ri)
+        elif (pot / "MEMORY.md").exists():
+            print("【记忆索引】读 %s(本记忆库未分角色索引,读根索引)" % (pot / "MEMORY.md"))
+    except Exception:
+        pass
     if rec.get("trained") is False:
         print("【🎓待训期】你是新注册角色、尚未结业(已自动通知培训师带训):待训期间只接简单明确的活;"
               "运维/写库/改基建类复杂活等培训师 `ab train-done --role %s` 结业后再接。" % role)

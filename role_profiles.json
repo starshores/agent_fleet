@@ -12,7 +12,8 @@
    "被唤起若 inbox 无新活→静默重挂+最多一行、绝不重 dump selfwake/who/状态(自灌上下文=加速 compact 降智)",
    "notice 读它 notice_of 指向的 done/<id>.json 取结果后 done 掉即弃",
    "被 wait 领进 processing 的消息必须当轮 done 闭合",
-   "需用户拍板/二选一→走 `ab ask-user --from {role} ...` 投非阻塞待办池、禁用 AskUserQuestion(已被 block_askuser.py 硬拦),投完继续干活别等"
+   "需用户拍板/二选一→走 `ab ask-user --from {role} ...` 投非阻塞待办池、禁用 AskUserQuestion(已被 block_askuser.py 硬拦),投完继续干活别等",
+   "上岗/被 compact 后重读你的【角色记忆索引】:所在项目记忆库 memory/{role}.MEMORY.md(无角色索引则读根 MEMORY.md;新记忆也写角色索引·公共纪律才进根公共段)"
   ]
  },
  "roles": [
