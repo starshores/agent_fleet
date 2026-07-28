@@ -42,13 +42,13 @@
 
 ## P2 — 卫生/清晰度
 
-- ☐ 错误通道统一(exit 码 vs stdout {"error"} 混用·机器调用方无法判败)
-- ☐ 入口路径归一 config(ab/ab.cmd/vbs/bus_tray 各自硬编码·"换机只改一处"实际五处)
-- ☐ enforce_selfwake.py 孤儿文件处置(SHELVED 已摘注册·git 留史即可删)
-- ☐ pool_dispatcher 休眠脚本:修 unlink-先于-spawn 的丢任务序,或明标 FUTURE 不修
-- ☐ external 家族:焦点策略自相矛盾说明/_RELOAD 全局改传参/四份 _lock 复制收敛
-- ☐ githooks:tag 强移不刷新 zip 与注释矛盾;打包运行中 db 的一致性注记
-- ☐ `--timeout 0` 哨兵语义、_gen_id 嵌 role 名(前缀匹配歧义面)——随 P1 done 精确匹配一并审
+- ☑ 错误通道统一(io._fail:{"error"} stdout 机器可读+非零退出码=契约;九处命令面收口·0892fa2)——原文:错误通道统一(exit 码 vs stdout {"error"} 混用·机器调用方无法判败)
+- ☑ 入口路径归一(ab/ab.cmd 认 AGENTBUS_PYTHON_BIN/AGENTBUS_AGENT_FLEET_HOME env 覆盖=归一机制·bootstrap 硬编码为默认(鸡生蛋);start_worker 已读 config;bus_tray 两件归 MasterUI·0892fa2)——原文:入口路径归一 config(ab/ab.cmd/vbs/bus_tray 各自硬编码·"换机只改一处"实际五处)
+- ☑ enforce_selfwake.py 孤儿文件处置(核实已不在库·git 留史)(SHELVED 已摘注册·git 留史即可删)
+- ☑ pool_dispatcher 休眠脚本(明标 FUTURE+已知丢单 bug 注记=启用前必修·0892fa2)——原文:pool_dispatcher 休眠脚本:修 unlink-先于-spawn 的丢任务序,或明标 FUTURE 不修
+- ☑ external 家族(四份 _lock 收敛 external_common.edge_lock;焦点策略成文=焦点-free 理想态+剪贴板/OS 键序成文豁免;_RELOAD=CLI 单次进程局部态无危害·注记保持·0892fa2)——原文:external 家族:焦点策略自相矛盾说明/_RELOAD 全局改传参/四份 _lock 复制收敛
+- ☑ githooks(强移 tag 刷新 zip·旧件留 .prev;运行中 db 一致性注记·0892fa2)——原文:githooks:tag 强移不刷新 zip 与注释矛盾;打包运行中 db 的一致性注记
+- ☑ `--timeout 0` 哨兵语义(进 wait --help)、_gen_id 嵌 role 名(P1 精确匹配后歧义面已消·io 注记·0892fa2)——原文:`--timeout 0` 哨兵语义、_gen_id 嵌 role 名(前缀匹配歧义面)——随 P1 done 精确匹配一并审
 
 ## 文档漂移清单(代码≠文档处·各 owner 自纠)
 
