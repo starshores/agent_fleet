@@ -1907,6 +1907,137 @@ def open_file(path):
 
 
 # =============================================================
+#  📁 路径注册表 —— 单一源 path_registry.json(5类26条)+ 健康校验
+#  kind=junction:  fsutil reparse + target resolve 一致
+#  kind=symlink:   is_symlink() + target resolve 一致
+#  kind=hardlink_mirror: 目录内抽样 st_nlink>1
+#  kind=dir/file/db: exists()
+#  用途:WebUI「📁路径」tab 渲染 + 换机迁移对账
+# =============================================================
+_PATH_REG = Path(__file__).resolve().parent.parent / "path_registry.json"
+
+
+def _check_path_entry(entry):
+    """返回带 health/health_msg/exists 的条目 dict(不改 entry 原始键)。"""
+    path = entry.get("path", "")
+    kind = entry.get("kind", "")
+    p = Path(path)
+    out = {k: entry.get(k) for k in ("id", "name", "path", "kind", "desc", "owner", "target", "source", "cross_ref")}
+    exists = p.exists() or p.is_symlink()
+    out["exists"] = exists
+    if not exists:
+        out["health"] = "bad"
+        out["health_msg"] = "路径不存在"
+        return out
+
+    if kind == "junction":
+        try:
+            import subprocess as _sp
+            r = _sp.run(["fsutil", "reparsepoint", "query", path],
+                        capture_output=True, timeout=10, creationflags=_NO_WINDOW)
+            txt = r.stdout.decode("utf-8", "replace")
+            if "Reparse Tag Value" not in txt and "重新解析" not in txt and r.returncode != 0:
+                out["health"] = "bad"
+                out["health_msg"] = "非 reparse point(原子写打回普通目录?)"
+                return out
+            target = entry.get("target")
+            if target:
+                try:
+                    real = str(p.resolve())
+                    if real.lower().rstrip("\\") != target.lower().rstrip("\\"):
+                        out["health"] = "warn"
+                        out["health_msg"] = "target 不符(期望 %s 实际 %s)" % (target, real)
+                        out["actual_target"] = real
+                        return out
+                except Exception:
+                    pass
+        except Exception as ex:
+            out["health"] = "warn"
+            out["health_msg"] = "fsutil 检查失败: " + str(ex)
+            return out
+        out["health"] = "ok"
+
+    elif kind == "symlink":
+        if not p.is_symlink():
+            out["health"] = "bad"
+            out["health_msg"] = "非 symlink(原子写打回普通文件=分叉!需 mklink 重建)"
+            return out
+        target = entry.get("target")
+        if target:
+            try:
+                real = str(p.resolve())
+                if real.lower().rstrip("\\") != target.lower().rstrip("\\"):
+                    out["health"] = "warn"
+                    out["health_msg"] = "target 不符(期望 %s 实际 %s)" % (target, real)
+                    out["actual_target"] = real
+                    return out
+            except Exception as ex:
+                out["health"] = "warn"
+                out["health_msg"] = "resolve 失败: " + str(ex)
+                return out
+        out["health"] = "ok"
+
+    elif kind == "hardlink_mirror":
+        try:
+            found = False
+            if p.is_dir():
+                for f in p.iterdir():
+                    if f.is_file():
+                        if f.stat().st_nlink > 1:
+                            found = True
+                            break
+            if not found:
+                out["health"] = "warn"
+                out["health_msg"] = "目录内无 nlink>1 文件(需跑 sync_memory.ps1 重链)"
+                return out
+        except Exception as ex:
+            out["health"] = "warn"
+            out["health_msg"] = "硬链校验失败: " + str(ex)
+            return out
+        out["health"] = "ok"
+
+    else:  # dir, file, db
+        out["health"] = "ok"
+
+    return out
+
+
+def build_paths():
+    """路径注册表 + 健康校验(单一源 path_registry.json)。请求路径直接读(只读·手动刷新)。"""
+    try:
+        reg = json.loads(_PATH_REG.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    categories = []
+    for cat in reg.get("categories", []):
+        entries = [_check_path_entry(e) for e in cat.get("entries", [])]
+        categories.append({"id": cat["id"], "name": cat["name"], "entries": entries})
+    bad = sum(1 for c in categories for e in c["entries"] if e.get("health") == "bad")
+    warn = sum(1 for c in categories for e in c["entries"] if e.get("health") == "warn")
+    return {
+        "ok": True,
+        "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "bad": bad, "warn": warn,
+        "categories": categories,
+    }
+
+
+def open_path(path):
+    """📂路径页 explorer 打开(POST /api/open-path)。
+    本机 127.0.0.1 内,用户主动点击,os.startfile 纯本机行为·无外发。"""
+    if not path:
+        return {"ok": False, "error": "缺 path"}
+    try:
+        p = Path(path)
+        if not (p.exists() or p.is_symlink()):
+            return {"ok": False, "error": "路径不存在: " + path}
+        os.startfile(str(p))
+        return {"ok": True, "opened": path}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# =============================================================
 #  长期任务线看板(阶段2·Master拍板·面板侧出面板/数据侧出数据)——读 tasklines.json,
 #  按 decision.ref 交叉 todos.json 状态判"待用户决策"。只读·直读小文件·无缓存。
 #  数据侧口径由 MasterAgent 维护(ab tasklines);此处仅呈现 + 决策点交叉高亮。

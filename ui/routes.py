@@ -118,6 +118,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/prompts":
             # 提示词审核:手动刷新时直接读小文件(无缓存/无 poller);只读
             self._send(200, build_prompts())
+        elif path == "/api/paths":
+            # 路径注册表:path_registry.json + 健康校验(请求路径直读·手动刷新)
+            self._send(200, api.build_paths())
         else:
             self._send(404, {"error": "not found"})
 
@@ -170,6 +173,10 @@ class Handler(BaseHTTPRequestHandler):
             # 📂开文件:白名单硬约束在 open_file 内(只允许 build_prompts openable 的真实文件·127.0.0.1 only)
             b = self._body_json()
             self._send(200, open_file((b.get("path") or "").strip()))
+        elif path == "/api/open-path":
+            # 📂路径页 explorer 打开:127.0.0.1 only(Origin 头已在 do_POST 头部检查)
+            b = self._body_json()
+            self._send(200, api.open_path((b.get("path") or "").strip()))
         else:
             self._send(404, {"error": "not found"})
 

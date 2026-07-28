@@ -409,6 +409,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="longrange">🗂️ 长程任务</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
+  <button class="tab" data-t="paths">📁 路径</button>
   <span class="spacer" style="flex:1"></span>
   <span class="muted" style="font-size:11.5px;align-self:center" id="tabHint"></span>
 </nav>
@@ -712,6 +713,15 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
       <button class="btn ghost mini" id="lrRefresh">刷新</button>
     </div>
     <div class="sec-b"><div id="lrBox" style="padding:6px 0"></div></div>
+  </section>
+
+  <section data-tab="paths">
+    <div class="sec-h">📁 路径注册表 <span class="sub">特殊路径地图(记忆库/存档/外链/配置/运行态方舟) · 单一源 <span class="mono">path_registry.json</span> · 健康校验 · 点路径复制</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="pathsMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="pathsRefresh">刷新</button>
+    </div>
+    <div class="sec-b" id="pathsBox"><div class="muted" style="padding:8px 16px">加载中…</div></div>
   </section>
 </main>
 
@@ -1352,13 +1362,13 @@ function applyRange(r){
   drawTrend(daily,{cv:'uTrend',mode:'io',peak:'trendPeak',tip:'uTrendTip',legend:'trendLegend'});
   drawTrend(daily,{cv:'uTrendTotal',mode:'total',peak:'trendPeakTotal',tip:'uTrendTotalTip'});
 }
-// 每日 token 趋势:口径混合(真实段=io=input+output;backfill 段=stats-cache 日聚合 total,口径或略异·供趋势参考);
-// gap=无源缺口(不画点、line 断开 + 阴影带,绝不当 0)。横轴含 gap 槽 → 缺口在视觉上是真断层。
-// 口径:mode='io'(input+output·新增有效工作量) | 'total'(io+cache读写·固定物理量总口径)
-// backfill 段只有日聚合 total(无 io 分项),两模式都用 total(标注供参考);gap=无源缺口(断开·不当0)。
+// 每日 token 趋势:前后一致的【单一连续序列】(别3段)。真实性靠脚注披露口径,不靠视觉分段。
+//  · backfill 段(03-27~04-28)= stats-cache 日聚合,其 total 量级≈io(未含 cache);io 图两段真可比、连续。
+//  · vacation 段(04-29~05-10)= 无使用 = 真实 0(已知的零,非插值/估算)。
+//  · 口径:mode='io'(input+output) | 'total'(io+cache读写)。总图早期 backfill 无 cache 故偏低=真相(不捏造)。
 function _trendVal(x, mode){
-  if(!x||x.src==='gap') return null;
-  if(x.src==='backfill') return (x.tokens_total!=null?x.tokens_total:null);
+  if(!x) return null;
+  if(x.src==='backfill') return (x.tokens_total!=null?x.tokens_total:null);  // 日聚合≈io量级(无 cache 拆分)
   if(mode==='total') return (x.tokens_total!=null?x.tokens_total:null);
   return (x.tokens_io!=null?x.tokens_io:null);
 }
@@ -1379,34 +1389,26 @@ function drawTrend(daily, opt){
   const X=i=>padL+gw*(n<2?0.5:i/(n-1)), Y=v=>padT+gh*(1-v/maxV);
   ctx.strokeStyle=UC.line;ctx.fillStyle=UC.dim;ctx.lineWidth=1;ctx.font='10px Consolas';
   for(let g=0;g<=4;g++){const gv=maxV*g/4,yy=Y(gv);ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(w-padR,yy);ctx.stroke();ctx.fillText(fmtN(Math.round(gv)),2,yy+3);}
-  let gi=0; while(gi<n){ if(all[gi].src==='gap'){ let gj=gi; while(gj+1<n && all[gj+1].src==='gap') gj++;
-      const x0=X(gi)-(gw/(n-1||1))*0.5, x1=X(gj)+(gw/(n-1||1))*0.5;
-      ctx.fillStyle='rgba(125,138,160,.10)'; ctx.fillRect(Math.max(padL,x0),padT,Math.min(w-padR,x1)-Math.max(padL,x0),gh);
-      ctx.fillStyle=UC.none; ctx.textAlign='center'; ctx.fillText('无源', (Math.max(padL,x0)+Math.min(w-padR,x1))/2, padT+gh/2); ctx.textAlign='left';
-      gi=gj+1; } else gi++; }
-  const lineColor=opt.mode==='total'?UC.live:UC.acc;   // 总口径用绿、io用蓝,两图一眼区分
+  const lineColor=opt.mode==='total'?UC.live:UC.acc;   // 总口径用绿、io用蓝,两图一眼区分(同图内前后一色·不再分段)
   (function seg(){ let prev=null;
     all.forEach((p,i)=>{ const v=vals[i];
       if(v==null){ prev=null; return; }
       const px=X(i),py=Y(v);
       if(prev!=null){ ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(px,py);
-        const bf=(p.src==='backfill'); ctx.setLineDash(bf?[4,3]:[]); ctx.strokeStyle=bf?UC.idle:lineColor; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); }
+        ctx.strokeStyle=lineColor; ctx.lineWidth=2; ctx.stroke(); }
       prev={x:px,y:py};
     }); })();
   let pk=-1, pkv=-1;
   all.forEach((p,i)=>{ const v=vals[i]; if(v==null) return; if(v>pkv){pkv=v;pk=i;}
-    const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,2.5,0,7); ctx.fillStyle=p.src==='backfill'?UC.idle:lineColor; ctx.fill();
+    const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,2.5,0,7); ctx.fillStyle=lineColor; ctx.fill();
     pts.push({x:px,y:py,date:p.date,v:v,src:p.src,cost:p.cost_usd,calls:p.calls}); });
   if(pk>=0){ const px=X(pk),py=Y(pkv); ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fillStyle=UC.dead; ctx.fill(); }
   ctx.fillStyle=UC.dim;ctx.fillText(all[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(all[n-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
-  if(peakEl) peakEl.textContent='峰值 '+fmtN(pkv)+' tok · '+all[pk].date.slice(5)+(all[pk].src==='backfill'?'(backfill·口径异)':'')+' · '+n+'天';
+  if(peakEl) peakEl.textContent='峰值 '+fmtN(pkv)+' tok · '+all[pk].date.slice(5)+' · '+n+'天';
   cv._pts=pts; cv._mode=opt.mode;
   if(lg){ const bm=_usageData&&_usageData.backfill_meta;
-    lg.innerHTML='<span><i style="background:'+UC.acc+'"></i>io(蓝)</span>'
-      +'<span><i style="background:'+UC.live+'"></i>总(绿)</span>'
-      +'<span><i style="background:'+UC.idle+'"></i>backfill·日聚合</span>'
-      +'<span><i class="gapi"></i>无源缺口</span>'
-      +(bm?'<span class="muted" style="margin-left:auto">backfill '+esc(bm.bf_from||'')+'~'+esc(bm.bf_to||'')+' · stats-cache 日聚合,口径或略异·供参考;'+esc(bm.gap_from||'')+'~'+esc(bm.gap_to||'')+' 无源(非0)</span>':''); }
+    lg.innerHTML='<span><i style="background:'+lineColor+'"></i>'+(opt.mode==='total'?'总(io+cache读写)':'io(input+output)')+'</span>'
+      +(bm?'<span class="muted" style="margin-left:auto">'+esc(bm.bf_from||'')+'~'+esc(bm.bf_to||'')+' stats-cache 日聚合(略粗'+(opt.mode==='total'?'·总口径未含cache故偏低':'')+');'+esc(bm.gap_from||'')+'~'+esc(bm.gap_to||'')+' 无使用(=0);其后逐条ETL</span>':''); }
 }
 function _bindTrendHover(cvId, tipId){
   const cv=document.getElementById(cvId); if(!cv||cv._hov)return; cv._hov=1;
@@ -1417,9 +1419,12 @@ function _bindTrendHover(cvId, tipId){
     let best=pts[0],bd=1e9;
     pts.forEach(p=>{const dd=Math.abs(p.x-mx); if(dd<bd){bd=dd;best=p;}});
     const lbl=cv._mode==='total'?'tok 总':'tok io';
-    const tag = best.src==='backfill' ? ' <span style="color:'+UC.idle+'">·backfill日聚合</span>' : '';
+    const tag = best.src==='backfill' ? ' <span style="color:'+UC.idle+'">·backfill日聚合</span>'
+              : best.src==='vacation' ? ' <span style="color:'+UC.idle+'">·无使用</span>' : '';
     let line = best.src==='backfill'
       ? fmtN(best.v)+' tok <span class="muted">(stats-cache·口径或异)</span>'
+      : best.src==='vacation'
+      ? '0 tok <span class="muted">(无使用)</span>'
       : fmtN(best.v)+' '+lbl+(best.cost!=null?' · '+usd(best.cost)+' 参考':'')+(best.calls!=null?' · '+fmtN(best.calls)+' calls':'');
     tip.innerHTML='<b>'+esc(best.date)+'</b>'+tag+'<br>'+line;
     tip.style.display='block';
@@ -2157,7 +2162,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2178,6 +2183,7 @@ function showTab(t){
   else if(t==='roles') loadRoles();
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
+  else if(t==='paths') loadPaths();
 }
 // 🎯 长期任务线看板:卡片 + ⧗待决策徽标 + 展开 current/deps/decisions(待用户决策红/黄高亮)
 async function loadTasklines(){
@@ -2274,6 +2280,59 @@ syncTabTop(); showTab(curTab);
 // BI 表格先出(首屏快),随后 /api/state 慢扫只影响舰队表(本就慢,晚 ~220ms 无感)。
 // 配合服务端启动预热 _proc_cache,首个 /api/bi 即 ~220ms。loadBI 已从 load() 解耦,
 // 下面 10s 定时单独刷 BI,/api/state 的 SSE/轮询刷新不再连带重拉 BI。
+// ===== 📁 路径注册表 =====
+const KIND_LABEL={'dir':'目录','file':'文件','db':'DB','junction':'junction','symlink':'symlink','hardlink_mirror':'硬链镜像'};
+const KIND_COLOR={'junction':'var(--accent)','symlink':'var(--live)','hardlink_mirror':'#c97bfc','db':'var(--warn)','dir':'var(--muted)','file':'var(--muted)'};
+async function loadPaths(){
+  const box=document.getElementById('pathsBox'); const meta=document.getElementById('pathsMeta');
+  if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">加载中…</div>';
+  try{
+    const r=await fetch('/api/paths'); const d=await r.json();
+    if(meta) meta.textContent='刷新 '+esc(d.as_of||'')+' · '+(d.bad||0)+' 🔴 · '+(d.warn||0)+' 🟡';
+    renderPaths(d);
+  }catch(e){ if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(''+e)+'</div>'; }
+}
+function renderPaths(d){
+  const box=document.getElementById('pathsBox'); if(!box) return;
+  if(!d||!d.ok){ box.innerHTML='<div class="muted" style="padding:8px 16px">错误:'+esc((d&&d.error)||'?')+'</div>'; return; }
+  const cats=d.categories||[];
+  box.innerHTML=cats.map(cat=>{
+    const rows=(cat.entries||[]).map(e=>{
+      const hc=e.health==='bad'?'var(--err)':e.health==='warn'?'var(--warn)':'var(--live)';
+      const hbadge='<span style="color:'+hc+';font-size:12px" title="'+esc(e.health_msg||'正常')+'">'+
+        (e.health==='bad'?'🔴':(e.health==='warn'?'🟡':'🟢'))+'</span>';
+      const kindC=KIND_COLOR[e.kind]||'var(--muted)';
+      const kindBadge='<span class="cap-chip" style="color:'+kindC+';font-size:11px">'+esc(KIND_LABEL[e.kind]||e.kind)+'</span>';
+      const pathHtml='<span class="mono" style="font-size:12px;cursor:pointer;text-decoration:underline dotted;color:var(--text)"'
+        +' title="点击复制路径" onclick="navigator.clipboard.writeText(\''+esc(e.path||'')+'\').then(()=>showToast(\'已复制\'))">'+esc(e.path||'')+'</span>';
+      const openBtn=e.exists?'<button class="btn ghost mini" style="padding:2px 7px;font-size:11px" onclick="openPath(\''+esc((e.path||'').replace(/\\/g,'\\\\'))+'\')">📂</button>':'';
+      const targetRow=e.target?('<div class="muted" style="font-size:11px;padding:2px 0 0 2px">→ target: <span class="mono">'+esc(e.target)+'</span></div>'):'';
+      const msgRow=e.health_msg&&e.health!=='ok'?('<div style="font-size:11px;color:'+hc+';padding:2px 0">'+esc(e.health_msg)+'</div>'):'';
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 14px;border-bottom:1px solid var(--line)">'
+        +'<div style="min-width:18px;padding-top:1px">'+hbadge+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<b style="font-size:13px">'+esc(e.name||e.id||'?')+'</b>'+kindBadge
+        +'<span class="muted" style="font-size:11px">owner: '+esc(e.owner||'?')+'</span>'
+        +'</div>'
+        +'<div style="margin-top:3px;display:flex;gap:6px;align-items:center">'+pathHtml+openBtn+'</div>'
+        +(e.desc?'<div class="muted" style="font-size:11.5px;margin-top:3px">'+esc(e.desc)+'</div>':'')
+        +targetRow+msgRow
+        +'</div></div>';
+    }).join('');
+    return '<div style="margin:10px 0 0 0">'
+      +'<div class="sec-h" style="font-size:13.5px;padding:6px 16px;background:var(--bg2)">'+esc(cat.name)+'</div>'
+      +rows+'</div>';
+  }).join('');
+}
+async function openPath(p){
+  try{
+    const r=await fetch('/api/open-path',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p})});
+    const d=await r.json();
+    showToast(d.ok?('已打开 '+p):(d.error||'打开失败'));
+  }catch(e){ showToast('请求失败:'+e); }
+}
+document.getElementById('pathsRefresh').onclick=()=>loadPaths();
 loadBI().finally(load); connectSSE(); setPoll();
 // 刷新门控(P1):BI 定时刷只在【BI tab 可见】时跑,不再无视可见性每 10s 扫 psutil + 拉 /api/bi
 setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);
