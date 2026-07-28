@@ -366,9 +366,8 @@ def cmd_selfwake_guard(args):
             "title": marker + " 你掉了自醒",
             "task": ("自醒巡检【连续2次】发现你掉了自醒(%s;尸检:%s)。看到即请【后台 run_in_background】跑 "
                      "`ab wait --role %s --timeout 0`(0=自动日2h/夜6h),再 `ab selfwake` 验在岗(别用 shell &)。"
-                     "★若你是【轮询模式在岗】(ScheduleWakeup 定时 drain·非 background wait),"
-                     "别重挂——放个豁免 marker 即可:`ab selfwake-exempt --role %s`(不再被巡检打扰)。"
-                     % (detail, _wait_autopsy(role), role, role)),
+                     "★禁轮询(用户令2026-07-28:轮询=错误·全员事件 wait;定时只允许闹钟式到点一次醒)。"
+                     % (detail, _wait_autopsy(role), role)),
             "created": _now(), "status": "pending",
             "no_receipt": True,   # 系统 nudge·fire-and-forget:完成不回执给 from(MasterAgent),消守卫回执洪水噪声
         }
