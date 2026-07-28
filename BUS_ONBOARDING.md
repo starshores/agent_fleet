@@ -79,6 +79,8 @@
 - **正例模板**:查 inbox → 空 → 重挂 wait → 一行带过。**别**每次 idle 都跑 selfwake/who 再贴一遍在岗表。
 - (有真活时正常处理;本纪律只管"空唤醒"那一类。)
 
+> **★补:用户下达的程序性/文体约定要【活过 compact】——光进 compact 摘要文本不够**(会话考古 2026-07-23 实证:约定文本进了摘要,compact 后仍被反复违反=compact 保住"事实记忆"却衰减"程序性遵守力")。**须落到【每轮自动重注入 + 指令语气】层**:管理层 agent 记进自己 `CLAUDE.md` 角色节(每会话确定性重载),被动的摘要文本 = advisory、遵守力会衰减。**机制/enforcement(reinject 是否覆盖"最新用户程序性约定"而非只 identity/纪律)= MasterAgent 的 SessionStart reinject hook + `SESSION_RELIABILITY.md`,以那份为准**(本条只做 onboarding 指针,不复述 doctrine 免漂移)。
+
 ---
 
 ## 二之二、改接口/机制 → 主动通报消费方(对称协作律)
