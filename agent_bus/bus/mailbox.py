@@ -12,25 +12,61 @@ from bus.presence import _set_current_task
 from bus.proc import _claude_ancestor
 
 
-def _claim(role, taskpath):
+def _claim(role, taskpath, locked=False):
     """原子领取:把任务从 inbox 移到 processing,返回 task dict。
-    多监听者(tab /loop + daemon)并存时只有一个 rename 成功,其余返回 None(没抢到),
-    所以绝不会重复执行同一任务。坏文件返回 {"error":...}。"""
-    proc = BUS / role / "processing" / taskpath.name
-    for attempt in range(4):
-        try:
-            os.replace(str(taskpath), str(proc))  # 原子;抢输的那个抛 FileNotFoundError
-            break
-        except FileNotFoundError:
-            return None  # 已被别的监听者领走 / 文件没了——不重试
-        except OSError:
-            # Windows 下源文件被 watcher/AV 瞬时占用会抛 PermissionError(OSError 子类)→ 领取竞态。
-            # 源还在就短重试(Master 实测反馈);源没了=被领走,放弃。
-            if not taskpath.exists():
+    并发安全 = O_EXCL 独占锁(<task>.lock 谁建成谁独占;P0 统一·2026-07-28):
+    本机实测 os.replace 争同源【会双胜】(pool.py gate① 压测 200-300 轮出 2-8 胜者),
+    多监听者(tab wait + daemon)并存时靠 replace 判胜=同任务双执行风险,故与组池统一 O_EXCL。
+    抢输/文件没了返回 None;坏文件返回 {"error":...}。
+    locked=True:调用方(pool._claim_group_task)已持有同名 <task>.lock → 跳过抢锁直接搬运
+    (否则自伤:组池持锁调进来会被自己的锁打成落空)。
+    stale 回收:锁主建锁后崩溃留孤儿 .lock → mtime 超 60s 强清重抢(claim 是毫秒级动作)。"""
+    lock = taskpath.with_name(taskpath.name + ".lock")
+    fd = None
+    if not locked:
+        for attempt in range(2):
+            try:
+                fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError:
+                try:
+                    if attempt == 0 and time.time() - lock.stat().st_mtime > 60:
+                        lock.unlink()      # 孤儿锁(持有者崩了)→ 强清重抢一次
+                        continue
+                except OSError:
+                    pass
+                return None                # 真被别的监听者独占(锁新鲜)→ 干净落空
+            except OSError:
                 return None
-            if attempt == 3:
-                return None  # 重试仍失败,本轮放弃(任务留 inbox,下轮再领)
-            time.sleep(0.04 * (attempt + 1))
+        if fd is None:
+            return None
+        try:
+            os.write(fd, json.dumps({"who": role, "pid": os.getpid(), "acquired_at": _now()},
+                                    ensure_ascii=False).encode("utf-8"))   # 记 pid/时间供排障
+        except Exception:
+            pass
+        os.close(fd)
+    proc = BUS / role / "processing" / taskpath.name
+    try:
+        for attempt in range(4):
+            try:
+                os.replace(str(taskpath), str(proc))  # 此刻仅持锁者到达,replace 无并发争用=纯搬运
+                break
+            except FileNotFoundError:
+                return None  # 已被(旧版本监听者/reap)移走——不重试
+            except OSError:
+                # Windows 下源文件被 watcher/AV 瞬时占用会抛 PermissionError(OSError 子类)。
+                # 源还在就短重试(Master 实测反馈);源没了=被移走,放弃。
+                if not taskpath.exists():
+                    return None
+                if attempt == 3:
+                    return None  # 重试仍失败,本轮放弃(任务留 inbox,下轮再领)
+                time.sleep(0.04 * (attempt + 1))
+    finally:
+        try:
+            lock.unlink()   # task 已移走/放弃,释放锁(残留也无害:_oldest_claimable 只认 *.json)
+        except Exception:
+            pass
     try:
         obj = json.loads(proc.read_text(encoding="utf-8"))
     except Exception as e:

@@ -15,6 +15,7 @@ ref 存【标识符】、不存对方 payload 副本(禁内联=防偷偷 A 归�
 import json, os
 
 from bus.config import BUS
+from bus.io import _write_json, json_lock
 from bus.roster import _list_roles, _retired_roles
 
 # 每条 ref 契约锁 4 要素:id 空间 / 基数 / 悬挂处理 / 解析目标(契约化只显式化·禁改现解析)。
@@ -121,19 +122,18 @@ def check_refs():
 
 def purge_smoke_todos():
     """①类 auto-purge:清 todos.json 里 __smoke* 测试污染(使用方批准的唯一可 auto-purge 类)。
-    原子写 + 备份。返回 (removed, before, after)。仅动 todos·不碰 ②③(退役历史/需人核)。"""
+    锁跨 RMW + 原子写 + 备份(P0·2026-07-28)。返回 (removed, before, after)。仅动 todos·不碰 ②③(退役历史/需人核)。"""
     p = BUS / "todos.json"
-    d = _load_json(p, [])
-    if not isinstance(d, list):
-        return (0, 0, 0)
-    kept = [t for t in d if not _is_smoke_from(t.get("from") or t.get("confirm_from"))]
-    removed = len(d) - len(kept)
-    if removed:
-        (BUS / "todos.json.pre-smoke-purge.bak").write_text(
-            json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp = BUS / "todos.json.tmp"
-        tmp.write_text(json.dumps(kept, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(str(tmp), str(p))
+    with json_lock(p):
+        d = _load_json(p, [])
+        if not isinstance(d, list):
+            return (0, 0, 0)
+        kept = [t for t in d if not _is_smoke_from(t.get("from") or t.get("confirm_from"))]
+        removed = len(d) - len(kept)
+        if removed:
+            (BUS / "todos.json.pre-smoke-purge.bak").write_text(
+                json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+            _write_json(p, kept)
     return (removed, len(d), len(kept))
 
 

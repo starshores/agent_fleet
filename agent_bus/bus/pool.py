@@ -217,7 +217,7 @@ def _claim_group_task(role, g, include_approval=False):
         pass
     os.close(fd)
     try:
-        obj = _claim(role, t)   # 此刻仅持锁者到达,os.replace 到 role/processing 无并发争用=安全
+        obj = _claim(role, t, locked=True)   # 已持 <task>.lock:locked=True 跳过 _claim 内层抢锁(否则被自己的锁打成落空);此刻仅持锁者到达,搬运无争用
     finally:
         try:
             lock.unlink()       # task 已移走,释放锁(留了也无害:_oldest_claimable 只认 *.json)

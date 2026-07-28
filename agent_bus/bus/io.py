@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""bus.io —— 原子落地 / id 生成 / 审计日志 / BI 资源指标(叶子层,仅依赖 bus.config)。"""
+"""bus.io —— 原子落地 / 共享 JSON 锁 / id 生成 / 审计日志 / BI 资源指标(叶子层,仅依赖 bus.config)。"""
 import json, os, time
+from contextlib import contextmanager
 from bus.config import BUS, METRICS, _now
 
 
@@ -9,7 +10,9 @@ def _gen_id(role):
 
 
 def _write_json(path, obj):
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # tmp 名带 pid+随机:两进程同写同目标时,固定 .tmp 名会让 B 的半截文件被 A replace 进正式位
+    # (P0·doc-blind 2026-07-28);随机化后各写各的 tmp,replace 仍原子=后写者胜、绝无半截。
+    tmp = path.parent / (path.name + ".%d-%s.tmp" % (os.getpid(), os.urandom(2).hex()))
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
     # 原子落地,避免 watcher 读到半截。os.replace 在 Windows 下若目标被 watcher/AV/另一 waiter
     # 瞬时占用会抛 PermissionError(WinError 5)——短 backoff 重试,绝不让瞬时锁把调用方崩掉
@@ -29,6 +32,51 @@ def _write_json(path, obj):
 def _oldest(folder):
     files = sorted([p for p in folder.glob("*.json")])
     return files[0] if files else None
+
+
+@contextmanager
+def json_lock(path, tries=100, sleep=0.03, stale_s=60):
+    """共享 JSON 文件的 RMW 独占锁(<path>.lock·O_EXCL 原子创建=恒一胜)。
+
+    用法:with json_lock(BUS/"todos.json"): load→改→_write_json。
+    背景(P0·doc-blind 2026-07-28):todos.json / agents.json 多方并发读-改-写会互相覆盖丢数据;
+    os.replace 争源本机实证会双胜(pool.py gate①),锁必须 O_EXCL。
+    stale 回收:RMW 是毫秒级,锁文件 mtime 超 stale_s 秒=持有者已崩 → 强清重抢(pool 同款思路,
+    叶子层不依赖 psutil,用 mtime ttl 判据足够)。抢不到(tries 耗尽)抛 TimeoutError——
+    调用方宁可失败重来,不可裸写。"""
+    lock = path.parent / (path.name + ".lock")
+    fd = None
+    for _ in range(tries):
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, json.dumps({"pid": os.getpid(), "acquired_at": _now()}).encode("utf-8"))
+            except Exception:
+                pass
+            break
+        except FileExistsError:
+            try:
+                if time.time() - lock.stat().st_mtime > stale_s:   # 孤儿锁(持有者崩了)→ 强清重抢
+                    lock.unlink()
+                    continue
+            except OSError:
+                continue          # 锁刚被释放/瞬时占用 → 立刻重抢
+            time.sleep(sleep)
+        except OSError:
+            time.sleep(sleep)
+    if fd is None:
+        raise TimeoutError("json_lock 抢锁超时:%s(持有者见锁文件内容)" % lock)
+    try:
+        yield
+    finally:
+        try:
+            os.close(fd)
+        except Exception:
+            pass
+        try:
+            lock.unlink()
+        except Exception:
+            pass
 
 
 def _audit(event, **fields):

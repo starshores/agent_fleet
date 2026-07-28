@@ -11,7 +11,7 @@ from pathlib import Path
 
 from bus.config import BUS, _now, cfg
 from bus.io import _audit, _gen_id, _write_json
-from bus.roster import _load_agents, _save_agents, _list_roles, _retired_roles, _pseudo_role_label, _role_dir, _case_collision
+from bus.roster import _load_agents, _save_agents, update_agents, _list_roles, _retired_roles, _pseudo_role_label, _role_dir, _case_collision
 from bus.presence import _touch_presence, _load_pidtags, _pidtags_file
 from bus.selfwake import _ancestor_pids, _is_parked, _parked_path, _self_wake_state, _wait_proc_roles, _is_guard_exempt, _guard_exempt_path
 from bus.notify import _fire_toast
@@ -24,9 +24,9 @@ def cmd_register(args):
         sys.stderr.write("⚠ 拒绝注册:角色名 %r 与既有 %r 仅大小写不同——Windows 文件系统不区分大小写、会共用同一 mailbox 目录(agents.json 却当两个角色→幽灵重复+路由错乱)。请改用既有名 %r,或换个真正不同的名。\n" % (role, dup, dup))
         sys.exit(2)
     _role_dir(role)
-    a = _load_agents()
-    a[role] = {"registered": _now(), "desc": args.desc or ""}
-    _save_agents(a)
+    def _mut(a):
+        a[role] = {"registered": _now(), "desc": args.desc or ""}
+    update_agents(_mut)   # 锁跨 RMW(P0):防与 hello/retire 并发覆盖
     print("registered role:", role)
 
 
@@ -62,12 +62,13 @@ def cmd_hello(args):
         sys.stderr.write("⚠ 拒绝 hello:角色名 %r 与既有 %r 仅大小写不同——Windows 文件系统不区分大小写、会共用同一 mailbox(致幽灵重复+绑定错乱)。你多半想声明 %r,请用它的准确大小写重跑。\n" % (role, dup, dup))
         sys.exit(2)
     _role_dir(role)
-    a = _load_agents()
-    is_new = role not in a          # 首次注册的新角色 → 培训闸(_auto_train_request)
-    a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
-    if is_new:
-        a[role]["trained"] = False  # 🎓待训:培训师 train-done 结业前,send 派活带警示(软闸·不硬拦,防培训师离线死锁)
-    _save_agents(a)
+    def _mut(a):
+        new = role not in a         # 首次注册的新角色 → 培训闸(_auto_train_request)
+        a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
+        if new:
+            a[role]["trained"] = False  # 🎓待训:培训师 train-done 结业前,send 派活带警示(软闸·不硬拦,防培训师离线死锁)
+        return new
+    is_new = update_agents(_mut)    # 锁跨 RMW(P0):防与 register/train-done 并发覆盖
     try:
         _parked_path(role).unlink()   # 重开 hello=活跃 → 清 park/休眠标(秒回活跃·⑤)
         print("(已清除 park/休眠标——重新活跃)")
@@ -213,16 +214,19 @@ def cmd_train_done(args):
     """培训师结业命令:置 agents.json[role].trained=true,解除 send 的待训警示(培训闸闭环)。
     配套:新角色首次 hello 自动标 trained=false + 投带训单给培训师(_auto_train_request)。"""
     role = args.role
-    a = _load_agents()
-    if role not in a:
+    by = args.by or os.environ.get("AGENTBUS_ROLE") or "培训师"
+    def _mut(a):
+        if role not in a:
+            return False
+        a[role]["trained"] = True
+        a[role]["trained_at"] = _now()
+        a[role]["trained_by"] = by
+        return True
+    if not update_agents(_mut):     # 锁跨 RMW(P0)
         sys.stderr.write("角色 %s 不在册(agents.json),无法结业。\n" % role)
         sys.exit(2)
-    a[role]["trained"] = True
-    a[role]["trained_at"] = _now()
-    a[role]["trained_by"] = args.by or os.environ.get("AGENTBUS_ROLE") or "培训师"
-    _save_agents(a)
-    _audit("train_done", role=role, by=a[role]["trained_by"])
-    print("🎓 %s 已结业(trained=true · by %s)。send 派活不再带待训警示。" % (role, a[role]["trained_by"]))
+    _audit("train_done", role=role, by=by)
+    print("🎓 %s 已结业(trained=true · by %s)。send 派活不再带待训警示。" % (role, by))
 
 
 def cmd_whoami(args):

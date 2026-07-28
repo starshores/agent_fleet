@@ -54,8 +54,16 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600):
 
         def killer():
             killed["v"] = True
+            # 杀【整棵进程树】(P0·2026-07-28):claude.cmd 是 cmd 宿主壳,p.kill 只杀壳,
+            # 底下 node 孤儿继续跑=烧 token,且其握着 stdout 管道写端 → 上面的 for line 循环
+            # 永不 EOF=daemon 卡死。taskkill /T /F 连子进程一起收;失败再退回 p.kill 兜底。
             try:
-                p.kill()
+                subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
+                               capture_output=True, timeout=15, creationflags=_NO_WINDOW)
+            except Exception:
+                pass
+            try:
+                p.kill()   # 兜底(taskkill 不在/失败;树杀成功时这里已无进程,静默无害)
             except Exception:
                 pass
 

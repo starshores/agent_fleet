@@ -14,7 +14,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, cfg, _now
-from bus.io import _audit, _write_json
+from bus.io import _audit, _write_json, json_lock
 from bus.proc import _age_seconds
 from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents
 from bus.edge import _edge_holder
@@ -272,75 +272,76 @@ def _health_sweep_core(stuck_min=90, apply=False):
     """检测 + 处置。apply=False 只报(dry-run)。返回处置报告。去重:已在 todos.json 的 ref 不重投。"""
     a = _health_anomalies(stuck_min)
     tf = BUS / "todos.json"
-    try:
-        todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
-        if not isinstance(todos, list):
+    with json_lock(tf):   # 锁跨 RMW(P0):ask-user/answer/archive/WebUI 并发裸写会丢待办;异常扫描已在锁外完成
+        try:
+            todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
+            if not isinstance(todos, list):
+                todos = []
+        except Exception:
             todos = []
-    except Exception:
-        todos = []
-    seen = {t.get("ref") for t in todos if t.get("ref")}
-    rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0, "resolved_stale": 0, "skipped_empty": 0}
+        seen = {t.get("ref") for t in todos if t.get("ref")}
+        rep = {"orphans_rerouted": [], "orphans_to_todo": [], "stuck_to_todo": [], "skipped_dup": 0, "resolved_stale": 0, "skipped_empty": 0}
 
-    # 自愈反收:撤销【异常已解决】的健康待办(避免过时派发——任务早已处理,待办却还在池里被派发)。
-    # 仍存在的异常 id;不在其中=已解决→把对应 health:* 待办标"完成"(进历史,不再占活跃)。
-    if apply and todos:
-        live = {"health:stuck:" + s["id"] for s in a["stuck"]} | {"health:orphan:" + o["id"] for o in a["orphans"]}
-        for t in todos:
-            ref = t.get("ref") or ""
-            if ref.startswith("health:") and t.get("status") != "完成" and ref not in live:
-                t["status"] = "完成"; t["updated"] = _now()
-                t["detail"] = (t.get("detail", "") + " 〔bus健康:异常已解决,自动关闭〕").strip()
-                rep["resolved_stale"] += 1
+        # 自愈反收:撤销【异常已解决】的健康待办(避免过时派发——任务早已处理,待办却还在池里被派发)。
+        # 仍存在的异常 id;不在其中=已解决→把对应 health:* 待办标"完成"(进历史,不再占活跃)。
+        if apply and todos:
+            live = {"health:stuck:" + s["id"] for s in a["stuck"]} | {"health:orphan:" + o["id"] for o in a["orphans"]}
+            for t in todos:
+                ref = t.get("ref") or ""
+                if ref.startswith("health:") and t.get("status") != "完成" and ref not in live:
+                    t["status"] = "完成"; t["updated"] = _now()
+                    t["detail"] = (t.get("detail", "") + " 〔bus健康:异常已解决,自动关闭〕").strip()
+                    rep["resolved_stale"] += 1
 
-    def _add_todo(title, detail, ref):
-        if any(t.get("ref") == ref and t.get("status") != "完成" for t in todos):
-            rep["skipped_dup"] += 1     # 已有【未完成】的同 ref 待办才算重复;已完成的允许新异常重新开
-            return False
-        todos.append({"id": "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex()),
-                      "title": title, "detail": detail, "source": "确认·bus健康", "priority": "中",
-                      "status": "待办", "deadline": "", "created": _now(), "updated": _now(),
-                      "task_id": None, "dispatched_to": None, "confirm_from": "bus健康", "ref": ref})
-        seen.add(ref)
-        return True
+        def _add_todo(title, detail, ref):
+            if any(t.get("ref") == ref and t.get("status") != "完成" for t in todos):
+                rep["skipped_dup"] += 1     # 已有【未完成】的同 ref 待办才算重复;已完成的允许新异常重新开
+                return False
+            todos.append({"id": "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex()),
+                          "title": title, "detail": detail, "source": "确认·bus健康", "priority": "中",
+                          "status": "待办", "deadline": "", "created": _now(), "updated": _now(),
+                          "task_id": None, "dispatched_to": None, "confirm_from": "bus健康", "ref": ref})
+            seen.add(ref)
+            return True
 
-    for o in a["orphans"]:
-        if o["owner"]:                       # 可自动追回:重路由到推断的 owner/done
-            if apply:
-                obj = o["obj"]
-                obj["recovered_from_unknown"] = True
-                obj["recovered_orig_to"] = obj.get("to")
-                dest = BUS / o["owner"] / "done"
-                dest.mkdir(parents=True, exist_ok=True)
-                _write_json(dest / (o["id"] + ".json"), obj)
-                try:
-                    os.remove(o["path"])     # 移出 unknown/=天然去重,下轮不再检出
-                except Exception:
-                    pass
-                _audit("health_reroute_orphan", id=o["id"], frm=o["from"], owner=o["owner"])
-            rep["orphans_rerouted"].append({"id": o["id"], "from": o["from"], "owner": o["owner"]})
-        else:                                # 推不出 owner:需人定,投待办
-            _ob = o.get("obj") or {}
-            if not (o.get("title") or "").strip() and not (_ob.get("task") or "").strip():
-                rep["skipped_empty"] += 1    # 空指向:回执标题+正文皆空=无物可认领的死信,不投(否则冲爆待确认池)
-            else:
+        for o in a["orphans"]:
+            if o["owner"]:                       # 可自动追回:重路由到推断的 owner/done
                 if apply:
-                    _add_todo("孤儿回执需认领:from %s" % o["from"],
-                              "回执丢进 unknown/、原请求方不可考。标题「%s」。要不要指认 owner/重投?" % o["title"][:80],
-                              "health:orphan:" + o["id"])
-                rep["orphans_to_todo"].append({"id": o["id"], "from": o["from"]})
+                    obj = o["obj"]
+                    obj["recovered_from_unknown"] = True
+                    obj["recovered_orig_to"] = obj.get("to")
+                    dest = BUS / o["owner"] / "done"
+                    dest.mkdir(parents=True, exist_ok=True)
+                    _write_json(dest / (o["id"] + ".json"), obj)
+                    try:
+                        os.remove(o["path"])     # 移出 unknown/=天然去重,下轮不再检出
+                    except Exception:
+                        pass
+                    _audit("health_reroute_orphan", id=o["id"], frm=o["from"], owner=o["owner"])
+                rep["orphans_rerouted"].append({"id": o["id"], "from": o["from"], "owner": o["owner"]})
+            else:                                # 推不出 owner:需人定,投待办
+                _ob = o.get("obj") or {}
+                if not (o.get("title") or "").strip() and not (_ob.get("task") or "").strip():
+                    rep["skipped_empty"] += 1    # 空指向:回执标题+正文皆空=无物可认领的死信,不投(否则冲爆待确认池)
+                else:
+                    if apply:
+                        _add_todo("孤儿回执需认领:from %s" % o["from"],
+                                  "回执丢进 unknown/、原请求方不可考。标题「%s」。要不要指认 owner/重投?" % o["title"][:80],
+                                  "health:orphan:" + o["id"])
+                    rep["orphans_to_todo"].append({"id": o["id"], "from": o["from"]})
 
-    for s in a["stuck"]:                     # 卡死任务:需人定(重派/催/判死),不自动杀
-        if not (s.get("title") or "").strip() and not (s.get("body") or "").strip():
-            rep["skipped_empty"] += 1        # 空指向:任务标题+正文皆空=无物可判的噪声,不投
-            continue
-        if apply:
-            _add_todo("任务卡死:%s 的 processing 已 %dmin" % (s["role"], s["age_min"]),
-                      "任务 from=%s「%s」认领后久未完成,worker 可能死/卡。要不要重派/催/判死?" % (s["from"], s["title"][:80]),
-                      "health:stuck:" + s["id"])
-        rep["stuck_to_todo"].append({"role": s["role"], "id": s["id"], "age_min": s["age_min"]})
+        for s in a["stuck"]:                     # 卡死任务:需人定(重派/催/判死),不自动杀
+            if not (s.get("title") or "").strip() and not (s.get("body") or "").strip():
+                rep["skipped_empty"] += 1        # 空指向:任务标题+正文皆空=无物可判的噪声,不投
+                continue
+            if apply:
+                _add_todo("任务卡死:%s 的 processing 已 %dmin" % (s["role"], s["age_min"]),
+                          "任务 from=%s「%s」认领后久未完成,worker 可能死/卡。要不要重派/催/判死?" % (s["from"], s["title"][:80]),
+                          "health:stuck:" + s["id"])
+            rep["stuck_to_todo"].append({"role": s["role"], "id": s["id"], "age_min": s["age_min"]})
 
-    if apply and (rep["orphans_to_todo"] or rep["stuck_to_todo"] or rep["resolved_stale"]):
-        _write_json(tf, todos)               # 复用鲁棒落地(含 os.replace 重试)
+        if apply and (rep["orphans_to_todo"] or rep["stuck_to_todo"] or rep["resolved_stale"]):
+            _write_json(tf, todos)               # 复用鲁棒落地(含 os.replace 重试)
     rep["hygiene"] = _hygiene_core(apply=apply)   # 卫生代谢随巡检同跑(supervise 90s 周期自动带上)
     return rep
 

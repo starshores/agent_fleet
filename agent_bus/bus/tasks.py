@@ -10,7 +10,7 @@ cmd_answer 闭环回路(答复路由回提问 agent + 标完成)。落磁盘=防
 import json, os, sys, time
 
 from bus.config import BUS, _now
-from bus.io import _gen_id, _write_json, _audit
+from bus.io import _gen_id, _write_json, _audit, json_lock
 from bus.core import _warn_unreachable
 from bus.roster import _load_agents
 
@@ -99,32 +99,33 @@ def cmd_answer(args):
     答复【自动路由回提问的 agent】(confirm_from)让它接着干 + 标该待办完成。
     谁替用户跑:协调位(Master/MasterAgent)转达,或 WebUI 回复框(MasterUI 接 /api 调本命令)。"""
     tf = BUS / "todos.json"
-    try:
-        todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
-        if not isinstance(todos, list):
+    with json_lock(tf):   # 锁跨 RMW(P0):ask-user/answer/sweep/WebUI 四方并发裸写会互相覆盖丢待办
+        try:
+            todos = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else []
+            if not isinstance(todos, list):
+                todos = []
+        except Exception:
             todos = []
-    except Exception:
-        todos = []
-    item = next((t for t in todos if t.get("id") == args.todo), None)
-    if not item:
-        print(json.dumps({"error": "无此待办 id: %s" % args.todo}, ensure_ascii=False)); return
-    target = item.get("confirm_from")
-    if not target or target in ("bus健康", "unknown"):
-        print(json.dumps({"error": "该待办无可回的提问方(confirm_from=%s),无处回路" % target}, ensure_ascii=False)); return
-    frm = args.frm or "用户"
-    _warn_unreachable(target)   # 提问方不在岗就告警;答复仍写进它 inbox,它上线即见
-    tid = _gen_id(target)
-    ref = item.get("ref")
-    task = {"id": tid, "from": frm, "to": target,
-            "title": "[待办答复] " + (item.get("title") or "")[:60],
-            "task": "用户对你提问《%s》的答复:%s%s" % (
-                item.get("title") or "", args.reply, ("\n(原任务 ref: %s)" % ref) if ref else ""),
-            "created": _now(), "status": "pending", "answer_of": item.get("id"), "ref": ref}
-    _write_json(BUS / target / "inbox" / (tid + ".json"), task)
-    _audit("answer", todo=args.todo, to=target, frm=frm)
-    item["status"] = "完成"; item["updated"] = _now()
-    item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
-    _write_json(tf, todos)
+        item = next((t for t in todos if t.get("id") == args.todo), None)
+        if not item:
+            print(json.dumps({"error": "无此待办 id: %s" % args.todo}, ensure_ascii=False)); return
+        target = item.get("confirm_from")
+        if not target or target in ("bus健康", "unknown"):
+            print(json.dumps({"error": "该待办无可回的提问方(confirm_from=%s),无处回路" % target}, ensure_ascii=False)); return
+        frm = args.frm or "用户"
+        _warn_unreachable(target)   # 提问方不在岗就告警;答复仍写进它 inbox,它上线即见
+        tid = _gen_id(target)
+        ref = item.get("ref")
+        task = {"id": tid, "from": frm, "to": target,
+                "title": "[待办答复] " + (item.get("title") or "")[:60],
+                "task": "用户对你提问《%s》的答复:%s%s" % (
+                    item.get("title") or "", args.reply, ("\n(原任务 ref: %s)" % ref) if ref else ""),
+                "created": _now(), "status": "pending", "answer_of": item.get("id"), "ref": ref}
+        _write_json(BUS / target / "inbox" / (tid + ".json"), task)
+        _audit("answer", todo=args.todo, to=target, frm=frm)
+        item["status"] = "完成"; item["updated"] = _now()
+        item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
+        _write_json(tf, todos)
     print("答复已路由给 %s(任务 %s),待办 %s 标完成。" % (target, tid, args.todo))
 
 
@@ -155,12 +156,6 @@ def cmd_ask_user(args):
               "  若你确是 bus 角色:先 `agentbus.py hello --role <你>` 注册后再 ask-user。" % frm)
         sys.exit(2)
     f = BUS / "todos.json"
-    try:
-        items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
-        if not isinstance(items, list):
-            items = []
-    except Exception:
-        items = []
     tid = "t-%d-%s" % (int(time.time() * 1000), os.urandom(2).hex())
     prio = args.priority if args.priority in ("高", "中", "低") else "中"
     item = {
@@ -175,10 +170,15 @@ def cmd_ask_user(args):
         "task_id": None, "dispatched_to": None,
         "confirm_from": frm, "ref": args.ref or None,
     }
-    items.append(item)
-    tmp = f.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, f)
+    with json_lock(f):   # 锁跨 RMW(P0)+ _write_json 原子落地(替换原手写 tmp+replace)
+        try:
+            items = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+            if not isinstance(items, list):
+                items = []
+        except Exception:
+            items = []
+        items.append(item)
+        _write_json(f, items)
     _audit("ask_user", id=tid, frm=frm, title=item["title"][:40])
     print("已投入待办池(待用户确认):《%s》[%s] from %s" % (item["title"], tid, frm))
 
@@ -202,40 +202,41 @@ def _archive_done_todos(older_than_min=0, apply=False):
     older_than_min>0 只归档 updated 早于该阈值的(近期完成态留给用户过目);0=全部完成态。
     先落 archive 再瘦 todos(原子写 + 备份 todos.json.pre-archive.bak)。返回处置报告。只动完成态·不碰活的。"""
     tf = BUS / "todos.json"
-    try:
-        todos = json.loads(tf.read_text(encoding="utf-8"))
-        if not isinstance(todos, list):
-            todos = []
-    except Exception:
-        return {"before": 0, "archived": 0, "after": 0, "dry": not apply, "err": "todos.json 读失败"}
-    now = time.time()
-
-    def _archivable(t):
-        if t.get("status") not in _DONE_STATUSES:
-            return False
-        if older_than_min <= 0:
-            return True
-        age = _todo_age_min(t.get("updated") or t.get("created") or "", now)
-        return age is None or age >= older_than_min
-
-    done = [t for t in todos if _archivable(t)]
-    kept = [t for t in todos if not _archivable(t)]
-    rep = {"before": len(todos), "archived": len(done), "after": len(kept), "dry": not apply}
-    if apply and done:
-        af = BUS / "todos_archive.json"
+    with json_lock(tf):   # 锁跨 RMW(P0):归档瘦身与 ask-user/answer/sweep 并发时不丢新投待办
         try:
-            arch = json.loads(af.read_text(encoding="utf-8")) if af.exists() else []
-            if not isinstance(arch, list):
-                arch = []
+            todos = json.loads(tf.read_text(encoding="utf-8"))
+            if not isinstance(todos, list):
+                todos = []
         except Exception:
-            arch = []
-        arch.extend(done)
-        (BUS / "todos.json.pre-archive.bak").write_text(
-            json.dumps(todos, ensure_ascii=False, indent=1), encoding="utf-8")
-        _write_json(af, arch)   # 先落归档(留痕)
-        _write_json(tf, kept)   # 再瘦待办池
-        _audit("todos_archive", archived=len(done), after=len(kept))
-    return rep
+            return {"before": 0, "archived": 0, "after": 0, "dry": not apply, "err": "todos.json 读失败"}
+        now = time.time()
+
+        def _archivable(t):
+            if t.get("status") not in _DONE_STATUSES:
+                return False
+            if older_than_min <= 0:
+                return True
+            age = _todo_age_min(t.get("updated") or t.get("created") or "", now)
+            return age is None or age >= older_than_min
+
+        done = [t for t in todos if _archivable(t)]
+        kept = [t for t in todos if not _archivable(t)]
+        rep = {"before": len(todos), "archived": len(done), "after": len(kept), "dry": not apply}
+        if apply and done:
+            af = BUS / "todos_archive.json"
+            try:
+                arch = json.loads(af.read_text(encoding="utf-8")) if af.exists() else []
+                if not isinstance(arch, list):
+                    arch = []
+            except Exception:
+                arch = []
+            arch.extend(done)
+            (BUS / "todos.json.pre-archive.bak").write_text(
+                json.dumps(todos, ensure_ascii=False, indent=1), encoding="utf-8")
+            _write_json(af, arch)   # 先落归档(留痕)
+            _write_json(tf, kept)   # 再瘦待办池
+            _audit("todos_archive", archived=len(done), after=len(kept))
+        return rep
 
 
 def cmd_todos_archive(args):

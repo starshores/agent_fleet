@@ -11,7 +11,7 @@ import json, os
 
 from bus.config import BUS, _now
 from bus.io import _write_json, _audit
-from bus.roster import _load_agents, _save_agents, _retired_roles, _is_test_role
+from bus.roster import _load_agents, _save_agents, update_agents, _retired_roles, _is_test_role
 from bus.selfwake import _self_wake_state, _wait_proc_roles
 
 
@@ -49,9 +49,8 @@ def cmd_retire(args):
     roster = _load_retired_roster()
     roster.append(entry)
     _write_json(_retired_roster_path(), roster)
-    # 番号下掉:从 agents.json 移除
-    if role in a:
-        del a[role]; _save_agents(a)
+    # 番号下掉:从 agents.json 移除(锁跨 RMW·P0:防与并发 hello/register 互相覆盖)
+    update_agents(lambda ag: ag.pop(role, None))
     # mailbox 移 _retired/ 留痕(_retired 前缀→_list_roles 不扫,从活跃视图消失)
     src = BUS / role
     moved = False
@@ -89,10 +88,10 @@ def cmd_revive(args):
     if idx is None:
         print(json.dumps({"error": "档案馆无 %s 的 archived 记录" % role}, ensure_ascii=False)); return
     rec = roster[idx]
-    a = _load_agents()
-    a[role] = {"registered": _now(), "desc": rec.get("desc", ""), "caps": rec.get("caps", []),
-               "revived_from_retired": rec.get("retired")}
-    _save_agents(a)
+    def _mut(ag):
+        ag[role] = {"registered": _now(), "desc": rec.get("desc", ""), "caps": rec.get("caps", []),
+                    "revived_from_retired": rec.get("retired")}
+    update_agents(_mut)   # 锁跨 RMW(P0)
     # mailbox 移回
     src = BUS / "_retired" / role
     if src.is_dir():
@@ -101,7 +100,7 @@ def cmd_revive(args):
     rec["status"] = "revived"; rec["revived_at"] = _now()
     _write_json(_retired_roster_path(), roster)
     _audit("revive", role=role)
-    print(json.dumps({"revived": role, "回活跃在册": role in a, "状态": "revived"}, ensure_ascii=False, indent=1))
+    print(json.dumps({"revived": role, "回活跃在册": role in _load_agents(), "状态": "revived"}, ensure_ascii=False, indent=1))
 
 def cmd_retired(args):
     """列退役档案馆(花名册):番号/退役时间/接替者/原因/会话ids/贡献记忆/状态。"""

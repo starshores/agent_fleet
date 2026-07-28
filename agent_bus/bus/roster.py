@@ -5,6 +5,7 @@
 """
 import json
 from bus.config import BUS
+from bus.io import _write_json, json_lock
 
 # 人值守角色:它们的回填才值得弹给人(toast 分级 + 可达校验豁免用)。角色分类,归 roster。
 HUMAN_ATTENDED = ("Master", "MasterAgent")
@@ -25,8 +26,21 @@ def _load_agents():
 
 
 def _save_agents(a):
+    """原子写(P0·2026-07-28:原 write_text 直写,崩溃截断=全花名册消失)。
+    做【读-改-写】的调用方应走 update_agents(锁跨 RMW),别 load→改→本函数裸写。"""
     BUS.mkdir(parents=True, exist_ok=True)
-    _agents_file().write_text(json.dumps(a, ensure_ascii=False, indent=1), encoding="utf-8")
+    _write_json(_agents_file(), a)
+
+
+def update_agents(mutator):
+    """agents.json 并发安全 RMW(P0·2026-07-28:register/hello/retire/revive/train-done
+    多方并发 load→改→save 会互相覆盖丢更新)。json_lock 跨整个读-改-写持锁;
+    mutator(a) 就地改 dict,其返回值透传给调用方。"""
+    with json_lock(_agents_file()):
+        a = _load_agents()
+        r = mutator(a)
+        _save_agents(a)
+        return r
 
 
 def _role_dir(role):
