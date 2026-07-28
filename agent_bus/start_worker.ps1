@@ -29,6 +29,18 @@ if (Test-Path $pres) {
   } catch {}
 }
 
+# P1 (2026-07-28): use config.json python_bin (env with watchdog/psutil), not bare PATH "python".
+# Bare python may lack watchdog -> daemon dies silently at import, looks "started" here but never serves.
+$python = "python"
+$cfgPath = Join-Path $bus "config.json"
+if (Test-Path $cfgPath) {
+  try {
+    $cfg = Get-Content -Raw -Encoding UTF8 $cfgPath | ConvertFrom-Json
+    if ($cfg.python_bin) { $python = $cfg.python_bin }
+  } catch {}
+}
+if ($env:AGENTBUS_PYTHON_BIN) { $python = $env:AGENTBUS_PYTHON_BIN }
+
 $argList = @($daemon, "--role", $Role, "--cwd", $Cwd, "--wait-timeout", $WaitTimeout)
-$proc = Start-Process -FilePath "python" -ArgumentList $argList -WindowStyle Hidden -PassThru
+$proc = Start-Process -FilePath $python -ArgumentList $argList -WindowStyle Hidden -PassThru
 Write-Output "STARTED worker daemon: role=$Role pid=$($proc.Id) (hidden; log: $bus\$Role\daemon.log)"

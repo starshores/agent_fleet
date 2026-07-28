@@ -19,6 +19,13 @@ def cmd_dispatch(args):
     与 send(投进某 role 的队列等它领)不同 —— dispatch 立刻 detached 起一个一次性执行体(claude -p),
     跑完把结果回填到派发方 <from>/done/<id>(用 `replies --role <from>` 收)。失败就再 dispatch 一个。"""
     frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+    # P1 审批闸(2026-07-28):dispatch 起的一次性 agent 以 --dangerously-skip-permissions 直跑、
+    # 无人审——高风险任务不得走这条快跑面(send/wait 侧有 requires_approval 闸,dispatch 原是空洞)。
+    if getattr(args, "requires_approval", False):
+        print(json.dumps({"error": "requires_approval 高风险任务不走 dispatch(一次性 agent 无人审直跑):"
+                                   "请改 `send --to <role> --requires-approval`,由人工值守 tab "
+                                   "`wait --include-approval` 领取执行。"}, ensure_ascii=False))
+        return
     tid = _gen_id("adhoc")
     cwd = args.cwd or cfg("default_worker_cwd")
     rec = {

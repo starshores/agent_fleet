@@ -47,18 +47,26 @@ def _warn_unreachable(role):
 
 
 
-def cmd_send(args):
-    role = args.to
-    _role_dir(role)
-    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
+def _deliver(to, frm, task, audit_event="send"):
+    """统一投递契约(P1·2026-07-28):目录保障 + from=unknown 警示 + 可达告警 + 培训闸软警示
+    + 写 inbox + 审计。send/request 共用——request 原来径写 inbox 绕过全部四层
+    (events.jsonl 里不可见、目标掉线/待训无警示、from=unknown 静默丢回执)。task 需含 id/title。"""
+    _role_dir(to)
     if frm == "unknown":
         sys.stderr.write(
             "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
             "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
-    _warn_unreachable(role)   # 校验目标在岗(治静默漏接:派了≠接了)
-    if (_load_agents().get(role) or {}).get("trained") is False:   # 培训闸·软警示(新角色未结业)
+    _warn_unreachable(to)   # 校验目标在岗(治静默漏接:派了≠接了)
+    if (_load_agents().get(to) or {}).get("trained") is False:   # 培训闸·软警示(新角色未结业)
         sys.stderr.write("⚠ 目标 %s 处于🎓待训期(新注册·培训师未 train-done):简单明确活可派;"
-                         "运维/写库/改基建类复杂活请等结业,或在任务里写明验证清单。(仍投递)\n" % role)
+                         "运维/写库/改基建类复杂活请等结业,或在任务里写明验证清单。(仍投递)\n" % to)
+    _write_json(BUS / to / "inbox" / (task["id"] + ".json"), task)
+    _audit(audit_event, id=task["id"], frm=frm, to=to, title=task.get("title") or "")
+
+
+def cmd_send(args):
+    role = args.to
+    frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
     tid = _gen_id(role)
     task = {
         "id": tid, "from": frm, "to": role,
@@ -67,8 +75,7 @@ def cmd_send(args):
     }
     if args.requires_approval:
         task["requires_approval"] = True   # 高风险:daemon 不执行,只交互 tab/人工批准后做
-    _write_json(BUS / role / "inbox" / (tid + ".json"), task)
-    _audit("send", id=tid, frm=frm, to=role, title=args.title or "")
+    _deliver(role, frm, task)
     print(tid)
 
 
@@ -309,7 +316,6 @@ def cmd_request(args):
     chain = [c for c in (args.chain.split(",") if args.chain else []) if c]
     if args.to in chain:                     # 防护2:目标已在调用链上 → 环(A→B→A、A→B→C→B 都挡)
         print(json.dumps({"error": "cycle detected: %s already in chain %s" % (args.to, chain)}, ensure_ascii=False)); return
-    _role_dir(args.to)
     tid = _gen_id(args.to)
     task = {
         "id": tid, "from": frm, "to": args.to,
@@ -317,22 +323,21 @@ def cmd_request(args):
         "created": _now(), "status": "pending",
         "reply_mode": "sync", "chain": chain + [frm],   # 把自己加进 chain 往下传
     }
-    _write_json(BUS / args.to / "inbox" / (tid + ".json"), task)
+    _deliver(args.to, frm, task, audit_event="request")   # 走统一投递契约(P1:原径写绕过审计/告警/培训闸)
     # 防护3:阻塞等应答,强制有限超时
     rep = _wait_for_reply(frm, tid, args.timeout)
     print(json.dumps(rep if rep is not None else {"timeout": True, "id": tid, "to": args.to}, ensure_ascii=False))
 
 
 def _find_task(role, tid):
-    for sub in ("processing", "inbox"):
+    """按 id 找任务文件。P1(2026-07-28):①禁前缀匹配——短 id startswith 会错配同前缀
+    任务(_gen_id 时间戳开头,同毫秒/复制粘贴截断都可能撞),回执路由给错人;只认精确 id。
+    ②查找含 archive/——done 崩在归档后回执前(或回执补发)时,任务已在 archive,
+    仍能找回原 from 正确路由,不再落 unknown。"""
+    for sub in ("processing", "inbox", "archive"):
         p = BUS / role / sub / (tid + ".json")
         if p.exists():
             return p
-    # 容错:扫一遍
-    for sub in ("processing", "inbox"):
-        for p in (BUS / role / sub).glob("*.json"):
-            if p.stem == tid or p.stem.startswith(tid):
-                return p
     return None
 
 
@@ -372,7 +377,7 @@ def cmd_done(args):
     }
     _role_dir(sender)
     _write_json(BUS / sender / "done" / (real_id + ".json"), result)
-    if p:
+    if p and p.parent.name != "archive":   # 已在 archive(重复 done/回执补发)→ 只发回执不再搬运(P1)
         arch = BUS / role / "archive" / p.name
         try:
             obj["status"] = args.status; obj["result"] = args.result; obj["finished"] = _now()

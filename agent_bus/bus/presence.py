@@ -11,57 +11,67 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, _now
-from bus.io import _write_json
+from bus.io import _write_json, json_lock
 from bus.proc import _claude_ancestor, _age_seconds, _alive_claude_pids
 
 
 def _touch_presence(role, mode, extra=None):
-    """写/更新 <role>/presence.json:声明身份 + 心跳(last_seen)。"""
+    """写/更新 <role>/presence.json:声明身份 + 心跳(last_seen)。
+    P1(presence 多写者·2026-07-28):①json_lock 跨 RMW——心跳(daemon 线程)与
+    _set_current_task(claim/done)并发整写会互相丢字段;②心跳继承 current_task/current_title
+    ——原实现整写抹掉、靠"领取与完成之间不发心跳"的时序假设,daemon 模式该假设不成立。"""
     pf = BUS / role / "presence.json"
-    prev = {}
-    if pf.exists():
-        try:
-            prev = json.loads(pf.read_text(encoding="utf-8"))
-        except Exception:
+    claude_pid, cwd, chain = _claude_ancestor()   # 进程探查在锁外(慢:psutil 走祖先链)
+    try:
+        with json_lock(pf, tries=50):
             prev = {}
-    claude_pid, cwd, chain = _claude_ancestor()
-    pres = {
-        "role": role,
-        "claude_pid": claude_pid,
-        "shell_pid": os.getpid(),
-        "cwd": cwd,
-        "host": socket.gethostname(),
-        "started": prev.get("started") or _now(),
-        "last_seen": _now(),
-        "mode": mode,
-        # 权威 session→role 绑定:交互 tab 的 hello/心跳子进程继承 CLAUDE_CODE_SESSION_ID
-        # (= 会话 jsonl id),据此 WebUI 看板精确对齐、不再 regex 猜 role。daemon 无此 env→None。
-        "session_id": os.environ.get("CLAUDE_CODE_SESSION_ID") or prev.get("session_id"),
-    }
-    if extra:
-        pres.update(extra)
-    _write_json(pf, pres)
+            if pf.exists():
+                try:
+                    prev = json.loads(pf.read_text(encoding="utf-8"))
+                except Exception:
+                    prev = {}
+            pres = {
+                "role": role,
+                "claude_pid": claude_pid,
+                "shell_pid": os.getpid(),
+                "cwd": cwd,
+                "host": socket.gethostname(),
+                "started": prev.get("started") or _now(),
+                "last_seen": _now(),
+                "mode": mode,
+                # 权威 session→role 绑定:交互 tab 的 hello/心跳子进程继承 CLAUDE_CODE_SESSION_ID
+                # (= 会话 jsonl id),据此 WebUI 看板精确对齐、不再 regex 猜 role。daemon 无此 env→None。
+                "session_id": os.environ.get("CLAUDE_CODE_SESSION_ID") or prev.get("session_id"),
+            }
+            for k in ("current_task", "current_title"):   # 心跳不丢"当前在做"(claim 设/done 清,只归它俩管)
+                if k in prev:
+                    pres[k] = prev[k]
+            if extra:
+                pres.update(extra)
+            _write_json(pf, pres)
+    except TimeoutError:
+        pass   # 抢不到锁(极端)→ 本次心跳丢弃,下次补;绝不裸写覆盖
 
 
 def _set_current_task(role, tid, title):
     """把'当前在做的任务'merge 进 presence(A3:让 who/WebUI 显示 worker/tab 在忙什么,
-    而非看着像空闲)。claim 时设、done 时清(tid=None)。merge 写,保留 presence 其它字段。
-    注:_touch_presence 心跳不保留该字段——但领取与完成之间不发心跳,故 current_task 在执行期间稳定可见。"""
+    而非看着像空闲)。claim 时设、done 时清(tid=None)。锁跨 RMW(P1),保留 presence 其它字段。"""
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return
     try:
-        pr = json.loads(pf.read_text(encoding="utf-8"))
-    except Exception:
-        return
-    if tid:
-        pr["current_task"] = tid
-        pr["current_title"] = (title or "")[:80]
-    else:
-        pr.pop("current_task", None)
-        pr.pop("current_title", None)
-    try:
-        _write_json(pf, pr)
+        with json_lock(pf, tries=50):
+            try:
+                pr = json.loads(pf.read_text(encoding="utf-8"))
+            except Exception:
+                return
+            if tid:
+                pr["current_task"] = tid
+                pr["current_title"] = (title or "")[:80]
+            else:
+                pr.pop("current_task", None)
+                pr.pop("current_title", None)
+            _write_json(pf, pr)
     except Exception:
         pass
 

@@ -4,11 +4,26 @@
 注:更上层的可达校验 _warn_unreachable 依赖 _self_wake_state,仍留在 agentbus.py,不在此。
 """
 import json
-from bus.config import BUS
+from pathlib import Path
+from bus.config import BUS, cfg
 from bus.io import _write_json, json_lock
 
+
+def _policy():
+    """角色策略注册表(P1·2026-07-28 出代码):role_profiles.json meta.policy——
+    human_attended / mgmt_owner / biz_default_owner 原散在多处硬编码,角色增减要改代码且守卫可被伪造名绕过。
+    读不到返 {}(调用方用降级默认兜底,绝不抛)。路径经 cfg agent_fleet_home,回退按物理位推
+    (resolve 穿 junction 落真实家,与 identity._role_profile 同款)。"""
+    try:
+        home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
+        return json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8")).get("meta", {}).get("policy") or {}
+    except Exception:
+        return {}
+
+
 # 人值守角色:它们的回填才值得弹给人(toast 分级 + 可达校验豁免用)。角色分类,归 roster。
-HUMAN_ATTENDED = ("Master", "MasterAgent")
+# 单一源=role_profiles.json meta.policy.human_attended;硬编码仅为注册表不可读时的降级默认。
+HUMAN_ATTENDED = tuple(_policy().get("human_attended") or ("Master", "MasterAgent"))
 
 
 def _agents_file():

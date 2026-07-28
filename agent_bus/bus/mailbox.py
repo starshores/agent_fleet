@@ -7,7 +7,7 @@
 import os, json, time
 
 from bus.config import BUS, _now
-from bus.io import _write_json, _audit
+from bus.io import _write_json, _audit, _steal_stale_lock
 from bus.presence import _set_current_task
 from bus.proc import _claude_ancestor
 
@@ -31,7 +31,7 @@ def _claim(role, taskpath, locked=False):
             except FileExistsError:
                 try:
                     if attempt == 0 and time.time() - lock.stat().st_mtime > 60:
-                        lock.unlink()      # 孤儿锁(持有者崩了)→ 强清重抢一次
+                        _steal_stale_lock(lock)   # 孤儿锁 → rename 原子夺取(ABA 防·P1)后重抢一次
                         continue
                 except OSError:
                     pass

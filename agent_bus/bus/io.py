@@ -34,6 +34,23 @@ def _oldest(folder):
     return files[0] if files else None
 
 
+def _steal_stale_lock(lock):
+    """原子夺取孤儿锁(P1·锁夺取 ABA 修):两进程同判 stale 各自 unlink 时,后 unlink 的
+    可能删掉的是【对方刚建的新锁】→ 双持锁。改为 rename 改名占有——os.replace 对同一源
+    恒一胜:胜者(rename 成功)删除改名件后去重抢,败者(源已没)直接去重抢,绝无双清。
+    返回 True=本进程夺取成功(可立刻重试 O_EXCL),False=别人抢先(同样应重试,别再 unlink)。"""
+    tomb = lock.with_name(lock.name + ".steal-%d-%s" % (os.getpid(), os.urandom(2).hex()))
+    try:
+        os.replace(str(lock), str(tomb))
+    except OSError:
+        return False          # 锁已被别人夺走/已释放——都不该再动
+    try:
+        tomb.unlink()
+    except Exception:
+        pass
+    return True
+
+
 @contextmanager
 def json_lock(path, tries=100, sleep=0.03, stale_s=60):
     """共享 JSON 文件的 RMW 独占锁(<path>.lock·O_EXCL 原子创建=恒一胜)。
@@ -56,8 +73,8 @@ def json_lock(path, tries=100, sleep=0.03, stale_s=60):
             break
         except FileExistsError:
             try:
-                if time.time() - lock.stat().st_mtime > stale_s:   # 孤儿锁(持有者崩了)→ 强清重抢
-                    lock.unlink()
+                if time.time() - lock.stat().st_mtime > stale_s:   # 孤儿锁(持有者崩了)→ 原子夺取重抢
+                    _steal_stale_lock(lock)   # rename 占有恒一胜(ABA 防:绝不 unlink 到别人新锁)
                     continue
             except OSError:
                 continue          # 锁刚被释放/瞬时占用 → 立刻重抢
@@ -81,12 +98,18 @@ def json_lock(path, tries=100, sleep=0.03, stale_s=60):
 
 def _audit(event, **fields):
     """append-only 审计日志:send/claim/done 各记一行到 BUS/events.jsonl。
-    全链路可追溯(replies 被 clear 后仍留痕);best-effort,绝不影响主流程。"""
+    全链路可追溯(replies 被 clear 后仍留痕);best-effort,绝不影响主流程。
+    P1(2026-07-28):改 O_APPEND 单次 os.write(与 record_metric 同款)——buffered open("a")
+    并发多进程可能拆行互相穿插,审计行一坏整条不可解析。"""
     try:
         rec = {"ts": _now(), "event": event}
         rec.update(fields)
-        with open(BUS / "events.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        line = (json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8")
+        fd = os.open(str(BUS / "events.jsonl"), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
     except Exception:
         pass
 

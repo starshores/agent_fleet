@@ -10,7 +10,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, METRICS, cfg, _now
-from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics
+from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics, _steal_stale_lock
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
 from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds
@@ -199,11 +199,8 @@ def _claim_group_task(role, g, include_approval=False):
             fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             break
         except FileExistsError:
-            if attempt == 0 and _group_lock_stale(lock):   # 孤儿锁 → 强清重抢一次
-                try:
-                    lock.unlink()
-                except Exception:
-                    pass
+            if attempt == 0 and _group_lock_stale(lock):   # 孤儿锁 → 原子夺取重抢一次(ABA 防·P1:rename 占有恒一胜,绝不 unlink 到别人新锁)
+                _steal_stale_lock(lock)
                 continue
             return None          # 真被别的成员独占(锁新鲜)→ 干净落空
         except OSError:
@@ -287,8 +284,7 @@ def _acquire_route_lock(g, tries=100, sleep=0.03):
             return fd, lock
         except FileExistsError:
             if _group_lock_stale(lock):
-                try: lock.unlink()
-                except Exception: pass
+                _steal_stale_lock(lock)   # ABA 防(P1):rename 原子夺取,绝不 unlink 到别人新锁
                 continue
             time.sleep(sleep)
         except OSError:

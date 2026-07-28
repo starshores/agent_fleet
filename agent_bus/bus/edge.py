@@ -14,7 +14,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, _now
-from bus.io import _audit
+from bus.io import _audit, _steal_stale_lock
 from bus.proc import _age_seconds
 from bus.mailbox import _resolve_self_role
 
@@ -99,10 +99,9 @@ def cmd_edge_acquire(args):
         except FileExistsError:
             holder = _edge_holder()
             if _edge_stale(holder, args.ttl):
-                try: lp.unlink()
-                except Exception: pass
-                _audit("edge_steal", who=who, victim=(holder or {}).get("who"))
-                continue  # 抢占陈旧锁后重试
+                if _steal_stale_lock(lp):   # ABA 防(P1):rename 原子夺取恒一胜,绝不 unlink 到别人新锁
+                    _audit("edge_steal", who=who, victim=(holder or {}).get("who"))
+                continue  # 夺取成败都重试 O_EXCL(败=别人抢先,正常竞争)
             if time.time() >= deadline:
                 print(json.dumps({"acquired": False, "timeout": True,
                                   "holder": (holder or {}).get("who")}, ensure_ascii=False)); return

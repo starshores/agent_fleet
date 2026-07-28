@@ -16,7 +16,7 @@ except Exception:
 from bus.config import BUS, cfg, _now
 from bus.io import _audit, _write_json, json_lock
 from bus.proc import _age_seconds
-from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents
+from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents, _policy
 from bus.edge import _edge_holder
 from bus.presence import _owner_live
 from bus.selfwake import _is_parked, _self_wake_state, _wait_proc_roles
@@ -50,20 +50,38 @@ def cmd_reap(args):
                 continue
             rq = int(obj.get("requeue_count", 0)) + 1
             tid = obj.get("id", p.stem)
+            # P1(done/reap 崩溃窗口):done 先写回执后归档,崩在中间会留 processing 残骸——
+            # 回执已在请求方 done/ = 任务其实做完了,归档补齐即可,绝不能 requeue 重跑。
+            sender = obj.get("from")
+            if sender and (BUS / sender / "done" / (tid + ".json")).exists():
+                if not args.dry_run:
+                    obj["reap_note"] = "receipt-exists→archived(done崩在归档前的残骸补齐)"
+                    try:
+                        _write_json(p, obj)
+                        os.replace(str(p), str(BUS / role / "archive" / p.name))
+                    except Exception:
+                        pass
+                actions.append(("回执已在→归档免重跑", role, tid)); continue
             if rq > args.max_requeue:
                 if not args.dry_run:
                     failed = BUS / role / "failed"; failed.mkdir(parents=True, exist_ok=True)
                     obj["status"] = "failed_max_requeue"; obj["reaped"] = _now()
-                    _write_json(failed / p.name, obj)
-                    try: p.unlink()
-                    except Exception: pass
+                    # 先原地改写再原子搬运(P1:原"写目标+删源"两步,崩在中间=双份双跑)
+                    try:
+                        _write_json(p, obj)
+                        os.replace(str(p), str(failed / p.name))
+                    except Exception:
+                        pass
                 actions.append(("毒任务→failed(超%d次)" % args.max_requeue, role, tid)); continue
             if not args.dry_run:
                 obj["status"] = "pending"; obj["requeue_count"] = rq
                 obj.pop("claimed", None); obj["requeued_at"] = _now()
-                _write_json(BUS / role / "inbox" / p.name, obj)
-                try: p.unlink()
-                except Exception: pass
+                # 同上:先原地改写、再 os.replace 原子搬回 inbox——任一时刻文件只在一处,绝无双份
+                try:
+                    _write_json(p, obj)
+                    os.replace(str(p), str(BUS / role / "inbox" / p.name))
+                except Exception:
+                    pass
             why = "owner存活但超ttl卡死" if live else "owner进程已退"
             actions.append(("退回inbox(第%d次,%s,age%ds)" % (rq, why, age), role, tid))
     if not actions:
@@ -207,7 +225,10 @@ def cmd_webui_guard(args):
 # ── 系统级 bus 健康巡检(push 补 pull 盲区:丢失/卡死的消息没有 agent 会自报)──────────
 # Master 定调(2026-06-25):能自动追回的先自动修(孤儿回执→推断 owner 自动重路由),
 # 修不了/需人定的才投🙋待办池,去重、别让巡检变噪音源。
-_MGMT_OWNER = {"MasterUI": "MasterAgent", "培训师": "MasterAgent"}
+# 单一源=role_profiles.json meta.policy(P1·2026-07-28 出代码进注册表);硬编码仅为注册表不可读时的降级默认。
+_pol = _policy()
+_MGMT_OWNER = dict(_pol.get("mgmt_owner") or {"MasterUI": "MasterAgent", "培训师": "MasterAgent"})
+_BIZ_OWNER = _pol.get("biz_default_owner") or "Master"
 # 卡死硬上限(分):owner 进程还活着但任务真卡这么久也兜底判卡死。远大于 daemon claude -p 的
 # 3600s 超时与正常长任务,避免误伤;跨夜掉自醒(进程活·心跳陈)不会触达这里→不再误判卡死。
 _STUCK_TTL_MIN = 1440
@@ -221,7 +242,7 @@ def _infer_orphan_owner(reply):
     if frm in _MGMT_OWNER:
         return _MGMT_OWNER[frm]
     if frm in _load_agents():
-        return "Master"
+        return _BIZ_OWNER
     return None
 
 def _health_anomalies(stuck_min=90):
