@@ -44,7 +44,10 @@ class Handler(BaseHTTPRequestHandler):
             for k, v in extra.items():
                 self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.wfile.write(data)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+            pass
 
     def _body_json(self):
         n = int(self.headers.get("Content-Length", 0) or 0)

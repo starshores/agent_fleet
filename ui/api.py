@@ -20,6 +20,7 @@ from pathlib import Path
 
 from common import ABDIR, ab, BUS  # noqa: F401
 from common import _roles, _count, _read_tasks, _safe_cwd, _turn_state, _vclass_of  # noqa: F401
+from bus.io import json_lock  # noqa: F401
 
 
 def compute_fleet():
@@ -160,8 +161,8 @@ def _refresh_fleet():
         _fleet_refreshing["v"] = False
 
 
-def compute_fleet_cached(force=False):
-    # 请求线程【只读缓存,永不触发刷新】——连 force 也不触发。
+def compute_fleet_cached():
+    # 请求线程【只读缓存,永不触发刷新】。
     # 关键教训:即便刷新走子进程,发起刷新的【那条请求线程】后续在 build_state 里的磁盘读
     # 会和子进程启动(import server + 2s 扫描的 CPU)抢资源 → 那一条冷请求被拖到 ~1.7s。
     # 故保活完全交给 _fleet_refresher 后台线程(它阻塞 ~4s 不影响任何请求);请求路径零扫描、零 spawn。
@@ -363,70 +364,6 @@ def _ev_epoch(ts):
 
 def _is_test_role(r):
     return (not r) or r.startswith("__") or r.startswith("zz") or r in ("?",)
-
-
-def build_activity():
-    """从 events.jsonl 重建【任务活动历史】(全程,无 token/成本)。
-    token/成本只有埋点后的前向真实数据,历史无从恢复,故活动单列、不混入消耗 BI。
-    claim→done 按 id 配对算时长;过滤 __*/zz* 等测试角色。"""
-    ev = BUS / "events.jsonl"
-    if not ev.exists():
-        return {"roles": [], "total": 0, "span": None}
-    try:
-        lines = ev.read_text(encoding="utf-8", errors="replace").splitlines()
-    except Exception:
-        return {"roles": [], "total": 0, "span": None}
-    recs = []
-    for ln in lines:
-        ln = ln.strip()
-        if ln:
-            try:
-                recs.append(json.loads(ln))
-            except Exception:
-                pass
-    claim_ts = {}
-    for r in recs:
-        if r.get("event") == "claim" and r.get("id"):
-            claim_ts[r["id"]] = _ev_epoch(r.get("ts", ""))
-    now = time.time()
-    h24 = now - 86400
-    per = {}
-    for r in recs:
-        if r.get("event") not in ("done", "dispatch_done"):
-            continue
-        role = r.get("role", "?")
-        if _is_test_role(role):
-            continue
-        dt = _ev_epoch(r.get("ts", ""))
-        d = per.setdefault(role, {"role": role, "tasks": 0, "ok": 0, "err": 0,
-                                  "tasks24": 0, "_durs": [], "_last": None})
-        d["tasks"] += 1
-        if r.get("status") == "error":
-            d["err"] += 1
-        else:
-            d["ok"] += 1
-        if dt and dt >= h24:
-            d["tasks24"] += 1
-        ct = claim_ts.get(r.get("id"))
-        if ct and dt and dt >= ct:
-            d["_durs"].append(dt - ct)
-        if dt and (d["_last"] is None or dt > d["_last"]):
-            d["_last"] = dt
-    out = []
-    for d in per.values():
-        durs = d.pop("_durs")
-        last = d.pop("_last")
-        d["avg_dur_s"] = round(sum(durs) / len(durs), 1) if durs else 0
-        d["last_active"] = time.strftime("%m-%d %H:%M", time.localtime(last)) if last else "-"
-        out.append(d)
-    out.sort(key=lambda x: -x["tasks"])
-    span = None
-    done_ts = [_ev_epoch(r.get("ts", "")) for r in recs if r.get("event") in ("done", "dispatch_done")]
-    done_ts = [t for t in done_ts if t]
-    if done_ts:
-        span = {"from": time.strftime("%m-%d %H:%M", time.localtime(min(done_ts))),
-                "to": time.strftime("%m-%d %H:%M", time.localtime(max(done_ts)))}
-    return {"roles": out, "total": sum(x["tasks"] for x in out), "span": span}
 
 
 def _agg_metrics(rows):
@@ -851,12 +788,23 @@ def compute_daemons():
 
 def read_events(n=40):
     """审计流:读 events.jsonl 末 N 行(send/claim/done),倒序(最新在前)。
-    events.jsonl 是 agentbus._audit 的 append-only 真相源,UI 只读不写。"""
+    events.jsonl 是 agentbus._audit 的 append-only 真相源,UI 只读不写。
+    bounded tail 读:只读尾部固定字节,避免整文件加载(文件持续增长)。"""
     fp = BUS / "events.jsonl"
     if not fp.exists():
         return []
+    _TAIL_BYTES = 64 * 1024  # 64KB 够容末 40 行 JSON
     try:
-        lines = fp.read_text(encoding="utf-8").splitlines()
+        size = fp.stat().st_size
+        with fp.open("rb") as f:
+            if size > _TAIL_BYTES:
+                f.seek(-_TAIL_BYTES, 2)
+                raw = f.read()
+                # 跳过首行残段(可能被截断)
+                raw = raw[raw.find(b"\n") + 1:]
+            else:
+                raw = f.read()
+        lines = raw.decode("utf-8", errors="replace").splitlines()
     except Exception:
         return []
     out = []
@@ -901,7 +849,7 @@ def run_supervise(dry_run=False):
 
 
 def build_state(reply_role="Master", fresh=False):
-    fleet = compute_fleet_cached(force=fresh)  # 缓存兜住轮询;fresh=SSE/手动刷新强制新算
+    fleet = compute_fleet_cached()  # 只读缓存,后台线程保鲜;fresh 参数保留供路由层兼容
     # 给每个 role 附带可点开的任务明细(inbox/processing/held/failed 任一非空就读)
     for row in fleet["roles"]:
         row["turn"] = _turn_state(row["role"])   # 现读 turn 状态(不吃 20s 舰队缓存;/api/state 有 3s TTL → ≤3s 刷新,灵敏)
@@ -1186,9 +1134,10 @@ def _load_todos():
 
 def _save_todos(items):
     ABDIR.mkdir(parents=True, exist_ok=True)
-    tmp = TODOS.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, TODOS)
+    with json_lock(TODOS):
+        tmp = TODOS.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(tmp, TODOS)
 
 
 def _sync_dispatched(items):
