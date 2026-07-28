@@ -69,6 +69,7 @@ def compute_fleet():
             row["parked"] = True
         if rec.get("pseudo"):
             row["pseudo"] = True
+        row["session_id"] = rec.get("session_id") or ""
         rows.append(row)
 
     # 在跑但未认领的 claude 进程:_who_data 已分好(tagged/unclaimed_pids),此处仅补 cwd(display 层)
@@ -152,6 +153,7 @@ def _refresh_fleet():
             if have:
                 return   # 保留上次 stale,不在主进程扫
             data = compute_fleet()   # 冷启且子进程失败的最后兜底(极少)
+        _fleet_enrich_model(data)   # 主进程侧 join ctx_cache → model 列(子进程无 ctx_cache)
         with _fleet_lock:
             _fleet_cache["data"] = data
             _fleet_cache["ts"] = time.time()
@@ -867,6 +869,7 @@ def build_state(reply_role="Master", fresh=False):
         "daemons": compute_daemons(),
         "events": read_events(40),
         "todos": _sorted_todos(),
+        "maintenance": get_maintenance(),
     }
 
 
@@ -1666,6 +1669,54 @@ def _refresh_ctx():
 def get_ctx():
     with _ctx_lock:
         return _ctx_cache["data"]
+
+
+def _fleet_enrich_model(data):
+    """主进程侧:从 _ctx_cache 按 session_id join,给舰队 roles 加 model 字段。
+    子进程运行 compute_fleet() 时 ctx_cache 为空(新进程),只能在主进程 _refresh_fleet 后 join。"""
+    with _ctx_lock:
+        ctx_data = _ctx_cache.get("data")
+    sid_model = {}
+    if ctx_data:
+        for row in ctx_data.get("rows", []):
+            sid_full = row.get("sid_full") or ""
+            if sid_full:
+                sid_model[sid_full] = row.get("model") or ""
+    for r in (data or {}).get("roles", []):
+        sid = r.get("session_id") or ""
+        r["model"] = sid_model.get(sid, "") if sid else ""
+
+
+def get_maintenance():
+    """读 agent_bus/maintenance.json。active=True 表示维修模式开启。"""
+    fp = ABDIR / "maintenance.json"
+    try:
+        return json.loads(fp.read_text(encoding="utf-8"))
+    except Exception:
+        return {"active": False}
+
+
+def build_fleet_log():
+    """读 agent_bus/fleet_log.jsonl —— append-only 编年史(ts/kind/title/detail/actor)。
+    倒序(最新在前)返回全部条目。"""
+    fp = ABDIR / "fleet_log.jsonl"
+    if not fp.exists():
+        return {"ok": True, "entries": [], "n": 0}
+    try:
+        lines = fp.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return {"ok": False, "entries": [], "n": 0}
+    entries = []
+    for ln in lines:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            entries.append(json.loads(ln))
+        except Exception:
+            pass
+    entries.sort(key=lambda x: x.get("ts", ""), reverse=True)
+    return {"ok": True, "entries": entries, "n": len(entries)}
 
 
 def start_ctx_refresher(interval=12):

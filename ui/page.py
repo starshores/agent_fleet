@@ -410,6 +410,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
   <button class="tab" data-t="paths">📁 路径</button>
+  <button class="tab" data-t="fleetlog">📋 舰队日志</button>
   <span class="spacer" style="flex:1"></span>
   <span class="muted" style="font-size:11.5px;align-self:center" id="tabHint"></span>
 </nav>
@@ -417,9 +418,10 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 <main>
   <section data-tab="fleet">
     <div class="sec-h">A · 舰队总览 <span class="sub">role 身份 / 心跳 / 队列(同 <span class="mono">who</span>+<span class="mono">list</span>)— 点行展开任务</span></div>
+    <div id="maintBanner" style="display:none;background:rgba(255,165,0,.12);border-bottom:1px solid rgba(255,165,0,.3);padding:7px 16px;font-size:13px">🔧 <b>维修模式启动中</b> <span id="maintDetail" class="muted"></span></div>
     <div class="sec-b">
       <table>
-        <thead><tr><th>Role</th><th>判定</th><th>turn 状态</th><th>pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th><th>心跳</th><th>inbox</th><th>proc</th><th>done</th><th>held</th><th>failed</th><th>cwd</th></tr></thead>
+        <thead><tr><th>Role</th><th>判定</th><th>turn 状态</th><th>pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th><th>心跳</th><th>inbox</th><th>proc</th><th>done</th><th>held</th><th>failed</th><th>cwd</th><th>模型</th></tr></thead>
         <tbody id="fleetBody"></tbody>
       </table>
     </div>
@@ -723,6 +725,17 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     </div>
     <div class="sec-b" id="pathsBox"><div class="muted" style="padding:8px 16px">加载中…</div></div>
   </section>
+
+  <!-- 📋 舰队日志(fleet_log.jsonl 编年史·倒序) -->
+  <section data-tab="fleetlog">
+    <div class="sec-h">📋 舰队日志
+      <span class="sub">bus 编年史 · <span class="mono">fleet_log.jsonl</span> · 里程碑/事件/维修/退役 · 倒序</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="flMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="flRefresh">刷新</button>
+    </div>
+    <div class="sec-b" id="flBox"><div class="muted" style="padding:8px 16px">加载中…</div></div>
+  </section>
 </main>
 
 <div id="toast" class="toast"></div>
@@ -810,7 +823,8 @@ function render(){
       <td class="mono">${fmtAge(r.age)}</td>
       <td>${qc(r.inbox,'ib')}</td><td>${qc(r.processing,'pr')}</td><td>${qc(r.done,'dn')}</td>
       <td>${qc(r.held||0,'held')}</td><td>${qc(r.failed||0,'failed')}</td>
-      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td></tr>`;
+      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td>
+      <td class="mono" style="font-size:11px">${esc(r.model||'–')}</td></tr>`;
     if(hasTasks){
       let inner='<div class="task-wrap">';
       (r.tasks||[]).forEach(t=>{
@@ -826,10 +840,16 @@ function render(){
           <pre>${esc(t.task)}</pre></div>`;
       });
       inner+='</div>';
-      fleetHtml+=`<tr data-key="fd-${esc(r.role)}" class="tasks" data-role="${esc(r.role)}" style="display:${open?'':'none'}"><td colspan="11">${inner}</td></tr>`;
+      fleetHtml+=`<tr data-key="fd-${esc(r.role)}" class="tasks" data-role="${esc(r.role)}" style="display:${open?'':'none'}"><td colspan="12">${inner}</td></tr>`;
     }
   });
   morphInto(document.getElementById('fleetBody'), fleetHtml);
+
+  // 维修横幅
+  const mb=document.getElementById('maintBanner');
+  const mt=state.maintenance||{};
+  mb.style.display=mt.active?'':'none';
+  document.getElementById('maintDetail').textContent=mt.active?(mt.by||'')+(mt.since?' · since '+mt.since:'')+(mt.note?' — '+mt.note:''):'';
 
   // process footer
   let foot=[];
@@ -2162,7 +2182,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2184,6 +2204,7 @@ function showTab(t){
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
   else if(t==='paths') loadPaths();
+  else if(t==='fleetlog') loadFleetLog();
 }
 // 🎯 长期任务线看板:卡片 + ⧗待决策徽标 + 展开 current/deps/decisions(待用户决策红/黄高亮)
 async function loadTasklines(){
@@ -2333,6 +2354,48 @@ async function openPath(p){
   }catch(e){ showToast('请求失败:'+e); }
 }
 document.getElementById('pathsRefresh').onclick=()=>loadPaths();
+
+// ===== 📋 舰队日志 =====
+let _fleetlogLoaded=false;
+async function loadFleetLog(){
+  const box=document.getElementById('flBox');
+  if(box&&!box.innerHTML.trim()) box.innerHTML='<div class="muted" style="padding:8px 16px">读取中…</div>';
+  try{
+    const r=await fetch('/api/fleet-log');
+    renderFleetLog(await r.json());
+    _fleetlogLoaded=true;
+  }catch(e){
+    if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(e)+'</div>';
+  }
+}
+function renderFleetLog(d){
+  const box=document.getElementById('flBox'); const meta=document.getElementById('flMeta'); if(!box) return;
+  if(!d||!d.ok){ box.innerHTML='<div class="muted" style="padding:8px 16px">日志读取失败</div>'; if(meta)meta.textContent=''; return; }
+  const kindIcon={incident:'🔥',maintenance:'🔧',milestone:'🏁',retire:'⊘',revive:'↩',train:'🎓',note:'📌'};
+  const kindColor={incident:'var(--fail)',maintenance:'rgba(255,165,0,.9)',milestone:'var(--live)',retire:'var(--dim)',revive:'var(--accent)',train:'var(--accent)',note:'var(--muted)'};
+  if(meta) meta.textContent=(d.n||0)+' 条 · 倒序';
+  const entries=d.entries||[];
+  if(!entries.length){ morphInto(box,'<div class="muted" style="padding:8px 16px">（无日志）</div>'); return; }
+  morphInto(box, entries.map((e,i)=>{
+    const icon=kindIcon[e.kind]||'·';
+    const col=kindColor[e.kind]||'var(--fg)';
+    const ts=(e.ts||'').replace('T',' ');
+    return `<div class="ev" data-key="fl-${i}" style="padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:16px;line-height:1.3">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="color:${col};font-weight:600">${esc(e.title||'')}</span>
+          <span class="cap-chip" style="font-size:10px;color:${col}">${esc(e.kind||'')}</span>
+          <span class="muted" style="font-size:11px">${esc(ts)}</span>
+          ${e.actor?`<span class="muted" style="font-size:11px">by ${esc(e.actor)}</span>`:''}
+        </div>
+        ${e.detail?`<div class="muted" style="font-size:12px;margin-top:3px">${esc(e.detail)}</div>`:''}
+      </div>
+    </div>`;
+  }).join(''));
+}
+document.getElementById('flRefresh').onclick=()=>loadFleetLog();
+
 loadBI().finally(load); connectSSE(); setPoll();
 // 刷新门控(P1):BI 定时刷只在【BI tab 可见】时跑,不再无视可见性每 10s 扫 psutil + 拉 /api/bi
 setInterval(()=>{ if(curTab==='bi') loadBI(); }, 10000);

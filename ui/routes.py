@@ -124,6 +124,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/paths":
             # 路径注册表:path_registry.json + 健康校验(请求路径直读·手动刷新)
             self._send(200, api.build_paths())
+        elif path == "/api/fleet-log":
+            # 舰队日志:fleet_log.jsonl 倒序(请求路径直读·手动刷新)
+            self._send(200, build_fleet_log())
         else:
             self._send(404, {"error": "not found"})
 
