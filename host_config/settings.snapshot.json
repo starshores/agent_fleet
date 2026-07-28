@@ -1,9 +1,9 @@
 {
-  "model": "opus[1m]",
   "env": {
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
   },
+  "model": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -22,9 +22,9 @@
           {
             "type": "command",
             "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
-            "async": true,
             "timeout": 10,
-            "statusMessage": "turn状态:跑工具"
+            "statusMessage": "turn状态:跑工具",
+            "async": true
           }
         ]
       }
@@ -46,9 +46,9 @@
           {
             "type": "command",
             "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
-            "async": true,
             "timeout": 10,
-            "statusMessage": "turn状态:回思考"
+            "statusMessage": "turn状态:回思考",
+            "async": true
           }
         ]
       }
@@ -87,6 +87,12 @@
             "command": "python C:/apphome/agent_fleet/hooks/turn_state.py",
             "timeout": 10,
             "statusMessage": "turn状态:思考/执行中"
+          },
+          {
+            "type": "command",
+            "command": "python C:/apphome/agent_fleet/hooks/user_prompt_anchor.py",
+            "timeout": 10,
+            "statusMessage": "插话纠偏锚:核手头processing"
           }
         ]
       }
@@ -109,6 +115,6 @@
   },
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "latest",
-  "skipDangerousModePermissionPrompt": true,
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true
 }

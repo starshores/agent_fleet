@@ -409,6 +409,12 @@
      "status": "新上·2026-07-10"
     },
     {
+     "name": "user_prompt_anchor 插话纠偏锚hook",
+     "does": "UserPromptSubmit hook:用户直接向会话插话那一刻,若该会话角色手上有未闭合processing任务(notice回执不算),stdout注入一行锚=任务清单+三选行为(速答后回任务/要紧先说明再切/新话题判lane route)——确定性纠偏防带歪弃单,不靠agent自觉;fail-open恒exit0·仅bus成员·空processing零噪音·UTF-8强制",
+     "carrier": "hooks/user_prompt_anchor.py",
+     "status": "新上·2026-07-28"
+    },
+    {
      "name": "bus_tray 托盘常驻监控",
      "does": "Windows托盘指示器:图标数字=在跑任务agent数·色绿(有在跑)/蓝(在岗全idle)/橙(有静默超心跳)/红(全离线);悬停tooltip=在岗N·在跑M·静默K·休眠P;双击开WebUI(127.0.0.1:8799)·右键刷新/退出。who --json每20s轮询·纯本机不外发(符合数据不出本机红线);pythonw静默启动器(无黑窗)+开机自启+单实例mutex守卫。数据口径(在岗/在跑/静默/休眠)归Master数分2维护",
      "carrier": "bus_tray.py + bus_tray_start.vbs",
