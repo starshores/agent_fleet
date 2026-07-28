@@ -434,7 +434,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div id="maintBanner" style="display:none;background:rgba(255,165,0,.12);border-bottom:1px solid rgba(255,165,0,.3);padding:7px 16px;font-size:13px">🔧 <b>维修模式启动中</b> <span id="maintDetail" class="muted"></span></div>
     <div class="sec-b">
       <table>
-        <thead><tr><th>Role</th><th>判定</th><th>turn 状态</th><th>pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th><th>心跳</th><th>inbox</th><th>proc</th><th>done</th><th>held</th><th>failed</th><th>cwd</th><th>模型</th></tr></thead>
+        <thead><tr><th>Role</th><th>模型</th><th style="max-width:90px">判定</th><th>turn 状态</th><th>pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th><th>心跳</th><th>inbox</th><th>proc</th><th>done</th><th>held</th><th>failed</th><th>cwd</th></tr></thead>
         <tbody id="fleetBody"></tbody>
       </table>
     </div>
@@ -830,14 +830,14 @@ function render(){
     const open=lastTasksOpen.has(r.role);
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
       <td><b>${esc(r.role)}</b></td>
-      <td><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
+      <td class="mono" style="font-size:11px" title="${esc(r.model||'')}">${esc((r.model||'').replace('claude-','')||'–')}</td>
+      <td style="max-width:90px"><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
       <td>${turnBadge(r.turn, r.self_wake)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
       <td>${qc(r.inbox,'ib')}</td><td>${qc(r.processing,'pr')}</td><td>${qc(r.done,'dn')}</td>
       <td>${qc(r.held||0,'held')}</td><td>${qc(r.failed||0,'failed')}</td>
-      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td>
-      <td class="mono" style="font-size:11px">${esc(r.model||'–')}</td></tr>`;
+      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td></tr>`;
     if(hasTasks){
       let inner='<div class="task-wrap">';
       (r.tasks||[]).forEach(t=>{
