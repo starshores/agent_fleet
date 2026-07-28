@@ -118,7 +118,7 @@ def _toast(title, body):
 
 def main():
     try:
-        data = json.load(sys.stdin)
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))   # 显式 UTF-8:裸 json.load 走 GBK,payload 含 CJK 即崩=hook 静默失效(全局铁律)
     except Exception:
         return
     if data.get("source") != "compact":   # 只在 compact 后注入(matcher 已过滤,双保险)

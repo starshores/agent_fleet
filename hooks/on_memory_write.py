@@ -6,9 +6,6 @@
 import sys, json, os, subprocess
 from pathlib import Path
 
-SYNC_CODE = r"C:\apphome\agent_fleet\sync_code.ps1"
-_CODE_EXT = (".py", ".ps1", ".json", ".cmd")
-
 # sync 脚本路径从 agent_bus/config.json 读(集中配置);读不到回退到默认。
 def _sync_script():
     try:
@@ -24,7 +21,7 @@ SYNC = _sync_script()
 
 def main():
     try:
-        data = json.load(sys.stdin)
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))   # 显式 UTF-8:裸 json.load 走 GBK,payload 含 CJK 即崩=hook 静默失效(全局铁律)
     except Exception:
         return
     ti = data.get("tool_input") or {}
@@ -40,9 +37,8 @@ def main():
     # ① 项目记忆 .md(agent_fleet\memory 不含 .claude,避免自触发/递归)→ 重链记忆镜像
     if "\\.claude\\" in fp and "\\memory\\" in fp and fp.endswith(".md"):
         _run(SYNC)
-    # ② agent_bus 总线源码(.py/.ps1/.json/.cmd)→ 重链代码镜像,保持 agent_fleet 自举
-    elif "\\.claude\\agent_bus\\" in fp and fp.endswith(_CODE_EXT):
-        _run(SYNC_CODE)
+    # ②(已卸·2026-07-28 doc-blind 审查):agent_bus 源码硬链镜像已被 junction 取代(07-15),
+    # sync_code.ps1 检测到 reparse 即 no-op——之前每次改总线源码都白起一个 powershell(30s 预算)烧在空转上。
 
 if __name__ == "__main__":
     main()

@@ -2,7 +2,7 @@
 """bus.pool —— 工作组池化(Phase 1a/1b):共享组 inbox + O_EXCL pull-claim + fan-out/collect
 + park 休眠命令 + 内存感知并发上限(mem-cap)。依赖下层 config/io/roster/proc/presence/selfwake/mailbox。
 无环:pool 复用 mailbox 的领取原语,不反向依赖 core。"""
-import os, sys, json, time
+import os, sys, json, threading, time
 
 try:
     import psutil
