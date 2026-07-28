@@ -71,7 +71,7 @@
      "desc": "send/claim/done/退役/结业等全审计(append-only);clear replies 后仍留痕,交接核实以此为准。", "owner": "MasterAgent"},
     {"id": "todos", "name": "待办池(ask-user)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos.json", "kind": "file",
      "desc": "🙋待用户拍板队列(ab ask-user 投/ab answer 闭环/WebUI 待办 tab 渲染)。", "owner": "MasterAgent(机制)/用户(处理)"},
-    {"id": "metrics", "name": "任务消耗埋点", "path": "C:\\apphome\\agent_fleet\\agent_bus\\bus\\metrics.jsonl", "kind": "file",
+    {"id": "metrics", "name": "任务消耗埋点", "path": "C:\\apphome\\agent_fleet\\agent_bus\\metrics.jsonl", "kind": "file",
      "desc": "claude_run 抓 usage/cost/duration,daemon/dispatch 完成后 append(O_APPEND);BI 消耗面板数据源之一。", "owner": "MasterAgent(埋点)/Master数分(口径)"}
    ]
   }
