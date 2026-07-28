@@ -72,7 +72,13 @@
     {"id": "todos", "name": "待办池(ask-user)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos.json", "kind": "file",
      "desc": "🙋待用户拍板队列(ab ask-user 投/ab answer 闭环/WebUI 待办 tab 渲染)。", "owner": "MasterAgent(机制)/用户(处理)"},
     {"id": "metrics", "name": "任务消耗埋点", "path": "C:\\apphome\\agent_fleet\\agent_bus\\metrics.jsonl", "kind": "file",
-     "desc": "claude_run 抓 usage/cost/duration,daemon/dispatch 完成后 append(O_APPEND);BI 消耗面板数据源之一。", "owner": "MasterAgent(埋点)/Master数分(口径)"}
+     "desc": "claude_run 抓 usage/cost/duration,daemon/dispatch 完成后 append(O_APPEND);BI 消耗面板数据源之一。", "owner": "MasterAgent(埋点)/Master数分(口径)"},
+    {"id": "fleet-config", "name": "fleet.json(daemon 期望配置)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet.json", "kind": "file",
+     "desc": "supervise 对账的 daemon 期望清单(前台化后现为空=期望0);与 fleet_status.json 同名不同物——那是 WebUI 推送通道(2.0 2c 决议:澄清并存·不合并)。", "owner": "MasterAgent"},
+    {"id": "fleet-status", "name": "fleet_status.json(舰队战报推送)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet_status.json", "kind": "file",
+     "desc": "WebUI 每 5s 刷的全舰队实时战报(协调位直接读=≤5s 新鲜,免自跑 who);写方=ui/api.py 推送线程。与 fleet.json(期望配置)是两回事。", "owner": "MasterUI(写)/协调位(读)"},
+    {"id": "hygiene-outputs", "name": "卫生代谢归档位(done_archive/_dead_letter/.trash)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\unknown\\_dead_letter", "kind": "dir",
+     "desc": "health-sweep 卫生代谢(2026-07-28)三个去处:各 role done_archive/(回执>14d)、unknown/_dead_letter/(死信>7d)、agent_bus/.trash/(bak>14d);supervise 90s 周期自动跑。", "owner": "MasterAgent"}
    ]
   }
  ]

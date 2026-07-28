@@ -341,7 +341,59 @@ def _health_sweep_core(stuck_min=90, apply=False):
 
     if apply and (rep["orphans_to_todo"] or rep["stuck_to_todo"] or rep["resolved_stale"]):
         _write_json(tf, todos)               # 复用鲁棒落地(含 os.replace 重试)
+    rep["hygiene"] = _hygiene_core(apply=apply)   # 卫生代谢随巡检同跑(supervise 90s 周期自动带上)
     return rep
+
+
+def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14):
+    """消息/文件卫生代谢(2026-07-28 用户令·2.0 收尾:bus 会自己变脏,给它代谢;之前 sweep 只
+    重路由/投待办、从不归档物理文件 → 孤儿回执/死信/bak 永久堆积)。默认 dry-run 只报数,apply 才动:
+    ① 各 role done/ 回执超 done_days 天 → 移 <role>/done_archive/(replies 只看近窗;events.jsonl 审计仍全量;
+       retire 移 mailbox 时 archive 随目录走);
+    ② unknown 死信桶(inbox/processing/done)超 dead_days 天 → 移 unknown/_dead_letter/;
+    ③ 运行态根 *.bak* 超 bak_days 天 → 移 BUS/.trash/(白名单 gitignore 本就不进 git)。"""
+    rep = {"done_archived": 0, "dead_lettered": 0, "bak_trashed": 0, "apply": apply}
+    now = time.time()
+
+    def _old(p, days):
+        try:
+            return (now - p.stat().st_mtime) > days * 86400
+        except Exception:
+            return False
+
+    def _mv(f, dst_dir, key):
+        rep[key] += 1
+        if apply:
+            try:
+                dst_dir.mkdir(exist_ok=True)
+                shutil.move(str(f), str(dst_dir / f.name))
+            except Exception:
+                rep[key] -= 1
+
+    for d in sorted(BUS.iterdir()):          # ① done 轮转(跳 .开头/_开头;unknown 走②)
+        if not d.is_dir() or d.name.startswith((".", "_")) or d.name == "unknown":
+            continue
+        dn = d / "done"
+        if dn.is_dir():
+            for f in dn.glob("*.json"):
+                if _old(f, done_days):
+                    _mv(f, d / "done_archive", "done_archived")
+    u = BUS / "unknown"                      # ② 死信桶
+    if u.is_dir():
+        for sub in ("inbox", "processing", "done"):
+            sd = u / sub
+            if sd.is_dir():
+                for f in sd.glob("*.json"):
+                    if _old(f, dead_days):
+                        _mv(f, u / "_dead_letter", "dead_lettered")
+    for f in BUS.glob("*.bak*"):             # ③ bak 清扫
+        if f.is_file() and _old(f, bak_days):
+            _mv(f, BUS / ".trash", "bak_trashed")
+    if apply and (rep["done_archived"] or rep["dead_lettered"] or rep["bak_trashed"]):
+        _audit("hygiene_sweep", done_archived=rep["done_archived"],
+               dead_lettered=rep["dead_lettered"], bak_trashed=rep["bak_trashed"])
+    return rep
+
 
 def cmd_health_sweep(args):
     """系统级 bus 健康巡检:孤儿回执自动追回、卡死任务投待办需人定。--apply 才动手,默认 dry-run。"""
