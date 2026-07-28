@@ -119,6 +119,10 @@ def cmd_who(args):
     d = _who_data()
     if getattr(args, "json", False):
         print(json.dumps(d, ensure_ascii=False)); return
+    from bus.fleetlog import maint_active, maint_info
+    if maint_active():
+        _mi = maint_info()
+        print("🔧 维修模式进行中(since %s·%s)——下表大片『进程已退』为预期停机态,非故障。" % (_mi.get("since", "?"), _mi.get("note") or "-"))
     print("%-14s %-22s %-9s %8s  %s" % ("role", "verdict", "claude_pid", "心跳age", "cwd"))
     print("-" * 88)
     for rec in d["roles"]:

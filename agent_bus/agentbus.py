@@ -82,6 +82,7 @@ from bus.health import (  # noqa: E402
     _daemon_alive,   # ui/api.py fleet 面板用 ab._daemon_alive——此前漏 re-export(fleet 空未炸的活雷·P1 补)
 )
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
+from bus.fleetlog import cmd_fleetlog, cmd_maint, fleet_log, maint_active  # noqa: E402
 from bus.identity import (  # noqa: E402
     cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
     cmd_train_done,
@@ -120,6 +121,7 @@ _CMD_GROUPS = [
     ("Edge 互斥", "edge-acquire edge-release"),
     ("长期任务·待办 tasks", "tasklines ask-user refs todos-archive"),
     ("会话·标注", "sessions tag"),
+    ("舰队日志·维修 fleetlog", "fleetlog maint"),
 ]
 
 
@@ -191,6 +193,8 @@ def main():
     p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.add_argument("--tag", default=None, help="给会话id打标记"); p.add_argument("--untag", default=None, help="撤会话id标记"); p.add_argument("--label", default=None, help="标签(默认'可恢复')"); p.add_argument("--note", default=None, help="标记备注"); p.add_argument("--tagged", action="store_true", help="只列已标记的会话"); p.add_argument("--live", action="store_true", help="只列运行中(有活进程)"); p.add_argument("--dead", action="store_true", help="只列死的(可恢复/休眠)"); p.add_argument("--non-bus", action="store_true", dest="non_bus", help="只列非bus(个人)会话"); p.add_argument("--bus", action="store_true", help="只列bus(agent)会话"); p.add_argument("--by-size", action="store_true", dest="by_size", help="按 resume jsonl 大小降序(辅助判断谁最大/该归档清)"); p.set_defaults(fn=cmd_sessions)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
+    p = sub.add_parser("fleetlog"); p.add_argument("--add", action="store_true", help="追加一条(默认=列最近)"); p.add_argument("--kind", default=None, help="milestone/incident/maintenance/retire/revive/train/note"); p.add_argument("--title", default=None); p.add_argument("--detail", default=""); p.add_argument("--by", default=None); p.add_argument("--ts", default=None, help="补记历史事件时指定时间(ISO)"); p.add_argument("--limit", type=int, default=20); p.set_defaults(fn=cmd_fleetlog)
+    p = sub.add_parser("maint"); p.add_argument("--on", action="store_true"); p.add_argument("--off", action="store_true"); p.add_argument("--note", default=""); p.add_argument("--by", default=None); p.set_defaults(fn=cmd_maint)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.add_argument("--requires-approval", dest="requires_approval", action="store_true", help="高风险标记:dispatch 拒收(无人审直跑面),改走 send+人工领取"); p.set_defaults(fn=cmd_dispatch)
 
     args = ap.parse_args()

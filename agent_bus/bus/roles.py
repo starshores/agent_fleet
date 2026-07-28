@@ -73,6 +73,8 @@ def cmd_retire(args):
     except Exception:
         pass
     _audit("retire", role=role, succeeded_by=entry["succeeded_by"], reason=entry["reason"][:60])
+    from bus.fleetlog import fleet_log
+    fleet_log("retire", "%s 退役归档" % role, "接替=%s;原因:%s" % (entry["succeeded_by"] or "-", entry["reason"] or "-"))
     print(json.dumps({"retired": role, "番号下掉": role not in _load_agents(),
                       "mailbox移_retired": moved, "档案馆": str(_retired_roster_path()),
                       "session_ids": entry["session_ids"], "status": "archived·可复用"}, ensure_ascii=False, indent=1))
@@ -100,6 +102,8 @@ def cmd_revive(args):
     rec["status"] = "revived"; rec["revived_at"] = _now()
     _write_json(_retired_roster_path(), roster)
     _audit("revive", role=role)
+    from bus.fleetlog import fleet_log
+    fleet_log("revive", "%s 复活回册" % role, "自档案馆调回(退役于 %s)" % rec.get("retired", "?"))
     print(json.dumps({"revived": role, "回活跃在册": role in _load_agents(), "状态": "revived"}, ensure_ascii=False, indent=1))
 
 def cmd_retired(args):

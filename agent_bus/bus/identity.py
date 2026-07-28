@@ -226,6 +226,8 @@ def cmd_train_done(args):
         sys.stderr.write("角色 %s 不在册(agents.json),无法结业。\n" % role)
         sys.exit(2)
     _audit("train_done", role=role, by=by)
+    from bus.fleetlog import fleet_log
+    fleet_log("train", "%s 结业" % role, "trained=true by %s" % by, actor=by)
     print("🎓 %s 已结业(trained=true · by %s)。send 派活不再带待训警示。" % (role, by))
 
 
@@ -265,6 +267,10 @@ def cmd_whoami(args):
 
 def cmd_selfwake(args):
     """自醒检测:列出每个 role 的事件自醒是否在岗(daemon watchdog / 会话后台 wait)。"""
+    from bus.fleetlog import maint_active, maint_info
+    if maint_active():
+        _mi = maint_info()
+        print("🔧 维修模式进行中(since %s·%s)——停机 agent 的⚠掉线为预期态;守卫已休眠。" % (_mi.get("since", "?"), _mi.get("note") or "-"))
     armed = recent = stale = off = retired = pseudo = parked = 0
     wait_roles = _wait_proc_roles()   # 一次性预扫,循环内复用
     retired_set = _retired_roles()
@@ -320,6 +326,12 @@ def cmd_selfwake_guard(args):
     agent → ①往其 inbox 投一条【重挂提醒】(dedup:已有未领的提醒就不重投)②WinRT toast 报警(汇总)。
     只报警+提醒,不代挂(外部无法替前台CLI重挂,见方案评估)。--dry-run 只报不动。
     周期驱动:可由 WebUI 常驻线程 / cron 每几分钟跑一次,把"18h没人发现"变"几分钟内报警"。"""
+    from bus.fleetlog import maint_active, maint_info
+    if maint_active():   # 🔧 维修模式(用户 2026-07-28):守卫休眠——停机 agent 大片"掉线"=预期,不报警不投提醒不 toast
+        i = maint_info()
+        print("🔧 维修模式进行中(since %s·%s)→ 自醒守卫休眠,本轮不巡检。`ab maint --off` 结束后恢复。"
+              % (i.get("since", "?"), i.get("note") or "-"))
+        return
     wait_roles = _wait_proc_roles()
     retired_set = _retired_roles()
     stale = []
