@@ -25,19 +25,19 @@
 
 ## P1 — 正确性/一致性(P0 后)
 
-- ☐ 锁夺取 ABA(两进程同判孤儿锁各自 unlink→双持锁;pool 组锁/route 锁/edge 锁三处;改 os.replace 改名占有)
-- ☐ done/reap 崩溃窗口(done 先写回执后删 processing→重跑;reap 写+删两步→双份;reap 前查回执已存在则归档)
-- ☐ request 走 send 契约(现绕过审计/可达告警/培训闸→events.jsonl 不可见;抽 _deliver 共用)
-- ☐ done 归属禁前缀匹配(startswith 短 id 可错配;查找应含 archive)
-- ☐ presence 多写者(心跳整写丢 current_task·靠时序假设;_audit 追加未用 O_APPEND)
-- ☐ 角色策略出代码进注册表(角色白名单/_MGMT_OWNER/HUMAN_ATTENDED 硬编码;守卫伪造 from=MasterAgent;
+- ☑ 锁夺取 ABA(io._steal_stale_lock rename 原子占有;json_lock/claim/组锁/route锁/edge锁 五处统一·fcffbf7)——原文:锁夺取 ABA(两进程同判孤儿锁各自 unlink→双持锁;pool 组锁/route 锁/edge 锁三处;改 os.replace 改名占有)
+- ☑ done/reap 崩溃窗口(reap 改原地改写→os.replace 原子搬运;回执已在→归档免重跑·fcffbf7)——原文:done/reap 崩溃窗口(done 先写回执后删 processing→重跑;reap 写+删两步→双份;reap 前查回执已存在则归档)
+- ☑ request 走 send 契约(抽 _deliver 共用:审计/可达/培训闸/unknown 警示·fcffbf7)——原文:request 走 send 契约(现绕过审计/可达告警/培训闸→events.jsonl 不可见;抽 _deliver 共用)
+- ☑ done 归属禁前缀匹配(_find_task 精确 id + 含 archive;已归档只发回执不搬运·fcffbf7)——原文:done 归属禁前缀匹配(startswith 短 id 可错配;查找应含 archive)
+- ☑ presence 多写者(_touch_presence/_set_current_task 锁跨 RMW+心跳继承 current_task;_audit O_APPEND·fcffbf7)——原文:presence 多写者(心跳整写丢 current_task·靠时序假设;_audit 追加未用 O_APPEND)
+- ☑ 角色策略出代码进注册表(role_profiles.json meta.policy;代码留降级默认·fcffbf7;守卫伪造名/bus-router 名单随注册表可改不动代码)——原文:角色策略出代码进注册表(角色白名单/_MGMT_OWNER/HUMAN_ATTENDED 硬编码;守卫伪造 from=MasterAgent;
   bus-router 不在伪角色名单)
-- ☐ start_worker.ps1 用 config python_bin(现裸 PATH python·缺 watchdog=隐藏 daemon 静默死)
-- ☐ dispatch 路径补 requires_approval 闸(现 --dangerously-skip-permissions 直跑高风险)
-- ☐ 卫生代谢扩容(_hygiene_core 补:孤儿 .tmp/*.lock、fanout manifest、pid_tags 死 pid、
+- ☑ start_worker.ps1 用 config python_bin(AGENTBUS_PYTHON_BIN 可覆盖·fcffbf7)(现裸 PATH python·缺 watchdog=隐藏 daemon 静默死)
+- ☑ dispatch 路径补 requires_approval 闸(拒走无人审快跑面→导向 send+人工领取;实测拒收·fcffbf7)(现 --dangerously-skip-permissions 直跑高风险)
+- ☑ 卫生代谢扩容(tmp/lock/steal 残渣·pid_tags 死 pid·jsonl 轮转·终点站 90d→.trash 30d 真删两段式·ae2b62c)——原文:卫生代谢扩容(_hygiene_core 补:孤儿 .tmp/*.lock、fanout manifest、pid_tags 死 pid、
   events/metrics.jsonl 轮转、done_archive//_dead_letter//.trash 终点站保留期)
-- ☐ watchdog 样板 4 处抽公共 wait_for_event(NameError 正是复制丢 import 所致)
-- ☐ 公共面定稳定 API 层(facade 现 re-export ~90 个 _私名无 __all__;UI 依赖 15 个私名)
+- ☑ watchdog 样板 4 处抽公共(bus/watch.py arm_watch;+2 降级轮询兜底;端到端事件唤醒实测·ae2b62c;pool_dispatcher 休眠脚本不动=随 P2 处置)(NameError 正是复制丢 import 所致)
+- ☑ 公共面定稳定 API 层(agentbus.__all__ 28 名·按消费方全量 grep 圈定=名单即契约;抓获活雷 ab._daemon_alive 从未 re-export 已补·ae2b62c)——原文:公共面定稳定 API 层(facade 现 re-export ~90 个 _私名无 __all__;UI 依赖 15 个私名)
 - ☐ UI:todos 锁/fresh 空操作/硬编码路径/read_events 整读尾取/死代码 build_activity(MasterUI lane)
 
 ## P2 — 卫生/清晰度
