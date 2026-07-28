@@ -364,10 +364,11 @@ def cmd_selfwake_guard(args):
         task = {
             "id": tid, "from": "MasterAgent", "to": role,
             "title": marker + " 你掉了自醒",
-            "task": ("自醒巡检【连续2次】发现你掉了自醒(%s)。看到即请【后台 run_in_background】跑 "
+            "task": ("自醒巡检【连续2次】发现你掉了自醒(%s;尸检:%s)。看到即请【后台 run_in_background】跑 "
                      "`ab wait --role %s --timeout 0`(0=自动日2h/夜6h),再 `ab selfwake` 验在岗(别用 shell &)。"
                      "★若你是【轮询模式在岗】(ScheduleWakeup 定时 drain·非 background wait),"
-                     "别重挂——放个豁免 marker 即可:`ab selfwake-exempt --role %s`(不再被巡检打扰)。" % (detail, role, role)),
+                     "别重挂——放个豁免 marker 即可:`ab selfwake-exempt --role %s`(不再被巡检打扰)。"
+                     % (detail, _wait_autopsy(role), role, role)),
             "created": _now(), "status": "pending",
             "no_receipt": True,   # 系统 nudge·fire-and-forget:完成不回执给 from(MasterAgent),消守卫回执洪水噪声
         }
@@ -382,7 +383,22 @@ def cmd_selfwake_guard(args):
         (" · %d 已提醒过跳过" % len(skipped)) if skipped else "",
         "" if args.dry_run else " + toast报警"))
     for role, detail in stale:
-        print("   - %s%s:%s" % (role, "" if role in confirmed else "(待确认)", detail))
+        print("   - %s%s:%s | 尸检:%s" % (role, "" if role in confirmed else "(待确认)", detail, _wait_autopsy(role)))
+
+
+def _wait_autopsy(role):
+    """掉线尸检分类(2026-07-28 会话可靠性立项):读 <role>/wait_trace.json(_serve_wait 进场记 start、
+    干净退场补 exit)把"掉了"升级为"怎么掉的"——根因分布从此有数据,不再靠猜:
+    · exit=None       → wait 进程【异常死亡】(被杀/机器休眠丢/宿主壳回收)= 环境问题,非纪律
+    · exit=idle/task  → wait 正常退出后【没重挂】= 纪律缺口(fire→重挂三步没走完)
+    · 无 trace        → 旧版 wait 或从未挂过(观察期)"""
+    try:
+        t = json.loads((BUS / role / "wait_trace.json").read_text(encoding="utf-8"))
+    except Exception:
+        return "无 trace(旧版 wait/从未挂过)"
+    if t.get("exit") is None:
+        return "wait 进程异常死亡(start=%s 无 exit·被杀/休眠丢/壳回收=环境因)" % (t.get("started") or "?")[:19]
+    return "上次 %s 正常退出(%s)后未重挂=纪律缺口" % (t.get("exit"), (t.get("exited") or "?")[:19])
 
 
 def cmd_selfwake_exempt(args):

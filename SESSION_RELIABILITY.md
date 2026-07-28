@@ -111,3 +111,20 @@
 
 ## E、保鲜 backlog(数据持久方舟,旁线)
 - **stats-cache.json 纳入 ETL**:它和被清的 jsonl 一样是【会被 Claude Code 覆盖/清掉的早期用量源】(数分2 已从中抢救 03-27~04-28 的 12.9M tokens 入 usage.db.daily_backfill)。持久方舟原则应扩展到它——ETL 顺手也抓。**实现归【业务侧】lane**(它做增量 ETL),非 infra 自接;待优先级到时 route 给它。
+
+---
+
+## 长会话轮换 runbook(E7·2026-07-28 立项落地)
+
+> 触发:ctx 面板该会话 ≥65%(红=将被 auto-compact 有损压缩)或会话已跨多天。**主动轮换 > 被动挨压**。
+
+**退场(老会话,3 步)**
+1. 把工作态写进【自己的角色记忆索引】`memory/<role>.MEMORY.md`(顶部加一条:当前目标/在做/下一步/未尽事项/坑),跑 sync_memory.ps1;
+2. 清手头:processing 的任务 done 掉或说明留 inbox;不留半截活;
+3. 关 tab 即可(presence 残留无害,新会话 hello 自动接管;绝不在退场前派新活给自己)。
+
+**接管(新会话,零知识起步)**
+1. 新 tab → `ab whoami`(空)→ `ab hello --role <角色>` —— hello 自动喂:角色页(定位/边界/启动流程)+ 能力池 + **角色记忆索引指针**;
+2. 读角色索引顶部工作态 → 挂后台 wait + selfwake 验 ✓在岗 → 接续。
+
+**机制支撑**:接管端已全自动(hello 喂入 2026-07-28 上线);退场端是纪律(靠本 runbook + compact hook 注入的"重读角色索引"铁律);掉线根因数据=wait_trace 尸检(guard 告警自带分类:异常死亡=环境因 / 正常退未重挂=纪律因)。

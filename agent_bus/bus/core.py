@@ -251,6 +251,12 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
 
     _kill_prior_waits(role)   # per-role 幂等:先清同 role 旧 wait,防累积(Master数分 2026-07-02)
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
+    # 掉线尸检 trace(2026-07-28 会话可靠性立项):进场记 start,干净退场补 exit;
+    # 事后 trace 有 start 无 exit = wait 进程【异常死亡】(被杀/休眠丢/宿主壳回收),guard 可据此分类根因,
+    # 不再靠猜。单文件覆盖写(只留最近一次),历史轨迹靠 events.jsonl 不重复存。
+    _tracef = BUS / role / "wait_trace.json"
+    _trace = {"pid": os.getpid(), "started": _now(), "timeout": timeout, "exit": None}
+    _write_json(_tracef, _trace)
     try:
         _touch_presence(role, presence_mode, extra)       # 声明身份 + 心跳
         obj = _wait_core(role, timeout, include_approval)
@@ -265,6 +271,11 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
         except Exception as e2:
             sys.stderr.write("⚠ 自恢复后仍异常:%s —— 返回 idle,交下一轮重挂。\n" % (str(e2)[:150]))
             obj = None
+    try:
+        _trace.update(exit=("task" if obj else "idle"), exited=_now())
+        _write_json(_tracef, _trace)
+    except Exception:
+        pass
     print(json.dumps(obj if obj is not None else {"idle": True, "role": role}, ensure_ascii=False))
 
 
