@@ -19,6 +19,7 @@
 | `SESSION_RELIABILITY.md` | 会话可靠性（compact 失忆 / 自醒·投递不可信 硬化）——reinject hook 指向·运行时操作锚点·留根 |
 | `SPECIALIZATION.md` | 专一性纪律（CLI 本能把非路由内容自揽的根因与「骑本能重定向为路由」解法）——reinject hook + onboarding 指向·运行时操作锚点·留根 |
 | `LONGRANGE_TASK_BRIEF_2026-07-13.md` | 长程任务机制简报（历史锚点）|
+| `docs/OPS_FINDINGS.md` | **运维/口径发现台账**（append-only·grep 按需查·不进 MEMORY.md/上下文）：一次性分析结论 / 外部政策发现 / 对表数据。口径="每轮要它在场→记忆;相关时查到即可→本台账"|
 | `bus_smoke.py` | **回归冒烟金标准**（46 命令面盘点 + 39 结构用例）——2.0 重构回归闸 |
 | `bus_smoke_baseline.json` | 冒烟基线（命令面快照，回归对比用）|
 | `bus_mechanisms.json` | 机制注册表（单一源，供 WebUI 🔧机制 tab）|
