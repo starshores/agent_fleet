@@ -83,6 +83,7 @@ from bus.health import (  # noqa: E402
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
 from bus.identity import (  # noqa: E402
     cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
+    cmd_train_done,
 )
 
 
@@ -91,7 +92,7 @@ from bus.identity import (  # noqa: E402
 _CMD_GROUPS = [
     ("消息任务流 core", "send wait serve request done peek replies answer"),
     ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard selfwake-exempt"),
-    ("角色·能力 roles", "register retire revive retired caps roster route"),
+    ("角色·能力 roles", "register retire revive retired caps roster route train-done"),
     ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
     ("工作组池 pool", "join-group leave-group send-group(--route) route-reap fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
@@ -140,6 +141,7 @@ def main():
     p = sub.add_parser("peek"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_peek)
     p = sub.add_parser("replies"); p.add_argument("--role", required=True); p.add_argument("--clear", action="store_true"); p.set_defaults(fn=cmd_replies)
     p = sub.add_parser("hello"); p.add_argument("--role", default=None); p.add_argument("--preview", action="store_true", help="只读预览 onboarding 文本(WebUI 提示词审核页用),不带 --role 也能跑、无副作用"); p.set_defaults(fn=cmd_hello)
+    p = sub.add_parser("train-done", help="培训师结业:置 trained=true 解除新角色待训警示(培训闸闭环)"); p.add_argument("--role", required=True); p.add_argument("--by", default=None); p.set_defaults(fn=cmd_train_done)
     p = sub.add_parser("who"); p.add_argument("--max-age", type=int, default=900); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_who)
     p = sub.add_parser("tag"); p.add_argument("--pid", type=int, required=True); p.add_argument("--label", required=True); p.add_argument("--note", default=""); p.add_argument("--public", action="store_true"); p.set_defaults(fn=cmd_tag)
     p = sub.add_parser("list"); p.set_defaults(fn=cmd_list)

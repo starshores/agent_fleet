@@ -7,8 +7,9 @@ _retired_roles/_pseudo_role_label/_role_dir/_case_collision)· presence(_touch_p
 · selfwake(_ancestor_pids/_is_parked/_parked_path/_self_wake_state/_wait_proc_roles)· notify(_fire_toast)。无反向依赖=无环。
 """
 import json, os, sys, time
+from pathlib import Path
 
-from bus.config import BUS, _now
+from bus.config import BUS, _now, cfg
 from bus.io import _audit, _gen_id, _write_json
 from bus.roster import _load_agents, _save_agents, _list_roles, _retired_roles, _pseudo_role_label, _role_dir, _case_collision
 from bus.presence import _touch_presence, _load_pidtags, _pidtags_file
@@ -62,7 +63,10 @@ def cmd_hello(args):
         sys.exit(2)
     _role_dir(role)
     a = _load_agents()
+    is_new = role not in a          # 首次注册的新角色 → 培训闸(_auto_train_request)
     a.setdefault(role, {})["registered"] = a.get(role, {}).get("registered") or _now()
+    if is_new:
+        a[role]["trained"] = False  # 🎓待训:培训师 train-done 结业前,send 派活带警示(软闸·不硬拦,防培训师离线死锁)
     _save_agents(a)
     try:
         _parked_path(role).unlink()   # 重开 hello=活跃 → 清 park/休眠标(秒回活跃·⑤)
@@ -75,6 +79,9 @@ def cmd_hello(args):
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
     _print_onboarding(role)
+    _print_role_feed(role)
+    if is_new:
+        _auto_train_request(role, a[role])
 
 
 def _print_onboarding(role):
@@ -116,6 +123,94 @@ def _print_onboarding(role):
     print("  口诀:棘手 → 先查能力池 → 换人做 或 请培训师教我做,别硬扛。")
 
 
+def _role_profile(role):
+    """读项目根 role_profiles.json(角色页/compact hook 同一单一源)取该角色条目;失败/未注册返 None。
+    路径经 cfg agent_fleet_home(换机只改 config.json),回退按物理文件位置推(resolve 穿 junction 落真实家)。"""
+    try:
+        home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
+        data = json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8"))
+        for r in data.get("roles", []):
+            if r.get("role") == role:
+                return r
+    except Exception:
+        pass
+    return None
+
+
+def _load_caps_pool():
+    try:
+        return json.loads((BUS / "capabilities.json").read_text(encoding="utf-8")).get("capabilities", {})
+    except Exception:
+        return {}
+
+
+def _print_role_feed(role):
+    """hello 即喂【角色页 + 能力池】(2026-07-28 用户令:机制上防"老角色的新会话空脑上岗"——
+    实证:MasterUI 新会话首单把 WebUI 重启到 5678 且假阳性验证,根因=角色操作知识只在 compact 注入、上岗时没人喂)。
+    数据同源 role_profiles.json + capabilities.json(与 WebUI 角色页/compact hook 同一份);纯打印无副作用。"""
+    prof = _role_profile(role)
+    print("\n==== 你的角色页(role_profiles.json 单一源)——【先读完并走完启动流程,再开始领活】 ====")
+    if prof:
+        print("【定位】" + (prof.get("one_liner") or ""))
+        if prof.get("mode"):
+            print("【形态】" + prof["mode"])
+        if prof.get("boundary"):
+            print("【边界】" + prof["boundary"])
+        flow = prof.get("startup_flow") or []
+        if flow:
+            print("【启动流程·逐条走完才算上岗】")
+            for s in flow:
+                print("  " + s)
+    else:
+        print("(你不在角色注册表 role_profiles.json——新角色:先请培训师带训、补注册表条目,再开始接活;跨领域活别自接。)")
+    rec = _load_agents().get(role) or {}
+    caps = rec.get("caps") or []
+    if caps:
+        pool = _load_caps_pool()
+        print("【能力池·你持有的 caps 与口径】")
+        for c in caps:
+            print("  - %s:%s" % (c, (pool.get(c) or {}).get("desc", "(池中无此能力描述)")))
+        print("  (能力模块详解按需向培训师要,对应 BUS_ONBOARDING.md 各节)")
+    if rec.get("trained") is False:
+        print("【🎓待训期】你是新注册角色、尚未结业(已自动通知培训师带训):待训期间只接简单明确的活;"
+              "运维/写库/改基建类复杂活等培训师 `ab train-done --role %s` 结业后再接。" % role)
+
+
+def _auto_train_request(role, rec):
+    """新角色首次 hello → 自动给培训师投带训单(培训闸·软闸:派活仍可达,send 对未结业目标带警示)。"""
+    try:
+        _role_dir("培训师")
+        tid = _gen_id("培训师")
+        task = {
+            "id": tid, "from": role, "to": "培训师",
+            "title": "[自动·新人带训] %s 首次上岗" % role,
+            "task": ("新角色 %s 刚 hello 注册(caps=%s),按 BUS_ONBOARDING.md 流程带训:先握手验自醒三步闭环、"
+                     "再按 caps 只发对应能力模块;完成后跑 `ab train-done --role %s` 结业(解除待训警示)。"
+                     % (role, ",".join(rec.get("caps") or []) or "未配·请顺带按最小授权配 caps", role)),
+            "created": _now(), "status": "pending",
+            "no_receipt": True,   # 机制单·fire-and-forget:完成不回执,防新人 inbox 被机制回执噪声灌
+        }
+        _write_json(BUS / "培训师" / "inbox" / (tid + ".json"), task)
+        _audit("train_request", role=role)
+        print("(已自动给培训师投带训单:%s)" % tid)
+    except Exception as e:
+        sys.stderr.write("(带训单投递失败:%s——请手动 `ab send --to 培训师` 请求带训)\n" % e)
+
+
+def cmd_train_done(args):
+    """培训师结业命令:置 agents.json[role].trained=true,解除 send 的待训警示(培训闸闭环)。
+    配套:新角色首次 hello 自动标 trained=false + 投带训单给培训师(_auto_train_request)。"""
+    role = args.role
+    a = _load_agents()
+    if role not in a:
+        sys.stderr.write("角色 %s 不在册(agents.json),无法结业。\n" % role)
+        sys.exit(2)
+    a[role]["trained"] = True
+    a[role]["trained_at"] = _now()
+    a[role]["trained_by"] = args.by or os.environ.get("AGENTBUS_ROLE") or "培训师"
+    _save_agents(a)
+    _audit("train_done", role=role, by=a[role]["trained_by"])
+    print("🎓 %s 已结业(trained=true · by %s)。send 派活不再带待训警示。" % (role, a[role]["trained_by"]))
 
 
 def cmd_whoami(args):

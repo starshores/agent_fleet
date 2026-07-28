@@ -71,7 +71,13 @@ ab answer --todo <id> --reply "<答复>" [--from 用户]  # 待办回路(闭环 
 ab register --role X --desc "<专长/分管>"            # 把会话里训出的专家入册(设/改专长);再按需配 caps
 ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
 ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code 会话(~/.claude/projects/*.jsonl:cwd/aiTitle/最近/大小);给 UI"可恢复会话"视图用;真 resume 在终端 claude --resume <id>
+ab train-done --role X [--by 培训师]                 # 培训师结业:置 trained=true,解除新角色🎓待训警示(培训闸闭环,见下「上岗喂入与培训闸」)
 ```
+
+### 上岗喂入与培训闸(2026-07-28 用户令·防"新会话空脑上岗")
+> 实证起因:MasterUI 老角色的新会话上岗首单,把 WebUI 重启到 5678(sql_agent 的口)且用错端口 HTTP 200 当"重启成功"——角色操作知识(8799/start_ui.ps1/验证纪律)在 role_profiles.json 里全有,但只在 compact 时注入、上岗时没人喂。
+- **hello 即喂角色页+能力池**:`hello --role X` 现在会追加打印 X 的 role_profiles 条目(定位/形态/边界/**启动流程——逐条走完才算上岗**)+ 持有 caps 的口径清单(capabilities.json)。数据与 WebUI 角色页/compact 注入 hook 同一单一源。
+- **新角色培训闸(软闸)**:首次注册的角色自动标 `trained=false` + 给培训师投带训单;`send` 派活给未结业目标打 ⚠待训警示(**仍投递**,不硬拦=防培训师离线死锁);培训师按 BUS_ONBOARDING 带完跑 `ab train-done --role X` 结业。老角色(此前已在册)不受影响。
 
 ### 两类执行体(2026-06-23)
 - **持久 role worker**(注册、常驻):由 CLI 启动 daemon(`start_worker.ps1`)或 tab `/loop serve`,监听自己 role 队列、接连多个任务。适合稳定专责角色。

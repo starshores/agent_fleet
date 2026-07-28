@@ -56,6 +56,9 @@ def cmd_send(args):
             "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
             "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
     _warn_unreachable(role)   # 校验目标在岗(治静默漏接:派了≠接了)
+    if (_load_agents().get(role) or {}).get("trained") is False:   # 培训闸·软警示(新角色未结业)
+        sys.stderr.write("⚠ 目标 %s 处于🎓待训期(新注册·培训师未 train-done):简单明确活可派;"
+                         "运维/写库/改基建类复杂活请等结业,或在任务里写明验证清单。(仍投递)\n" % role)
     tid = _gen_id(role)
     task = {
         "id": tid, "from": frm, "to": role,
