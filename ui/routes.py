@@ -122,6 +122,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        origin = self.headers.get("Origin", "")
+        if origin and origin not in ("http://127.0.0.1:8799", "http://localhost:8799"):
+            self._send(403, {"error": "forbidden"})
+            return
         path = urlparse(self.path).path
         if path == "/api/send":
             b = self._body_json()
@@ -170,7 +174,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def _sse(self):
-        global _change_ver
+        # 直接引用 api 模块属性，绕过 facade int 定格副本(facade 拷贝时 _change_ver=0 定格，api._bump() 只改 api 侧)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
@@ -179,14 +183,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(b": connected\n\n")
             self.wfile.flush()
-            with _change_cv:
-                last = _change_ver
+            with api._change_cv:
+                last = api._change_ver
             while True:
-                with _change_cv:
-                    # 最长 15s 等变更;到点发心跳保活
-                    got = _change_cv.wait_for(lambda: _change_ver != last, timeout=15)
+                with api._change_cv:
+                    got = api._change_cv.wait_for(lambda: api._change_ver != last, timeout=15)
                     if got:
-                        last = _change_ver
+                        last = api._change_ver
                 if got:
                     self.wfile.write(b"data: change\n\n")
                 else:

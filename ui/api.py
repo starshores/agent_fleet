@@ -1128,6 +1128,8 @@ def send_task(to, title, task, requires_approval=False, notify="auto"):
 
 
 def clear_replies(role, file=None):
+    if not role or role.startswith((".", "_")) or any(c in role for c in ("/", "\\", "..")):
+        return 0
     d = BUS / role / "done"
     n = 0
     if not d.exists():
@@ -1455,23 +1457,30 @@ def _augment_daily_with_backfill(data):
                 while cur < end:
                     ds = cur.isoformat()
                     if ds not in bf_dates and ds not in existing:
-                        gap.append({"date": ds, "src": "gap", "tokens_total": None,
-                                    "tokens_io": None, "cost_usd": None, "calls": None})
+                        # 04-29~05-10 无任何源 = 无使用 → 真实 0(已确认;不再当"未知缺口",
+                        # 故填 0 而非 None——这是【已知的零】,不是插值/估算)。
+                        gap.append({"date": ds, "src": "vacation", "tokens_total": 0,
+                                    "tokens_io": 0, "cost_usd": 0, "calls": 0})
                     cur += timedelta(days=1)
             except Exception:
                 pass
         merged = bf + gap + daily
         merged.sort(key=lambda x: x.get("date") or "")
         data["daily"] = merged
+        _first = (merged[0]["date"] if merged else None)   # 历史真起点(=最早一条,当前=stats-cache firstSessionDate 2026-03-27)
         data["backfill_meta"] = {
             "n_backfill": len(bf), "n_gap": len(gap),
             "bf_from": (min(bf_dates) if bf_dates else None),
             "bf_to": (max(bf_dates) if bf_dates else None),
-            "gap_from": (gap[0]["date"] if gap else None),
+            "vac_from": (gap[0]["date"] if gap else None),
+            "vac_to": (gap[-1]["date"] if gap else None),
+            "gap_from": (gap[0]["date"] if gap else None),   # 兼容旧键(消费方 legend 读 gap_from/to);语义已=零使用段
             "gap_to": (gap[-1]["date"] if gap else None),
+            "first_session": _first,                          # 真字段(非仅 note 文本);此前无数据=未开始用·非丢失
             "source": (rows[0][6] if rows else None),
-            "note": "03-27~04-28 为 Claude Code stats-cache 抢救的【日聚合】数据(无逐会话/cache 拆分、"
-                    "口径或略异,供趋势参考);04-29~05-10 无任何源,显示为缺口(非0)。",
+            "note": "03-27~04-28 为 Claude Code stats-cache 抢救的【日聚合】数据(总口径未含 cache,量级≈io、"
+                    "粒度较粗,供趋势参考);04-29~05-10 无任何源·无使用(=0,已确认);"
+                    "05-11 起为逐条 ETL。first_session=历史起点(此前无数据=未开始使用,非丢失)。",
         }
         return data
     except Exception:
@@ -1617,9 +1626,13 @@ def _ctx_win_of(model):
     """模型→上下文窗口(真实值)。返回 (window, known):known=False 表示窗口为假定值,UI 需标注。
     切勿按名硬编 200K——opus-4-7/opus-4-8 都是 1M(踩过把 opus-4-7 当 200K 算出假 164%)。"""
     m = (model or "").lower()
+    if "fable" in m or "mythos" in m:            # Claude 5 家族:fable-5/mythos-5=1M(claude-api 权威·2026-07-27 修 fable 落 200K 假红警)
+        return 1000000, True
     if "opus-4" in m or "haiku" in m:           # 任务确认:opus-4*=1M、haiku=200K
         return (1000000 if "opus-4" in m else 200000), True
-    if "sonnet-4" in m:                          # 1M-capable 家族(沿用参考实现,窗口标假定)
+    if "sonnet-4-6" in m:                         # 官方确认 1M(claude-api 权威·2026-07-28)
+        return 1000000, True
+    if "sonnet-4" in m:                           # 其余 sonnet-4*(4-0/4-5 默认 200K·1M须beta头)·假定
         return 1000000, False
     return 200000, False                         # 未知:默认 200K 且标注
 
