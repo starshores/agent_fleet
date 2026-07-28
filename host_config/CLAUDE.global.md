@@ -31,6 +31,18 @@
 
 **原因**:2026-07-06 用户 explicit — "AskUserQuestion 会占用会话,要想办法优化掉"(agent 用卡片阻塞会话的实例)。
 
+## agent bus 标准用法(hello / 自醒)— 所有会话通用
+
+> 2026-07-28 用户令:所有项目/会话都纳入 bus 管理,无"无关项目"例外。
+
+- **入口**:`ab <命令>`(已在用户 PATH;固化正确 env python + UTF-8)。新 shell 报 `ab: command not found` 时用全路径回退:`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <命令>`。
+- **标准上岗三步**(顺序别乱):
+  1. `ab whoami` — 先反查本会话是否已绑定 role(**compact 重载 presence 不丢,不必重 hello**,重认身份即可);
+  2. 查不到才是真·新 tab → `ab hello --role <本tab角色>`(每个 tab 仅一次;登记身份、绑定进程,**不会自动接活**)。还没有角色名的新项目会话:用 `ab roster` 看在册角色、或问 Master/培训师 定名注册,别匿名干活;
+  3. 挂自醒:后台跑 `ab wait --role <角色> --timeout 0`(run_in_background、别前台阻塞)→ `ab selfwake` 验本 role **✓在岗**才算完。
+- **铁律**:每次被唤醒处理完,必须**重挂 wait + selfwake 再验**(不重挂=掉线收不到消息);空唤醒→静默重挂+最多一行,别重复 dump 状态。
+- 完整协议(send/done/peek/replies/roster/route 等)见 `C:\apphome\agent_fleet\AGENTS.md` + `BUS_ONBOARDING.md`。
+
 ## 等本地长任务 / 文件变化 → 事件机制,不要 sleep polling
 
 - 文件变化用 `watchdog.observers.Observer` 或 `pywin32.win32file.ReadDirectoryChangesW`
@@ -75,3 +87,7 @@ AppID 已通过 HKCU:\SOFTWARE\Classes\AppUserModelId\ClaudeCode.NotifyTest 注�
 ④ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
 砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
 压后第一动作:复述①②自检,答不全就重读【你自己的 CLAUDE.md + 相关记忆】补回再干活。
+
+
+
+
