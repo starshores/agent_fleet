@@ -78,6 +78,86 @@ def maint_info():
         return {}
 
 
+# ---------------- 舰队状态判定(用户令 2026-07-28:UI 顶部显示·预设条件可配置)----------------
+_RULES = BUS / "fleet_state_rules.json"
+_DEFAULT_STATES = [
+    {"state": "维修中", "icon": "🔧", "when": "maintenance"},
+    {"state": "严重掉线", "icon": "🔴", "when": "stale_count>=3"},
+    {"state": "部分掉线", "icon": "🟠", "when": "stale_count>=1"},
+    {"state": "正常", "icon": "🟢", "when": "default"},
+]
+
+
+def fleet_state():
+    """舰队总体状态(单一源·CLI 与 WebUI 顶栏共用):按 fleet_state_rules.json 预设条件
+    顺序评估,首条命中即状态。返回 {state, icon, desc, guard, counts, maint, rule}。
+    counts 口径与 selfwake 一致(排除 伪角色/退役/parked/测试);guard=自醒守卫状态
+    (维修模式=休眠,否则=值守)。规则文件坏/缺 → 内置默认(降级仍可判)。"""
+    from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _is_test_role
+    from bus.selfwake import _self_wake_state, _wait_proc_roles, _is_parked
+    try:
+        states = json.loads(_RULES.read_text(encoding="utf-8")).get("states") or _DEFAULT_STATES
+    except Exception:
+        states = _DEFAULT_STATES
+    wait_roles = _wait_proc_roles()
+    retired = _retired_roles()
+    counts = {"armed": 0, "recent": 0, "stale": 0, "off": 0, "parked": 0, "expected": 0}
+    stale_roles = []
+    for role in _list_roles():
+        if _pseudo_role_label(role) or role in retired or _is_test_role(role):
+            continue
+        if _is_parked(role):
+            counts["parked"] += 1
+            continue
+        counts["expected"] += 1
+        st = _self_wake_state(role, wait_roles=wait_roles)[0]
+        counts[st] = counts.get(st, 0) + 1
+        if st == "stale":
+            stale_roles.append(role)
+    stale = counts["stale"]
+    ratio = (stale / counts["expected"]) if counts["expected"] else 0.0
+    m_on = maint_active()
+
+    def _hit(when):
+        if when == "maintenance":
+            return m_on
+        if when == "default":
+            return True
+        if when.startswith("stale_count>="):
+            try:
+                return stale >= int(when.split(">=", 1)[1])
+            except Exception:
+                return False
+        if when.startswith("stale_ratio>="):
+            try:
+                return ratio >= float(when.split(">=", 1)[1])
+            except Exception:
+                return False
+        return False
+
+    chosen = next((r for r in states if _hit(r.get("when", ""))), _DEFAULT_STATES[-1])
+    out = {"state": chosen.get("state"), "icon": chosen.get("icon", ""), "desc": chosen.get("desc", ""),
+           "rule": chosen.get("when"), "guard": "休眠(维修模式)" if m_on else "值守中",
+           "counts": counts, "stale_roles": stale_roles}
+    if m_on:
+        out["maint"] = maint_info()
+    return out
+
+
+def cmd_fleet_state(args):
+    """舰队状态一行判定(预设条件见 fleet_state_rules.json;--json 给 WebUI/脚本)。"""
+    st = fleet_state()
+    if getattr(args, "json", False):
+        print(json.dumps(st, ensure_ascii=False)); return
+    c = st["counts"]
+    print("%s 舰队状态:%s(规则 %s)· 守卫:%s" % (st["icon"], st["state"], st["rule"], st["guard"]))
+    print("   在岗%d/应在岗%d · 待确认%d · 掉线%d%s · 休眠%d" % (
+        c["armed"], c["expected"], c.get("recent", 0), c["stale"],
+        ("(" + "、".join(st["stale_roles"]) + ")") if st["stale_roles"] else "", c["parked"]))
+    if st.get("maint"):
+        print("   🔧 维修:since %s·%s" % (st["maint"].get("since"), st["maint"].get("note") or "-"))
+
+
 _MARK = {"milestone": "🏁", "incident": "🔥", "maintenance": "🔧", "retire": "⊘",
          "revive": "♻", "train": "🎓", "note": "·"}
 
