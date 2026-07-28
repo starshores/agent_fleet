@@ -3,6 +3,8 @@
 > 方法:4 个只读代码、禁读文档的审查代理(核心架构/并发与崩溃一致性/周边进程/WebUI)独立审查,
 > MasterAgent 拿疑点对文档/决议逐条销案——销不掉的进本清单。目标(用户令):让 bus 成为优秀项目。
 > 状态图例:☐待办 ☑完成 ◪部分。完成一项勾一项,全清后本文件归档。
+>
+> ✅ **全清归档(2026-07-28)**:P0 9 项 / P1 12 项 / P2 7 项全部完成。MasterAgent lane commit 链:e7f1244→6ef2f18→fcffbf7→ae2b62c→0892fa2;MasterUI lane:6a516b4(安全三件)→10bdf0d(路径页)→270c3a5(UI P1+噪音静音)。每批 bus_smoke 43/43;claim 并发闸 120×6 恒一胜;端到端事件唤醒实测。本文件转为【已完成审计记录】留档。
 
 ## P0 — 会造成数据错/丢/双跑/安全洞(先修)
 
@@ -38,7 +40,7 @@
   events/metrics.jsonl 轮转、done_archive//_dead_letter//.trash 终点站保留期)
 - ☑ watchdog 样板 4 处抽公共(bus/watch.py arm_watch;+2 降级轮询兜底;端到端事件唤醒实测·ae2b62c;pool_dispatcher 休眠脚本不动=随 P2 处置)(NameError 正是复制丢 import 所致)
 - ☑ 公共面定稳定 API 层(agentbus.__all__ 28 名·按消费方全量 grep 圈定=名单即契约;抓获活雷 ab._daemon_alive 从未 re-export 已补·ae2b62c)——原文:公共面定稳定 API 层(facade 现 re-export ~90 个 _私名无 __all__;UI 依赖 15 个私名)
-- ☐ UI:todos 锁/fresh 空操作/硬编码路径/read_events 整读尾取/死代码 build_activity(MasterUI lane)
+- ☑ UI:todos 锁(json_lock)/fresh no-op 参数清理/硬编码路径动态派生/read_events bounded 尾读(64KB)/死代码 build_activity 删除(62行)——MasterUI·270c3a5;并顺带静音 routes._send 客户端中断噪音(WinError 10053·用户报)
 
 ## P2 — 卫生/清晰度
 
