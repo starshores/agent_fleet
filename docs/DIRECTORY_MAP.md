@@ -27,7 +27,7 @@
 | `group_metrics_spec.py` | 工作组指标口径定义（使用方 owner）|
 | `sync_code.ps1` | junction 守卫（检测到 reparse 点即 no-op，防 hook 误把文件硬链回自己）|
 | `sync_memory.ps1` | MasterAgent 运行记忆硬链镜像维护（Write/Edit 断链后刷新）|
-| `sync_host_config.ps1` | 宿主全局配置快照刷新（`host_config/`）|
+| `sync_host_config.ps1` | 宿主 settings.json 快照刷新 + CLAUDE.md 软链完好性守卫（`host_config/`）|
 
 ---
 
@@ -97,7 +97,7 @@
 | `hooks/` | Claude Code 生命周期 hook：`reinject_post_compact.py`（compact 后自定位）/ `block_askuser.py`（防阻塞询问转待办池）/ `enforce_selfwake.py`（自醒守卫）/ `turn_state.py`（回合观测）/ `on_memory_write.py`（记忆写触发重链）|
 | `docs/` | 设计 / 评审 / 简报 / 计划文档（本文所在；ARCHITECTURE_REVIEW / BUS_2.0_PLAN / BUS_2.0_P2_DESIGN / NEWINFRA_* / LONGRANGE_HOWTO …）|
 | `memory/` | MasterAgent 运行记忆硬链镜像（源 = `~/.claude/projects/XXX/memory`；只镜像 MasterAgent/bus 运行记忆，不含业务知识）|
-| `host_config/` | 宿主全局配置快照（`CLAUDE.global.snapshot.md` + `settings.snapshot.json`；换机回填用，含 Compact 指令 + 早压 env + hook 注册）|
+| `host_config/` | 宿主全局配置（`CLAUDE.global.md` = 全局 `~/.claude/CLAUDE.md` **物理原件**·宿主路径是文件软链接·2026-07-27 + `settings.snapshot.json` 快照；换机回填用，含 Compact 指令 + 早压 env + hook 注册）|
 | `githooks/` | 发版钩子（`reference-transaction`：打 vX tag 时自动 zip 快照到同级 `agent_fleet_releases/`）|
 | `session-archive/` | 退役会话 jsonl 归档 + manifest（轮换时冻结存档，可 --resume 回溯）|
 | `proposals/` | 待提议的外部变更草案（如 `XXX_CLAUDE.md.proposed`）|
