@@ -22,7 +22,9 @@ while read -r old new ref; do
   mkdir -p "$REL"
   out="$REL/${NAME}_${tag}.zip"
   [ -f "$out" ] && { echo "[release-hook] $tag 已存在,跳过"; continue; }
-  if "$TAR" -a -c -f "$out" -C "$PARENT" --exclude='*__pycache__*' "$NAME" 2>/dev/null; then
+  # projects/ = 全部 agent 会话运行态(2026-07-28 迁入·含业务库 junction,bsdtar 会追进去=数百MB),
+  # 发版 zip 是【代码快照】不带它;整目录迁移走文件夹拷贝路径、自然带上。
+  if "$TAR" -a -c -f "$out" -C "$PARENT" --exclude='*__pycache__*' --exclude="${NAME}/projects" "$NAME" 2>/dev/null; then
     echo "[release-hook] 已 snapshot $tag -> $out"
   else
     echo "[release-hook] snapshot $tag 失败(检查 tar 路径/权限)"
