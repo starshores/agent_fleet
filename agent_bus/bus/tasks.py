@@ -10,7 +10,7 @@ cmd_answer 闭环回路(答复路由回提问 agent + 标完成)。落磁盘=防
 import json, os, sys, time
 
 from bus.config import BUS, _now
-from bus.io import _gen_id, _write_json, _audit, json_lock
+from bus.io import _gen_id, _write_json, _audit, json_lock, _fail
 from bus.core import _warn_unreachable
 from bus.roster import _load_agents
 
@@ -108,10 +108,10 @@ def cmd_answer(args):
             todos = []
         item = next((t for t in todos if t.get("id") == args.todo), None)
         if not item:
-            print(json.dumps({"error": "无此待办 id: %s" % args.todo}, ensure_ascii=False)); return
+            _fail("无此待办 id: %s" % args.todo)
         target = item.get("confirm_from")
         if not target or target in ("bus健康", "unknown"):
-            print(json.dumps({"error": "该待办无可回的提问方(confirm_from=%s),无处回路" % target}, ensure_ascii=False)); return
+            _fail("该待办无可回的提问方(confirm_from=%s),无处回路" % target)
         frm = args.frm or "用户"
         _warn_unreachable(target)   # 提问方不在岗就告警;答复仍写进它 inbox,它上线即见
         tid = _gen_id(target)

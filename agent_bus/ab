@@ -2,6 +2,10 @@
 # ab —— bus 短命令入口(Git Bash)。BUS 2.0 使用体验:固化【正确 env python(带 watchdog/psutil)】
 # +【真实项目根路径(避 junction 遍历歧义)】+ UTF-8,消除"裸 python 崩 / 长路径 / 反斜杠 / cwd"诸坑。
 # 用法:ab wait --role X --timeout 3600 / ab done --id .. --role .. --result .. / ab who / ab hello --role X …
-# 换机:改下面两路径(与 config.json 的 python_bin / agent_fleet_home 一致即可)。
+# 换机(P2 归一·2026-07-28):优先设环境变量 AGENTBUS_PYTHON_BIN / AGENTBUS_AGENT_FLEET_HOME(与 config.json
+# 的 python_bin / agent_fleet_home 同义);不设则用下面默认。启动器无法读 config(鸡生蛋:读 config
+# 先要 python),env 覆盖即是归一机制——五处入口同认这两个 env。
 export PYTHONUTF8=1
-exec "C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" "$@"
+PY="${AGENTBUS_PYTHON_BIN:-C:/path/to/python.exe}"
+AF="${AGENTBUS_AGENT_FLEET_HOME:-C:/apphome/agent_fleet}"
+exec "$PY" "$AF/agent_bus/agentbus.py" "$@"

@@ -35,30 +35,7 @@ BASE = os.environ.get("EXTERNAL_DOCS_BASE", "https://example.com")  # 按部署�
 DEFAULT_DOC = os.environ.get("EXTERNAL_DOC_TOKEN", "example-doc-token")  # 默认表格 token 可由部署环境覆盖
 
 
-def _lock(action, who):
-    """edge 焦点互斥锁。acquire 失败【硬退出】(P0·2026-07-28):edge-acquire 恒 exit 0、
-    结果在 stdout JSON——之前只捕异常不看结果,抢锁失败照操作 Edge=互斥形同虚设=串台病根。"""
-    try:
-        r = subprocess.run([sys.executable, os.path.join(HERE, "agentbus.py"),
-                            f"edge-{action}", "--who", who] + (["--timeout", "60"] if action == "acquire" else []),
-                           capture_output=True, text=True, timeout=70)
-        if action == "acquire":
-            ok = False
-            try:
-                ok = bool(json.loads((r.stdout or "").strip().splitlines()[-1]).get("acquired"))
-            except Exception:
-                ok = False
-            if not ok:
-                print(f"[fatal] edge-acquire 抢锁失败(被占/超时/异常)→ 禁止无锁操作 Edge,退出。"
-                      f"稍后重试或 `ab edge-status` 看持有者。stdout={(r.stdout or '').strip()[:200]}", file=sys.stderr)
-                sys.exit(3)
-    except SystemExit:
-        raise
-    except Exception as e:
-        if action == "acquire":
-            print(f"[fatal] edge-acquire 调用异常:{e} —— 抢锁失败禁继续(P0),退出。", file=sys.stderr)
-            sys.exit(3)
-        print(f"[warn] edge-{action} 异常: {e}", file=sys.stderr)
+from external_common import edge_lock as _lock   # P2 收敛:四份逐字复制体归一(焦点策略成文也在 external_common)
 
 
 class _TableParser(HTMLParser):

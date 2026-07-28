@@ -65,12 +65,18 @@ def _role_dir(role):
     return d
 
 
+# 已知非 role 目录(不靠前缀排除的漏网者):bus=总线自身 Python 源码包(与 mailbox 同住 BUS 根;
+# Master数分 2026-07-28 报:被枚举成 role 后 selfwake/who 误报"bus 掉线")。__pycache__ 双保险。
+_NON_ROLE_DIRS = {"bus", "__pycache__"}
+
+
 def _list_roles():
-    """BUS 下的 role 目录(排除 __pycache__ / 以 . 或 _ 开头的非 role 目录)。"""
+    """BUS 下的 role 目录(排除 . / _ 前缀 + _NON_ROLE_DIRS 明册)。"""
     if not BUS.exists():
         return []
     return sorted([p.name for p in BUS.iterdir()
-                   if p.is_dir() and not p.name.startswith((".", "_"))])
+                   if p.is_dir() and not p.name.startswith((".", "_"))
+                   and p.name not in _NON_ROLE_DIRS])
 
 
 def _retired_roster_names():
@@ -133,7 +139,8 @@ def _case_collision(role):
     rl = role.lower()
     seen = set(_load_agents().keys())
     try:
-        seen |= {p.name for p in BUS.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))}
+        seen |= {p.name for p in BUS.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))
+                 and p.name not in _NON_ROLE_DIRS}   # 同步排除源码包等非 role(Master数分 2026-07-28 报)
     except Exception:
         pass
     for name in seen:

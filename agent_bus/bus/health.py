@@ -14,7 +14,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, cfg, _now
-from bus.io import _audit, _write_json, json_lock
+from bus.io import _audit, _write_json, json_lock, _fail
 from bus.proc import _age_seconds
 from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents, _policy
 from bus.edge import _edge_holder
@@ -666,7 +666,7 @@ def cmd_supervise(args):
     try:
         fleet = json.loads((BUS / "fleet.json").read_text(encoding="utf-8"))
     except Exception as e:
-        print(json.dumps({"error": "读 fleet.json 失败: %s" % e}, ensure_ascii=False)); return
+        _fail("读 fleet.json 失败: %s" % e)
     daemons = fleet.get("daemons", [])
     sw = BUS / "start_worker.ps1"
     actions = []

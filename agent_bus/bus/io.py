@@ -6,6 +6,8 @@ from bus.config import BUS, METRICS, _now
 
 
 def _gen_id(role):
+    # 形如 <毫秒ts>-<role>-<6hex>。role 嵌 id 曾与 done 的 startswith 前缀匹配叠出错配歧义面
+    # (P2 审):P1 已改 _find_task 精确 id 匹配,歧义面消;保留 role 段=人读排障友好,不再改。
     return "%d-%s-%s" % (time.time_ns() // 1_000_000, role, os.urandom(3).hex())
 
 
@@ -33,6 +35,15 @@ def _write_json(path, obj):
 def _oldest(folder):
     files = sorted([p for p in folder.glob("*.json")])
     return files[0] if files else None
+
+
+def _fail(msg, code=1):
+    """错误通道统一(P2·2026-07-28):{"error": msg} 落 stdout(机器可读不变)+ 非零退出码。
+    原状=各命令 print error 后 exit 0,脚本/daemon 调用方无法用退出码判败,只能 parse stdout。
+    约定:命令面错误一律走本函数;exit 0 = 成功且 stdout 无 error 键。"""
+    import sys
+    print(json.dumps({"error": msg}, ensure_ascii=False))
+    sys.exit(code)
 
 
 def _steal_stale_lock(lock):

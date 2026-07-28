@@ -10,7 +10,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, METRICS, cfg, _now, _idle_timeout_policy
-from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics
+from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics, _fail
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
 from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds
@@ -260,7 +260,7 @@ def cmd_serve(args):
     """通用 worker 入口:自动认出本 tab 的 role(需先 hello 过一次),再阻塞等任务。"""
     role = _resolve_self_role()
     if not role:
-        print(json.dumps({"error": "未识别本 tab 身份,请先运行一次:agentbus hello --role <本tab名>"}, ensure_ascii=False))
+        _fail("未识别本 tab 身份,请先运行一次:agentbus hello --role <本tab名>")
         return
     _serve_wait(role, args.timeout)
 
@@ -274,10 +274,10 @@ def cmd_request(args):
     chain 跨 claude -p 靠 worker 自觉透传 --chain '<我收到任务里的 chain,逗号拼接>'。"""
     frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
     if args.to == frm:                       # 防护1:自请求必死锁(自己阻塞等自己)
-        print(json.dumps({"error": "self-request forbidden (to==from): %s" % frm}, ensure_ascii=False)); return
+        _fail("self-request forbidden (to==from): %s" % frm)
     chain = [c for c in (args.chain.split(",") if args.chain else []) if c]
     if args.to in chain:                     # 防护2:目标已在调用链上 → 环(A→B→A、A→B→C→B 都挡)
-        print(json.dumps({"error": "cycle detected: %s already in chain %s" % (args.to, chain)}, ensure_ascii=False)); return
+        _fail("cycle detected: %s already in chain %s" % (args.to, chain))
     tid = _gen_id(args.to)
     task = {
         "id": tid, "from": frm, "to": args.to,

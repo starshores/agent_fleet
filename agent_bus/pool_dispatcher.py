@@ -6,6 +6,8 @@
    运行时 join/leave 已支持手动缩放(关成员=presence掉=临时缩池·别人顶上;重开=rejoin),不需自动派发器。
    本脚本【留档备 future】,当前【无 daemon 拉它、不激活】。决策支持改由 ab mem-cap + WebUI 内存/并发看板(使用方)提供。
    dry-run 已验 gate/scaling 正确;future 若走自动弹性可直接启用。
+   ⚠ 已知 bug(P2 审查 2026-07-28·启用前必修):任务文件 unlink 先于 spawn 成功确认——
+   spawn 失败(claude_bin 坏/资源限)时任务已删=静默丢单;应改为 spawn 确认后再 unlink(或搬 processing)。
 
 
 治内存墙:池成员不再是持久 claude tab(~360MB/个常驻),而是【按需 spin 一次性 claude -p worker 跑一分片即释】。

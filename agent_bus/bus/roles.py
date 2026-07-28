@@ -10,7 +10,7 @@
 import json, os
 
 from bus.config import BUS, _now
-from bus.io import _write_json, _audit
+from bus.io import _write_json, _audit, _fail
 from bus.roster import _load_agents, _save_agents, update_agents, _retired_roles, _is_test_role
 from bus.selfwake import _self_wake_state, _wait_proc_roles
 
@@ -86,7 +86,7 @@ def cmd_revive(args):
         if roster[i].get("role") == role and roster[i].get("status") == "archived":
             idx = i; break
     if idx is None:
-        print(json.dumps({"error": "档案馆无 %s 的 archived 记录" % role}, ensure_ascii=False)); return
+        _fail("档案馆无 %s 的 archived 记录" % role)
     rec = roster[idx]
     def _mut(ag):
         ag[role] = {"registered": _now(), "desc": rec.get("desc", ""), "caps": rec.get("caps", []),

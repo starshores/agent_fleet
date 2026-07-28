@@ -11,7 +11,7 @@ import json, os, subprocess, sys
 from pathlib import Path
 
 from bus.config import BUS, cfg, _now
-from bus.io import _gen_id, _write_json, _audit
+from bus.io import _gen_id, _write_json, _audit, _fail
 
 
 def cmd_dispatch(args):
@@ -22,10 +22,9 @@ def cmd_dispatch(args):
     # P1 审批闸(2026-07-28):dispatch 起的一次性 agent 以 --dangerously-skip-permissions 直跑、
     # 无人审——高风险任务不得走这条快跑面(send/wait 侧有 requires_approval 闸,dispatch 原是空洞)。
     if getattr(args, "requires_approval", False):
-        print(json.dumps({"error": "requires_approval 高风险任务不走 dispatch(一次性 agent 无人审直跑):"
-                                   "请改 `send --to <role> --requires-approval`,由人工值守 tab "
-                                   "`wait --include-approval` 领取执行。"}, ensure_ascii=False))
-        return
+        _fail("requires_approval 高风险任务不走 dispatch(一次性 agent 无人审直跑):"
+              "请改 `send --to <role> --requires-approval`,由人工值守 tab "
+              "`wait --include-approval` 领取执行。")
     tid = _gen_id("adhoc")
     cwd = args.cwd or cfg("default_worker_cwd")
     rec = {
@@ -45,5 +44,5 @@ def cmd_dispatch(args):
         subprocess.Popen([sys.executable, da, "--id", tid], creationflags=flags,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(BUS))
     except Exception as e:
-        print(json.dumps({"error": "dispatch 起一次性 agent 失败: %s" % e}, ensure_ascii=False)); return
+        _fail("dispatch 起一次性 agent 失败: %s" % e)
     print(tid)

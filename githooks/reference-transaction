@@ -21,7 +21,11 @@ while read -r old new ref; do
   tag="${ref#refs/tags/}"
   mkdir -p "$REL"
   out="$REL/${NAME}_${tag}.zip"
-  [ -f "$out" ] && { echo "[release-hook] $tag 已存在,跳过"; continue; }
+  # 强移 tag(git tag -f)也重打 snapshot,保 zip 与 tag 指向一致(P2 修:原"已存在即跳过"
+  # 会让强移后的 zip 停在旧内容,与"snapshot=该 tag 时刻"的注释矛盾)。旧 zip 先留 .prev 一代可回看。
+  [ -f "$out" ] && { mv -f "$out" "$out.prev" 2>/dev/null; echo "[release-hook] $tag 已存在→刷新(旧件留 .prev)"; }
+  # 注:zip 含运行态 db(usage.db 等);打包瞬间若有写入,db 快照可能非事务一致——
+  # 发版 zip 定位是【代码+当时状态的粗快照】,精确迁移走"停写后整目录拷贝"路径。
   # projects/ = 全部 agent 会话运行态(2026-07-28 迁入·含业务库 junction,bsdtar 会追进去=数百MB),
   # 发版 zip 是【代码快照】不带它;整目录迁移走文件夹拷贝路径、自然带上。
   if "$TAR" -a -c -f "$out" -C "$PARENT" --exclude='*__pycache__*' --exclude="${NAME}/projects" "$NAME" 2>/dev/null; then
