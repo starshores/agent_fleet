@@ -82,6 +82,7 @@ from bus.health import (  # noqa: E402
     _daemon_alive,   # ui/api.py fleet 面板用 ab._daemon_alive——此前漏 re-export(fleet 空未炸的活雷·P1 补)
 )
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
+from bus.storage import cmd_storage_audit, storage_audit  # noqa: E402
 from bus.fleetlog import cmd_fleetlog, cmd_maint, cmd_fleet_state, fleet_log, fleet_state, maint_active  # noqa: E402
 from bus.bootcheck import cmd_boot_check, boot_check, cmd_role_audit, cmd_memory_audit, cmd_caps_audit  # noqa: E402
 from bus.identity import (  # noqa: E402
@@ -120,7 +121,7 @@ _CMD_GROUPS = [
     ("消息任务流 core", "send wait serve request done peek replies answer"),
     ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard selfwake-exempt boot-check"),
     ("角色·能力 roles", "register retire revive retired caps roster route train-done role-audit caps-audit memory-audit"),
-    ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
+    ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale storage-audit"),
     ("工作组池 pool", "join-group leave-group send-group(--route) route-reap fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
     ("Edge 互斥", "edge-acquire edge-release"),
@@ -179,6 +180,7 @@ def main():
     p = sub.add_parser("health-sweep"); p.add_argument("--apply", action="store_true"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.set_defaults(fn=cmd_health_sweep)
     p = sub.add_parser("health"); p.add_argument("--stale-min", type=int, default=30, dest="stale_min"); p.add_argument("--stuck-min", type=int, default=90, dest="stuck_min"); p.add_argument("--todo-stale-min", type=int, default=1440, dest="todo_stale_min"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_health)
     p = sub.add_parser("stale"); p.add_argument("--hours", type=int, default=24); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_stale)
+    p = sub.add_parser("storage-audit"); p.add_argument("--threshold-mb", type=float, default=5.0, dest="threshold_mb"); p.add_argument("--top", type=int, default=10); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_storage_audit)
     p = sub.add_parser("tasklines"); p.add_argument("--id", default=None); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_tasklines)
     p = sub.add_parser("refs"); p.add_argument("--check", action="store_true"); p.add_argument("--purge-smoke", action="store_true"); p.set_defaults(fn=cmd_refs)
     p = sub.add_parser("prune"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_prune)

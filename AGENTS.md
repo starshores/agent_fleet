@@ -72,7 +72,14 @@ ab register --role X --desc "<专长/分管>"            # 把会话里训出的
 ab ask-user --from X --title "..." [--detail .. --priority 高/中/低 --ref <任务id>]  # 把【待用户确认】项投进 UI 待办池(不滚走);source=确认·X,capture-only 无回路
 ab sessions [--project X --limit N --json]          # 列可恢复 Claude Code 会话(~/.claude/projects/*.jsonl:cwd/aiTitle/最近/大小);给 UI"可恢复会话"视图用;真 resume 在终端 claude --resume <id>
 ab train-done --role X [--by 培训师]                 # 培训师结业:置 trained=true,解除新角色🎓待训警示(培训闸闭环,见下「上岗喂入与培训闸」)
+ab storage-audit [--threshold-mb 5 --top 10 --json] # 存储体检(2.4):三分格局总览(项目根/_releases/_data)+ 项目根分类分布(junction 不计体积)+ 素材纪律违规检测
 ```
+
+### 素材入库纪律(2.4 存储·2026-07-29 用户立项)
+> 三分格局:**项目根=代码+运行态方舟 / agent_fleet_releases=发版快照 / agent_fleet_data=素材源数据**。
+- **新素材(>1MB 的 raw / 数据包 / 中间产物)一律落 `C:\apphome\agent_fleet_data\` 或本会话 scratchpad,不落项目根/docs/agent_bus**。项目根内确需 canonical 路径的,物理放 _data、原位 junction 回链(先广播→动刀→再确认)。
+- 豁免(运行态·有自己的方舟/代谢机制,不算素材):agent_bus 根的 usage.db/events.jsonl、projects/(CC 自清)、.git。
+- 巡检抓手:`ab storage-audit`(>5MB 落非豁免区=违规候选,处置=移 _data+junction);_data/session-archive 自带独立本地 git(只版本化小提炼产物·raw 不入库,业务清理整目录删=连史全清)。
 
 ### 上岗喂入与培训闸(2026-07-28 用户令·防"新会话空脑上岗")
 > 实证起因:MasterUI 老角色的新会话上岗首单,把 WebUI 重启到 5678(sql_agent 的口)且用错端口 HTTP 200 当"重启成功"——角色操作知识(8799/start_ui.ps1/验证纪律)在 role_profiles.json 里全有,但只在 compact 时注入、上岗时没人喂。

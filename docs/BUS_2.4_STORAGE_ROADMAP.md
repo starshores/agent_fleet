@@ -9,13 +9,16 @@
   项目根目录 250→172MB;发版 zip 加排除(junction 会被 bsdtar 追进);path_registry data-home 登记;
   CLAUDE.md 迁移清单 +③c。
 
-## P1
-- **存储体检命令 `ab storage-audit`**:du 分布+按注册表分类(代码/方舟/素材/缓存/业务)+超标告警
-  (素材落在项目根非 junction 处=违规项),给 2.4 长效巡检抓手。
-- **素材入库纪律**:新素材(>1MB 的 raw/中间产物)一律落 _data 或 scratchpad,不落项目根/docs;
-  写进 AGENTS.md 操作锚 + onboarding(培训师)。
-- **剩余大件逐项定性**:agent_bus mailbox 积压(卫生代谢在吃)/ projects\C--apphome-agent-fleet
-  会话库 81MB(CC 自清+设计内)/ usage.db 37MB(方舟·必迁·不动)。
+## P1(✅ 已完成 2026-07-29)
+- **存储体检命令 `ab storage-audit`**(bus/storage.py):三分格局总览+项目根 top-level 分类分布
+  (junction 不追体积·归物理家)+大文件 topN+素材违规检测(>5MB 落非豁免区);--json 供 P2 面板复用。
+- **素材入库纪律**:已落 AGENTS.md 操作锚(命令速查+「素材入库纪律」节);onboarding 模块已派培训师。
+- **剩余大件定性(storage-audit 实测 2026-07-29·项目根逐文件实算 145MB)**:
+  usage.db 36.1MB=方舟不动;projects/C--apphome-agent-fleet 83MB=运行态(CC 自清+迁移包设计,
+  其中单会话 jsonl 最大 17.1MB——归档清瘦走 sessions --by-size+Master数分闸,非 2.4 强动);
+  agent_bus 50.2MB=源码+运行态(mailbox 积压卫生代谢在吃);.git 10.4MB=史。全部无素材违规。
+- **附带产出**:_data/session-archive 建独立本地 git(969433c·只版本化 extracted/manifest 等小提炼
+  产物,raw 不入库)——版本史+防误改,且不进项目根基建 git=业务数据可整体清除连史全清(平台纲领)。
 
 ## P2
 - WebUI 存储面板(📁路径页加大小列/趋势·MasterUI);_data 目录自身的保留期策略(Master数分口径)。
