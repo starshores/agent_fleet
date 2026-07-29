@@ -16,11 +16,13 @@
 
 | 阶段 | 内容 | 主实现 | 验证 | 备注 |
 |---|---|---|---|---|
-| **U0 金标准** | `ui_smoke.py` + 基线:GET 端点全量 200+JSON 键 / 页面关键面板锚 / 安全 POST(400 校验·supervise dry-run)/ SSE 连通;基线比对(端点消失=回归) | MasterAgent | Master数分 | 对应 bus_smoke;每阶段必跑 |
-| **U1 morphdom 全铺** | ①舰队总览(M·最高收益) → ②BI/派工/会话/活动只读表(S×n) → ③用量表格周边(canvas 不 morph)+ live.log 保滚动位 | MasterUI | Master数分逐面板 | 模式=待办池样板;一面板一上不阻断 |
-| **U2 一致性** | 历史用量拆独立 tab;刷新按【可见 tab】门控(省 psutil/token);0值/空折叠口径统一 | MasterUI | Master数分 | 提案 §2 |
-| **U3 route 防误派** | `/api/route` 后端(shell ab route)+ 派活表单"建议对口"chip | MasterAgent(端点)+ MasterUI(前端) | Master数分 | 有真实误派事故;nicety 排后 |
-| **U4 拆分收口** | page.py 拆分(F8 遗留·2823 行·同 P4 纯搬运契约);清 B2(start_maint 周期 reap + todos-archive)/ D6(cost 口径);收口决议成文 | MasterAgent+MasterUI | Master数分 | 结构收官 |
+| **U0 金标准** | `ui_smoke.py` + 基线:GET 端点全量 200+JSON 键 / 页面关键面板锚 / 安全 POST(400 校验·supervise dry-run)/ SSE 连通;基线比对(端点消失=回归)。★Master数分审计补三缺口后 38→69 用例(565c133),Master数分绿灯已出 | MasterAgent(✅完) | Master数分(✅绿) | 对应 bus_smoke;每阶段必跑 |
+| **U1 morphdom 全铺** | ①舰队总览(M·最高收益) → ②BI/派工/会话/活动只读表(S×n) → ③用量表格周边(canvas 不 morph)+ live.log 保滚动位 | MasterAgent | Master数分逐面板 | 模式=待办池样板;一面板一上不阻断 |
+| **U2 一致性** | 历史用量拆独立 tab;刷新按【可见 tab】门控(省 psutil/token);0值/空折叠口径统一 | MasterAgent | Master数分 | 提案 §2 |
+| **U3 route 防误派** | `/api/route` 后端(shell ab route)+ 派活表单"建议对口"chip | MasterAgent | Master数分 | 有真实误派事故;nicety 排后 |
+| **U4 拆分收口** | page.py 拆分(F8 遗留·2823 行·同 P4 纯搬运契约);清 B2(start_maint 周期 reap + todos-archive)/ D6(cost 口径);收口决议成文 | MasterAgent | Master数分 | 结构收官 |
+
+> **★分工变更(2026-07-29 用户令)**:UI 实施(U1-U4)由 MasterAgent 主实现——长程改造任务对模型等级敏感,MasterUI 模型等级低不宜担纲;MasterUI 保留 WebUI 运行位 owner(start_ui/常驻控制台/B2 运行侧),MasterAgent 改 ui/ 代码按对称律每阶段知会 MasterUI。
 
 ## 铁律(从 2.0 原样继承)
 
