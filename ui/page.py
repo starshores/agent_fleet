@@ -477,6 +477,22 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     </div>
   </section>
 
+  <section data-tab="bi">
+    <div class="sec-h">🚚 派工/协作效率 <span class="sub"><span class="mono">metrics.jsonl</span> · 仅自动化派工(daemon/dispatch)口径,非总账</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="pill muted" id="dmMeta">–</span>
+    </div>
+    <div class="sec-b">
+      <div class="bi-kpis" id="dmKpis"></div>
+      <div class="sub" style="padding:6px 16px 0">各角色成本(降序 · $/turn 效率)</div>
+      <div id="dmRoles" style="padding:4px 16px 6px"></div>
+      <div class="sub" style="padding:6px 16px 0">daemon vs dispatch 拆分</div>
+      <div id="dmKind" style="padding:4px 16px 6px"></div>
+      <div class="sub" style="padding:6px 16px 0">Top 耗时任务</div>
+      <div id="dmTop" style="padding:4px 16px 12px"></div>
+    </div>
+  </section>
+
   <section data-tab="tasks">
     <div class="sec-h">B · 待办池 TODO Pool <span class="sub">待确认 + 待办统一队列 · 存 <span class="mono">agent_bus/todos.json</span></span>
       <span id="confirmAlert" class="confirm-alert" style="display:none"></span>
@@ -2365,7 +2381,7 @@ function showTab(t){
   document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
   window.scrollTo({top:0});
   // 刷新门控(P1):只在进入对应 tab 时拉它的重数据 —— 不再无视可见性后台全刷(省 psutil 子进程+token)
-  if(t==='bi'){ loadBI(); }
+  if(t==='bi'){ loadBI(); loadDispatch(); }
   else if(t==='usage') loadUsage(true);
   else if(t==='caps') loadCaps();
   else if(t==='ctx') loadCtx();

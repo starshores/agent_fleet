@@ -51,7 +51,11 @@
   "bizRolesBox",
   "sendTask",
   "tviewActive",
-  "tviewHistory"
+  "tviewHistory",
+  "dmKpis",
+  "dmRoles",
+  "dmKind",
+  "dmTop"
  ],
  "tests": [
   {
@@ -180,9 +184,29 @@
    "note": "页面含 tviewHistory"
   },
   {
+   "name": "anchor-dmKpis",
+   "ok": true,
+   "note": "页面含 dmKpis"
+  },
+  {
+   "name": "anchor-dmRoles",
+   "ok": true,
+   "note": "页面含 dmRoles"
+  },
+  {
+   "name": "anchor-dmKind",
+   "ok": true,
+   "note": "页面含 dmKind"
+  },
+  {
+   "name": "anchor-dmTop",
+   "ok": true,
+   "note": "页面含 dmTop"
+  },
+  {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=206641"
+   "note": "200 bytes=209380"
   },
   {
    "name": "keys /api/state",
@@ -217,7 +241,7 @@
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=4286"
+   "note": "200 bytes=4589"
   },
   {
    "name": "GET /api/live",
@@ -257,7 +281,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4778"
+   "note": "200 bytes=4901"
   },
   {
    "name": "keys /api/bi",
@@ -267,7 +291,7 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=35314"
+   "note": "200 bytes=35317"
   },
   {
    "name": "GET /api/usage",
@@ -292,7 +316,7 @@
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=5243"
+   "note": "200 bytes=4307"
   },
   {
    "name": "keys /api/ctx",
@@ -302,7 +326,7 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=5520"
+   "note": "200 bytes=4537"
   },
   {
    "name": "GET /api/prompts",
@@ -337,7 +361,7 @@
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=11047"
+   "note": "200 bytes=11349"
   },
   {
    "name": "GET /api/fleet-state",
@@ -400,6 +424,6 @@
    "note": "202 bytes"
   }
  ],
- "test_count": 69,
- "pass": 69
+ "test_count": 73,
+ "pass": 73
 }

@@ -37,6 +37,7 @@ PAGE_ANCHORS = [
     "grpBox", "mechBox", "lrBox", "ctxBody", "promptsBox", "pathsBox",           # 组池/机制/长程/上下文/提示词/路径
     "archRetired", "archResumeBody", "bizRolesBox",                              # 归档/业务角色
     "sendTask", "tviewActive", "tviewHistory",                                   # 派活表单/任务视图
+    "dmKpis", "dmRoles", "dmKind", "dmTop",                                      # 派工效率(U2 复活的死码面板)
 ]
 
 # 关键数据端点"必含键"(Master数分缺口1:只验 JSON-parse 会放过 {} 空壳;键=当前真实响应的稳定子集)。
