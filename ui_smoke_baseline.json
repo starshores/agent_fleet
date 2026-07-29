@@ -1,0 +1,232 @@
+{
+ "endpoints": [
+  "/api/state",
+  "/api/health",
+  "/api/tray",
+  "/api/reap",
+  "/api/todos",
+  "/api/live",
+  "/api/tasklines",
+  "/api/groups",
+  "/api/mechanisms",
+  "/api/role-profiles",
+  "/api/role-profiles-biz",
+  "/api/longrange",
+  "/api/bi",
+  "/api/caps",
+  "/api/usage",
+  "/api/dispatch_metrics",
+  "/api/sessions",
+  "/api/ctx",
+  "/api/ctxpanel",
+  "/api/prompts",
+  "/api/archive",
+  "/api/paths",
+  "/api/storage",
+  "/api/lifecycle",
+  "/api/fleet-log",
+  "/api/fleet-state"
+ ],
+ "anchors": [
+  "fleetBody",
+  "todoBox",
+  "sessBox",
+  "liveBox",
+  "fleetStateBar",
+  "morphdom"
+ ],
+ "tests": [
+  {
+   "name": "page-200",
+   "ok": true,
+   "note": "GET / = 200"
+  },
+  {
+   "name": "anchor-fleetBody",
+   "ok": true,
+   "note": "页面含 fleetBody"
+  },
+  {
+   "name": "anchor-todoBox",
+   "ok": true,
+   "note": "页面含 todoBox"
+  },
+  {
+   "name": "anchor-sessBox",
+   "ok": true,
+   "note": "页面含 sessBox"
+  },
+  {
+   "name": "anchor-liveBox",
+   "ok": true,
+   "note": "页面含 liveBox"
+  },
+  {
+   "name": "anchor-fleetStateBar",
+   "ok": true,
+   "note": "页面含 fleetStateBar"
+  },
+  {
+   "name": "anchor-morphdom",
+   "ok": true,
+   "note": "页面含 morphdom"
+  },
+  {
+   "name": "GET /api/state",
+   "ok": true,
+   "note": "200 bytes=205052"
+  },
+  {
+   "name": "GET /api/health",
+   "ok": true,
+   "note": "200 bytes=1196"
+  },
+  {
+   "name": "GET /api/tray",
+   "ok": true,
+   "note": "200 bytes=149"
+  },
+  {
+   "name": "GET /api/reap",
+   "ok": true,
+   "note": "200 bytes=115"
+  },
+  {
+   "name": "GET /api/todos",
+   "ok": true,
+   "note": "200 bytes=4286"
+  },
+  {
+   "name": "GET /api/live",
+   "ok": true,
+   "note": "200 bytes=51"
+  },
+  {
+   "name": "GET /api/tasklines",
+   "ok": true,
+   "note": "200 bytes=3358"
+  },
+  {
+   "name": "GET /api/groups",
+   "ok": true,
+   "note": "200 bytes=473"
+  },
+  {
+   "name": "GET /api/mechanisms",
+   "ok": true,
+   "note": "200 bytes=21456"
+  },
+  {
+   "name": "GET /api/role-profiles",
+   "ok": true,
+   "note": "200 bytes=41635"
+  },
+  {
+   "name": "GET /api/role-profiles-biz",
+   "ok": true,
+   "note": "200 bytes=16529"
+  },
+  {
+   "name": "GET /api/longrange",
+   "ok": true,
+   "note": "200 bytes=18923"
+  },
+  {
+   "name": "GET /api/bi",
+   "ok": true,
+   "note": "200 bytes=4634"
+  },
+  {
+   "name": "GET /api/caps",
+   "ok": true,
+   "note": "200 bytes=35313"
+  },
+  {
+   "name": "GET /api/usage",
+   "ok": true,
+   "note": "200 bytes=27912"
+  },
+  {
+   "name": "GET /api/dispatch_metrics",
+   "ok": true,
+   "note": "200 bytes=5380"
+  },
+  {
+   "name": "GET /api/sessions",
+   "ok": true,
+   "note": "200 bytes=34892"
+  },
+  {
+   "name": "GET /api/ctx",
+   "ok": true,
+   "note": "200 bytes=5243"
+  },
+  {
+   "name": "GET /api/ctxpanel",
+   "ok": true,
+   "note": "200 bytes=5520"
+  },
+  {
+   "name": "GET /api/prompts",
+   "ok": true,
+   "note": "200 bytes=87530"
+  },
+  {
+   "name": "GET /api/archive",
+   "ok": true,
+   "note": "200 bytes=51949"
+  },
+  {
+   "name": "GET /api/paths",
+   "ok": true,
+   "note": "200 bytes=14746"
+  },
+  {
+   "name": "GET /api/storage",
+   "ok": true,
+   "note": "200 bytes=2817"
+  },
+  {
+   "name": "GET /api/lifecycle",
+   "ok": true,
+   "note": "200 bytes=16130"
+  },
+  {
+   "name": "GET /api/fleet-log",
+   "ok": true,
+   "note": "200 bytes=11047"
+  },
+  {
+   "name": "GET /api/fleet-state",
+   "ok": true,
+   "note": "200 bytes=255"
+  },
+  {
+   "name": "GET-unknown-404",
+   "ok": true,
+   "note": "404"
+  },
+  {
+   "name": "POST-send-empty-400",
+   "ok": true,
+   "note": "400"
+  },
+  {
+   "name": "POST-supervise-dryrun",
+   "ok": true,
+   "note": "200"
+  },
+  {
+   "name": "POST-unknown-404",
+   "ok": true,
+   "note": "404"
+  },
+  {
+   "name": "SSE-connect",
+   "ok": true,
+   "note": "202 bytes"
+  }
+ ],
+ "test_count": 38,
+ "pass": 38
+}
