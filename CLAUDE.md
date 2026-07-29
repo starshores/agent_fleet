@@ -74,6 +74,7 @@ ab whoami
 > **junction 化验证**(2026-07-15):`fsutil reparsepoint query` 确认 `~/.claude/agent_bus` 为正规 junction(tag 0xa0000003);原生 python 经反/正斜杠均能解析 canonical 返回正确 role;canonical agentbus.py 全程可跑保持。旧 canonical 曾存 `~/.claude/agent_bus.bak`,**已于 2026-07-22 删除**(junction 稳定一周·全 agent 经 junction 运行·其 agentbus.py=1951 行旧单体 vs 活源 176 行·usage.db 59392 行是活源 81153 行的陈旧子集无独有数据)→「`~/.claude` 目录以外均为引用」不变量已洁净成立。**踩坑**:迁移窗口(rename→junction 那 ~1 分钟)其他 agent 会瞬时报 canonical No-such-file → 是瞬时、非 junction 真坏;重挂优先用真实路径 `C:/apphome/agent_fleet/agent_bus/agentbus.py`(无 junction 遍历歧义)。
 
 > **基准②·基础设施洁净**:bus = **基础设施、非业务**,与业务负载解耦(业务可插拔)。核心(`agent_bus/` 源码 + config + fleet/agents/capabilities.json)**只放协调机制本身**,不掺【业务数据/口径/客户明细/业务分析结果】——这些属业务、不进 bus 核心。运行态队列里的业务消息是过境流量、不算污染;但**核心文件必须干净**。
+> **基准②·平台化升格(用户纲领 2026-07-29·贯穿始终)**:bus 的目标=**优秀的通用 agent 管理平台、适用于所有工作**;当前业务只是第一个租户,【业务=可插拔负载】(装上能跑、卸掉干净、换域照用)。业务内容一律进业务侧存储并登记 `path_registry.json` 的 **biz-data 清单**(业务角色注册表 role_profiles_biz.json / BaseSpace 业务库 / 过境消息)——数据清理=按清单整体清除,基建 git 零业务残留。**新机制三问验收**:①归属问(机制还是业务内容?)②清除问(清完平台能空载跑?)③换域问(换业务域要改平台代码?)。详见记忆 bus-pluggable-business-platform。
 > ⚠ **别把「对外脱敏」误套到内部**:脱敏是【对外】的事——对外交付物(对外仓/对客材料)的规范管理,由业务侧把关。**基座内部文档保留工程细节与真实技术术语、不做内部脱敏**——内部脱敏只会丢掉需要的信息。洁净 = 不掺业务,≠ 内部脱敏。
 > **基座的版本库 ≠ 对外交付仓**:基座的 git 是【内部工程演进追踪】、只有内部看,不是对外交付仓;所以基座 git 里出现真实技术术语正常、无需脱敏。脱敏只发生在【基座→对外交付】那一层。唯一硬约束:**凭据/密钥**(secret 本身)不进任何 git=防机密外泄,这与术语脱敏是两回事。
 
