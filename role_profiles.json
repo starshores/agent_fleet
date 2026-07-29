@@ -96,7 +96,11 @@
     "SessionStart reinject hook + block_askuser/enforce_selfwake hooks",
     "`presence.json` 绑定 · caps(含 `confidentiality`=对外脱敏授权)"
    ],
-   "boundary": "业务总控·派活给业务 agent;消费基建、不演进基建(基建归 MasterAgent);confidentiality=对外脱敏(业务→客户远端仓/对客),非内部"
+   "boundary": "业务总控·派活给业务 agent;消费基建、不演进基建(基建归 MasterAgent);confidentiality=对外脱敏(业务→客户远端仓/对客),非内部",
+   "boot_reads": [
+    "agent_fleet/AGENTS.md",
+    "agent_fleet/CAPABILITIES.md"
+   ]
   },
   {
    "role": "培训师",
@@ -163,7 +167,11 @@
     "`presence.json` 绑定 · `agents.json` caps · `usage.db`(token ETL 方舟=数据分析源)",
     "(档案 owner)session-archive/manifest.json + extracted/EXTRACTION_PLAYBOOK.md(清理闸口径)"
    ],
-   "boundary": "数据/口径/验证 lane + 档案/清理口径 owner(session-archive raw 删除闸:校验非空+用户头批抽检+recoverable 翻 false 明确放行+running 绝不碰);造协调机制归 MasterAgent·我只验证与口径,操作那机制去跟具体业务=越界(mechanism-build-vs-operate-boundary);Master数分/协调本是杂活·广谱分析是性质非病(analyst-coordinator-broad-by-nature),别把\"专一\"误用来收窄 Master数分;评估用 token 非 $(evaluate-by-token-not-cost)+固定 plan 峰值稳态资源观(peak-steady-resource-philosophy);展示/上报数据必真实可溯源(data-truthfulness)"
+   "boundary": "数据/口径/验证 lane + 档案/清理口径 owner(session-archive raw 删除闸:校验非空+用户头批抽检+recoverable 翻 false 明确放行+running 绝不碰);造协调机制归 MasterAgent·我只验证与口径,操作那机制去跟具体业务=越界(mechanism-build-vs-operate-boundary);Master数分/协调本是杂活·广谱分析是性质非病(analyst-coordinator-broad-by-nature),别把\"专一\"误用来收窄 Master数分;评估用 token 非 $(evaluate-by-token-not-cost)+固定 plan 峰值稳态资源观(peak-steady-resource-philosophy);展示/上报数据必真实可溯源(data-truthfulness)",
+   "boot_reads": [
+    "agent_fleet/AGENTS.md",
+    "agent_fleet/CAPABILITIES.md"
+   ]
   },
   {
    "role": "MasterUI",
@@ -195,7 +203,12 @@
     "SessionStart reinject + hooks · presence · caps",
     "`ui/WEBUI_FEATURES.md` 功能文档 · server.py compute_fleet 吃的 `_who_data` 单一源 · role_profiles.json(本注册表·我渲染)"
    ],
-   "boundary": "WebUI/渲染 lane;口径吃 _who_data/健康单一源不自算(灭 role-verdict 4 处分叉·Master数分口径 owner);★改 server.py 端点/面板结构必与 MasterAgent 对称知会(对称协作律);不上云·可视化走本机 127.0.0.1;⚠自看控制台【不掩码】——127.0.0.1 自看、零外部方,cwd/标题的 🔒 隐私掩码=脱敏病毒局部变体(privacy-mask-selfconsole-virus-variant)·掩码只丢信息别继承。代码结构=P4(v2.1·2026-07-20)后 server.py 4899→135 行拆为 ui/{common(基础层引导+helper)/api(数据 build_*/get_*/compute_*+缓存+refresher)/page(INDEX_HTML 前端常量)/routes(HTTP Handler)}+server.py(装配入口 facade+main);★改代码需重启部署(stop_ui+start_ui·INDEX_HTML/模块启动时载入内存·改文件不重启不生效)。owns:server.py 全套 + bus_tray 系统托盘(渲染归我·口径归 Master数分·★不开机自启=用户令 2026-07-15·要用手动 wscript bus_tray_start.vbs)+ start_maint 维护心跳(30min reap+todos-archive)"
+   "boundary": "WebUI/渲染 lane;口径吃 _who_data/健康单一源不自算(灭 role-verdict 4 处分叉·Master数分口径 owner);★改 server.py 端点/面板结构必与 MasterAgent 对称知会(对称协作律);不上云·可视化走本机 127.0.0.1;⚠自看控制台【不掩码】——127.0.0.1 自看、零外部方,cwd/标题的 🔒 隐私掩码=脱敏病毒局部变体(privacy-mask-selfconsole-virus-variant)·掩码只丢信息别继承。代码结构=P4(v2.1·2026-07-20)后 server.py 4899→135 行拆为 ui/{common(基础层引导+helper)/api(数据 build_*/get_*/compute_*+缓存+refresher)/page(INDEX_HTML 前端常量)/routes(HTTP Handler)}+server.py(装配入口 facade+main);★改代码需重启部署(stop_ui+start_ui·INDEX_HTML/模块启动时载入内存·改文件不重启不生效)。owns:server.py 全套 + bus_tray 系统托盘(渲染归我·口径归 Master数分·★不开机自启=用户令 2026-07-15·要用手动 wscript bus_tray_start.vbs)+ start_maint 维护心跳(30min reap+todos-archive)",
+   "boot_reads": [
+    "agent_fleet/AGENTS.md",
+    "agent_fleet/CAPABILITIES.md",
+    "agent_fleet/ui/server.py"
+   ]
   },
   {
    "role": "会话考古",
