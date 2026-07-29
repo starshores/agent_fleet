@@ -122,6 +122,21 @@ def cmd_boot_check(args):
     if r["ok"]:
         extra = ("(%s)" % r["note"]) if r.get("note") else ("(%d/%d 必读均已读)" % (len(r["matched"]), r["required_n"]))
         print("✅ boot-check %s:装载完成 %s" % (role, extra))
+        # 2.3 P2:每会话首次 ✅ 记舰队日志(boot_state.json 存上次通过 sid,同会话重跑不刷屏)
+        try:
+            if r.get("required_n"):
+                bs = BUS / role / "boot_state.json"
+                prev = {}
+                try:
+                    prev = json.loads(bs.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+                if prev.get("sid") != r.get("sid"):
+                    bs.write_text(json.dumps({"sid": r.get("sid"), "ok_at": __import__("time").strftime("%Y-%m-%dT%H:%M:%S")}, ensure_ascii=False), encoding="utf-8")
+                    from bus.fleetlog import fleet_log
+                    fleet_log("train", "%s 新会话装载完成" % role, "boot-check %d/%d ✅(sid %s)" % (r["required_n"], r["required_n"], (r.get("sid") or "?")[:8]), actor=role)
+        except Exception:
+            pass
         sys.exit(0)
     print("⛔ boot-check %s:装载未完成——以下必读【本会话还没读】,用 Read 逐个读完再领活:" % role)
     for m in r["missing"]:

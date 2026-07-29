@@ -139,6 +139,25 @@ def fleet_state():
     out = {"state": chosen.get("state"), "icon": chosen.get("icon", ""), "desc": chosen.get("desc", ""),
            "rule": chosen.get("when"), "guard": "休眠(维修模式)" if m_on else "值守中",
            "counts": counts, "stale_roles": stale_roles}
+    # 装载维度(2.3 P2):有活跃 presence 会话、且有必读声明、但 boot-check 未过的角色 → 顶栏可见
+    try:
+        from bus.bootcheck import boot_check
+        pend = []
+        for role in _list_roles():
+            if _pseudo_role_label(role) or role in retired or _is_parked(role):
+                continue
+            pf = BUS / role / "presence.json"
+            if not pf.exists():
+                continue
+            sid = json.loads(pf.read_text(encoding="utf-8")).get("session_id")
+            if not sid:
+                continue
+            r = boot_check(role, sid=sid)
+            if r.get("required_n") and not r.get("ok"):
+                pend.append(role)
+        out["boot_pending"] = pend
+    except Exception:
+        out["boot_pending"] = []
     if m_on:
         out["maint"] = maint_info()
     return out
@@ -154,6 +173,8 @@ def cmd_fleet_state(args):
     print("   在岗%d/应在岗%d · 待确认%d · 掉线%d%s · 休眠%d" % (
         c["armed"], c["expected"], c.get("recent", 0), c["stale"],
         ("(" + "、".join(st["stale_roles"]) + ")") if st["stale_roles"] else "", c["parked"]))
+    if st.get("boot_pending"):
+        print("   ⛔ 装载未完成(活跃会话·boot-check 未过):%s" % "、".join(st["boot_pending"]))
     if st.get("maint"):
         print("   🔧 维修:since %s·%s" % (st["maint"].get("since"), st["maint"].get("note") or "-"))
 
