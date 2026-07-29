@@ -78,7 +78,9 @@
     {"id": "biz-session-libs", "name": "业务会话/记忆库(外置区)", "path": "C:\\BaseSpace\\project", "kind": "dir",
      "desc": "业务大库(业务记忆/角色锚)物理家;项目根 projects 内是 junction 回链。清除=删本目录+删三个死链。", "owner": "业务侧"},
     {"id": "biz-transit", "name": "过境业务消息(运行态·自代谢)", "path": "C:\\apphome\\agent_fleet\\agent_bus", "kind": "dir",
-     "desc": "各业务 role mailbox(inbox/processing/done/archive)里的业务任务=过境流量,卫生代谢自动归档→90d 终点站→30d 真删;立即清=对业务 role 目录逐个清队列。agents.json 中业务角色条目(caps/desc)与 _retired 业务留痕亦属业务面。", "owner": "MasterAgent(机制)/Master(内容)"}
+     "desc": "各业务 role mailbox(inbox/processing/done/archive)里的业务任务=过境流量,卫生代谢自动归档→90d 终点站→30d 真删;立即清=对业务 role 目录逐个清队列。agents.json 中业务角色条目(caps/desc)与 _retired 业务留痕亦属业务面。", "owner": "MasterAgent(机制)/Master(内容)"},
+    {"id": "biz-extract-transit", "name": "会考抢救业务残件(过渡态·迁移后清零)", "path": "C:\\apphome\\agent_fleet\\session-archive\\extracted", "kind": "dir",
+     "desc": "会话考古从离线业务 agent 会话抢救的记忆/报告【中转站】——终态=各归其库(业务→业务库·基建→基建库),Master 跟进迁移(2026-07-29 批准);迁毕本目录业务残件应为零。数据清理时此处业务残件一并清。", "owner": "Master(迁移)/会话考古(manifest)"}
    ]
   },
   {
