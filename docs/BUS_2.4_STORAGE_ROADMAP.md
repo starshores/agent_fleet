@@ -20,8 +20,9 @@
 - **附带产出**:_data/session-archive 建独立本地 git(969433c·只版本化 extracted/manifest 等小提炼
   产物,raw 不入库)——版本史+防误改,且不进项目根基建 git=业务数据可整体清除连史全清(平台纲领)。
 
-## P2(已派发 2026-07-29·归下版)
-- WebUI 存储面板(📁路径页加大小列·MasterUI,task 1785294339638,数据源 storage_audit() 已备好);
+## P2(✅ 全部完成 2026-07-29·当天闭环)
+- **WebUI 存储面板 ✅ MasterUI(92e606c)**:📁路径页💾存储全景子面板(三分总览条/项目根分布表/违规候选区),
+  GET /api/storage(120s TTL 缓存·不进 SSE),数据源 storage_audit() 同源;MasterAgent 实测端点返回真实数据✓;
 - **_data 保留期口径 ✅ Master数分已回(2026-07-29·全文见其 done,总原则已落 path_registry data-home)**:
   清瘦只清「大块·已提炼·recoverable=false」raw;保护集+提炼产物+失能实证素材(25M·37bc808a 案
   唯一 primary source)全保留;真删一律走删raw闸·非 automatic。现状 5 raw 全保护=可执行清瘦 0;
@@ -29,6 +30,8 @@
 
 ## 发版
 - **v2.4(2026-07-29)**=P0+P1+wait 心跳修复;zip 30MB(v2.3 52.7MB→外置瘦身直接体现)。
+  同日 P2 当天闭环(MasterUI 面板+Master数分口径)→ **v2.4 tag 刷新**纳入,2.4 全项完成。
+  遗留观察:后台 wait 两次 exit 127 异常死(wait_trace 有 start 无 exit·已入尸检样本,复现即查)。
 
 ## 非目标
 - 不压缩/不动 usage.db 方舟;不动 projects 迁移包设计;素材绝不直接删(外置≠清除,删走Master数分闸)。
