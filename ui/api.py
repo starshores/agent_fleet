@@ -461,27 +461,50 @@ def build_bi():
     except Exception:
         today_usage = None
 
-    # 模型用量统计:从 usage.db messages 表聚合(今日 + 历史合计·按调用次数降序)
-    model_counts = {"today": [], "all_time": []}
-    try:
-        import sqlite3 as _sq
-        _dbp = ABDIR / "usage.db"
-        if _dbp.exists():
-            _tstr = time.strftime("%Y-%m-%d", time.gmtime(now + 8 * 3600))
-            _con = _sq.connect(str(_dbp))
+    # 模型用量统计:按会话维度 —— 各 bus 成员 presence.json → session_id → jsonl 尾部取模型名 → 聚合
+    _proj_root = ABDIR.parent / "projects"  # C:/apphome/agent_fleet/projects
+    def _role_model(session_id):
+        """从 session jsonl 尾部读最近 assistant 消息的 model 字段;找不到返回 None。"""
+        for _f in _proj_root.rglob(session_id + ".jsonl"):
             try:
-                _cur = _con.execute(
-                    "SELECT model, COUNT(*) FROM messages WHERE sh_date=? AND model NOT LIKE '<%'"
-                    " GROUP BY model ORDER BY COUNT(*) DESC", (_tstr,))
-                model_counts["today"] = [{"model": r[0], "calls": r[1]} for r in _cur.fetchall()]
-                _cur = _con.execute(
-                    "SELECT model, COUNT(*) FROM messages WHERE model NOT LIKE '<%'"
-                    " GROUP BY model ORDER BY COUNT(*) DESC")
-                model_counts["all_time"] = [{"model": r[0], "calls": r[1]} for r in _cur.fetchall()]
-            finally:
-                _con.close()
-    except Exception:
-        pass
+                _sz = _f.stat().st_size
+                with open(_f, "rb") as _fp:
+                    _fp.seek(max(0, _sz - 32768))
+                    _tail = _fp.read().decode("utf-8", "replace")
+                for _ln in reversed(_tail.split("\n")):
+                    if not _ln.strip():
+                        continue
+                    try:
+                        _d = json.loads(_ln)
+                        if _d.get("type") == "assistant" and isinstance(_d.get("message"), dict):
+                            _m = _d["message"].get("model")
+                            if _m:
+                                return _m
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        return None
+
+    model_sessions: dict = {}  # model → [role, ...]
+    for _role in _roles():
+        _pf = BUS / _role / "presence.json"
+        if not _pf.exists():
+            continue
+        try:
+            _pr = json.loads(_pf.read_text(encoding="utf-8"))
+            _sid = _pr.get("session_id")
+            if not _sid:
+                continue
+            _model = _role_model(_sid) or "unknown"
+            model_sessions.setdefault(_model, []).append(_role)
+        except Exception:
+            pass
+    model_counts = sorted(
+        [{"model": m, "sessions": len(roles), "roles": roles}
+         for m, roles in model_sessions.items()],
+        key=lambda x: -x["sessions"]
+    )
 
     return {
         "now": time.strftime("%H:%M:%S", time.localtime(now)),
@@ -490,7 +513,7 @@ def build_bi():
         "per_role": per_role,
         "running": running,
         "psutil": ab.psutil is not None,
-        "model_counts": model_counts,        # ← 今日+历史模型调用次数
+        "model_counts": model_counts,        # ← 各模型会话数([{model,sessions,roles}])
     }
 
 

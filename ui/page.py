@@ -1321,17 +1321,19 @@ function renderBI(bi){
   morphInto(document.getElementById('biRunning'), bi.running.length? bi.running.map(r=>
     `<span class="bi-run" data-key="run-${esc(r.role)}"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
     : '<span class="muted" style="font-size:12px">当前无在跑任务</span>');
-  // 模型用量统计(today + all_time)
-  const mc=bi.model_counts||{}, mToday=mc.today||[], mAll=mc.all_time||[];
-  if(mToday.length||mAll.length){
-    const mkRow=(m,bold)=>`<tr data-key="mc-${esc(m.model)}"><td style="padding:4px 0;${bold?'font-weight:600':''}"><span class="mono" style="font-size:12px">${esc(modelShort(m.model))}</span></td><td class="num" style="padding:4px 0">${fmtN(m.calls)}</td></tr>`;
-    const section=(title,rows)=>rows.length?`<div style="flex:1;min-width:140px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:4px">${title}</div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:0;color:var(--dim);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">模型</th><th class="num" style="padding:0;color:var(--dim);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">次数</th></tr></thead><tbody>${rows.map((m,i)=>mkRow(m,i===0)).join('')}</tbody></table></div>`:'';
+  // 模型用量统计:各模型→会话数+角色列表
+  const mc=bi.model_counts||[];
+  if(mc.length){
+    const chips=mc.map(m=>{
+      const col=modelColor(m.model);
+      const roles=(m.roles||[]).join('、');
+      return `<div data-key="mc-${esc(m.model)}" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 12px;margin:2px 4px 2px 0">`
+        +`<span class="mono" style="font-size:12.5px;color:${col};font-weight:600">${esc(modelShort(m.model))}</span>`
+        +`<span style="font-size:13px;font-weight:700">${m.sessions}</span><span class="muted" style="font-size:11px">个会话</span>`
+        +(roles?`<span class="muted" style="font-size:10.5px;margin-left:2px">(${esc(roles)})</span>`:``)+`</div>`;
+    }).join('');
     morphInto(document.getElementById('biModels'),
-      `<div class="sub" style="padding:0 0 6px">模型用量统计</div>`
-      +`<div style="display:flex;gap:24px;flex-wrap:wrap">`
-      +(section('今日',mToday)||'<div style="flex:1;min-width:140px"><div class="muted" style="font-size:11px">今日暂无记录</div></div>')
-      +section('历史合计',mAll)
-      +`</div>`);
+      `<div class="muted" style="font-size:11px;font-weight:600;margin-bottom:5px">模型用量统计 <span style="font-weight:400">· 各会话当前使用模型</span></div>`+chips);
   } else {
     morphInto(document.getElementById('biModels'),'');
   }
