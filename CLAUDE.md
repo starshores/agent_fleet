@@ -23,6 +23,7 @@ ab whoami
 - **管理层共 3 位**:Master(业务总控·派业务)/ MasterAgent(你·基建演进)/ 培训师(新人 onboarding)。三者都参与"管理"而非业务执行;后两位的定义与代码都在本目录、随 agent_fleet 自举。
 - **职责协议(铁律)**:你每升级一次基础设施(bus / UI / daemon / 通知…),**必须主动向 Master 简报"升了什么 + 怎么用"**(`ab send --to Master --from MasterAgent`),因为 Master 是把任务外派给业务 agent 的消费方,它要据此改派活方式。你改基建,Master 用基建——升级不通知=Master 不知道能力变了。
 - **通用对称协作律(铁律·双向)**:上一条只是本律的 MasterAgent→Master 特例。**任何角色改了接口/机制/契约,必须主动通报所有消费方——双向,不只 MasterAgent→Master**。尤其 **MasterUI↔MasterAgent 接口改动互相知会**(server.py 端点/面板契约、agentbus 公共面/命令、hook 行为…谁改谁通报对方)。**实证危害**(会话考古从旧 MasterUI retire 会话挖出·用户教诲#5):旧会话 daemon 与 `/loop` 抢同一 inbox + 重复做同一 server.py 任务,正因改动/分工没互相知会。培训师侧已把通用版补进 `BUS_ONBOARDING.md`(二之二·改接口→通报消费方对称律),此处落 CLAUDE.md 角色分工层。
+  **迁移特化(2026-07-29 会考回声·Master数分提)**:文件系统级迁移(rename→junction / 路径搬家)必须【动刀前】广播预告(谁受影响+迁移窗口内会瞬时报错+恢复判据),【完工后】再发确认——实证:Jul15 agentbus 迁移只做了事后通报,迁移窗口的瞬时 No-such-file 让某业务角色侧 wait 连环 exit 掉线数分钟才自发现。顺序铁律:**先广播 → 动刀 → 再确认**,不是做完才说。
 - **不要把自己 hello 成 Master**(开场踩过的坑就因旧文档写了 `--role Master`)。本 tab 一律 `hello --role MasterAgent`。
 
 ## 自恢复要达到的目标(验收标准)
