@@ -22,8 +22,10 @@
 
 ## P2(已派发 2026-07-29·归下版)
 - WebUI 存储面板(📁路径页加大小列·MasterUI,task 1785294339638,数据源 storage_audit() 已备好);
-- _data 保留期策略(Master数分口径,task 1785294341970:raw jsonl/两素材源包保留期;extracted+manifest
-  默认永久·已有独立 git)。
+- **_data 保留期口径 ✅ Master数分已回(2026-07-29·全文见其 done,总原则已落 path_registry data-home)**:
+  清瘦只清「大块·已提炼·recoverable=false」raw;保护集+提炼产物+失能实证素材(25M·37bc808a 案
+  唯一 primary source)全保留;真删一律走删raw闸·非 automatic。现状 5 raw 全保护=可执行清瘦 0;
+  唯一待办=补提炼 1740ca10+5948239a(已派会话考古)。
 
 ## 发版
 - **v2.4(2026-07-29)**=P0+P1+wait 心跳修复;zip 30MB(v2.3 52.7MB→外置瘦身直接体现)。

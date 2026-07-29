@@ -96,7 +96,7 @@
      "name": "素材源数据家(agent_fleet_data)",
      "path": "C:\\apphome\\agent_fleet_data",
      "kind": "dir",
-     "desc": "2.4 存储瘦身(用户立项 2026-07-29):素材/raw 源数据的物理家(首住户=session-archive 78MB),与项目根代码目录、_releases 同级三分:代码+运行态方舟(项目根)/发版快照(_releases)/素材源数据(_data)。换机按需迁(不迁则删项目根内对应死链)。",
+     "desc": "2.4 存储瘦身(用户立项 2026-07-29):素材/raw 源数据的物理家(首住户=session-archive 78MB),与项目根代码目录、_releases 同级三分:代码+运行态方舟(项目根)/发版快照(_releases)/素材源数据(_data)。换机按需迁(不迁则删项目根内对应死链)。【保留期口径·Master数分 2026-07-29】清瘦只清「大块·已提炼·recoverable=false」的 raw;保护集(recoverable=true)+提炼产物(extracted/manifest·独立 git 永久)+失能实证素材(_feat_verify_audit/_workgroup_opt_source=37bc808a 案唯一 primary source·25M 不设短保留,可 zip 冷存不删原始)全保留;一切真删走删raw闸(非空+头批抽检+SHA256 凭证+用户确认)·非 automatic。",
      "owner": "MasterAgent(机制)/Master数分(归档口径)"
     }
    ]
