@@ -452,9 +452,19 @@ def cmd_selfwake_exempt(args):
             print("%s 本无豁免 marker,无需撤销。" % role)
         _audit("selfwake_exempt_off", role=role)
         return
-    rec = {"mode": args.mode or "polling", "reason": args.reason or "", "note": args.note or "",
+    # ⛔ 禁轮询铁律(用户令 2026-07-28·no-polling-doctrine):polling 豁免【硬拒】——
+    # 实证残留危害:铁律前发的 polling marker 没撤,新会话上岗读 marker 即恢复
+    # ScheduleWakeup 轮询(2026-07-29 用户抓获)。"turn边界SIGTERM无法常驻wait"=过期认知
+    # (MasterAgent 会话实测背景 wait 跨 turn 常驻);真遇 wait 无法常驻 → 修环境/报 MasterAgent,不是转轮询。
+    mode = args.mode or "polling"
+    if mode == "polling":
+        sys.stderr.write("⛔ 拒绝:polling 豁免已随禁轮询铁律(用户令 2026-07-28)废止——自醒一律事件 wait,"
+                         "无角色例外。若 wait 真无法常驻:修环境或报 MasterAgent 排障,别转轮询。"
+                         "(park/休眠请用 ab park;仅历史遗留的非 polling 用途才可另立 mode。)\n")
+        sys.exit(2)
+    rec = {"mode": mode, "reason": args.reason or "", "note": args.note or "",
            "since": _now()}
     _write_json(p, rec)
     _audit("selfwake_exempt", role=role, mode=rec["mode"])
-    print("已给 %s 放巡检豁免 marker(mode=%s)。守卫不再判其掉线;selfwake/who 显示 ⏱轮询。撤销:ab selfwake-exempt --role %s --off"
+    print("已给 %s 放巡检豁免 marker(mode=%s)。守卫不再判其掉线。撤销:ab selfwake-exempt --role %s --off"
           % (role, rec["mode"], role))
