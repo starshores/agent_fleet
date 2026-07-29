@@ -12,7 +12,7 @@ except Exception:
 
 from bus.config import BUS, _now
 from bus.io import _write_json, json_lock
-from bus.proc import _claude_ancestor, _age_seconds, _alive_claude_pids
+from bus.proc import _claude_ancestor, _age_seconds, _alive_claude_pids, _claude_by_session
 
 
 def _touch_presence(role, mode, extra=None):
@@ -22,6 +22,11 @@ def _touch_presence(role, mode, extra=None):
     ——原实现整写抹掉、靠"领取与完成之间不发心跳"的时序假设,daemon 模式该假设不成立。"""
     pf = BUS / role / "presence.json"
     claude_pid, cwd, chain = _claude_ancestor()   # 进程探查在锁外(慢:psutil 走祖先链)
+    if not claude_pid:
+        # parent-walk 失败(本 harness 下 Bash 子 shell 父链偶发够不到 claude.exe)→ 按 session_id
+        # 反查 `claude --resume <sid>` 的活进程(2026-07-29 模型侧报:resume 会话 presence 绑死旧 pid 的治本)
+        sp, sc = _claude_by_session(os.environ.get("CLAUDE_CODE_SESSION_ID"))
+        claude_pid, cwd = sp, (cwd or sc)
     try:
         with json_lock(pf, tries=50):
             prev = {}
@@ -30,12 +35,18 @@ def _touch_presence(role, mode, extra=None):
                     prev = json.loads(pf.read_text(encoding="utf-8"))
                 except Exception:
                     prev = {}
+            inherited_pid = prev.get("claude_pid")
+            if not claude_pid and inherited_pid and inherited_pid not in _alive_claude_pids():
+                # 死 pid 不永续(2026-07-29 重启实证):电脑重启后旧 pid 永远死,继承会让 who 永判"残留"
+                # 且掩盖真进程未绑;置 None 让 who 显"无 pid"→按 CLAUDE.md 补跑 hello 重绑(诚实降级)。
+                inherited_pid = None
             pres = {
                 "role": role,
                 # 探查不到就继承旧值(同 session_id 模式·2026-07-29 培训师报):后台 wait/心跳进程的
                 # 祖先链常解析不到 claude(派生壳重挂靠)→ 原来无条件写会把 pid/cwd 冲成 None,
-                # wait 期周期心跳(70099ac)放大了冲刷频率。真死进程由 who/selfwake 的存活检查兜底判定。
-                "claude_pid": claude_pid or prev.get("claude_pid"),
+                # wait 期周期心跳(70099ac)放大了冲刷频率。真死进程由 who/selfwake 的存活检查兜底判定;
+                # 但【死 claude pid 不继承】(上面置 None),防重启后旧 pid 被心跳永续。
+                "claude_pid": claude_pid or inherited_pid,
                 "shell_pid": os.getpid(),
                 "cwd": cwd or prev.get("cwd"),
                 "host": socket.gethostname(),

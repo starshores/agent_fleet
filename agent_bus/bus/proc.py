@@ -11,6 +11,31 @@ except Exception:
     psutil = None
 
 
+def _claude_by_session(sid):
+    """按 session_id 反查活 claude 进程:命令行含该 sid 的 claude.exe(`claude --resume <sid>` 锚)。
+    治本回退(2026-07-29 模型侧报):本 harness 下 Bash 子 shell 的父进程链偶发够不到 tab 的
+    claude.exe → parent-walk 失败 → presence 继承旧(死)pid,--resume 恢复的会话全中招。
+    仅 resume 的会话命令行带 sid(新开 tab 不带 → 返 None,走上层继承逻辑)。返回 (pid, cwd) 或 (None, None)。"""
+    if psutil is None or not sid:
+        return None, None
+    try:
+        for p in psutil.process_iter(["name"]):
+            try:
+                if "claude" not in ((p.info.get("name") or "").lower()):
+                    continue
+                if sid in " ".join(p.cmdline()):
+                    try:
+                        cwd = p.cwd()
+                    except Exception:
+                        cwd = None
+                    return p.pid, cwd
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None, None
+
+
 def _claude_ancestor():
     """从当前进程向上走父链,找到 claude.exe 那个 tab 进程。返回 (pid, cwd, chain)。
     身份只能靠自报:OS 里所有 claude 进程长得一样,谁是谁要会话自己声明。"""

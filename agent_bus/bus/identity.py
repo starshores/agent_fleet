@@ -76,7 +76,11 @@ def cmd_hello(args):
         pass
     except Exception:
         pass
-    _touch_presence(role, "idle")
+    extra = None
+    if getattr(args, "pid", None):
+        # 显式指定本 tab 的 claude pid(parent-walk + session 反查都失败时的人工兜底·2026-07-29 模型侧案)
+        extra = {"claude_pid": int(args.pid)}
+    _touch_presence(role, "idle", extra)
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
     _print_onboarding(role)
