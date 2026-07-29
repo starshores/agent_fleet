@@ -112,6 +112,8 @@ __all__ = [
     "fleet_state", "maint_active", "fleet_log",
     # 装载核验(2.3·WebUI 角色页可显每会话装载态)
     "boot_check",
+    # 存储体检(2.4·WebUI 存储面板 P2 数据源)
+    "storage_audit",
 ]
 
 
