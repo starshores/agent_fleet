@@ -384,7 +384,7 @@ def cmd_selfwake_guard(args):
             reminded.append(role); continue
         tid = _gen_id(role)
         task = {
-            "id": tid, "from": "MasterAgent", "to": role,
+            "id": tid, "from": "bus守卫", "to": role,   # 2.3 P1:系统名义,不再伪造 MasterAgent(回执归 bus守卫 桶·卫生代谢清)
             "title": marker + " 你掉了自醒",
             "task": ("自醒巡检【连续2次】发现你掉了自醒(%s;尸检:%s)。看到即请【后台 run_in_background】跑 "
                      "`ab wait --role %s --timeout 0`(0=自动日2h/夜6h),再 `ab selfwake` 验在岗(别用 shell &)。"

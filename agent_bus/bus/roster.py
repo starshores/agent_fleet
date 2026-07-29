@@ -121,6 +121,9 @@ _PSEUDO_ROLE_LABELS = {
     "用户": "伪角色·待办池(ask-user 投给人类的收件箱,人类永不 hello)",
     "unknown": "伪角色·死信桶(role 解析不出的消息/回执落此,无害待清)",
 }
+# 2.3 P1:名单单一源=role_profiles meta.policy.pseudo_roles(bus守卫/bus健康/bus-router 等系统名义
+# 在注册表登记即生效·不改代码);上面硬编码仅为注册表不可读时的降级默认。
+_PSEUDO_ROLE_LABELS.update({k: str(v) for k, v in (_policy().get("pseudo_roles") or {}).items()})
 
 
 def _pseudo_role_label(role):

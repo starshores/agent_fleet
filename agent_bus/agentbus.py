@@ -83,7 +83,7 @@ from bus.health import (  # noqa: E402
 )
 from bus.status import _who_data, cmd_who, cmd_list  # noqa: E402
 from bus.fleetlog import cmd_fleetlog, cmd_maint, cmd_fleet_state, fleet_log, fleet_state, maint_active  # noqa: E402
-from bus.bootcheck import cmd_boot_check, boot_check  # noqa: E402
+from bus.bootcheck import cmd_boot_check, boot_check, cmd_role_audit, cmd_memory_audit, cmd_caps_audit  # noqa: E402
 from bus.identity import (  # noqa: E402
     cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
     cmd_train_done,
@@ -119,7 +119,7 @@ __all__ = [
 _CMD_GROUPS = [
     ("消息任务流 core", "send wait serve request done peek replies answer"),
     ("身份·自醒 presence/selfwake", "hello whoami selfwake selfwake-guard selfwake-exempt boot-check"),
-    ("角色·能力 roles", "register retire revive retired caps roster route train-done"),
+    ("角色·能力 roles", "register retire revive retired caps roster route train-done role-audit caps-audit memory-audit"),
     ("健康·运维 health", "who list health health-sweep reap supervise prune webui-guard mem-cap stale"),
     ("工作组池 pool", "join-group leave-group send-group(--route) route-reap fanout fanout-collect park unpark"),
     ("派遣执行 exec", "dispatch"),
@@ -200,6 +200,9 @@ def main():
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("fleetlog"); p.add_argument("--add", action="store_true", help="追加一条(默认=列最近)"); p.add_argument("--kind", default=None, help="milestone/incident/maintenance/retire/revive/train/note"); p.add_argument("--title", default=None); p.add_argument("--detail", default=""); p.add_argument("--by", default=None); p.add_argument("--ts", default=None, help="补记历史事件时指定时间(ISO)"); p.add_argument("--limit", type=int, default=20); p.set_defaults(fn=cmd_fleetlog)
     p = sub.add_parser("boot-check"); p.add_argument("--role", default=None); p.add_argument("--sid", default=None, help="核验指定会话(默认=本会话/presence 绑定)"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_boot_check)
+    p = sub.add_parser("role-audit"); p.set_defaults(fn=cmd_role_audit)
+    p = sub.add_parser("memory-audit"); p.add_argument("--dir", default=None); p.set_defaults(fn=cmd_memory_audit)
+    p = sub.add_parser("caps-audit"); p.set_defaults(fn=cmd_caps_audit)
     p = sub.add_parser("fleet-state"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_fleet_state)
     p = sub.add_parser("maint"); p.add_argument("--on", action="store_true"); p.add_argument("--off", action="store_true"); p.add_argument("--note", default=""); p.add_argument("--by", default=None); p.set_defaults(fn=cmd_maint)
     p = sub.add_parser("dispatch"); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--name", default="adhoc"); p.add_argument("--cwd", default=None); p.add_argument("--timeout", type=float, default=3600.0); p.add_argument("--requires-approval", dest="requires_approval", action="store_true", help="高风险标记:dispatch 拒收(无人审直跑面),改走 send+人工领取"); p.set_defaults(fn=cmd_dispatch)
