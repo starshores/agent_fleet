@@ -5,101 +5,308 @@
   "owner": "MasterAgent",
   "purpose": "bus 特殊路径注册表(单一源)——记忆库/存档/外链(junction·symlink·硬链)/宿主配置/运行态方舟。供 WebUI「📁路径」页渲染(MasterUI)+ 换机迁移对账 + 健康校验(kind 与 expect 字段)。",
   "kind_legend": {
-   "dir": "普通目录", "file": "普通文件", "db": "SQLite 数据库",
-   "junction": "目录 junction(mklink /J·免管理员)", "symlink": "文件软链接(mklink·需管理员/开发者模式)",
+   "dir": "普通目录",
+   "file": "普通文件",
+   "db": "SQLite 数据库",
+   "junction": "目录 junction(mklink /J·免管理员)",
+   "symlink": "文件软链接(mklink·需管理员/开发者模式)",
    "hardlink_mirror": "逐文件硬链镜像(同卷 NTFS 共 inode·原子写会断链·靠 sync 脚本/hook 重链)"
   },
   "check_hint": "健康校验口径:exists 必查;junction/symlink 加验 reparse/LinkType 且 target 一致(原子写会把 symlink 打回普通文件=分叉告警);hardlink_mirror 抽验 st_nlink>1 或 samefile(source)。"
  },
  "categories": [
   {
-   "id": "memory", "name": "记忆库(记忆随角色走·2026-07-28)",
+   "id": "memory",
+   "name": "记忆库(记忆随角色走·2026-07-28)",
    "entries": [
-    {"id": "mem-fleet-pot", "name": "bus 角色记忆库(正本)", "path": "C:\\Users\\<用户>\\.claude\\projects\\C--apphome-agent-fleet\\memory", "kind": "dir",
-     "desc": "MasterAgent/MasterUI/Master数分/考古/培训师 共锅(CC 记忆按 cwd 定位):根 MEMORY.md=角色路由器+公共段,<role>.MEMORY.md=各角色索引,正文 .md 平铺。新记忆写角色索引。", "owner": "MasterAgent(机制)/各角色(内容)"},
-    {"id": "mem-fleet-mirror", "name": "项目根记忆硬链镜像", "path": "C:\\apphome\\agent_fleet\\memory", "kind": "hardlink_mirror", "source": "mem-fleet-pot",
-     "desc": "随项目根目录迁移/防误删;Write/Edit 原子写断链后跑 sync_memory.ps1(或 PostToolUse hook on_memory_write 自动重链)。不进 git。", "owner": "MasterAgent"},
-    {"id": "mem-biz-pot", "name": "业务记忆库", "path": "C:\\Users\\<用户>\\.claude\\projects\\XXX\\memory", "kind": "dir",
-     "desc": "业务知识 100+ 条(Master 及业务角色);业务记忆归这、不进基建库。未分角色索引(读根 MEMORY.md)。", "owner": "业务侧"}
+    {
+     "id": "mem-fleet-pot",
+     "name": "bus 角色记忆库(正本)",
+     "path": "C:\\Users\\<用户>\\.claude\\projects\\C--apphome-agent-fleet\\memory",
+     "kind": "dir",
+     "desc": "MasterAgent/MasterUI/Master数分/考古/培训师 共锅(CC 记忆按 cwd 定位):根 MEMORY.md=角色路由器+公共段,<role>.MEMORY.md=各角色索引,正文 .md 平铺。新记忆写角色索引。",
+     "owner": "MasterAgent(机制)/各角色(内容)"
+    },
+    {
+     "id": "mem-fleet-mirror",
+     "name": "项目根记忆硬链镜像",
+     "path": "C:\\apphome\\agent_fleet\\memory",
+     "kind": "hardlink_mirror",
+     "source": "mem-fleet-pot",
+     "desc": "随项目根目录迁移/防误删;Write/Edit 原子写断链后跑 sync_memory.ps1(或 PostToolUse hook on_memory_write 自动重链)。不进 git。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "mem-biz-pot",
+     "name": "业务记忆库",
+     "path": "C:\\Users\\<用户>\\.claude\\projects\\XXX\\memory",
+     "kind": "dir",
+     "desc": "业务知识 100+ 条(Master 及业务角色);业务记忆归这、不进基建库。未分角色索引(读根 MEMORY.md)。",
+     "owner": "业务侧"
+    }
    ]
   },
   {
-   "id": "archive", "name": "存档",
+   "id": "archive",
+   "name": "存档",
    "entries": [
-    {"id": "session-archive", "name": "退役会话 jsonl 冻结存档", "path": "C:\\apphome\\agent_fleet\\session-archive", "kind": "dir",
-     "desc": "轮换/退役会话 jsonl + manifest.json(entries 单一源·聚合跑 recompute_manifest.py;recoverable=true 保护集绝不批删;删 raw 走Master数分闸)。gitignored·随目录迁移。", "owner": "Master数分(口径闸)/MasterAgent(机制)"},
-    {"id": "releases", "name": "发版快照", "path": "C:\\apphome\\agent_fleet_releases", "kind": "dir",
-     "desc": "打 vX tag 时 githooks/reference-transaction 自动 zip 全目录快照(bsdtar);在项目根同级、不在项目根内(防自包含膨胀)。", "owner": "MasterAgent"},
-    {"id": "retired-roster", "name": "退役档案花名册", "path": "C:\\apphome\\agent_fleet\\agent_bus\\retired_roster.json", "kind": "file",
-     "desc": "退役 agent 番号/时间/接替者/贡献记忆指针(ab retired / retire / revive)。", "owner": "培训师(登记)/MasterAgent(机制)"},
-    {"id": "mailbox-retired", "name": "退役 mailbox 留痕", "path": "C:\\apphome\\agent_fleet\\agent_bus\\_retired", "kind": "dir",
-     "desc": "ab retire 时整个 role mailbox 移入留痕(revive 移回)。", "owner": "MasterAgent"},
-    {"id": "todos-archive", "name": "待办池归档", "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos_archive.json", "kind": "file",
-     "desc": "ab todos-archive 把已处理待办从 todos.json 移入(池瘦身留痕)。", "owner": "MasterAgent"}
+    {
+     "id": "session-archive",
+     "name": "退役会话 jsonl 冻结存档",
+     "path": "C:\\apphome\\agent_fleet\\session-archive",
+     "kind": "junction",
+     "desc": "轮换/退役会话 jsonl + manifest.json(entries 单一源·recoverable 保护集绝不批删·删 raw 走Master数分闸)。2026-07-29(2.4 存储瘦身)物理外置至 agent_fleet_data、原位 junction——canonical 路径不变。gitignored·发版 zip 排除。",
+     "owner": "Master数分(口径闸)/MasterAgent(机制)",
+     "target": "C:\\apphome\\agent_fleet_data\\session-archive"
+    },
+    {
+     "id": "releases",
+     "name": "发版快照",
+     "path": "C:\\apphome\\agent_fleet_releases",
+     "kind": "dir",
+     "desc": "打 vX tag 时 githooks/reference-transaction 自动 zip 全目录快照(bsdtar);在项目根同级、不在项目根内(防自包含膨胀)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "retired-roster",
+     "name": "退役档案花名册",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\retired_roster.json",
+     "kind": "file",
+     "desc": "退役 agent 番号/时间/接替者/贡献记忆指针(ab retired / retire / revive)。",
+     "owner": "培训师(登记)/MasterAgent(机制)"
+    },
+    {
+     "id": "mailbox-retired",
+     "name": "退役 mailbox 留痕",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\_retired",
+     "kind": "dir",
+     "desc": "ab retire 时整个 role mailbox 移入留痕(revive 移回)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "todos-archive",
+     "name": "待办池归档",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos_archive.json",
+     "kind": "file",
+     "desc": "ab todos-archive 把已处理待办从 todos.json 移入(池瘦身留痕)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "data-home",
+     "name": "素材源数据家(agent_fleet_data)",
+     "path": "C:\\apphome\\agent_fleet_data",
+     "kind": "dir",
+     "desc": "2.4 存储瘦身(用户立项 2026-07-29):素材/raw 源数据的物理家(首住户=session-archive 78MB),与项目根代码目录、_releases 同级三分:代码+运行态方舟(项目根)/发版快照(_releases)/素材源数据(_data)。换机按需迁(不迁则删项目根内对应死链)。",
+     "owner": "MasterAgent(机制)/Master数分(归档口径)"
+    }
    ]
   },
   {
-   "id": "links", "name": "外链(junction / symlink / 硬链——「~/.claude 内皆引用·物理原件在项目根」)",
+   "id": "links",
+   "name": "外链(junction / symlink / 硬链——「~/.claude 内皆引用·物理原件在项目根」)",
    "entries": [
-    {"id": "junction-agentbus", "name": "agent_bus 目录 junction", "path": "C:\\Users\\<用户>\\.claude\\agent_bus", "kind": "junction", "target": "C:\\apphome\\agent_fleet\\agent_bus",
-     "desc": "2026-07-15 起 项目根=唯一物理家;canonical 调用路径经此 junction。换机 mklink /J 重建(免管理员)。守卫:sync_code.ps1(检测 reparse 即 no-op)。", "owner": "MasterAgent"},
-    {"id": "symlink-global-claudemd", "name": "全局 CLAUDE.md 文件软链", "path": "C:\\Users\\<用户>\\.claude\\CLAUDE.md", "kind": "symlink", "target": "C:\\apphome\\agent_fleet\\host_config\\CLAUDE.global.md",
-     "desc": "2026-07-27 用户令:物理原件在 host_config;改全局指令编辑物理原件、绝不对本路径原子写(会打回普通文件分叉)。换机 mklink 重建(需管理员)。守卫:sync_host_config.ps1 完好性检查。", "owner": "MasterAgent"},
-    {"id": "hardlink-memory", "name": "记忆硬链镜像(见 mem-fleet-mirror)", "path": "C:\\apphome\\agent_fleet\\memory", "kind": "hardlink_mirror", "source": "mem-fleet-pot",
-     "desc": "同 memory 类 mem-fleet-mirror 条(此处按「外链」视角交叉列出:逐文件硬链·原子写断链·sync_memory.ps1/on_memory_write hook 重链)。", "owner": "MasterAgent", "cross_ref": "mem-fleet-mirror"},
-    {"id": "junction-projects", "name": "CC 会话/记忆根 junction", "path": "C:\\Users\\<用户>\\.claude\\projects", "kind": "junction", "target": "C:\\apphome\\agent_fleet\\projects",
-     "desc": "2026-07-28 用户令:全部 agent 会话/记忆库物理迁入项目根(整目录迁移即带走全员记忆);宿主路径经此 junction。换机 mklink /J 重建(免管理员)。", "owner": "MasterAgent"},
-    {"id": "junction-biz-1", "name": "业务会话库外置 junction(业务库1)", "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-1", "kind": "junction", "target": "C:\\BaseSpace\\project\\XXX-biz-1",
-     "desc": "业务大库物理在业务侧缓存区(业务随业务·项目根迁移包不驮业务体积);项目根 projects 内是 junction 回链。", "owner": "MasterAgent(链)/业务侧(内容)"},
-    {"id": "junction-biz-2", "name": "业务会话库外置 junction(业务库2)", "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-2", "kind": "junction", "target": "C:\\BaseSpace\\project\\XXX-biz-2",
-     "desc": "同业务库1 模式。", "owner": "MasterAgent(链)/业务侧(内容)"},
-    {"id": "junction-biz-3", "name": "业务会话库外置 junction(业务库3)", "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-3", "kind": "junction", "target": "C:\\BaseSpace\\project\\XXX-biz-3",
-     "desc": "同业务库1 模式。", "owner": "MasterAgent(链)/业务侧(内容)"}
+    {
+     "id": "junction-agentbus",
+     "name": "agent_bus 目录 junction",
+     "path": "C:\\Users\\<用户>\\.claude\\agent_bus",
+     "kind": "junction",
+     "target": "C:\\apphome\\agent_fleet\\agent_bus",
+     "desc": "2026-07-15 起 项目根=唯一物理家;canonical 调用路径经此 junction。换机 mklink /J 重建(免管理员)。守卫:sync_code.ps1(检测 reparse 即 no-op)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "symlink-global-claudemd",
+     "name": "全局 CLAUDE.md 文件软链",
+     "path": "C:\\Users\\<用户>\\.claude\\CLAUDE.md",
+     "kind": "symlink",
+     "target": "C:\\apphome\\agent_fleet\\host_config\\CLAUDE.global.md",
+     "desc": "2026-07-27 用户令:物理原件在 host_config;改全局指令编辑物理原件、绝不对本路径原子写(会打回普通文件分叉)。换机 mklink 重建(需管理员)。守卫:sync_host_config.ps1 完好性检查。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "hardlink-memory",
+     "name": "记忆硬链镜像(见 mem-fleet-mirror)",
+     "path": "C:\\apphome\\agent_fleet\\memory",
+     "kind": "hardlink_mirror",
+     "source": "mem-fleet-pot",
+     "desc": "同 memory 类 mem-fleet-mirror 条(此处按「外链」视角交叉列出:逐文件硬链·原子写断链·sync_memory.ps1/on_memory_write hook 重链)。",
+     "owner": "MasterAgent",
+     "cross_ref": "mem-fleet-mirror"
+    },
+    {
+     "id": "junction-projects",
+     "name": "CC 会话/记忆根 junction",
+     "path": "C:\\Users\\<用户>\\.claude\\projects",
+     "kind": "junction",
+     "target": "C:\\apphome\\agent_fleet\\projects",
+     "desc": "2026-07-28 用户令:全部 agent 会话/记忆库物理迁入项目根(整目录迁移即带走全员记忆);宿主路径经此 junction。换机 mklink /J 重建(免管理员)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "junction-biz-1",
+     "name": "业务会话库外置 junction(业务库1)",
+     "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-1",
+     "kind": "junction",
+     "target": "C:\\BaseSpace\\project\\XXX-biz-1",
+     "desc": "业务大库物理在业务侧缓存区(业务随业务·项目根迁移包不驮业务体积);项目根 projects 内是 junction 回链。",
+     "owner": "MasterAgent(链)/业务侧(内容)"
+    },
+    {
+     "id": "junction-biz-2",
+     "name": "业务会话库外置 junction(业务库2)",
+     "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-2",
+     "kind": "junction",
+     "target": "C:\\BaseSpace\\project\\XXX-biz-2",
+     "desc": "同业务库1 模式。",
+     "owner": "MasterAgent(链)/业务侧(内容)"
+    },
+    {
+     "id": "junction-biz-3",
+     "name": "业务会话库外置 junction(业务库3)",
+     "path": "C:\\apphome\\agent_fleet\\projects\\XXX-biz-3",
+     "kind": "junction",
+     "target": "C:\\BaseSpace\\project\\XXX-biz-3",
+     "desc": "同业务库1 模式。",
+     "owner": "MasterAgent(链)/业务侧(内容)"
+    }
    ]
   },
   {
-   "id": "config", "name": "宿主/机器配置",
+   "id": "config",
+   "name": "宿主/机器配置",
    "entries": [
-    {"id": "host-config", "name": "宿主全局配置(物理原件+快照)", "path": "C:\\apphome\\agent_fleet\\host_config", "kind": "dir",
-     "desc": "CLAUDE.global.md=全局指令物理原件(宿主是 symlink);settings.snapshot.json=~/.claude/settings.json 快照(65%早压 env/hook 注册/model·换机回填)。", "owner": "MasterAgent"},
-    {"id": "host-settings", "name": "宿主 settings.json(live)", "path": "C:\\Users\\<用户>\\.claude\\settings.json", "kind": "file",
-     "desc": "hooks 注册(SessionStart reinject/block_askuser/enforce_selfwake/turn_state/on_memory_write)+ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=65 + model。改后跑 sync_host_config.ps1 刷快照。", "owner": "MasterAgent(快照)/用户(内容)"},
-    {"id": "bus-config", "name": "bus 机器路径集中配置", "path": "C:\\apphome\\agent_fleet\\agent_bus\\config.json", "kind": "file",
-     "desc": "claude_bin/python_bin/repo/memory_index/agent_fleet_home/usage_db 等;换机只改这一处(或 AGENTBUS_* env 覆盖)。", "owner": "MasterAgent"},
-    {"id": "projects-root", "name": "CC 会话/记忆根(物理原件·宿主经 junction)", "path": "C:\\apphome\\agent_fleet\\projects", "kind": "dir",
-     "desc": "各项目会话 jsonl(sessions 命令/ctx 面板扫宿主 canonical 路径;CC 会清老 jsonl→用量先入 usage.db 方舟)+ 各项目 memory/ 库。2026-07-28 物理迁入项目根;宿主 C:\\Users\\<用户>\\.claude\\projects 是 junction(见 junction-projects);业务会话库再外置业务侧缓存区(见 junction-biz-*)。不进 git/发版 zip。", "owner": "harness(结构)/各角色(内容)"}
+    {
+     "id": "host-config",
+     "name": "宿主全局配置(物理原件+快照)",
+     "path": "C:\\apphome\\agent_fleet\\host_config",
+     "kind": "dir",
+     "desc": "CLAUDE.global.md=全局指令物理原件(宿主是 symlink);settings.snapshot.json=~/.claude/settings.json 快照(65%早压 env/hook 注册/model·换机回填)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "host-settings",
+     "name": "宿主 settings.json(live)",
+     "path": "C:\\Users\\<用户>\\.claude\\settings.json",
+     "kind": "file",
+     "desc": "hooks 注册(SessionStart reinject/block_askuser/enforce_selfwake/turn_state/on_memory_write)+ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=65 + model。改后跑 sync_host_config.ps1 刷快照。",
+     "owner": "MasterAgent(快照)/用户(内容)"
+    },
+    {
+     "id": "bus-config",
+     "name": "bus 机器路径集中配置",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\config.json",
+     "kind": "file",
+     "desc": "claude_bin/python_bin/repo/memory_index/agent_fleet_home/usage_db 等;换机只改这一处(或 AGENTBUS_* env 覆盖)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "projects-root",
+     "name": "CC 会话/记忆根(物理原件·宿主经 junction)",
+     "path": "C:\\apphome\\agent_fleet\\projects",
+     "kind": "dir",
+     "desc": "各项目会话 jsonl(sessions 命令/ctx 面板扫宿主 canonical 路径;CC 会清老 jsonl→用量先入 usage.db 方舟)+ 各项目 memory/ 库。2026-07-28 物理迁入项目根;宿主 C:\\Users\\<用户>\\.claude\\projects 是 junction(见 junction-projects);业务会话库再外置业务侧缓存区(见 junction-biz-*)。不进 git/发版 zip。",
+     "owner": "harness(结构)/各角色(内容)"
+    }
    ]
   },
   {
-   "id": "biz-data", "name": "业务数据清单(数据清理=按此整体清除·基建零业务残留)",
+   "id": "biz-data",
+   "name": "业务数据清单(数据清理=按此整体清除·基建零业务残留)",
    "entries": [
-    {"id": "biz-role-profiles", "name": "业务角色注册表", "path": "C:\\apphome\\agent_fleet\\role_profiles_biz.json", "kind": "file",
-     "desc": "具体业务角色的角色页(2026-07-29 分仓·gitignore);基建表只留『业务角色』抽象条目。清除本文件=业务角色页全清。", "owner": "培训师(建档)/Master(口径)"},
-    {"id": "biz-session-libs", "name": "业务会话/记忆库(外置区)", "path": "C:\\BaseSpace\\project", "kind": "dir",
-     "desc": "业务大库(业务记忆/角色锚)物理家;项目根 projects 内是 junction 回链。清除=删本目录+删三个死链。", "owner": "业务侧"},
-    {"id": "biz-transit", "name": "过境业务消息(运行态·自代谢)", "path": "C:\\apphome\\agent_fleet\\agent_bus", "kind": "dir",
-     "desc": "各业务 role mailbox(inbox/processing/done/archive)里的业务任务=过境流量,卫生代谢自动归档→90d 终点站→30d 真删;立即清=对业务 role 目录逐个清队列。agents.json 中业务角色条目(caps/desc)与 _retired 业务留痕亦属业务面。", "owner": "MasterAgent(机制)/Master(内容)"},
-    {"id": "biz-extract-transit", "name": "会考抢救业务残件(过渡态·迁移后清零)", "path": "C:\\apphome\\agent_fleet\\session-archive\\extracted", "kind": "dir",
-     "desc": "会话考古从离线业务 agent 会话抢救的记忆/报告【中转站】——终态=各归其库(业务→业务库·基建→基建库),Master 跟进迁移(2026-07-29 批准);迁毕本目录业务残件应为零。数据清理时此处业务残件一并清。", "owner": "Master(迁移)/会话考古(manifest)"}
+    {
+     "id": "biz-role-profiles",
+     "name": "业务角色注册表",
+     "path": "C:\\apphome\\agent_fleet\\role_profiles_biz.json",
+     "kind": "file",
+     "desc": "具体业务角色的角色页(2026-07-29 分仓·gitignore);基建表只留『业务角色』抽象条目。清除本文件=业务角色页全清。",
+     "owner": "培训师(建档)/Master(口径)"
+    },
+    {
+     "id": "biz-session-libs",
+     "name": "业务会话/记忆库(外置区)",
+     "path": "C:\\BaseSpace\\project",
+     "kind": "dir",
+     "desc": "业务大库(业务记忆/角色锚)物理家;项目根 projects 内是 junction 回链。清除=删本目录+删三个死链。",
+     "owner": "业务侧"
+    },
+    {
+     "id": "biz-transit",
+     "name": "过境业务消息(运行态·自代谢)",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus",
+     "kind": "dir",
+     "desc": "各业务 role mailbox(inbox/processing/done/archive)里的业务任务=过境流量,卫生代谢自动归档→90d 终点站→30d 真删;立即清=对业务 role 目录逐个清队列。agents.json 中业务角色条目(caps/desc)与 _retired 业务留痕亦属业务面。",
+     "owner": "MasterAgent(机制)/Master(内容)"
+    },
+    {
+     "id": "biz-extract-transit",
+     "name": "会考抢救业务残件(过渡态·迁移后清零)",
+     "path": "C:\\apphome\\agent_fleet\\session-archive\\extracted",
+     "kind": "dir",
+     "desc": "会话考古从离线业务 agent 会话抢救的记忆/报告【中转站】——终态=各归其库(业务→业务库·基建→基建库),Master 跟进迁移(2026-07-29 批准);迁毕本目录业务残件应为零。数据清理时此处业务残件一并清。",
+     "owner": "Master(迁移)/会话考古(manifest)"
+    }
    ]
   },
   {
-   "id": "runtime", "name": "运行态方舟/审计(不进 git·随目录迁移)",
+   "id": "runtime",
+   "name": "运行态方舟/审计(不进 git·随目录迁移)",
    "entries": [
-    {"id": "usage-db", "name": "usage.db 用量方舟", "path": "C:\\apphome\\agent_fleet\\agent_bus\\usage.db", "kind": "db",
-     "desc": "token 用量增量 ETL 持久库(message_id 主键);CC 清 jsonl 后唯一史源——resume 剪裁前必先 token_stats.py --etl。BI 全量从此出数。", "owner": "Master数分(ETL/口径)"},
-    {"id": "events-jsonl", "name": "全链路审计流水", "path": "C:\\apphome\\agent_fleet\\agent_bus\\events.jsonl", "kind": "file",
-     "desc": "send/claim/done/退役/结业等全审计(append-only);clear replies 后仍留痕,交接核实以此为准。", "owner": "MasterAgent"},
-    {"id": "todos", "name": "待办池(ask-user)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos.json", "kind": "file",
-     "desc": "🙋待用户拍板队列(ab ask-user 投/ab answer 闭环/WebUI 待办 tab 渲染)。", "owner": "MasterAgent(机制)/用户(处理)"},
-    {"id": "metrics", "name": "任务消耗埋点", "path": "C:\\apphome\\agent_fleet\\agent_bus\\metrics.jsonl", "kind": "file",
-     "desc": "claude_run 抓 usage/cost/duration,daemon/dispatch 完成后 append(O_APPEND);BI 消耗面板数据源之一。", "owner": "MasterAgent(埋点)/Master数分(口径)"},
-    {"id": "fleet-config", "name": "fleet.json(daemon 期望配置)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet.json", "kind": "file",
-     "desc": "supervise 对账的 daemon 期望清单(前台化后现为空=期望0);与 fleet_status.json 同名不同物——那是 WebUI 推送通道(2.0 2c 决议:澄清并存·不合并)。", "owner": "MasterAgent"},
-    {"id": "fleet-status", "name": "fleet_status.json(舰队战报推送)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet_status.json", "kind": "file",
-     "desc": "WebUI 每 5s 刷的全舰队实时战报(协调位直接读=≤5s 新鲜,免自跑 who);写方=ui/api.py 推送线程。与 fleet.json(期望配置)是两回事。", "owner": "MasterUI(写)/协调位(读)"},
-    {"id": "hygiene-outputs", "name": "卫生代谢归档位(done_archive/_dead_letter/.trash)", "path": "C:\\apphome\\agent_fleet\\agent_bus\\unknown\\_dead_letter", "kind": "dir",
-     "desc": "health-sweep 卫生代谢(2026-07-28)三个去处:各 role done_archive/(回执>14d)、unknown/_dead_letter/(死信>7d)、agent_bus/.trash/(bak>14d);supervise 90s 周期自动跑。", "owner": "MasterAgent"}
+    {
+     "id": "usage-db",
+     "name": "usage.db 用量方舟",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\usage.db",
+     "kind": "db",
+     "desc": "token 用量增量 ETL 持久库(message_id 主键);CC 清 jsonl 后唯一史源——resume 剪裁前必先 token_stats.py --etl。BI 全量从此出数。",
+     "owner": "Master数分(ETL/口径)"
+    },
+    {
+     "id": "events-jsonl",
+     "name": "全链路审计流水",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\events.jsonl",
+     "kind": "file",
+     "desc": "send/claim/done/退役/结业等全审计(append-only);clear replies 后仍留痕,交接核实以此为准。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "todos",
+     "name": "待办池(ask-user)",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\todos.json",
+     "kind": "file",
+     "desc": "🙋待用户拍板队列(ab ask-user 投/ab answer 闭环/WebUI 待办 tab 渲染)。",
+     "owner": "MasterAgent(机制)/用户(处理)"
+    },
+    {
+     "id": "metrics",
+     "name": "任务消耗埋点",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\metrics.jsonl",
+     "kind": "file",
+     "desc": "claude_run 抓 usage/cost/duration,daemon/dispatch 完成后 append(O_APPEND);BI 消耗面板数据源之一。",
+     "owner": "MasterAgent(埋点)/Master数分(口径)"
+    },
+    {
+     "id": "fleet-config",
+     "name": "fleet.json(daemon 期望配置)",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet.json",
+     "kind": "file",
+     "desc": "supervise 对账的 daemon 期望清单(前台化后现为空=期望0);与 fleet_status.json 同名不同物——那是 WebUI 推送通道(2.0 2c 决议:澄清并存·不合并)。",
+     "owner": "MasterAgent"
+    },
+    {
+     "id": "fleet-status",
+     "name": "fleet_status.json(舰队战报推送)",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\fleet_status.json",
+     "kind": "file",
+     "desc": "WebUI 每 5s 刷的全舰队实时战报(协调位直接读=≤5s 新鲜,免自跑 who);写方=ui/api.py 推送线程。与 fleet.json(期望配置)是两回事。",
+     "owner": "MasterUI(写)/协调位(读)"
+    },
+    {
+     "id": "hygiene-outputs",
+     "name": "卫生代谢归档位(done_archive/_dead_letter/.trash)",
+     "path": "C:\\apphome\\agent_fleet\\agent_bus\\unknown\\_dead_letter",
+     "kind": "dir",
+     "desc": "health-sweep 卫生代谢(2026-07-28)三个去处:各 role done_archive/(回执>14d)、unknown/_dead_letter/(死信>7d)、agent_bus/.trash/(bak>14d);supervise 90s 周期自动跑。",
+     "owner": "MasterAgent"
+    }
    ]
   }
  ]
