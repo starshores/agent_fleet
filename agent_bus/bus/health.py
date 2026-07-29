@@ -458,6 +458,19 @@ def _hygiene_core(apply=False, done_days=14, dead_days=7, bak_days=14,
                     os.replace(str(f), str(BUS / ("%s.%s.1" % (name, time.strftime("%Y%m%d-%H%M%S")))))
         except Exception:
             rep["jsonl_rotated"] = max(0, rep["jsonl_rotated"] - 1)
+    # ⑦b 各 role session_reads.jsonl(2.3 boot-check 采集·只服务活会话)超 5MB 直接轮转进 .trash
+    #    (老会话的读记录无追溯价值——boot-check 只看当前 sid;.trash 30d 反悔窗后真删)
+    for d in sorted(BUS.iterdir()):
+        if d.is_dir() and not d.name.startswith((".", "_")):
+            f = d / "session_reads.jsonl"
+            try:
+                if f.exists() and f.stat().st_size > 5 * 1024 * 1024:
+                    rep["jsonl_rotated"] += 1
+                    if apply:
+                        (BUS / ".trash").mkdir(exist_ok=True)
+                        os.replace(str(f), str(BUS / ".trash" / ("%s.session_reads.%s" % (d.name, time.strftime("%Y%m%d-%H%M%S")))))
+            except Exception:
+                pass
     # ⑧ 终点站保留期:done_archive / _dead_letter 超期 → .trash;.trash 超期 → 真删(唯一真删点)
     for d in sorted(BUS.iterdir()):
         if d.is_dir() and not d.name.startswith((".", "_")):

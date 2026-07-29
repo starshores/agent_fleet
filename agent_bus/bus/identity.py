@@ -82,7 +82,7 @@ def cmd_hello(args):
     _print_onboarding(role)
     _print_role_feed(role)
     if is_new:
-        _auto_train_request(role, a[role])
+        _auto_train_request(role, _load_agents().get(role) or {})   # P0 重构后 a 已不在作用域(锁内 mutator);重读取
 
 
 def _print_onboarding(role):
@@ -190,8 +190,9 @@ def _print_role_feed(role):
     # boot 完备自检(2026-07-28 用户案:新会话 hello 后没走完启动流程就开始接话,被问"加载了吗"
     # 才发现指定必读文件没读——喂入起效了(它能列出缺什么),缺口在时序。此处把时序也定死。)
     print("【⛔ boot 未完成=不算上岗】上面 启动流程/必读文件/角色记忆索引 逐条走完之前:不领活、"
-          "不答业务问题(用户插话也先答'boot 中,还差X'再补完)。自检口令:被问『角色和能力都加载了吗』"
-          "时,你必须能答'全部加载完'并列出走过的每条——答不全=立即补完再继续。")
+          "不答业务问题(用户插话也先答'boot 中,还差X'再补完)。")
+    print("【机器自验·2.3】读完必读后跑 `ab boot-check --role %s`——它按你本会话的真实 Read 记录核验"
+          "必读清单(不认自述),✅装载完成才开始领活;✗会列出还没读的,逐个读完重跑直到 ✅。" % role)
 
 
 def _auto_train_request(role, rec):

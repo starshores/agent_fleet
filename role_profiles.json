@@ -18,10 +18,19 @@
   ],
   "policy_note": "角色策略(P1·2026-07-28 出代码进注册表):human_attended=人值守角色(toast 分级/可达豁免);mgmt_owner=管理位孤儿回执归属;biz_default_owner=其余已登记角色的孤儿回执默认归属。roster._policy()/health 读此;缺失时代码内降级默认兜底。角色增减改这里,不改代码。",
   "policy": {
-   "human_attended": ["Master", "MasterAgent"],
-   "mgmt_owner": {"MasterUI": "MasterAgent", "培训师": "MasterAgent", "会话考古": "MasterAgent", "Master数分": "MasterAgent"},
+   "human_attended": [
+    "Master",
+    "MasterAgent"
+   ],
+   "mgmt_owner": {
+    "MasterUI": "MasterAgent",
+    "培训师": "MasterAgent",
+    "会话考古": "MasterAgent",
+    "Master数分": "MasterAgent"
+   },
    "biz_default_owner": "Master"
-  }
+  },
+  "boot_reads_note": "BUS 2.3 P0「该读没读」(2026-07-29):boot_reads=该角色新会话【必须用 Read 工具读过】的文件(相对路径可·后缀匹配;角色记忆索引 <role>.MEMORY.md 存在即自动纳入不用列)。turn_state hook 落 session_reads,`ab boot-check --role X` 机器核验。注意:CLAUDE.md/根 MEMORY.md 是自动注入、不走 Read,别列进来。各角色清单随 P1 角色页体检补齐(培训师协作);能力挂 reads 自动聚合=P1 能力项。"
  },
  "roles": [
   {
@@ -30,7 +39,10 @@
    "one_liner": "对 Master 自身的 Master——只演进 agent_fleet 协调基建(bus / 协调 WebUI / worker daemon / 完成通知 / 记忆备份)本身",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(mode=listening·无 daemon)",
-   "caps": ["bus-comms", "self-wake"],
+   "caps": [
+    "bus-comms",
+    "self-wake"
+   ],
    "startup_flow": [
     "① 在 agent_fleet tab 开会话 → `ab whoami` 反查真实身份(同 cwd 多 role,防误认成培训师或其他角色)",
     "② `python recover.py` 探活(谁在跑/待办/回填/Edge锁)+ 读 CLAUDE.md/AGENTS.md/CAPABILITIES.md 恢复",
@@ -50,7 +62,11 @@
     "PreToolUse `block_askuser` / Stop `enforce_selfwake` / `turn_state` / PostToolUse `on_memory_write` hooks",
     "`presence.json` 身份绑定 · `agents.json` 的 caps · 培训师 onboarding(BUS_ONBOARDING)带过的能力模块"
    ],
-   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师。⚠反面锚(MasterAgent 曾是脱敏病毒载体源·别学回来):脱敏只对外(业务→客户远端仓),bus 内部保留真实术语【不脱敏】=洁净基准≠内部脱敏(desensitize-outward-only / desensitize-virus-infra-contamination)。★★自醒不降级(用户令 2026-07-27·硬约束):MasterAgent 保【事件即时自醒】(后台 wait·消息即时唤醒),【绝不切轮询模式】——轮询=最多 30min drain 延迟=丢实时任务投递响应,不可接受。背景 wait 在本会话实测跨 turn 常驻(polling 兜底的『turn 边界 SIGTERM』前提对本会话不成立);唯一掉线源=会话整个关闭的多天 gap(轮询同样救不了·靠恢复时重挂)。见记忆 masteragent-event-selfwake-no-downgrade"
+   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师。⚠反面锚(MasterAgent 曾是脱敏病毒载体源·别学回来):脱敏只对外(业务→客户远端仓),bus 内部保留真实术语【不脱敏】=洁净基准≠内部脱敏(desensitize-outward-only / desensitize-virus-infra-contamination)。★★自醒不降级(用户令 2026-07-27·硬约束):MasterAgent 保【事件即时自醒】(后台 wait·消息即时唤醒),【绝不切轮询模式】——轮询=最多 30min drain 延迟=丢实时任务投递响应,不可接受。背景 wait 在本会话实测跨 turn 常驻(polling 兜底的『turn 边界 SIGTERM』前提对本会话不成立);唯一掉线源=会话整个关闭的多天 gap(轮询同样救不了·靠恢复时重挂)。见记忆 masteragent-event-selfwake-no-downgrade",
+   "boot_reads": [
+    "agent_fleet/AGENTS.md",
+    "agent_fleet/CAPABILITIES.md"
+   ]
   },
   {
    "role": "Master",
@@ -58,7 +74,11 @@
    "one_liner": "业务总控——把业务任务外派给各业务 agent(按业务域分工…)并收结果",
    "cwd": "C:\\BaseSpace\\XXX",
    "mode": "前台 listening cli(mode=listening·无 daemon)",
-   "caps": ["bus-comms", "self-wake", "confidentiality"],
+   "caps": [
+    "bus-comms",
+    "self-wake",
+    "confidentiality"
+   ],
    "startup_flow": [
     "① 在业务项目 tab 开会话(业务总控的家在业务仓,非 agent_fleet)",
     "② `ab hello --role Master`(或 presence 已绑,compact 重载免 hello)",
@@ -84,7 +104,10 @@
    "one_liner": "新人 onboarding 专责——按 BUS_ONBOARDING 流程带新 agent;只管总线协议层,业务口径归业务老 agent",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(mode=listening·无 daemon;CLAUDE.md 旧称『常驻 daemon』已随前台化过时)",
-   "caps": ["bus-comms", "self-wake"],
+   "caps": [
+    "bus-comms",
+    "self-wake"
+   ],
    "startup_flow": [
     "① 在 agent_fleet tab 开会话 → `ab whoami` 反查身份(与 MasterAgent 同 cwd,靠 whoami 区分)",
     "② `ab hello --role 培训师`(或 presence 已绑)",
@@ -103,7 +126,10 @@
     "`SPECIALIZATION.md` / `SESSION_RELIABILITY.md`(带新人必灌的专一性/可靠性纪律)",
     "SessionStart reinject hook + block_askuser/enforce_selfwake hooks · presence · caps"
    ],
-   "boundary": "只总线协议层·业务口径归业务老 agent;caps 登记/roster 管理归它;改接口/机制必通报消费方(对称协作律)。onboarding 必强化【fire→重挂→selfwake 验✓在岗】三步闭环(前台 agent 顽固失败模式·实证旧 MasterUI 一会话被催 5 次)+ 辨析【◐待确认≠armed】(有心跳无 wait 进程=瞬时非在岗)"
+   "boundary": "只总线协议层·业务口径归业务老 agent;caps 登记/roster 管理归它;改接口/机制必通报消费方(对称协作律)。onboarding 必强化【fire→重挂→selfwake 验✓在岗】三步闭环(前台 agent 顽固失败模式·实证旧 MasterUI 一会话被催 5 次)+ 辨析【◐待确认≠armed】(有心跳无 wait 进程=瞬时非在岗)",
+   "boot_reads": [
+    "agent_fleet/BUS_ONBOARDING.md"
+   ]
   },
   {
    "role": "Master数分",
@@ -111,7 +137,13 @@
    "one_liner": "数据分析·口径·bus 演进验证 + 档案/清理口径 owner——基线验证(bus_smoke)、token/usage 口径(usage.db/BI/ctx)、count 闸(role-verdict 单一源逐视图核)、数据卫生、session-archive 归档/删 raw 闸",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(mode=listening·无 daemon)",
-   "caps": ["bus-comms", "self-wake", "data-analysis", "bus-monitoring", "token-usage-etl"],
+   "caps": [
+    "bus-comms",
+    "self-wake",
+    "data-analysis",
+    "bus-monitoring",
+    "token-usage-etl"
+   ],
    "startup_flow": [
     "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd 多 role·防误认成 MasterAgent/培训师)",
     "② `python recover.py` 探活 + 读 CLAUDE.md/CAPABILITIES/MEMORY.md 恢复(角色恢复锚在 MEMORY.md 索引搜 Master数分)",
@@ -139,7 +171,11 @@
    "one_liner": "协调 WebUI/控制台——server.py 面板(舰队·运维·BI·上下文·任务线·机制·角色…)+ SSE 实时 + 系统托盘 + bus 维护心跳(start_maint);渲染吃 ab._who_data() 单一源不自算 verdict",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(无 daemon)·自醒=后台 wait 事件自醒(标准三步;2026-07-28 用户令废止轮询模式·豁免 marker 已撤)",
-   "caps": ["bus-comms", "self-wake", "webui"],
+   "caps": [
+    "bus-comms",
+    "self-wake",
+    "webui"
+   ],
    "startup_flow": [
     "① agent_fleet tab 开会话 → `ab whoami` 反查身份(同 cwd·防误认成 MasterAgent/培训师/Master数分)",
     "② `python recover.py` + 读 CLAUDE.md/ui 文档恢复;WebUI 常驻控制台 `ui/start_ui.ps1` 幂等拉起(WMI/CIM 脱壳常驻 127.0.0.1:8799)",
@@ -167,7 +203,11 @@
    "one_liner": "归档会话深读提炼——逐上下文 LLM 读入 session-archive jsonl(非工具/正则解析)、提炼用户教诲→修补角色规则、删大文件前无损保全价值",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(单开 tab 专职·深读吃上下文·别污染别人窗口=专一性)",
-   "caps": ["bus-comms", "self-wake", "data-analysis"],
+   "caps": [
+    "bus-comms",
+    "self-wake",
+    "data-analysis"
+   ],
    "startup_flow": [
     "① agent_fleet tab 开会话 → `ab whoami` 反查身份",
     "② 读 `session-archive/extracted/EXTRACTION_PLAYBOOK.md`(操作手册)+ `session-archive/manifest.json`(归档索引)",
@@ -186,7 +226,11 @@
     "`MEMORY.md` · presence · caps(复用 data-analysis 覆盖深读·未新建 cap 类型)",
     "`session-archive/manifest.json`(归档会话索引·recoverable 标志)"
    ],
-   "boundary": "只深读+提炼+登记;删 raw 须过闸(校验非空+用户抽检+recoverable 翻 false+running 绝不碰);业务 PII 聚合不誊抄·凭据不入 md/git;不加 confidentiality cap(基建层·防脱敏病毒重染)"
+   "boundary": "只深读+提炼+登记;删 raw 须过闸(校验非空+用户抽检+recoverable 翻 false+running 绝不碰);业务 PII 聚合不誊抄·凭据不入 md/git;不加 confidentiality cap(基建层·防脱敏病毒重染)",
+   "boot_reads": [
+    "session-archive/extracted/EXTRACTION_PLAYBOOK.md",
+    "session-archive/manifest.json"
+   ]
   }
  ]
 }

@@ -72,6 +72,23 @@ def main():
     role = _role_of(data.get("session_id"))
     if not role:
         return  # 非 bus 成员 → 不写(与 bus 收窄一致,也省得给无关项目留状态文件)
+    # ── session_reads 采集(BUS 2.3 P0「该读没读」·2026-07-29):bus 成员会话每次 Read 工具
+    # 落一行 <role>/session_reads.jsonl(sid+file+ts)→ 哪些文件真被读过【可观测】,ab boot-check
+    # 据此核验角色必读清单(boot_reads),不再靠 agent 自述。append-only·best-effort。
+    if ev == "PostToolUse" and (data.get("tool_name") or "") == "Read":
+        fp = ((data.get("tool_input") or {}).get("file_path") or "").strip()
+        if fp:
+            try:
+                rec_r = {"sid": data.get("session_id"), "file": fp,
+                         "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())}
+                fd = os.open(str(BUS / role / "session_reads.jsonl"),
+                             os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
+                try:
+                    os.write(fd, (json.dumps(rec_r, ensure_ascii=False) + "\n").encode("utf-8"))
+                finally:
+                    os.close(fd)
+            except Exception:
+                pass
     state, label = _EVENT_STATE[ev]
     tool = (data.get("tool_name") or "") if ev in ("PreToolUse", "PostToolUse") else ""
     if state == "tool" and tool:
