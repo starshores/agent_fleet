@@ -140,6 +140,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/fleet-state":
             # 舰队整体状态(fleet_state_rules.json 判定·顶栏徽标数据源)
             self._send(200, get_fleet_state())
+        elif path == "/api/route":
+            # 派活建议对口(U3 防误派):bus.roles.route_scores 单一源,只读
+            q = parse_qs(u.query).get("q", [""])[0]
+            self._send(200, build_route(q))
         else:
             self._send(404, {"error": "not found"})
 

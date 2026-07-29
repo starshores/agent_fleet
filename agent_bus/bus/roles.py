@@ -123,12 +123,13 @@ def cmd_retired(args):
     print("复用某番号:ab revive --role <名>(从档案馆调回 agents.json 活跃在册)")
 
 
-def cmd_route(args):
-    """对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,
-    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。"""
-    terms = [t.lower() for t in (args.keywords or []) if t.strip()]
+def route_scores(terms, limit=5):
+    """对口路由评分(单一源:cmd_route CLI 与 WebUI /api/route 共用·UI2.0 U3)。
+    terms=关键词列表(内部转小写);按花名册 role/desc/caps 子串命中计分,
+    命中多优先、在岗优先,退役/测试排除。返回 [{role,score,state,desc}](仅命中>0,前 limit 条)。"""
+    terms = [t.lower() for t in (terms or []) if t and t.strip()]
     if not terms:
-        print("用法: ab route <关键词...>(按专长/能力找对口角色)"); return
+        return []
     agents = _load_agents()
     retired = _retired_roles()
     wait_roles = _wait_proc_roles()
@@ -140,15 +141,25 @@ def cmd_route(args):
         score = sum(hay.count(t) for t in terms)
         if score > 0:
             st = _self_wake_state(role, wait_roles=wait_roles)[0]
-            scored.append((score, 0 if st == "armed" else 1, role, st, (v.get("desc") or "")[:58]))
+            scored.append({"role": role, "score": score, "state": st, "desc": (v.get("desc") or "")[:58]})
+    scored.sort(key=lambda x: (-x["score"], 0 if x["state"] == "armed" else 1))   # 命中多优先、在岗优先
+    return scored[:limit]
+
+
+def cmd_route(args):
+    """对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,
+    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。"""
+    terms = [t for t in (args.keywords or []) if t.strip()]
+    if not terms:
+        print("用法: ab route <关键词...>(按专长/能力找对口角色)"); return
+    scored = route_scores(terms, limit=5)
     if not scored:
         print("无对口专责命中「%s」——考虑广播,或 ab register 新专家。" % " ".join(terms)); return
-    scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先
     mark = {"armed": "✓在岗", "recent": "◐待确认", "stale": "⚠掉线", "off": "—未醒", "parked": "🅿️休眠"}
     print("对口路由推荐(命中「%s」):" % " ".join(terms))
-    for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):
-        tag = " ← 推荐(对口+在岗)" if i == 0 and st == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
-        print("  %-12s %s 命中%d  %s%s" % (role, mark.get(st, "?"), sc, desc, tag))
+    for i, s in enumerate(scored):
+        tag = " ← 推荐(对口+在岗)" if i == 0 and s["state"] == "armed" else (" ← 最对口但掉线,先让它重挂" if i == 0 else "")
+        print("  %-12s %s 命中%d  %s%s" % (s["role"], mark.get(s["state"], "?"), s["score"], s["desc"], tag))
     print("→ 对口直派:ab send --to <角色> --from <你> ...(别自接跨领域、别乱广播)")
 
 

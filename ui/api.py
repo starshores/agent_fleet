@@ -1973,6 +1973,27 @@ def build_ctxpanel():
 
 
 # =============================================================
+#  派活建议对口(UI2.0 U3 · 防误派)—— GET /api/route?q=<标题+任务文本>
+#  评分单一源 = bus.roles.route_scores(与 `ab route` CLI 同一逻辑);此处只做关键词化:
+#  ASCII 词(≥2字符)+ CJK bigram(中文标题/描述无空格分词,bigram 对 desc 子串命中效果好)。
+# =============================================================
+def build_route(q):
+    q = (q or "").strip()
+    if not q:
+        return {"ok": False, "error": "q 必填"}
+    ascii_terms = [w.lower() for w in re.findall(r"[A-Za-z0-9_]{2,}", q)]
+    cjk = re.findall(r"[一-鿿]", q)
+    bigrams = ["".join(cjk[i:i + 2]) for i in range(len(cjk) - 1)]
+    terms = list(dict.fromkeys(ascii_terms + bigrams))[:40]
+    try:
+        from bus.roles import route_scores
+        recs = route_scores(terms, limit=3)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "q": q[:200], "terms_n": len(terms), "recs": recs}
+
+
+# =============================================================
 #  提示词审核 —— 只读展示【当前喂给 agent 的提示词原文】供审核措辞。
 #  小文件,请求路径直接读(手动刷新,不设后台 poller/缓存)。每节标源路径+mtime。只读不回写。
 # =============================================================

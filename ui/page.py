@@ -545,7 +545,8 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <div class="grid2" data-tab="tasks">
     <section>
       <div class="sec-h">C · 派活 <span class="sub">复用 <span class="mono">agentbus send</span> · from=Master</span></div>
-      <label>派给(to role)</label>
+      <label>派给(to role)<span class="muted" style="font-weight:normal;font-size:11px"> · 输入标题/任务后自动给出建议对口(ab route 同源·防误派)</span></label>
+      <div id="routeChips" style="display:none;margin:2px 0 6px"></div>
       <select id="sendTo"></select>
       <label>标题(title)</label>
       <input type="text" id="sendTitle" placeholder="一句话任务名">
@@ -1266,6 +1267,30 @@ document.getElementById('sendBtn').onclick=async()=>{
   }catch(e){toast('发送失败:'+e,true);}
   btn.disabled=false;
 };
+
+// U3 防误派:标题/任务输入 → 防抖拉 /api/route(bus.roles.route_scores 单一源)→ 建议对口 chip,点击即选
+let _routeTimer=null;
+async function refreshRouteChips(){
+  const box=document.getElementById('routeChips'); if(!box) return;
+  const q=((document.getElementById('sendTitle').value||'')+' '+(document.getElementById('sendTask').value||'')).trim();
+  if(q.length<4){ box.style.display='none'; morphInto(box,''); return; }
+  try{
+    const r=await fetch('/api/route?q='+encodeURIComponent(q.slice(0,400)));
+    const d=await r.json();
+    if(!d.ok||!(d.recs||[]).length){ box.style.display='none'; morphInto(box,''); return; }
+    const mark={armed:'✓在岗',recent:'◐待确认',stale:'⚠掉线',off:'—未醒',parked:'🅿️休眠'};
+    morphInto(box,'<span class="muted" style="font-size:11px">建议对口:</span>'+d.recs.map(x=>
+      `<button type="button" class="cap-chip route-chip" data-key="rc-${esc(x.role)}" data-role="${esc(x.role)}" style="cursor:pointer" title="${esc(x.desc||'')} · 命中${x.score} · ${mark[x.state]||x.state}">${esc(x.role)} <span class="muted" style="font-size:10px">${mark[x.state]||''}</span></button>`).join(' '));
+    box.style.display='';
+  }catch(e){}
+}
+['sendTitle','sendTask'].forEach(id=>{const el=document.getElementById(id);
+  if(el) el.addEventListener('input',()=>{clearTimeout(_routeTimer);_routeTimer=setTimeout(refreshRouteChips,600);});});
+document.getElementById('routeChips').addEventListener('click',e=>{
+  const c=e.target.closest('.route-chip'); if(!c) return;
+  const sel=document.getElementById('sendTo'); if(sel) sel.value=c.dataset.role;
+  toast('已选派给:'+c.dataset.role);
+});
 
 // 孤儿巡检(reap --dry-run)
 document.getElementById('reapBtn').onclick=async()=>{

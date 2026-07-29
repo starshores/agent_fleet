@@ -25,7 +25,8 @@
   "/api/storage",
   "/api/lifecycle",
   "/api/fleet-log",
-  "/api/fleet-state"
+  "/api/fleet-state",
+  "/api/route"
  ],
  "anchors": [
   "fleetBody",
@@ -55,7 +56,8 @@
   "dmKpis",
   "dmRoles",
   "dmKind",
-  "dmTop"
+  "dmTop",
+  "routeChips"
  ],
  "tests": [
   {
@@ -204,9 +206,14 @@
    "note": "页面含 dmTop"
   },
   {
+   "name": "anchor-routeChips",
+   "ok": true,
+   "note": "页面含 routeChips"
+  },
+  {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=209380"
+   "note": "200 bytes=208445"
   },
   {
    "name": "keys /api/state",
@@ -216,7 +223,7 @@
   {
    "name": "GET /api/health",
    "ok": true,
-   "note": "200 bytes=1196"
+   "note": "200 bytes=1247"
   },
   {
    "name": "keys /api/health",
@@ -241,7 +248,7 @@
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=4589"
+   "note": "200 bytes=5195"
   },
   {
    "name": "GET /api/live",
@@ -281,7 +288,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4901"
+   "note": "200 bytes=4778"
   },
   {
    "name": "keys /api/bi",
@@ -291,12 +298,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=35317"
+   "note": "200 bytes=35316"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=27911"
+   "note": "200 bytes=27907"
   },
   {
    "name": "keys /api/usage",
@@ -361,7 +368,7 @@
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=11349"
+   "note": "200 bytes=11953"
   },
   {
    "name": "GET /api/fleet-state",
@@ -372,6 +379,11 @@
    "name": "keys /api/fleet-state",
    "ok": true,
    "note": "必含键齐"
+  },
+  {
+   "name": "GET /api/route",
+   "ok": true,
+   "note": "200 bytes=34"
   },
   {
    "name": "GET-unknown-404",
@@ -419,11 +431,21 @@
    "note": "200 ok=False"
   },
   {
+   "name": "GET-route-empty",
+   "ok": true,
+   "note": "q 必填"
+  },
+  {
+   "name": "GET-route-query",
+   "ok": true,
+   "note": "recs=1"
+  },
+  {
    "name": "SSE-connect",
    "ok": true,
    "note": "202 bytes"
   }
  ],
- "test_count": 73,
- "pass": 73
+ "test_count": 77,
+ "pass": 77
 }

@@ -27,7 +27,7 @@ GET_ENDPOINTS = [
     "/api/bi", "/api/caps", "/api/usage", "/api/dispatch_metrics",
     "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/prompts",
     "/api/archive", "/api/paths", "/api/storage", "/api/lifecycle",
-    "/api/fleet-log", "/api/fleet-state",
+    "/api/fleet-log", "/api/fleet-state", "/api/route",
 ]
 # 页面骨架锚(page.py 关键面板容器;拆分/morphdom 改造后必须仍在。一面板一锚,U1/U4 回归网·Master数分缺口2)
 PAGE_ANCHORS = [
@@ -38,6 +38,7 @@ PAGE_ANCHORS = [
     "archRetired", "archResumeBody", "bizRolesBox",                              # 归档/业务角色
     "sendTask", "tviewActive", "tviewHistory",                                   # 派活表单/任务视图
     "dmKpis", "dmRoles", "dmKind", "dmTop",                                      # 派工效率(U2 复活的死码面板)
+    "routeChips",                                                                # 建议对口 chip(U3 防误派)
 ]
 
 # 关键数据端点"必含键"(Master数分缺口1:只验 JSON-parse 会放过 {} 空壳;键=当前真实响应的稳定子集)。
@@ -138,6 +139,21 @@ def run_tests(base, port):
             add(name, st == 200 and j.get("ok") is False, "%s ok=%s" % (st, j.get("ok")))
         except Exception as e:
             add(name, False, repr(e))
+
+    # ── route 行为(U3):空 q 必拒;q=角色名必命中(role 名恒在评分 hay 里=确定性,不赌 desc 措辞)──
+    try:
+        st, body = _get(base, "/api/route")
+        j = json.loads(body.decode("utf-8"))
+        add("GET-route-empty", st == 200 and j.get("ok") is False, str(j.get("error", "")))
+    except Exception as e:
+        add("GET-route-empty", False, repr(e))
+    try:
+        st, body = _get(base, "/api/route?q=MasterAgent")
+        j = json.loads(body.decode("utf-8"))
+        hit = any(r.get("role") == "MasterAgent" for r in (j.get("recs") or []))
+        add("GET-route-query", st == 200 and j.get("ok") is True and hit, "recs=%d" % len(j.get("recs") or []))
+    except Exception as e:
+        add("GET-route-query", False, repr(e))
 
     # ── SSE 连通:读到前导注释帧即通(短超时防挂死)──
     try:
