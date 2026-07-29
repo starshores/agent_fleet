@@ -20,8 +20,13 @@
 - **附带产出**:_data/session-archive 建独立本地 git(969433c·只版本化 extracted/manifest 等小提炼
   产物,raw 不入库)——版本史+防误改,且不进项目根基建 git=业务数据可整体清除连史全清(平台纲领)。
 
-## P2
-- WebUI 存储面板(📁路径页加大小列/趋势·MasterUI);_data 目录自身的保留期策略(Master数分口径)。
+## P2(已派发 2026-07-29·归下版)
+- WebUI 存储面板(📁路径页加大小列·MasterUI,task 1785294339638,数据源 storage_audit() 已备好);
+- _data 保留期策略(Master数分口径,task 1785294341970:raw jsonl/两素材源包保留期;extracted+manifest
+  默认永久·已有独立 git)。
+
+## 发版
+- **v2.4(2026-07-29)**=P0+P1+wait 心跳修复;zip 30MB(v2.3 52.7MB→外置瘦身直接体现)。
 
 ## 非目标
 - 不压缩/不动 usage.db 方舟;不动 projects 迁移包设计;素材绝不直接删(外置≠清除,删走Master数分闸)。
