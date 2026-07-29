@@ -23,6 +23,8 @@
 | **U4 拆分收口** | page.py 拆分(F8 遗留·2823 行·同 P4 纯搬运契约);清 B2(start_maint 周期 reap + todos-archive)/ D6(cost 口径);收口决议成文 | MasterAgent | Master数分 | 结构收官 |
 
 > **★分工变更(2026-07-29 用户令)**:UI 实施(U1-U4)由 MasterAgent 主实现——长程改造任务对模型等级敏感,MasterUI 模型等级低不宜担纲;MasterUI 保留 WebUI 运行位 owner(start_ui/常驻控制台/B2 运行侧),MasterAgent 改 ui/ 代码按对称律每阶段知会 MasterUI。
+>
+> **★收口(2026-07-29 当日全交付)**:U0-U4 全部完成,Master数分 U0-U3 绿灯已出、U4 验单已发;交付明细/关键决议/实况澄清见 **`docs/UI_2.0_CLOSEOUT.md`**(单一收口档)。
 
 ## 铁律(从 2.0 原样继承)
 
