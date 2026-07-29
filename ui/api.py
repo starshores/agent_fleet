@@ -1728,6 +1728,94 @@ def build_fleet_log():
     return {"ok": True, "entries": entries, "n": len(entries)}
 
 
+def build_lifecycle():
+    """汇总角色全生命周期:agents.json(在册) + retired_roster.json(退役档案) + fleet_log.jsonl(retire/revive)。"""
+    agents_data = ab._load_agents()
+    try:
+        roster = ab._load_retired_roster() or []
+    except Exception:
+        roster = []
+
+    # fleet_log: 采集每个 role 的 retire/revive 事件
+    fp = ABDIR / "fleet_log.jsonl"
+    role_events: dict = {}
+    if fp.exists():
+        try:
+            for ln in fp.read_text(encoding="utf-8").splitlines():
+                ln = ln.strip()
+                if not ln:
+                    continue
+                try:
+                    ev = json.loads(ln)
+                    k = ev.get("kind", "")
+                    actor = ev.get("actor", "") or ev.get("role", "")
+                    if k in ("retire", "revive") and actor:
+                        role_events.setdefault(actor, []).append(
+                            {"kind": k, "ts": ev.get("ts", ""), "title": ev.get("title", "")}
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # boot_pending:活跃会话尚未完成装载
+    try:
+        from bus.fleetlog import fleet_state as _fs
+        boot_pending: set = set(_fs().get("boot_pending") or [])
+    except Exception:
+        boot_pending = set()
+
+    roster_roles = {r.get("role") for r in roster}
+    rows = []
+
+    # 在册角色(agents.json, 未标 retired)
+    for role, info in agents_data.items():
+        if ab._is_test_role(role):
+            continue
+        info = info if isinstance(info, dict) else {}
+        if info.get("retired"):
+            continue
+        stage = "boot_pending" if role in boot_pending else "active"
+        rows.append({
+            "role": role,
+            "stage": stage,
+            "registered": info.get("registered", ""),
+            "desc": info.get("desc", ""),
+            "events": role_events.get(role, []),
+        })
+
+    # 退役档案(retired_roster.json)
+    for rec in roster:
+        role = rec.get("role", "")
+        if not role:
+            continue
+        evs = role_events.get(role, [])
+        revived = any(e.get("kind") == "revive" for e in evs)
+        rows.append({
+            "role": role,
+            "stage": "revived" if revived else "retired",
+            "registered": rec.get("registered", ""),
+            "retired_at": rec.get("retired", ""),
+            "succeeded_by": rec.get("succeeded_by", ""),
+            "reason": rec.get("reason", ""),
+            "desc": rec.get("desc", ""),
+            "events": evs,
+        })
+
+    active_rows = [r for r in rows if r["stage"] in ("active", "boot_pending")]
+    inactive_rows = sorted(
+        [r for r in rows if r["stage"] in ("retired", "revived")],
+        key=lambda r: (r.get("retired_at") or ""), reverse=True
+    )
+    return {
+        "ok": True,
+        "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "rows": active_rows + inactive_rows,
+        "n_active": len(active_rows),
+        "n_retired": len(inactive_rows),
+    }
+
+
 def start_ctx_refresher(interval=12):
     """唯一的上下文占用刷新者:后台线程每 interval 秒读活跃会话 jsonl 尾部刷新 _ctx_cache。
     bounded tail/head 读 + 后台独立 GIL → 请求路径只读缓存,零现读。首轮立即跑。"""
@@ -2221,6 +2309,7 @@ def build_mechanisms():
 #  静态读·只读文件·无实时 telemetry·无 refresher 线程·数据不出本机。
 # =============================================================
 _ROLE_PROFILES = Path(r"C:\apphome\agent_fleet\role_profiles.json")
+_ROLE_PROFILES_BIZ = Path(r"C:\apphome\agent_fleet\role_profiles_biz.json")
 _HOOKS_DIR = Path(r"C:\apphome\agent_fleet\hooks")
 
 
@@ -2260,7 +2349,19 @@ def build_role_profiles():
     roles = d.get("roles", []) or []
     return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "meta": d.get("meta", {}), "roles": roles, "n_roles": len(roles),
-            "compact": _compact_inject([r.get("role") for r in roles if r.get("role")])}
+            "compact": _compact_inject([r.get("role") for r in roles if r.get("role") and not r.get("_abstract")])}
+
+
+def build_role_profiles_biz():
+    if not _ROLE_PROFILES_BIZ.exists():
+        return {"ok": True, "missing": True, "roles": [], "n_roles": 0, "meta": {}}
+    try:
+        d = json.loads(_ROLE_PROFILES_BIZ.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e), "roles": [], "meta": {}}
+    roles = d.get("roles", []) or []
+    return {"ok": True, "missing": False, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "meta": d.get("meta", {}), "roles": roles, "n_roles": len(roles)}
 
 
 # =============================================================

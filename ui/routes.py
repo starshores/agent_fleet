@@ -116,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, build_mechanisms())
         elif path == "/api/role-profiles":
             self._send(200, build_role_profiles())
+        elif path == "/api/role-profiles-biz":
+            self._send(200, build_role_profiles_biz())
         elif path == "/api/longrange":
             self._send(200, build_longrange())
         elif path == "/api/prompts":
@@ -124,6 +126,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/paths":
             # 路径注册表:path_registry.json + 健康校验(请求路径直读·手动刷新)
             self._send(200, api.build_paths())
+        elif path == "/api/lifecycle":
+            # 角色全生命周期:agents.json + retired_roster.json + fleet_log retire/revive 事件
+            self._send(200, build_lifecycle())
         elif path == "/api/fleet-log":
             # 舰队日志:fleet_log.jsonl 倒序(请求路径直读·手动刷新)
             self._send(200, build_fleet_log())

@@ -44,7 +44,7 @@ tr.role-row{cursor:default}
 tr.role-row.clickable{cursor:pointer}
 tr.role-row.clickable:hover{background:var(--panel2)}
 .badge{font-size:11px;padding:2px 9px;border-radius:6px;white-space:nowrap;font-weight:600}
-.badge.vbadge{display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.badge.vbadge{display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .badge.live{background:rgba(62,207,142,.15);color:var(--live)}
 .badge.warn{background:rgba(245,166,35,.15);color:var(--warn)}
 .badge.dead{background:rgba(255,93,93,.15);color:var(--dead)}
@@ -406,6 +406,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
   <button class="tab" data-t="groups">🧩 工作组</button>
   <button class="tab" data-t="mechanisms">🔧 机制</button>
   <button class="tab" data-t="roles">👤 角色</button>
+  <button class="tab" data-t="bizroles">🏢 业务角色</button>
   <button class="tab" data-t="longrange">🗂️ 长程任务</button>
   <button class="tab" data-t="tasks">📋 任务/协作</button>
   <button class="tab" data-t="live">🔴 实时</button>
@@ -426,6 +427,11 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <span class="badge warn" id="fsStaleBtn" style="cursor:pointer" onclick="toggleFleetStale(this)">⚠ 掉线 <span id="fsStaleN"></span> ▾</span>
     <span id="fsStaleDetail" style="display:none;font-size:11px;color:var(--warn);margin-left:4px"></span>
   </span>
+  <span id="fsBootWrap" style="display:none">
+    <span class="muted">|</span>
+    <span class="badge dead" id="fsBootBtn" style="cursor:pointer" onclick="toggleFleetBoot(this)">⛔ 未装载 <span id="fsBootN"></span> ▾</span>
+    <span id="fsBootDetail" style="display:none;font-size:11px;color:var(--dead);margin-left:4px"></span>
+  </span>
 </div>
 
 <main>
@@ -434,7 +440,20 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div id="maintBanner" style="display:none;background:rgba(255,165,0,.12);border-bottom:1px solid rgba(255,165,0,.3);padding:7px 16px;font-size:13px">🔧 <b>维修模式启动中</b> <span id="maintDetail" class="muted"></span></div>
     <div class="sec-b">
       <table>
-        <thead><tr><th>Role</th><th>模型</th><th style="max-width:90px">判定</th><th>turn 状态</th><th>pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th><th>心跳</th><th>inbox</th><th>proc</th><th>done</th><th>held</th><th>failed</th><th>cwd</th></tr></thead>
+        <thead><tr>
+          <th style="width:1%;white-space:nowrap">Role</th>
+          <th style="width:120px;max-width:120px">模型</th>
+          <th style="width:200px;max-width:200px">判定</th>
+          <th style="width:1%;white-space:nowrap">turn 状态</th>
+          <th style="width:1%;white-space:nowrap">pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th>
+          <th style="width:1%;white-space:nowrap">心跳</th>
+          <th style="width:1%;white-space:nowrap">inbox</th>
+          <th style="width:1%;white-space:nowrap">proc</th>
+          <th style="width:1%;white-space:nowrap">done</th>
+          <th style="width:1%;white-space:nowrap">held</th>
+          <th style="width:1%;white-space:nowrap">failed</th>
+          <th>cwd</th>
+        </tr></thead>
         <tbody id="fleetBody"></tbody>
       </table>
     </div>
@@ -717,6 +736,21 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
       <button class="btn ghost mini" id="rolesRefresh">刷新</button>
     </div>
     <div class="sec-b"><div id="rolesBox" style="padding:6px 0"></div></div>
+    <!-- ⏱ 生命周期总览(懒加载·点展开) -->
+    <div style="border-top:1px solid var(--line)">
+      <div id="lcToggle" onclick="toggleLifecycle()" style="padding:7px 16px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--dim);user-select:none"><span id="lcArrow">▸</span> 角色全生命周期总览 <span id="lcMeta" class="muted" style="font-size:11px"></span></div>
+      <div id="lcBox" style="display:none;padding:0 0 8px"></div>
+    </div>
+  </section>
+
+  <section data-tab="bizroles">
+    <div class="sec-h">🏢 业务角色
+      <span class="sub">业务执行层角色档案 · 数据 <span class="mono">role_profiles_biz.json</span>(业务数据·不进 git)</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="bizRolesMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="bizRolesRefresh">刷新</button>
+    </div>
+    <div class="sec-b"><div id="bizRolesBox" style="padding:6px 0"></div></div>
   </section>
 
   <!-- 🗂️ 长程任务·锚定生长网(P0:脊柱+当前段+进度·使用方简报/MasterAgent引擎+数据/MasterUI render) -->
@@ -830,8 +864,8 @@ function render(){
     const open=lastTasksOpen.has(r.role);
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
       <td><b>${esc(r.role)}</b></td>
-      <td class="mono" style="font-size:11px" title="${esc(r.model||'')}">${esc((r.model||'').replace('claude-','')||'–')}</td>
-      <td style="max-width:90px"><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</td>
+      <td class="mono" style="font-size:11px;width:120px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.model||'')}">${esc((r.model||'').replace('claude-','')||'–')}</td>
+      <td style="width:200px;max-width:200px;overflow:hidden"><div style="display:flex;gap:4px;align-items:center;max-width:200px;overflow:hidden"><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</div></td>
       <td>${turnBadge(r.turn, r.self_wake)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
@@ -1960,7 +1994,16 @@ function renderRoles(d){
   const col=(title,items,ic)=>'<div style="flex:1;min-width:150px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:3px">'+ic+' '+title+'</div>'
     +((items&&items.length)?('<ol style="margin:0;padding-left:16px;font-size:11.5px;line-height:1.55">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>')
       :'<div class="muted" style="font-size:11px">—</div>')+'</div>';
-  morphInto(box, head+glob+roles.map(r=>{
+  const normalRoles=roles.filter(r=>!r._abstract);
+  const abstractRoles=roles.filter(r=>r._abstract);
+  const abstractCards=abstractRoles.map(r=>'<div class="tl-card" data-key="role-abs-'+esc(r.role)+'" style="border:1px solid var(--accent2);border-radius:8px;margin:8px 16px;padding:10px 14px;cursor:pointer;background:rgba(91,157,255,.06)" onclick="showTab(\'bizroles\')">'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">🏢 '+esc(r.role)+'</b>'
+    +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span>'
+    +'<span class="badge live" style="font-size:10px">→ 业务角色页</span></div>'
+    +(r.one_liner?'<div style="font-size:12.5px;margin-top:4px">'+esc(r.one_liner)+'</div>':'')
+    +'<div class="muted" style="font-size:11px;margin-top:5px">点击跳转 <b>🏢 业务角色</b> 页查看具体业务角色档案 (role_profiles_biz.json)</div>'
+    +'</div>').join('');
+  morphInto(box, head+glob+normalRoles.map(r=>{
     const caps=(r.caps||[]).map(c=>'<span class="cap-chip">'+esc(c)+'</span>').join('');
     // compact 注入区块:角色层(render_role)+ 完整注入折叠(build_context·WYSIWYG=hook 实注同一串)
     const ci=cby[r.role]||{}; let cblock='';
@@ -1991,7 +2034,88 @@ function renderRoles(d){
       +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
       +cblock
       +'</div>';
-  }).join(''));
+  }).join('')+abstractCards);
+}
+
+// ===== ⏱ 角色全生命周期总览(懒加载·点展开) =====
+let _lcLoaded=false;
+function toggleLifecycle(){
+  const box=document.getElementById('lcBox');
+  const arr=document.getElementById('lcArrow');
+  const open=box.style.display!=='none';
+  box.style.display=open?'none':'';
+  arr.textContent=open?'▸':'▾';
+  if(!open&&!_lcLoaded) loadLifecycle();
+}
+async function loadLifecycle(){
+  const box=document.getElementById('lcBox');
+  if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取中…</div>';
+  try{ const r=await fetch('/api/lifecycle'); renderLifecycle(await r.json()); _lcLoaded=true; }
+  catch(e){ if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(e)+'</div>'; }
+}
+function renderLifecycle(d){
+  const box=document.getElementById('lcBox'); const meta=document.getElementById('lcMeta');
+  if(!box) return;
+  if(!d||!d.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败</div>'); return; }
+  if(meta) meta.textContent='共 '+d.n_active+' 在册 · '+d.n_retired+' 退役';
+  const STAGE={active:'<span class="badge live">✓ 在册</span>',boot_pending:'<span class="badge warn">⚠ 装载中</span>',retired:'<span class="badge dead">🗃 退役</span>',revived:'<span class="badge idle">🔄 复活</span>'};
+  const rows=(d.rows||[]).map(r=>{
+    const stage=STAGE[r.stage]||('<span class="badge idle">'+esc(r.stage)+'</span>');
+    const reg=r.registered?r.registered.slice(0,10):'—';
+    const ret=r.retired_at?r.retired_at.slice(0,10):'—';
+    const succ=r.succeeded_by?'→ '+esc(r.succeeded_by):'—';
+    const logBtn=(r.stage==='retired'||r.stage==='revived')
+      ?'<button class="btn ghost mini" style="font-size:10px;padding:1px 6px;margin:0" onclick="showTab(\'fleetlog\')">查看日志</button>':'';
+    return '<tr style="border-bottom:1px solid var(--line)">'
+      +'<td style="padding:4px 16px;font-weight:600;white-space:nowrap">'+esc(r.role)+'</td>'
+      +'<td style="padding:4px 8px">'+stage+'</td>'
+      +'<td class="mono" style="padding:4px 8px;font-size:11px;color:var(--dim)">'+reg+'</td>'
+      +'<td class="mono" style="padding:4px 8px;font-size:11px;color:var(--dim)">'+ret+'</td>'
+      +'<td style="padding:4px 8px;font-size:11.5px;color:var(--dim)">'+succ+'</td>'
+      +'<td style="padding:4px 8px">'+logBtn+'</td>'
+      +'</tr>';
+  }).join('');
+  morphInto(box,'<table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr style="font-size:11px;color:var(--dim);border-bottom:1px solid var(--line)">'
+    +'<th style="padding:3px 16px;text-align:left;font-weight:600">角色</th>'
+    +'<th style="padding:3px 8px;text-align:left;font-weight:600">阶段</th>'
+    +'<th style="padding:3px 8px;text-align:left;font-weight:600">注册</th>'
+    +'<th style="padding:3px 8px;text-align:left;font-weight:600">退役</th>'
+    +'<th style="padding:3px 8px;text-align:left;font-weight:600">接替</th>'
+    +'<th style="padding:3px 8px"></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>');
+}
+
+// ===== 🏢 业务角色(读 role_profiles_biz.json·业务数据不进 git)=====
+{const _br=document.getElementById('bizRolesRefresh'); if(_br) _br.onclick=()=>loadBizRoles();}
+async function loadBizRoles(){
+  const box=document.getElementById('bizRolesBox'); if(box&&!box.innerHTML) box.innerHTML='<div class="muted" style="padding:8px 16px">读取中…</div>';
+  try{ const r=await fetch('/api/role-profiles-biz'); renderBizRoles(await r.json()); }
+  catch(e){ if(box) box.innerHTML='<div class="muted" style="padding:8px 16px">读取失败:'+esc(e)+'</div>'; }
+}
+function renderBizRoles(d){
+  const box=document.getElementById('bizRolesBox'); const meta=document.getElementById('bizRolesMeta'); if(!box) return;
+  if(!d||!d.ok){ morphInto(box,'<div class="muted" style="padding:8px 16px">读取失败:'+esc((d&&d.error)||'?')+'</div>'); if(meta)meta.textContent=''; return; }
+  if(d.missing){ morphInto(box,'<div class="muted" style="padding:12px 16px">无业务建档 (role_profiles_biz.json 不存在)</div>'); if(meta)meta.textContent=''; return; }
+  const roles=d.roles||[], m=d.meta||{};
+  if(meta) meta.textContent=(d.n_roles||0)+' 个业务角色 · v'+esc(m.version||'?')+' · 更新 '+esc(m.updated||'');
+  const col=(title,items,ic)=>'<div style="flex:1;min-width:150px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:3px">'+ic+' '+title+'</div>'
+    +((items&&items.length)?('<ol style="margin:0;padding-left:16px;font-size:11.5px;line-height:1.55">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>')
+      :'<div class="muted" style="font-size:11px">—</div>')+'</div>';
+  morphInto(box, roles.map(r=>{
+    const caps=(r.caps||[]).map(c=>'<span class="cap-chip">'+esc(c)+'</span>').join('');
+    return '<div class="tl-card" data-key="bizrole-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
+      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">🏢 '+esc(r.role)+'</b>'
+      +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span></div>'
+      +(r.one_liner?'<div style="font-size:12.5px;margin-top:4px">'+esc(r.one_liner)+'</div>':'')
+      +'<div class="muted" style="font-size:11px;margin-top:5px">cwd <span class="mono">'+esc(r.cwd||'?')+'</span> · mode '+esc(r.mode||'?')+' · caps '+(caps||'—')+'</div>'
+      +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">'
+      +col('启动流程',r.startup_flow,'🚀')
+      +col('明式输入(显式派)',r.explicit_inputs,'📥')
+      +col('隐式输入(自举读锚)',r.implicit_inputs,'🧭')+'</div>'
+      +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
+      +'</div>';
+  }).join('')||'<div class="muted" style="padding:8px 16px">（无业务角色）</div>');
 }
 
 // ===== 🗂️ 长程任务·锚定生长网(P0:脊柱+当前段+进度·使用方简报/MasterAgent数据/MasterUI render)=====
@@ -2195,7 +2319,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -2214,6 +2338,7 @@ function showTab(t){
   else if(t==='groups') loadGroups();
   else if(t==='mechanisms') loadMechanisms();
   else if(t==='roles') loadRoles();
+  else if(t==='bizroles') loadBizRoles();
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
   else if(t==='paths') loadPaths();
@@ -2438,6 +2563,10 @@ function renderFleetState(d){
   const sw=document.getElementById('fsStaleWrap');
   if(stale.length){ sw.style.display=''; document.getElementById('fsStaleN').textContent=stale.length; document.getElementById('fsStaleDetail').textContent=stale.join('、'); }
   else { sw.style.display='none'; }
+  const boot=d.boot_pending||[];
+  const bw=document.getElementById('fsBootWrap');
+  if(boot.length){ bw.style.display=''; document.getElementById('fsBootN').textContent=boot.length; document.getElementById('fsBootDetail').textContent=boot.join('、'); }
+  else { bw.style.display='none'; }
   // 维修模式:顶栏底色变暖
   bar.style.background=d.rule==='maintenance'?'rgba(255,165,0,.08)':'var(--card)';
 }
@@ -2447,6 +2576,13 @@ function toggleFleetStale(btn){
   d.style.display=open?'none':'';
   const n=document.getElementById('fsStaleN').textContent;
   btn.textContent=open?('⚠ 掉线 '+n+' ▾'):'⚠ 折叠 ▴';
+}
+function toggleFleetBoot(btn){
+  const d=document.getElementById('fsBootDetail');
+  const open=d.style.display!=='none';
+  d.style.display=open?'none':'';
+  const n=document.getElementById('fsBootN').textContent;
+  btn.textContent=open?('⛔ 未装载 '+n+' ▾'):'⛔ 折叠 ▴';
 }
 loadFleetState(); setInterval(loadFleetState, 30000); // 30s 轮询(fleet_state_rules.json·零 psutil)
 
