@@ -14,6 +14,10 @@ memory/
 # BI 视觉验证截图(临时产物,不入仓)
 ui/bi_*.png
 
+# role_profiles_biz.json = 业务角色注册表(用户令 2026-07-29 分仓):业务数据不进基建 git;
+# 数据清理时随业务数据清单(path_registry biz-data 类)整体清除,基建注册表零业务残留。
+role_profiles_biz.json
+
 # projects/ = 宿主 ~/.claude/projects 的物理原件(2026-07-28 用户令迁入·宿主路径是 junction)。
 # 全部 agent 会话/记忆运行态,易变且含隐私,随文件夹拷贝迁移、不进 git;
 # 其中业务会话库再外置到业务侧缓存区、此处只是 junction。

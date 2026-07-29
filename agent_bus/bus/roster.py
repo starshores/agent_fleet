@@ -9,6 +9,28 @@ from bus.config import BUS, cfg
 from bus.io import _write_json, json_lock
 
 
+def load_role_profiles():
+    """角色注册表【两表合并视图】(用户令 2026-07-29 分仓):基建 role_profiles.json(git·管理/基建
+    角色+『业务角色』抽象条目)+ 业务 role_profiles_biz.json(gitignore·业务数据·数据清理整体清除)。
+    读取方(hello 喂入/boot-check/role-audit/WebUI)一律走本函数;业务表缺失/坏=合法(视为无业务建档)。
+    meta 取基建表;roles=基建+业务顺序拼接(角色名不重复:业务表禁止收录基建角色)。绝不抛。"""
+    home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
+    out = {"meta": {}, "roles": []}
+    try:
+        d = json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8"))
+        out["meta"] = d.get("meta") or {}
+        out["roles"] = list(d.get("roles") or [])
+    except Exception:
+        pass
+    try:
+        b = json.loads(Path(home, "role_profiles_biz.json").read_text(encoding="utf-8"))
+        seen = {r.get("role") for r in out["roles"]}
+        out["roles"] += [r for r in (b.get("roles") or []) if r.get("role") not in seen]
+    except Exception:
+        pass
+    return out
+
+
 def _policy():
     """角色策略注册表(P1·2026-07-28 出代码):role_profiles.json meta.policy——
     human_attended / mgmt_owner / biz_default_owner 原散在多处硬编码,角色增减要改代码且守卫可被伪造名绕过。

@@ -1,7 +1,7 @@
 {
  "_comment": "能力池(2026-06-24)。agent 按专项【最小授权】:agents.json 每个 role 的 caps 只列它需要的能力。培训师按 role 的 caps 只带对应模块——模块内容见 agent_fleet/BUS_ONBOARDING.md 的同名小节(## cap:<name>)。铁律:external-tool-edge 只给【对外 agent】,业务 agent 不直接操作云文档,要外发就把内容交给对外 agent。caps 初版为合理默认,可按角色实际调。",
  "capabilities": {
-  "bus-comms":       {"desc": "总线收发:hello / send / wait / request / done / notice / ask-user(待办记录:要用户拍板的事投进待办池,不滚走)", "default_for": "所有 agent(底座)"},
+  "bus-comms":       {"desc": "总线收发:hello / send / wait / request / done / notice / ask-user(待办记录:要用户拍板的事投进待办池,不滚走)", "default_for": "所有 agent(底座)", "reads": ["agent_fleet/AGENTS.md"]},
   "self-wake":       {"desc": "事件自醒:后台 wait + 每次被唤起后重挂(交互会话/协调位需手动管;daemon 由 worker_daemon 自动具备)", "default_for": "协调位 + 以交互会话形态接异步派活的"},
   "confidentiality": {"desc": "安全与隐私最佳实践:基座与业务解耦 / 最小权限与数据最小化 / 凭据与披露(密钥·令牌·凭据·绝对路径不进版本库/日志/记忆/对话)", "default_for": "全员适用"},
   "external-tool-edge": {"desc": "CDP 操作云文档(写单元格/读群/发消息) + edge-lock 互斥锁", "default_for": "仅【对外 agent】——业务 agent 外发走对外 agent,自己不碰"},

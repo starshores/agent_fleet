@@ -37,7 +37,8 @@
     "bus-router": "伪角色·系统发件名义(状态路由机制;非执行体)"
    }
   },
-  "boot_reads_note": "BUS 2.3 P0「该读没读」(2026-07-29):boot_reads=该角色新会话【必须用 Read 工具读过】的文件(相对路径可·后缀匹配;角色记忆索引 <role>.MEMORY.md 存在即自动纳入不用列)。turn_state hook 落 session_reads,`ab boot-check --role X` 机器核验。注意:CLAUDE.md/根 MEMORY.md 是自动注入、不走 Read,别列进来。各角色清单随 P1 角色页体检补齐(培训师协作);能力挂 reads 自动聚合=P1 能力项。"
+  "boot_reads_note": "BUS 2.3 P0「该读没读」(2026-07-29):boot_reads=该角色新会话【必须用 Read 工具读过】的文件(相对路径可·后缀匹配;角色记忆索引 <role>.MEMORY.md 存在即自动纳入不用列)。turn_state hook 落 session_reads,`ab boot-check --role X` 机器核验。注意:CLAUDE.md/根 MEMORY.md 是自动注入、不走 Read,别列进来。各角色清单随 P1 角色页体检补齐(培训师协作);能力挂 reads 自动聚合=P1 能力项。",
+  "biz_split_note": "分仓(用户令 2026-07-29):本表=基建 git·只留管理/基建角色+『业务角色』抽象条目;具体业务角色在 role_profiles_biz.json(gitignore·业务数据·数据清理时整体清除)。读取方自动合并两表。"
  },
  "roles": [
   {
@@ -251,6 +252,22 @@
     "session-archive/extracted/EXTRACTION_PLAYBOOK.md",
     "session-archive/manifest.json"
    ]
+  },
+  {
+   "role": "业务角色",
+   "_abstract": true,
+   "layer": "业务层(抽象)",
+   "one_liner": "业务执行层的抽象角色——所有具体业务角色(按业务域分工…)的共性画像;具体角色页在 role_profiles_biz.json(业务数据·可整体清除)",
+   "cwd": "C:\\BaseSpace\\XXX(典型)",
+   "mode": "前台 listening cli 或按需拉起;接 Master 派单、干完回填",
+   "boundary": "只做本角色专长业务;业务知识/记忆归业务库,不进基建库;对外产物走脱敏(confidentiality 由业务口径把关);不碰基建演进(归 MasterAgent)",
+   "startup_flow": [
+    "① 在业务仓 tab 开会话 → `ab whoami` 反查(查不到才 hello)",
+    "② `ab hello --role <具体角色>`(角色页从 role_profiles_biz.json 喂入)",
+    "③ 后台 `ab wait --role <具体角色> --timeout 0` → `ab selfwake` 验 ✓在岗",
+    "④ 读自己的角色锚(业务库 role_anchor_*.md)→ `ab boot-check` ✅ 后领活"
+   ],
+   "boot_reads": []
   }
  ]
 }

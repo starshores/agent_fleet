@@ -22,8 +22,8 @@ def _norm(p):
 
 def _profile(role):
     try:
-        home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
-        for r in json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8")).get("roles", []):
+        from bus.roster import load_role_profiles   # 两表合并视图(2026-07-29 分仓:基建+业务)
+        for r in load_role_profiles().get("roles", []):
             if r.get("role") == role:
                 return r
     except Exception:
@@ -138,14 +138,13 @@ def cmd_role_audit(args):
     """角色页完备度体检:role_profiles 各角色缺哪些字段;agents.json 活跃角色谁没建档。
     机制归 MasterAgent·内容补齐归培训师(体检报告即培训师的工单)。"""
     from bus.roster import _load_agents, _retired_roles, _pseudo_role_label, _is_test_role
-    home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
-    try:
-        prof = json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8"))
-    except Exception as e:
-        print("role_profiles.json 不可读:%s" % e); sys.exit(1)
+    from bus.roster import load_role_profiles
+    prof = load_role_profiles()   # 两表合并视图(基建+业务·2026-07-29 分仓)
     need = ("one_liner", "cwd", "mode", "boundary", "startup_flow", "boot_reads")
     rows, ok = [], 0
     for r in prof.get("roles", []):
+        if r.get("_abstract"):
+            ok += 1; continue      # 抽象条目(如『业务角色』)=分类卡,不按具体角色字段硬要求
         miss = [k for k in need if not r.get(k)]
         if miss:
             rows.append((r.get("role"), "缺:" + "、".join(miss)))

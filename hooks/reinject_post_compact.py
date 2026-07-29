@@ -23,11 +23,19 @@ BUS = Path(os.environ.get("AGENTBUS_DIR") or (Path.home() / ".claude" / "agent_b
 _PROFILES = Path(__file__).resolve().parent.parent / "role_profiles.json"
 
 def _load_profiles():
-    """读 role_profiles.json → dict;文件缺失/json 失败返 {}。绝不抛。"""
+    """读 role_profiles.json(+role_profiles_biz.json 业务表合并·2026-07-29 分仓)→ dict;
+    缺失/坏返 {}(业务表缺失=合法)。绝不抛。"""
     try:
-        return json.loads(_PROFILES.read_text(encoding="utf-8"))
+        d = json.loads(_PROFILES.read_text(encoding="utf-8"))
     except Exception:
         return {}
+    try:
+        b = json.loads((_PROFILES.parent / "role_profiles_biz.json").read_text(encoding="utf-8"))
+        seen = {r.get("role") for r in d.get("roles", [])}
+        d["roles"] = list(d.get("roles", [])) + [r for r in b.get("roles", []) if r.get("role") not in seen]
+    except Exception:
+        pass
+    return d
 
 def render_common(role):
     """全局通用操作铁律(所有 role 适用)——读 meta.common_rules→join→.format(role=role)。

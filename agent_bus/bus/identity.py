@@ -125,12 +125,11 @@ def _print_onboarding(role):
 
 
 def _role_profile(role):
-    """读项目根 role_profiles.json(角色页/compact hook 同一单一源)取该角色条目;失败/未注册返 None。
-    路径经 cfg agent_fleet_home(换机只改 config.json),回退按物理文件位置推(resolve 穿 junction 落真实家)。"""
+    """取角色页条目——走【两表合并视图】roster.load_role_profiles(2026-07-29 分仓:基建表+业务表
+    role_profiles_biz.json);失败/未注册返 None。"""
     try:
-        home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
-        data = json.loads(Path(home, "role_profiles.json").read_text(encoding="utf-8"))
-        for r in data.get("roles", []):
+        from bus.roster import load_role_profiles
+        for r in load_role_profiles().get("roles", []):
             if r.get("role") == role:
                 return r
     except Exception:

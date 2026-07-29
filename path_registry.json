@@ -71,6 +71,17 @@
    ]
   },
   {
+   "id": "biz-data", "name": "业务数据清单(数据清理=按此整体清除·基建零业务残留)",
+   "entries": [
+    {"id": "biz-role-profiles", "name": "业务角色注册表", "path": "C:\\apphome\\agent_fleet\\role_profiles_biz.json", "kind": "file",
+     "desc": "具体业务角色的角色页(2026-07-29 分仓·gitignore);基建表只留『业务角色』抽象条目。清除本文件=业务角色页全清。", "owner": "培训师(建档)/Master(口径)"},
+    {"id": "biz-session-libs", "name": "业务会话/记忆库(外置区)", "path": "C:\\BaseSpace\\project", "kind": "dir",
+     "desc": "业务大库(业务记忆/角色锚)物理家;项目根 projects 内是 junction 回链。清除=删本目录+删三个死链。", "owner": "业务侧"},
+    {"id": "biz-transit", "name": "过境业务消息(运行态·自代谢)", "path": "C:\\apphome\\agent_fleet\\agent_bus", "kind": "dir",
+     "desc": "各业务 role mailbox(inbox/processing/done/archive)里的业务任务=过境流量,卫生代谢自动归档→90d 终点站→30d 真删;立即清=对业务 role 目录逐个清队列。agents.json 中业务角色条目(caps/desc)与 _retired 业务留痕亦属业务面。", "owner": "MasterAgent(机制)/Master(内容)"}
+   ]
+  },
+  {
    "id": "runtime", "name": "运行态方舟/审计(不进 git·随目录迁移)",
    "entries": [
     {"id": "usage-db", "name": "usage.db 用量方舟", "path": "C:\\apphome\\agent_fleet\\agent_bus\\usage.db", "kind": "db",
