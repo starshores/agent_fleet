@@ -912,7 +912,7 @@ function render(){
   if(f.tagged.length) foot.push('已标注(非fleet):'+f.tagged.map(t=>`<span class="tag ${t.private?'lock':''}">${esc(t.label)} pid ${t.pid}${t.private?' 🔒':(t.cwd?' · '+esc(t.cwd):'')}</span>`).join(''));
   foot.push(`<span class="muted">在跑 claude ${f.alive_count} · 在岗(已认领)${f.fleet_count} · 已标注 ${f.tagged.length} · 未声明 ${f.unknown.length}</span>`);
   if(f.unknown.length) foot.push('未声明(非fleet·未标记):'+f.unknown.map(u=>`<span class="tag">pid ${u.pid}${u.cwd?' · '+esc(u.cwd):''}</span>`).join(''));
-  document.getElementById('procFoot').innerHTML=foot.join('<br>');
+  morphInto(document.getElementById('procFoot'), foot.join('<br>'));
 
   // daemon 自愈面板(fleet.json × 存活)
   const db=document.getElementById('daemonBox'); const dm=state.daemons||{daemons:[]};
@@ -1378,6 +1378,7 @@ function modelShort(m){ return m.replace('claude-','').replace('-20251001',''); 
 function projShort(p){ return p ? p.replace(/^([A-Za-z])--/, '$1:/').replace(/-/g, '/') : ''; }
 
 let _usageData=null, _uRange=30;
+const openProjRaws=new Set();   // 展开钻取的项目名(状态驱动·morph 刷新不丢;U1 响应式教义:命令式注入子树先状态化)
 function sliceDaily(daily,r){
   // 按"日历范围"切片(以数据最后一天为锚,非系统今天 — 与数据对齐、免时区抖动)
   if(!r||!daily||!daily.length) return (daily||[]).slice();
@@ -1401,7 +1402,14 @@ function renderUsage(d){
   if(rg && !rg._bound){ rg._bound=1; rg.querySelectorAll('button').forEach(b=>b.onclick=()=>applyRange(+b.dataset.r)); }
   _bindTrendHover('uTrend','uTrendTip'); _bindTrendHover('uTrendTotal','uTrendTotalTip');
   applyRange(_uRange);
-  // 项目 Top N —— token 为主(用量统计侧已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径
+  renderUProj();
+  // 模型迁移
+  drawModels(d.by_month_model||[]);
+}
+// 项目 Top N —— token 为主(用量统计侧已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径。
+// U1 响应式:钻取展开=openProjRaws 状态驱动、raw 内容随主渲染一并出 html → morphInto 增量 patch,刷新中展开态/内容天然保留。
+function renderUProj(){
+  const d=_usageData; if(!d) return;
   let projs=(d.by_project||[]).slice();
   const tokOf=p=>p.tokens_total!=null?p.tokens_total:(p.input!=null?((p.input||0)+(p.output||0)+(p.cache_read||0)+(p.cache_write_5m||0)+(p.cache_write_1h||0)):null);
   const ioOf=p=>p.tokens_io!=null?p.tokens_io:(p.input!=null?((p.input||0)+(p.output||0)):null);
@@ -1414,20 +1422,27 @@ function renderUsage(d){
   const lmax=Math.log(Math.max(1,max)), lspan=(lmax-lmin)||1;
   const unit=document.getElementById('uProjUnit');
   if(unit) unit.textContent=hasTok?'(全历史 · 按 tokens_total 排 · 条=对数刻度 · io/$ 对照)':'(全历史 · $ API等价·参考 — token 分项待 token_stats 迁移补齐)';
-  document.getElementById('uProj').innerHTML=projs.map((p,i)=>{
+  const rawHtml=(proj)=>{
+    let raws=rawFor(proj), note='';
+    if(!raws.length){ raws=(d.by_project_raw||[]).slice(0,12); note='<div class="muted" style="font-size:11px;padding:1px 0 3px">未能自动映射,列出全部原始目录:</div>'; }
+    const rmax=raws.length?Math.max.apply(null,raws.map(x=>x.cost_usd))||1:1;
+    return note+raws.map(rr=>{const pct=Math.max(2,rr.cost_usd/rmax*100).toFixed(1);
+      return `<div class="bar-row" style="grid-template-columns:150px 1fr 90px"><span class="lbl" title="${esc(rr.project)}">${esc(projShort(rr.project))}</span><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:var(--idle)"></span></span><span class="num">${usd(rr.cost_usd)} · ${fmtN(rr.calls)}</span></div>`;
+    }).join('')||'<div class="muted" style="font-size:11px;padding:2px 0">无</div>';
+  };
+  morphInto(document.getElementById('uProj'), projs.map(p=>{
     const v=valOf(p); const pct=(8+(Math.log(Math.max(1,v))-lmin)/lspan*92).toFixed(1);
     const num=hasTok
       ? `${fmtN(tokOf(p))} tok <span style="color:var(--dim)">· io ${fmtN(ioOf(p))} · ${usd(p.cost_usd)}参考</span>`
       : usd(p.cost_usd);
-    return `<div class="bar-row uproj-row" data-proj="${esc(p.project)}" title="点击展开原始目录构成">
+    const open=openProjRaws.has(p.project);
+    return `<div class="bar-row uproj-row" data-key="up-${esc(p.project)}" data-proj="${esc(p.project)}" title="点击展开原始目录构成">
       <span class="lbl">${esc(p.project)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
       <span class="num">${num}</span></div>
-      <div class="uproj-raw" id="uraw-${i}" style="display:none"></div>`;
-  }).join('')||'<div class="muted" style="padding:6px 0">无数据</div>';
+      <div class="uproj-raw" data-key="ur-${esc(p.project)}" style="display:${open?'block':'none'}">${open?rawHtml(p.project):''}</div>`;
+  }).join('')||'<div class="muted" style="padding:6px 0">无数据</div>');
   bindProjDrill();
-  // 模型迁移
-  drawModels(d.by_month_model||[]);
 }
 function applyRange(r){
   _uRange=r;
@@ -1533,19 +1548,13 @@ function rawFor(logical){
   return raws.filter(r=>{const n=norm(r.project); return n===l||(n&&l&&(n.indexOf(l)>=0||l.indexOf(n)>=0));});
 }
 function bindProjDrill(){
-  const up=document.getElementById('uProj'); if(!up)return;
-  up.querySelectorAll('.uproj-row').forEach((row,i)=>{
-    row.onclick=()=>{
-      const box=document.getElementById('uraw-'+i); if(!box)return;
-      if(box.style.display!=='none'){ box.style.display='none'; return; }
-      let raws=rawFor(row.dataset.proj), note='';
-      if(!raws.length){ raws=((_usageData&&_usageData.by_project_raw)||[]).slice(0,12); note='<div class="muted" style="font-size:11px;padding:1px 0 3px">未能自动映射,列出全部原始目录:</div>'; }
-      const rmax=raws.length?Math.max.apply(null,raws.map(x=>x.cost_usd))||1:1;
-      box.innerHTML=note+raws.map(rr=>{const pct=Math.max(2,rr.cost_usd/rmax*100).toFixed(1);
-        return `<div class="bar-row" style="grid-template-columns:150px 1fr 90px"><span class="lbl" title="${esc(rr.project)}">${esc(projShort(rr.project))}</span><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:var(--idle)"></span></span><span class="num">${usd(rr.cost_usd)} · ${fmtN(rr.calls)}</span></div>`;
-      }).join('')||'<div class="muted" style="font-size:11px;padding:2px 0">无</div>';
-      box.style.display='block';
-    };
+  // 委托事件·只绑一次:点击行 → 切 openProjRaws 状态 → 重渲染项目表(morph 增量,展开态状态驱动)
+  const up=document.getElementById('uProj'); if(!up||up._drill)return; up._drill=1;
+  up.addEventListener('click',e=>{
+    const row=e.target.closest('.uproj-row'); if(!row||!up.contains(row))return;
+    const proj=row.dataset.proj; if(proj==null)return;
+    if(openProjRaws.has(proj)) openProjRaws.delete(proj); else openProjRaws.add(proj);
+    renderUProj();
   });
 }
 function drawModels(bmm){
@@ -1729,10 +1738,10 @@ function renderCtx(){
   if(!body) return;
   if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="6" class="muted">加载中（后台 jsonl 尾读）…</td></tr>'); return; }
   meta.textContent='活跃 '+d.n+' · 精确绑定 '+(d.n_bound||0)+'/'+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
-  kp.innerHTML='<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
+  morphInto(kp,'<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
     +'<div class="k"><div class="v ctxpct '+(d.n_red>0?'red':'green')+'">'+d.n_red+'</div><div class="l">≥65% 将被自动压</div></div>'
     +'<div class="k"><div class="v ctxpct '+(d.n_yellow>0?'yellow':'green')+'">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
-    +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>';
+    +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>');
   if(!d.rows||!d.rows.length){ morphInto(body,'<tr><td colspan="6" class="muted">（最近 '+d.active_min+' 分钟无活跃会话）</td></tr>'); foot.textContent=''; return; }
   morphInto(body, d.rows.map(r=>{
     const barW=Math.max(2,Math.min(100,r.pct))*0.6;
@@ -1766,13 +1775,15 @@ document.getElementById('ctxBadge').onclick=()=>showTab('ctx');
 
 // ===== 📝 提示词审核(只读·手动刷新)=====
 let _promptsLoaded=false, _promptsData=null;
+const openPrompts=new Set();   // 展开的提示词节序号(状态驱动·morph 刷新不丢)
 function renderPrompts(d){
   const box=document.getElementById('promptsBox'); const meta=document.getElementById('promptsMeta');
   if(!box) return;
   if(!d||!d.ok){ box.innerHTML='<div class="muted">读取失败:'+esc((d&&d.error)||'?')+'</div>'; return; }
   _promptsData=d;
   meta.textContent='共 '+d.sections.length+' 节 · 读取于 '+esc(d.as_of||'');
-  box.innerHTML=d.sections.map((s,i)=>{
+  morphInto(box, d.sections.map((s,i)=>{
+    const open=openPrompts.has(i);
     // 📂开文件按钮:仅【真实文件 path】section(server 标 openable);白名单在 server 端二次校验
     const openBtn = s.openable
       ? '<button class="btn ghost mini pmt-open" onclick="event.stopPropagation();openPromptFile('+i+')" title="在本机默认程序打开该文件">📂开文件</button>'
@@ -1782,17 +1793,17 @@ function renderPrompts(d){
       +(s.bytes!=null?(' · '+fmtN(s.bytes)+'B/'+ (s.lines||0) +'行'):'')+'</span>'+openBtn+'</div>';
     let body;
     if(s.error){
-      body='<div class="pmt-b muted" id="pmt-'+i+'" style="display:none">⚠ '+esc(s.error)+'</div>';
+      body='<div class="pmt-b muted" id="pmt-'+i+'" style="display:'+(open?'block':'none')+'">⚠ '+esc(s.error)+'</div>';
     }else{
       // 行号 gutter:每逻辑行一 flex 行(行号顶对齐·内容 wrap 不打乱行号)
       const lines=(s.content||'').split('\n');
       const rows=lines.map((ln,n)=>'<div class="pln"><span class="lno">'+(n+1)+'</span><span class="lco">'+esc(ln)+'</span></div>').join('');
-      body='<div class="pmt-code" id="pmt-'+i+'" style="display:none">'+rows+'</div>';
+      body='<div class="pmt-code" id="pmt-'+i+'" style="display:'+(open?'block':'none')+'">'+rows+'</div>';
     }
-    return '<div class="pmt-sec'+(s.error?' err':'')+'">'+head+body+'</div>';
-  }).join('')||'<div class="muted">无内容</div>';
+    return '<div class="pmt-sec'+(s.error?' err':'')+'" data-key="pmt-sec-'+i+'">'+head+body+'</div>';
+  }).join('')||'<div class="muted">无内容</div>');
 }
-function togglePrompt(i){ const el=document.getElementById('pmt-'+i); if(el) el.style.display = el.style.display==='none'?'block':'none'; }
+function togglePrompt(i){ if(openPrompts.has(i)) openPrompts.delete(i); else openPrompts.add(i); if(_promptsData) renderPrompts(_promptsData); }
 function openPromptFile(i){
   const s=_promptsData&&_promptsData.sections&&_promptsData.sections[i];
   if(!s||!s.path){ toast('无有效 path',1); return; }
