@@ -32,9 +32,12 @@ def _touch_presence(role, mode, extra=None):
                     prev = {}
             pres = {
                 "role": role,
-                "claude_pid": claude_pid,
+                # 探查不到就继承旧值(同 session_id 模式·2026-07-29 培训师报):后台 wait/心跳进程的
+                # 祖先链常解析不到 claude(派生壳重挂靠)→ 原来无条件写会把 pid/cwd 冲成 None,
+                # wait 期周期心跳(70099ac)放大了冲刷频率。真死进程由 who/selfwake 的存活检查兜底判定。
+                "claude_pid": claude_pid or prev.get("claude_pid"),
                 "shell_pid": os.getpid(),
-                "cwd": cwd,
+                "cwd": cwd or prev.get("cwd"),
                 "host": socket.gethostname(),
                 "started": prev.get("started") or _now(),
                 "last_seen": _now(),
