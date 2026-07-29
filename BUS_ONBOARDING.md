@@ -116,6 +116,30 @@
 
 ---
 
+## 二之四、素材入库纪律(2.4 存储·新素材不落项目根)
+
+> 权威文本:`AGENTS.md` §「素材入库纪律」;此处为 onboarding 精华版,带新人时按 caps 发对应角色。
+
+**核心规则(一句话锚定)**:新素材(>1MB 的 raw / 数据包 / 中间产物)一律落 `C:\apphome\agent_fleet_data\` 或本会话 scratchpad,**不落项目根/docs/agent_bus**。
+
+**三分格局**:
+- `agent_fleet/`(本目录) = 代码 + 运行态方舟(usage.db / events.jsonl / projects/ 等)
+- `agent_fleet_releases/` = 发版快照
+- `agent_fleet_data/` = 素材源数据(>1MB raw/数据包/中间产物)
+
+**路径例外**:项目根内确需 canonical 路径 → 物理放 `_data`、原位 junction 回链;迁移三步铁律:**先广播 → 动刀 → 再确认**。
+
+**豁免(有自己的方舟/代谢机制,不算"素材")**:
+- `usage.db` / `events.jsonl`(方舟代谢)
+- `projects/`(CC 自清)
+- `.git`
+
+**巡检**:`ab storage-audit` — >5MB 落非豁免区 = 违规候选,处置 = 移 `_data` + junction。
+
+**带新人时发法**:此模块面向所有在项目根目录工作的角色(MasterAgent / MasterUI / 培训师 / 会话考古 / Master数分…);业务 agent cwd 在业务仓、不常落素材进项目根,轻讲或略。
+
+---
+
 ## 二、能力模块(按 caps 取用)
 
 ### cap:bus-comms — 总线收发(底座,人人有)
