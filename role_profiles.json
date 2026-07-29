@@ -16,7 +16,7 @@
    "上岗/被 compact 后重读你的【角色记忆索引】:所在项目记忆库 memory/{role}.MEMORY.md(无角色索引则读根 MEMORY.md;新记忆也写角色索引·公共纪律才进根公共段)",
    "自醒【绝不用轮询】(用户令2026-07-28:轮询=错误·周期drain丢实时):事件 wait 为主;定时只允许【闹钟式到点一次醒】(如指定几点醒来·一次性),不允许固定间隔循环唤醒"
   ],
-  "policy_note": "角色策略(P1·2026-07-28 出代码进注册表):human_attended=人值守角色(toast 分级/可达豁免);mgmt_owner=管理位孤儿回执归属;biz_default_owner=其余已登记角色的孤儿回执默认归属。roster._policy()/health 读此;缺失时代码内降级默认兜底。角色增减改这里,不改代码。 pseudo_roles=伪角色/系统桶名单(2.3 P1:出代码,守卫/健康/路由的系统名义在此登记,不再被判掉线、也不再借用真角色名义)。",
+  "policy_note": "角色策略(P1·2026-07-28 出代码进注册表):human_attended=人值守角色(toast 分级/可达豁免);mgmt_owner=管理位孤儿回执归属;biz_default_owner=其余已登记角色的孤儿回执默认归属。roster._policy()/health 读此;缺失时代码内降级默认兜底。角色增减改这里,不改代码。 pseudo_roles=伪角色/系统桶名单(2.3 P1:出代码,守卫/健康/路由的系统名义在此登记,不再被判掉线、也不再借用真角色名义)。 biz_roles 名单已改为自动派生自 role_profiles_biz.json(业务表·layer 业务且非抽象条目);此处留空数组仅作应急覆盖位——换域零改基建(2026-07-29 平台三问收口)。",
   "policy": {
    "human_attended": [
     "Master",
@@ -28,6 +28,7 @@
     "会话考古": "MasterAgent",
     "Master数分": "MasterAgent"
    },
+   "biz_roles": [],
    "biz_default_owner": "Master",
    "pseudo_roles": {
     "用户": "伪角色·待办池(ask-user 投给人类的收件箱,人类永不 hello)",

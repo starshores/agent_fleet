@@ -225,8 +225,20 @@ def cmd_webui_guard(args):
 # ── 系统级 bus 健康巡检(push 补 pull 盲区:丢失/卡死的消息没有 agent 会自报)──────────
 # Master 定调(2026-06-25):能自动追回的先自动修(孤儿回执→推断 owner 自动重路由),
 # 修不了/需人定的才投🙋待办池,去重、别让巡检变噪音源。
-# 单一源=role_profiles.json meta.policy(P1·2026-07-28 出代码进注册表);硬编码仅为注册表不可读时的降级默认。
+# 单一源=meta.policy + 业务注册表派生(2026-07-29 平台三问收口:基建代码/基建表不再含业务角色名,
+# 换域零改基建)。_BIZ_ROLES = policy.biz_roles(应急覆盖位·通常空)∪ role_profiles_biz.json 里
+# layer 为业务且非抽象的条目;业务表缺失=名单空(孤儿推不出 owner→投待办需人定,安全降级)。
 _pol = _policy()
+
+def _derived_biz_roles():
+    try:
+        from bus.roster import load_role_profiles
+        return {r.get("role") for r in load_role_profiles().get("roles", [])
+                if (r.get("layer") or "").startswith("业务") and not r.get("_abstract") and r.get("role")}
+    except Exception:
+        return set()
+
+_BIZ_ROLES = set(_pol.get("biz_roles") or ()) | _derived_biz_roles()
 _MGMT_OWNER = dict(_pol.get("mgmt_owner") or {"MasterUI": "MasterAgent", "培训师": "MasterAgent"})
 _BIZ_OWNER = _pol.get("biz_default_owner") or "Master"
 # 卡死硬上限(分):owner 进程还活着但任务真卡这么久也兜底判卡死。远大于 daemon claude -p 的
@@ -241,7 +253,7 @@ def _infer_orphan_owner(reply):
         return None
     if frm in _MGMT_OWNER:
         return _MGMT_OWNER[frm]
-    if frm in _load_agents():
+    if frm in _BIZ_ROLES:
         return _BIZ_OWNER
     return None
 
