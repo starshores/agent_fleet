@@ -461,6 +461,28 @@ def build_bi():
     except Exception:
         today_usage = None
 
+    # 模型用量统计:从 usage.db messages 表聚合(今日 + 历史合计·按调用次数降序)
+    model_counts = {"today": [], "all_time": []}
+    try:
+        import sqlite3 as _sq
+        _dbp = ABDIR / "usage.db"
+        if _dbp.exists():
+            _tstr = time.strftime("%Y-%m-%d", time.gmtime(now + 8 * 3600))
+            _con = _sq.connect(str(_dbp))
+            try:
+                _cur = _con.execute(
+                    "SELECT model, COUNT(*) FROM messages WHERE sh_date=? AND model NOT LIKE '<%'"
+                    " GROUP BY model ORDER BY COUNT(*) DESC", (_tstr,))
+                model_counts["today"] = [{"model": r[0], "calls": r[1]} for r in _cur.fetchall()]
+                _cur = _con.execute(
+                    "SELECT model, COUNT(*) FROM messages WHERE model NOT LIKE '<%'"
+                    " GROUP BY model ORDER BY COUNT(*) DESC")
+                model_counts["all_time"] = [{"model": r[0], "calls": r[1]} for r in _cur.fetchall()]
+            finally:
+                _con.close()
+    except Exception:
+        pass
+
     return {
         "now": time.strftime("%H:%M:%S", time.localtime(now)),
         "today_usage": today_usage,          # ← usage.db 活数据(运营/资源新口径)
@@ -468,6 +490,7 @@ def build_bi():
         "per_role": per_role,
         "running": running,
         "psutil": ab.psutil is not None,
+        "model_counts": model_counts,        # ← 今日+历史模型调用次数
     }
 
 

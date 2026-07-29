@@ -468,6 +468,7 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
     <div class="sec-b">
       <div class="bi-kpis" id="biKpis"></div>
       <div id="biRunning" style="padding:0 16px 8px"></div>
+      <div id="biModels" style="padding:2px 16px 10px"></div>
       <div class="sub" style="padding:12px 16px 0">在岗资源占用(当前进程 · <span class="mono">psutil</span> 实时 · 进程此刻的 CPU/内存 · 按内存降序)</div>
       <table class="bi-tbl">
         <thead><tr><th>角色</th><th>CPU%</th><th>内存MB</th></tr></thead>
@@ -1320,6 +1321,20 @@ function renderBI(bi){
   morphInto(document.getElementById('biRunning'), bi.running.length? bi.running.map(r=>
     `<span class="bi-run" data-key="run-${esc(r.role)}"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
     : '<span class="muted" style="font-size:12px">当前无在跑任务</span>');
+  // 模型用量统计(today + all_time)
+  const mc=bi.model_counts||{}, mToday=mc.today||[], mAll=mc.all_time||[];
+  if(mToday.length||mAll.length){
+    const mkRow=(m,bold)=>`<tr data-key="mc-${esc(m.model)}"><td style="padding:4px 0;${bold?'font-weight:600':''}"><span class="mono" style="font-size:12px">${esc(modelShort(m.model))}</span></td><td class="num" style="padding:4px 0">${fmtN(m.calls)}</td></tr>`;
+    const section=(title,rows)=>rows.length?`<div style="flex:1;min-width:140px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:4px">${title}</div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:0;color:var(--dim);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">模型</th><th class="num" style="padding:0;color:var(--dim);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">次数</th></tr></thead><tbody>${rows.map((m,i)=>mkRow(m,i===0)).join('')}</tbody></table></div>`:'';
+    morphInto(document.getElementById('biModels'),
+      `<div class="sub" style="padding:0 0 6px">模型用量统计</div>`
+      +`<div style="display:flex;gap:24px;flex-wrap:wrap">`
+      +(section('今日',mToday)||'<div style="flex:1;min-width:140px"><div class="muted" style="font-size:11px">今日暂无记录</div></div>')
+      +section('历史合计',mAll)
+      +`</div>`);
+  } else {
+    morphInto(document.getElementById('biModels'),'');
+  }
   // 在岗资源占用:仅列有活进程(sys)的 role,按内存降序(metrics 任务消耗口径已随 daemon 移除退役,成本看「历史用量」)
   const live=(bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
   morphInto(document.getElementById('biSysBody'), !live.length
