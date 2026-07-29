@@ -21,6 +21,7 @@ from pathlib import Path
 from common import ABDIR, ab, BUS  # noqa: F401
 from common import _roles, _count, _read_tasks, _safe_cwd, _turn_state, _vclass_of  # noqa: F401
 from bus.io import json_lock  # noqa: F401
+from bus.storage import storage_audit as _storage_audit  # noqa: F401
 
 
 def compute_fleet():
@@ -2178,6 +2179,32 @@ def open_path(path):
         return {"ok": True, "opened": path}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# =============================================================
+#  存储全景面板 —— storage_audit(threshold_mb, top) · 长 TTL(full du 数秒,别进 SSE)
+# =============================================================
+_STORAGE_TTL = 120.0
+_storage_cache: dict = {"ts": 0.0, "data": None}
+_storage_lock = threading.Lock()
+
+
+def build_storage(force=False):
+    """存储体检面板(缓存 120s;full du 数秒·别进 5s SSE·手动/tab 切入刷)。"""
+    with _storage_lock:
+        data = _storage_cache["data"]
+        age = time.time() - _storage_cache["ts"]
+    if data is not None and not force and age < _STORAGE_TTL:
+        return data
+    try:
+        data = _storage_audit(threshold_mb=5.0, top=10)
+        data["ok"] = True
+    except Exception as e:
+        data = {"ok": False, "error": str(e)}
+    with _storage_lock:
+        _storage_cache["data"] = data
+        _storage_cache["ts"] = time.time()
+    return data
 
 
 # =============================================================

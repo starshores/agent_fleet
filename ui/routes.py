@@ -126,6 +126,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/paths":
             # 路径注册表:path_registry.json + 健康校验(请求路径直读·手动刷新)
             self._send(200, api.build_paths())
+        elif path == "/api/storage":
+            # 存储全景:三分格局+项目根分布+违规候选(长 TTL 缓存·full du 数秒·别进 SSE)
+            q = parse_qs(u.query)
+            fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
+            self._send(200, build_storage(force=fresh))
         elif path == "/api/lifecycle":
             # 角色全生命周期:agents.json + retired_roster.json + fleet_log retire/revive 事件
             self._send(200, build_lifecycle())

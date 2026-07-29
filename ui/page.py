@@ -771,6 +771,14 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
       <span id="pathsMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="pathsRefresh">刷新</button>
     </div>
+    <div class="sec-h" style="font-size:13px;padding:5px 16px;background:var(--bg2);border-top:1px solid var(--line)">💾 存储全景 <span class="sub">三分格局 · 项目根内分布 · 违规候选</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="storageMeta" class="muted" style="font-size:11px"></span>
+      <button class="btn ghost mini" id="storageRefresh">刷新存储</button>
+    </div>
+    <div id="storagePanel" style="padding:8px 16px 12px"><div class="muted" style="font-size:12px">加载中…</div></div>
+    <div class="sec-h" style="font-size:13px;padding:5px 16px;background:var(--bg2);border-top:1px solid var(--line)">📁 路径注册表 <span class="sub">特殊路径地图 · 健康校验 · 点路径复制</span>
+    </div>
     <div class="sec-b" id="pathsBox"><div class="muted" style="padding:8px 16px">加载中…</div></div>
   </section>
 
@@ -2358,7 +2366,7 @@ function showTab(t){
   else if(t==='bizroles') loadBizRoles();
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
-  else if(t==='paths') loadPaths();
+  else if(t==='paths'){ loadPaths(); loadStorage(); }
   else if(t==='fleetlog') loadFleetLog();
 }
 // 🎯 长期任务线看板:卡片 + ⧗待决策徽标 + 展开 current/deps/decisions(待用户决策红/黄高亮)
@@ -2509,6 +2517,59 @@ async function openPath(p){
   }catch(e){ showToast('请求失败:'+e); }
 }
 document.getElementById('pathsRefresh').onclick=()=>loadPaths();
+
+// ===== 💾 存储全景(路径页嵌入) =====
+function _fmtBytes(b){
+  if(b==null||b<0) return '?';
+  if(b<1024) return b+'B';
+  if(b<1024*1024) return (b/1024).toFixed(1)+'KB';
+  if(b<1024*1024*1024) return (b/(1024*1024)).toFixed(1)+'MB';
+  return (b/(1024*1024*1024)).toFixed(2)+'GB';
+}
+async function loadStorage(force){
+  const panel=document.getElementById('storagePanel'), meta=document.getElementById('storageMeta');
+  if(!panel) return;
+  if(!panel.innerHTML.trim()) morphInto(panel,'<div class="muted" style="font-size:12px">加载中…</div>');
+  try{
+    const r=await fetch('/api/storage'+(force?'?fresh=1':'')); const d=await r.json();
+    if(meta) meta.textContent='缓存2min · '+(d.violations&&d.violations.length?'⚠'+d.violations.length+'项违规':'无违规');
+    renderStorage(d);
+  }catch(e){ morphInto(panel,'<div class="muted" style="font-size:12px">读取失败:'+esc(''+e)+'</div>'); }
+}
+function renderStorage(d){
+  const panel=document.getElementById('storagePanel'); if(!panel) return;
+  if(!d||!d.ok){ morphInto(panel,'<div class="muted" style="font-size:12px">错误:'+esc((d&&d.error)||'?')+'</div>'); return; }
+  const tri=(d.tri||[]).map(t=>{
+    const isMA=t.role==='代码+运行态方舟';
+    return `<div style="display:inline-flex;align-items:baseline;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 12px;margin:0 6px 4px 0">`
+      +`<span style="font-size:12px;font-weight:600;color:${isMA?'var(--accent)':'var(--muted)'}">${esc(t.name)}</span>`
+      +`<span style="font-size:14px;font-weight:700">${_fmtBytes(t.bytes)}</span>`
+      +`<span class="muted" style="font-size:11px">${esc(t.role)}</span>`+`</div>`;
+  }).join('');
+  const topRows=(d.root_top||[]).map(t=>{
+    const jBadge=t.junction?'<span class="cap-chip" style="color:var(--accent);font-size:10.5px">↗外置</span>':'';
+    const sizeCell=t.junction?'<span class="muted" style="font-size:11px">—(外置)</span>'
+      :`<span style="font-size:12.5px;font-weight:${t.bytes>50*1024*1024?700:400};color:${t.bytes>200*1024*1024?'var(--warn)':'inherit'}">${_fmtBytes(t.bytes)}</span>`;
+    return `<tr><td style="padding:4px 10px 4px 0"><span class="mono" style="font-size:12px">${esc(t.name)}</span> ${jBadge}</td>`
+      +`<td style="padding:4px 10px 4px 0">${sizeCell}</td>`
+      +`<td style="padding:4px 10px 4px 0"><span class="cap-chip" style="font-size:10.5px">${esc(t.cls||'')}</span></td>`
+      +`<td style="padding:4px 0;font-size:11px;color:var(--muted)">${esc(t.note||'')}</td></tr>`;
+  }).join('');
+  const viols=d.violations||[];
+  const violHtml=viols.length
+    ?`<div style="margin-top:10px;padding:8px 12px;background:rgba(255,80,80,.08);border-left:3px solid var(--err);border-radius:0 6px 6px 0">`
+      +`<div style="font-size:12px;font-weight:700;color:var(--err);margin-bottom:6px">⚠ 违规候选 ${viols.length} 项（>5MB 非豁免区）</div>`
+      +viols.map(v=>`<div style="display:flex;gap:10px;align-items:center;font-size:11.5px;padding:2px 0">`
+        +`<span class="mono" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.path)}</span>`
+        +`<span style="font-weight:600;color:var(--err)">${_fmtBytes(v.bytes)}</span></div>`).join('')
+      +`<div class="muted" style="font-size:11px;margin-top:6px">处置指引：移至 _data + 建 junction 回链</div></div>`:'';
+  morphInto(panel,
+    `<div style="margin-bottom:8px">${tri}</div>`
+    +`<div class="muted" style="font-size:11px;font-weight:600;margin-bottom:4px">项目根内分布</div>`
+    +`<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%"><tbody>${topRows}</tbody></table></div>`
+    +violHtml);
+}
+document.getElementById('storageRefresh').onclick=()=>loadStorage(true);
 
 // ===== 📋 舰队日志 =====
 let _fleetlogLoaded=false;
