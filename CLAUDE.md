@@ -11,7 +11,7 @@ ab whoami
 > **`ab` = bus 短命令入口**(BUS 2.0 使用体验):固化了正确的 env python(带 watchdog/psutil)+ 真实项目根路径 + UTF-8,消除"裸 python 崩 / 长路径 / 反斜杠 / cwd"诸坑。本文后续一律 `ab <命令>`。**回退**(新 shell 的 PATH 尚未刷到 agent_bus 时):`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <命令>`(真实路径,无 junction 遍历歧义)。
 
 (按 `CLAUDE_CODE_SESSION_ID` / 进程祖先 pid 反查 presence 绑定的 role)
-- **打印出某 role**(exit 0)→ **你就是那个 role**,按【那个角色】的定义/纪律/记忆恢复(**不一定是 MasterAgent**);presence 绑定 compact 后不丢,**不必重 hello**,补的是"重认身份 + 重载本角色纪律"。
+- **打印出某 role**(exit 0)→ **你就是那个 role**,按【那个角色】的定义/纪律/记忆恢复(**不一定是 MasterAgent**);presence 绑定 compact 后不丢,**不必重 hello**——若 `who` 显示本 role「无pid」(历史冲刷残留),补跑一次 `hello` 即恢复;顺序无关(e3133f5 起心跳继承 pid 不再冲,实证:先 wait 后 hello 同样恢复并保住)。补的是"重认身份 + 重载本角色纪律(+按需 hello 补 pid)"。
 - **空 / exit 2**(反查不到)→ 才是真·新未绑定 tab,默认 **MasterAgent** 恢复,按下面走 + `hello --role MasterAgent`。
 
 能力没丢,只需按【真实身份】重新加载。别从零摸索。**以下内容是 MasterAgent 视角**;若 whoami 查出你是别的 role,以你自己那份角色恢复锚/记忆为准。
@@ -39,7 +39,7 @@ ab whoami
 2. **探活体状态**:运行 `python C:/apphome/agent_fleet/recover.py`
    —— 打印 agent bus 谁在跑/待办/回填、Edge 调试口是否在、关键指针。
 3. **声明身份**:
-   - **被 compact 重载**(whoami 已查到你就是 MasterAgent、presence 还在)→ **不必重 hello**(绑定没丢),只需重认身份+重挂 wait(`wait --role MasterAgent` 后台 + `selfwake` 验)。
+   - **被 compact 重载**(whoami 已查到你就是 MasterAgent、presence 还在)→ **不必重 hello**(绑定没丢):重认身份 + 后台重挂 `wait --role MasterAgent --timeout 0` + `selfwake` 验 ✓在岗;若 `who` 显示无 pid,补跑一次 `ab hello --role MasterAgent` 即恢复(e3133f5 心跳继承·与 wait 先后顺序无关)。
    - **真新 tab**(whoami 空)→ 运行 `ab hello --role MasterAgent` 声明。
    (`hello` 绑定本 tab 的 claude 进程,在错的 tab 跑会贴错身份。**注意**:若本 role 已起 daemon,daemon 会把 presence 改成 daemon 模式,本交互 tab 做 `done` 要显式带 `--role MasterAgent`。)
 

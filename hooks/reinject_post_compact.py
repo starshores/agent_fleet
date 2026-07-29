@@ -77,7 +77,7 @@ def build_context(role):
         rule = "读你的角色恢复锚记忆(在 MEMORY.md 索引里搜你的 role)。"
     return (
         "## ⚡ compact 后自定位(SessionStart·source=compact 自动注入)\n"
-        "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。\n\n"
+        "**你是【%s】。** compact 只压了对话、没动你的 presence 绑定——【不必重 hello】,但必须重认身份+重载下面纪律,别退化。(唯一例外:`who` 显示本 role「无pid」→ 补跑一次 hello 即恢复;与 wait 先后顺序无关·心跳继承 pid 不再冲。)\n\n"
         "**你的操作铁律**:%s\n\n"
         "**本角色特有**:%s\n\n"
         "**compact 自检·程序约束(易衰减)**:若用户给过【程序性/文体约定】(措辞、格式、流程、别做某动作…),现在确认它们在你的【每轮自动重注入层】=项目 CLAUDE.md 角色节 / 记忆 / role_profiles boundary;compact 摘要只保『文本在』不保『遵守力』(SESSION_RELIABILITY 实证:约定进了摘要仍被反复重犯·越新越易失效),不在就现在补进去、别只靠摘要。\n\n"
