@@ -74,7 +74,7 @@ from bus.roles import (  # noqa: E402
     cmd_route, cmd_roster, cmd_caps,
 )
 from bus.exec import cmd_dispatch  # noqa: E402
-from bus.sessions import cmd_sessions  # noqa: E402
+from bus.sessions import cmd_sessions, cmd_resume  # noqa: E402
 from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
@@ -128,7 +128,7 @@ _CMD_GROUPS = [
     ("派遣执行 exec", "dispatch"),
     ("Edge 互斥", "edge-acquire edge-release"),
     ("长期任务·待办 tasks", "tasklines ask-user refs todos-archive"),
-    ("会话·标注", "sessions tag"),
+    ("会话·标注", "sessions tag resume"),
     ("舰队日志·维修 fleetlog", "fleetlog maint fleet-state"),
 ]
 
@@ -200,6 +200,7 @@ def main():
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)
     p = sub.add_parser("retired"); p.set_defaults(fn=cmd_retired)
     p = sub.add_parser("sessions"); p.add_argument("--project", default=None); p.add_argument("--limit", type=int, default=0); p.add_argument("--json", action="store_true"); p.add_argument("--tag", default=None, help="给会话id打标记"); p.add_argument("--untag", default=None, help="撤会话id标记"); p.add_argument("--label", default=None, help="标签(默认'可恢复')"); p.add_argument("--note", default=None, help="标记备注"); p.add_argument("--tagged", action="store_true", help="只列已标记的会话"); p.add_argument("--live", action="store_true", help="只列运行中(有活进程)"); p.add_argument("--dead", action="store_true", help="只列死的(可恢复/休眠)"); p.add_argument("--non-bus", action="store_true", dest="non_bus", help="只列非bus(个人)会话"); p.add_argument("--bus", action="store_true", help="只列bus(agent)会话"); p.add_argument("--by-size", action="store_true", dest="by_size", help="按 resume jsonl 大小降序(辅助判断谁最大/该归档清)"); p.set_defaults(fn=cmd_sessions)
+    p = sub.add_parser("resume", help="停机快速恢复面板:按角色列最后绑定会话+状态+恢复命令(presence 锚)"); p.add_argument("--role", default=None, help="只看某角色"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_resume)
     p = sub.add_parser("edge-acquire"); p.add_argument("--who", default=None); p.add_argument("--timeout", type=float, default=120.0); p.add_argument("--ttl", type=float, default=300.0); p.set_defaults(fn=cmd_edge_acquire)
     p = sub.add_parser("edge-release"); p.add_argument("--who", default=None); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_edge_release)
     p = sub.add_parser("fleetlog"); p.add_argument("--add", action="store_true", help="追加一条(默认=列最近)"); p.add_argument("--kind", default=None, help="milestone/incident/maintenance/retire/revive/train/note"); p.add_argument("--title", default=None); p.add_argument("--detail", default=""); p.add_argument("--by", default=None); p.add_argument("--ts", default=None, help="补记历史事件时指定时间(ISO)"); p.add_argument("--limit", type=int, default=20); p.set_defaults(fn=cmd_fleetlog)

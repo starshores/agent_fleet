@@ -139,6 +139,86 @@ def _session_meta(sid):
     return None, None
 
 
+def _find_session_file(sid):
+    """按 session-id 在 ~/.claude/projects 找会话 jsonl,返回 Path 或 None(只判存在,不读内容)。"""
+    root = Path.home() / ".claude" / "projects"
+    if not sid or not root.exists():
+        return None
+    for pdir in root.iterdir():
+        f = pdir / (sid + ".jsonl")
+        if f.exists():
+            return f
+    return None
+
+
+def cmd_resume(args):
+    """停机快速恢复面板(2026-07-29 用户案:突然停机后"找不到谁是谁"没法快速恢复)。
+    按角色列【最后绑定的会话】+ 状态 + 可直接粘贴的恢复命令。锚 = presence.json 的
+    session_id/cwd(hello/心跳持久写入,重启不丢)——不用翻 sessions 列表按标题猜归属。
+    过滤同 selfwake 口径:伪角色/测试/退役不列;休眠(park)列出但标注不必恢复。"""
+    from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _is_test_role
+    from bus.proc import _alive_claude_pids
+    from bus.selfwake import _is_parked
+    only = getattr(args, "role", None)
+    retired = _retired_roles()
+    alive_claude = _alive_claude_pids() if psutil is not None else set()
+    rows = []
+    for role in sorted({p.parent.name for p in BUS.glob("*/presence.json")}):
+        if _pseudo_role_label(role) or _is_test_role(role) or role in retired:
+            continue
+        if only and role != only:
+            continue
+        try:
+            d = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        sid = d.get("session_id")
+        cwd = d.get("cwd") or ""
+        mode = d.get("mode") or ""
+        last = (d.get("last_seen") or "")[:16].replace("T", " ")
+        if mode == "daemon":
+            alive = bool(psutil is not None and d.get("daemon_pid") and psutil.pid_exists(d["daemon_pid"]))
+        else:
+            alive = d.get("claude_pid") in alive_claude   # 名字校验防重启后 pid 复用误判(_owner_live 同口径)
+        f = _find_session_file(sid)
+        resume_cmd = note = ""
+        if alive:
+            state = "✓在岗"
+        elif _is_parked(role):
+            state, note = "🅿️休眠", "用户故意暂离·不必恢复"
+        elif mode == "daemon":
+            state, note = "⏻daemon停", "ab supervise 拉起(需在 fleet.json 在册)"
+        elif not sid:
+            state, note = "⚠无会话锚", "presence 无 session_id——ab sessions 按 cwd/标题人工找"
+        elif not f:
+            state, note = "⚠会话缺失", "jsonl 不在 projects/(已归档/清理)——查 ab sessions --tagged 快照"
+        else:
+            state = "⏻需恢复"
+            resume_cmd = 'cd "%s" ; claude --resume %s' % (cwd, sid)
+        rows.append({"role": role, "state": state, "last_seen": last, "session_id": sid or "",
+                     "cwd": cwd, "mode": mode, "resume": resume_cmd, "note": note,
+                     "size_kb": round(f.stat().st_size / 1024, 1) if f else 0})
+    order = {"⏻需恢复": 0, "⚠会话缺失": 1, "⚠无会话锚": 1, "⏻daemon停": 2, "✓在岗": 3, "🅿️休眠": 4}
+    rows.sort(key=lambda r: (order.get(r["state"], 9), r["role"]))
+    if getattr(args, "json", False):
+        print(json.dumps(rows, ensure_ascii=False))
+        return
+    n_need = sum(1 for r in rows if r["state"] == "⏻需恢复")
+    print("停机快速恢复(角色→最后绑定会话·presence 锚;共 %d 角色 · 需恢复 %d):" % (len(rows), n_need))
+    print("%-12s %-9s %-12s %-8s %-38s %s" % ("role", "状态", "最后在岗", "resume大小", "会话id", "备注"))
+    for r in rows:
+        print("%-12s %-9s %-12s %-8s %-38s %s" % (
+            r["role"], r["state"], r["last_seen"][5:] or "-",
+            ("%.1fM" % (r["size_kb"] / 1024)) if r["size_kb"] >= 1024 else ("%dK" % r["size_kb"]) if r["size_kb"] else "-",
+            r["session_id"] or "-", r["note"]))
+    if n_need:
+        print("\n恢复命令(每条在【新终端 tab】整行粘贴跑;起来后按 CLAUDE.md 自举:whoami→重认身份→挂 wait):")
+        for r in rows:
+            if r["resume"]:
+                print("  [%s]\t%s" % (r["role"], r["resume"]))
+    print("\n口径:✓在岗=绑定进程活着不用动;⏻需恢复=进程没了且会话 jsonl 在(可 resume);休眠/伪角色/退役不需恢复。")
+
+
 def cmd_sessions(args):
     """列 Claude Code 历史会话(~/.claude/projects/<cwd编码>/<session-id>.jsonl),仅元数据、可【打标记】。
     - 列表:ab sessions [--project X] [--limit N] [--tagged](只看已标记)[--json];标记的会话显示 🏷标签。
