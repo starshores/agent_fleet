@@ -33,7 +33,25 @@
   "sessBox",
   "liveBox",
   "fleetStateBar",
-  "morphdom"
+  "morphdom",
+  "biKpis",
+  "biRunning",
+  "biSysBody",
+  "biModels",
+  "usageKpis",
+  "uProj",
+  "grpBox",
+  "mechBox",
+  "lrBox",
+  "ctxBody",
+  "promptsBox",
+  "pathsBox",
+  "archRetired",
+  "archResumeBody",
+  "bizRolesBox",
+  "sendTask",
+  "tviewActive",
+  "tviewHistory"
  ],
  "tests": [
   {
@@ -72,9 +90,104 @@
    "note": "页面含 morphdom"
   },
   {
+   "name": "anchor-biKpis",
+   "ok": true,
+   "note": "页面含 biKpis"
+  },
+  {
+   "name": "anchor-biRunning",
+   "ok": true,
+   "note": "页面含 biRunning"
+  },
+  {
+   "name": "anchor-biSysBody",
+   "ok": true,
+   "note": "页面含 biSysBody"
+  },
+  {
+   "name": "anchor-biModels",
+   "ok": true,
+   "note": "页面含 biModels"
+  },
+  {
+   "name": "anchor-usageKpis",
+   "ok": true,
+   "note": "页面含 usageKpis"
+  },
+  {
+   "name": "anchor-uProj",
+   "ok": true,
+   "note": "页面含 uProj"
+  },
+  {
+   "name": "anchor-grpBox",
+   "ok": true,
+   "note": "页面含 grpBox"
+  },
+  {
+   "name": "anchor-mechBox",
+   "ok": true,
+   "note": "页面含 mechBox"
+  },
+  {
+   "name": "anchor-lrBox",
+   "ok": true,
+   "note": "页面含 lrBox"
+  },
+  {
+   "name": "anchor-ctxBody",
+   "ok": true,
+   "note": "页面含 ctxBody"
+  },
+  {
+   "name": "anchor-promptsBox",
+   "ok": true,
+   "note": "页面含 promptsBox"
+  },
+  {
+   "name": "anchor-pathsBox",
+   "ok": true,
+   "note": "页面含 pathsBox"
+  },
+  {
+   "name": "anchor-archRetired",
+   "ok": true,
+   "note": "页面含 archRetired"
+  },
+  {
+   "name": "anchor-archResumeBody",
+   "ok": true,
+   "note": "页面含 archResumeBody"
+  },
+  {
+   "name": "anchor-bizRolesBox",
+   "ok": true,
+   "note": "页面含 bizRolesBox"
+  },
+  {
+   "name": "anchor-sendTask",
+   "ok": true,
+   "note": "页面含 sendTask"
+  },
+  {
+   "name": "anchor-tviewActive",
+   "ok": true,
+   "note": "页面含 tviewActive"
+  },
+  {
+   "name": "anchor-tviewHistory",
+   "ok": true,
+   "note": "页面含 tviewHistory"
+  },
+  {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=205052"
+   "note": "200 bytes=206641"
+  },
+  {
+   "name": "keys /api/state",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/health",
@@ -82,9 +195,19 @@
    "note": "200 bytes=1196"
   },
   {
+   "name": "keys /api/health",
+   "ok": true,
+   "note": "必含键齐"
+  },
+  {
    "name": "GET /api/tray",
    "ok": true,
    "note": "200 bytes=149"
+  },
+  {
+   "name": "keys /api/tray",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/reap",
@@ -134,17 +257,27 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4634"
+   "note": "200 bytes=4778"
+  },
+  {
+   "name": "keys /api/bi",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=35313"
+   "note": "200 bytes=35314"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=27912"
+   "note": "200 bytes=27911"
+  },
+  {
+   "name": "keys /api/usage",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/dispatch_metrics",
@@ -162,6 +295,11 @@
    "note": "200 bytes=5243"
   },
   {
+   "name": "keys /api/ctx",
+   "ok": true,
+   "note": "必含键齐"
+  },
+  {
    "name": "GET /api/ctxpanel",
    "ok": true,
    "note": "200 bytes=5520"
@@ -175,6 +313,11 @@
    "name": "GET /api/archive",
    "ok": true,
    "note": "200 bytes=51949"
+  },
+  {
+   "name": "keys /api/archive",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/paths",
@@ -202,6 +345,11 @@
    "note": "200 bytes=255"
   },
   {
+   "name": "keys /api/fleet-state",
+   "ok": true,
+   "note": "必含键齐"
+  },
+  {
    "name": "GET-unknown-404",
    "ok": true,
    "note": "404"
@@ -222,11 +370,36 @@
    "note": "404"
   },
   {
+   "name": "POST-answer-empty",
+   "ok": true,
+   "note": "200 ok=False"
+  },
+  {
+   "name": "POST-dispatch-empty",
+   "ok": true,
+   "note": "200 ok=False"
+  },
+  {
+   "name": "POST-openpath-empty",
+   "ok": true,
+   "note": "200 ok=False"
+  },
+  {
+   "name": "POST-openfile-empty",
+   "ok": true,
+   "note": "200 ok=False"
+  },
+  {
+   "name": "POST-lrdecide-empty",
+   "ok": true,
+   "note": "200 ok=False"
+  },
+  {
    "name": "SSE-connect",
    "ok": true,
    "note": "202 bytes"
   }
  ],
- "test_count": 38,
- "pass": 38
+ "test_count": 69,
+ "pass": 69
 }

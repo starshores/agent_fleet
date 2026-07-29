@@ -29,8 +29,29 @@ GET_ENDPOINTS = [
     "/api/archive", "/api/paths", "/api/storage", "/api/lifecycle",
     "/api/fleet-log", "/api/fleet-state",
 ]
-# 页面骨架锚(page.py 关键面板;拆分/morphdom 改造后必须仍在)
-PAGE_ANCHORS = ["fleetBody", "todoBox", "sessBox", "liveBox", "fleetStateBar", "morphdom"]
+# 页面骨架锚(page.py 关键面板容器;拆分/morphdom 改造后必须仍在。一面板一锚,U1/U4 回归网·Master数分缺口2)
+PAGE_ANCHORS = [
+    "fleetBody", "todoBox", "sessBox", "liveBox", "fleetStateBar", "morphdom",   # 核心
+    "biKpis", "biRunning", "biSysBody", "biModels",                              # BI
+    "usageKpis", "uProj",                                                        # 历史用量(canvas 周边)
+    "grpBox", "mechBox", "lrBox", "ctxBody", "promptsBox", "pathsBox",           # 组池/机制/长程/上下文/提示词/路径
+    "archRetired", "archResumeBody", "bizRolesBox",                              # 归档/业务角色
+    "sendTask", "tviewActive", "tviewHistory",                                   # 派活表单/任务视图
+]
+
+# 关键数据端点"必含键"(Master数分缺口1:只验 JSON-parse 会放过 {} 空壳;键=当前真实响应的稳定子集)。
+# /api/health 与 /api/ctx 有【冷启 loading 占位契约】(routes.py 注释):{"loading":true} 也算合约内。
+MUST_KEYS = {
+    "/api/state": ["bus", "fleet", "todos", "now"],
+    "/api/bi": ["per_role", "today_usage", "running"],
+    "/api/fleet-state": ["state", "icon", "counts", "guard"],
+    "/api/health": ["healthy", "selfwake", "queues"],
+    "/api/tray": ["ok", "running", "stale"],
+    "/api/archive": ["ok", "retired", "resume"],
+    "/api/usage": ["totals", "daily", "by_project"],
+    "/api/ctx": ["ok", "rows"],
+}
+LOADING_OK = {"/api/health", "/api/ctx"}
 
 
 def _get(base, path, timeout=30):
@@ -69,13 +90,19 @@ def run_tests(base, port):
         for a in PAGE_ANCHORS:
             add("anchor-%s" % a, False, "页面拉取失败")
 
-    # ── GET 端点面:200 + JSON 可解析(loading 占位也算 200+JSON,口径宽进防 flap)──
+    # ── GET 端点面:200 + JSON 可解析;关键数据端点再验必含键(防空壳化回归)──
     for ep in GET_ENDPOINTS:
         name = "GET " + ep
         try:
             st, body = _get(base, ep)
             j = json.loads(body.decode("utf-8"))
             add(name, st == 200 and isinstance(j, (dict, list)), "%s bytes=%d" % (st, len(body)))
+            if ep in MUST_KEYS and isinstance(j, dict):
+                if ep in LOADING_OK and j.get("loading") and len(j) <= 2:
+                    add("keys " + ep, True, "冷启 loading 占位(合约内)")
+                else:
+                    missing = [k for k in MUST_KEYS[ep] if k not in j]
+                    add("keys " + ep, not missing, ("缺键: %s" % missing) if missing else "必含键齐")
         except Exception as e:
             add(name, False, repr(e))
 
@@ -97,6 +124,19 @@ def run_tests(base, port):
         add("POST-supervise-dryrun", False, repr(e))
     st, body = _post(base, "/api/no-such-endpoint", {})
     add("POST-unknown-404", st == 404, str(st))
+    # 其余 POST 的空入参校验面(Master数分缺口3:只挑【实现里空入参必拒·零副作用】的;
+    # todos/add 空体会真建"(无标题)"待办、clear_replies 会真清 → 有副作用,不进 smoke)
+    for name, path in (("POST-answer-empty", "/api/todos/answer"),
+                       ("POST-dispatch-empty", "/api/todos/dispatch"),
+                       ("POST-openpath-empty", "/api/open-path"),
+                       ("POST-openfile-empty", "/api/open-file"),
+                       ("POST-lrdecide-empty", "/api/lr-decide")):
+        try:
+            st, body = _post(base, path, {})
+            j = json.loads(body.decode("utf-8"))
+            add(name, st == 200 and j.get("ok") is False, "%s ok=%s" % (st, j.get("ok")))
+        except Exception as e:
+            add(name, False, repr(e))
 
     # ── SSE 连通:读到前导注释帧即通(短超时防挂死)──
     try:
