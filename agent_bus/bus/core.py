@@ -207,6 +207,26 @@ def _kill_prior_waits(role):
 # 维护哨兵:稳定路径(agent_bus 之外),bus 计划内停摆(如目录迁移)时置位;wait 见之原地睡等。
 _MAINT_SENTINEL = BUS.parent / ".bus_maintenance"
 
+# wait 阻塞期心跳间隔(会话考古上报 2026-07-29:原来只在 _serve_wait 进场 touch 一次,
+# 2h/6h 阻塞期 last_seen 不刷新 → who 心跳持续老化像掉线)。presence 多写者安全(json_lock)。
+_WAIT_HB_INTERVAL = float(os.environ.get("AGENTBUS_WAIT_HB_INTERVAL", 120))
+
+
+def _start_wait_heartbeat(role, mode, extra, interval=None):
+    """后台心跳线程:wait 阻塞期间每 interval 秒刷一次 presence(daemon 线程·best-effort)。
+    返回 stop Event——wait 返回后 set() 停线程(最迟 interval 秒后退出,daemon=True 不阻进程退出)。"""
+    stop = threading.Event()
+
+    def _beat():
+        while not stop.wait(interval or _WAIT_HB_INTERVAL):
+            try:
+                _touch_presence(role, mode, extra)
+            except Exception:
+                pass                      # 心跳绝不影响 wait 主流程(bus 路径瞬失等,下一拍再试)
+
+    threading.Thread(target=_beat, daemon=True).start()
+    return stop
+
 
 def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, include_approval=False):
     # ── 中断 / 自恢复机制(用户 2026-07-15 令·好设计):遇不可恢复问题不崩溃、不空转,睡 5 分钟再自恢复 ──
@@ -226,12 +246,13 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
     _tracef = BUS / role / "wait_trace.json"
     _trace = {"pid": os.getpid(), "started": _now(), "timeout": timeout, "exit": None}
     _write_json(_tracef, _trace)
+    _hb_stop = _start_wait_heartbeat(role, presence_mode, extra)   # 阻塞期周期心跳(会话考古上报修)
     try:
         _touch_presence(role, presence_mode, extra)       # 声明身份 + 心跳
         obj = _wait_core(role, timeout, include_approval)
     except Exception as e:
         # ② 不可恢复问题(bus 路径暂失 / 迁移中 / 未预期异常):睡 300s 再自恢复一次,绝不崩溃/秒返空转。
-        #    睡眠期间后台 wait 仍"在跑"=agent 保持在岗、透明熬过瞬时故障,恢复后自动接上。
+        #    睡眠期间后台 wait 仍"在跑"=agent 保持在岗、透明熬过瞬时故障,恢复后自动接上(心跳线程也在跳)。
         sys.stderr.write("⚠ wait 遇不可恢复问题:%s → 睡 300s 再自恢复重试...\n" % (str(e)[:150]))
         time.sleep(300)
         try:
@@ -240,6 +261,8 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
         except Exception as e2:
             sys.stderr.write("⚠ 自恢复后仍异常:%s —— 返回 idle,交下一轮重挂。\n" % (str(e2)[:150]))
             obj = None
+    finally:
+        _hb_stop.set()
     try:
         _trace.update(exit=("task" if obj else "idle"), exited=_now())
         _write_json(_tracef, _trace)
