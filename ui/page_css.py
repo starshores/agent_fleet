@@ -9,9 +9,9 @@ CSS = r""":root{
   --line:#30363d; --line-muted:#21262d; --line-strong:#3d444d;
   --txt:#e6edf3; --dim:#9198a1; --muted:#8b949e; --none:#6e7681;
   --accent:#58a6ff; --accent2:rgba(56,139,253,.15);
-  --live:#3fb950; --warn:#d29922; --dead:#f85149; --idle:#8b949e;
+  --live:#3ecf8e; --warn:#d29922; --dead:#f85149; --idle:#8b949e;
   /* 状态 RGB 通道(rgba(var(--x-rgb),α) 收编全站散落 rgba·alpha 层次保留、色相单点) */
-  --live-rgb:63,185,80; --warn-rgb:210,153,34; --dead-rgb:248,81,73;
+  --live-rgb:62,207,142; --warn-rgb:210,153,34; --dead-rgb:248,81,73;
   --accent-rgb:88,166,255; --idle-rgb:139,148,158; --none-rgb:110,118,129; --purple-rgb:163,113,247;
   /* 交互/层次 */
   --hover:rgba(177,186,196,.08); --focus:#1f6feb; --shadow:0 1px 3px rgba(1,4,9,.45);
@@ -38,11 +38,11 @@ header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--idle)}
 .dot.on{background:var(--live);box-shadow:0 0 6px var(--live)}
 .dot.off{background:var(--dead)}
-main{padding:18px;max-width:1500px;margin:0 auto;display:grid;gap:18px}
-.grid2{display:grid;grid-template-columns:1.7fr 1fr;gap:18px}
+main{padding:20px 18px;max-width:1500px;margin:0 auto;display:grid;gap:26px}
+.grid2{display:grid;grid-template-columns:1.7fr 1fr;gap:26px}
 @media(max-width:1080px){.grid2{grid-template-columns:1fr}}
 section{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
-.sec-h{padding:11px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;
+.sec-h{padding:11px 16px;border-bottom:1px solid var(--line);font-weight:650;font-size:13.5px;box-shadow:inset 3px 0 0 var(--accent2);
   display:flex;align-items:center;gap:10px;background:var(--panel2)}
 .sec-h .sub{font-weight:400;color:var(--dim);font-size:12px}
 .sec-b{padding:8px 0}
@@ -388,4 +388,12 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .ag-meta{font-size:10.5px;color:var(--none);margin-top:1px}
 .sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:980px){.sec-grid{grid-template-columns:1fr}}
+/* U5b 构图重构(用户口径 2026-08-03:块认知·突出主体):舰队表【正常态安静·异常态醒目】——
+   满屏亮绿=正常在大声喊,真正的主体(异常)被吃掉;正常转低调文字,色底只留给要人看的异常。 */
+#fleetBody .badge.live{background:transparent;color:var(--live);font-weight:500;opacity:.8;padding:2px 4px}
+#fleetBody .badge.idle{background:transparent;color:var(--idle);font-weight:400;opacity:.75;padding:2px 4px}
+#fleetBody .badge.none{background:transparent;color:var(--none);font-weight:400;padding:2px 4px}
+#fleetBody .badge.vbadge.live{background:rgba(var(--live-rgb),.10)}  /* verdict 主徽标保留极淡底=可扫读 */
+#fleetBody .qcount.dn{background:transparent;color:var(--dim)}       /* done 计数=历史信息,安静 */
+#fleetBody .qcount.ib{font-weight:700}                                /* inbox 待领=要人处理,加重 */
 """
