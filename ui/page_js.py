@@ -883,7 +883,7 @@ function renderCaps(d){
     return '<div class="ag-card '+fcls+'" data-key="ag-'+esc(a.role)+'">'+
       '<div class="ag-head"><span class="ag-name">'+esc(a.role)+'</span>'+form+succ+'</div>'+
       (verdict?('<div>'+verdict+'</div>'):'')+
-      '<div class="ag-desc">'+desc+'</div>'+caps+metaLine+'</div>';
+      '<div class="ag-desc clampable">'+desc+'</div>'+caps+metaLine+'</div>';
   };
   const agAll=(d.agents||[]).map(agCard).join('')+(d.agents_retired||[]).map(agCard).join('');
   morphInto(document.getElementById('agDetail'), agAll||'<div class="muted" style="padding:8px">（无 agent）</div>');
@@ -893,7 +893,7 @@ function renderCaps(d){
     const cls='cap-card'+(c.risk_cls?(' '+c.risk_cls):'')+(c.count===0?' zero':'');
     const hold=c.count?('<span class="muted" style="font-size:11px"> · '+c.holders.map(esc).join('、')+'</span>'):'<span class="muted" style="font-size:11px"> · 无持有者</span>';
     return '<div class="'+cls+'"><div class="cn">'+esc(c.name)+rk+'</div>'+
-      '<div class="cd">'+esc(c.desc)+'</div>'+
+      '<div class="cd clampable">'+esc(c.desc)+'</div>'+
       '<div class="cf">默认给:'+esc(c.default_for||'-')+'</div>'+
       '<div class="ch">持有 <b>'+c.count+'</b>'+hold+'</div></div>';
   }).join('');
@@ -1255,10 +1255,11 @@ function renderRoles(d){
   }
   const cr=m.common_rules||[];
   if(cr.length){
-    glob+='<div style="margin:8px 16px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'
-      +'<div style="font-weight:600;color:var(--accent);font-size:13px">🌐 全局层 · compact 后所有角色共用</div>'
+    glob+='<div class="fold" style="margin:8px 16px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'
+      +'<div class="fold-head" style="font-weight:600;color:var(--accent);font-size:13px"><span class="fold-arrow">▶</span> 🌐 全局层 · compact 后所有角色共用 <span class="muted" style="font-weight:400;font-size:11px">('+cr.length+' 条铁律·点开看)</span></div>'
+      +'<div class="fold-body">'
       +'<div class="muted" style="font-size:11px;margin:2px 0 6px">'+esc(m.common_rules_note||'compact hook 全局通用操作铁律;{role} 为模板占位(实注时按角色插值)')+'</div>'
-      +'<ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">'+cr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol></div>';
+      +'<ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">'+cr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol></div></div>';
   }
   const col=(title,items,ic)=>'<div style="flex:1;min-width:150px"><div class="muted" style="font-size:11px;font-weight:600;margin-bottom:3px">'+ic+' '+title+'</div>'
     +((items&&items.length)?('<ol style="margin:0;padding-left:16px;font-size:11.5px;line-height:1.55">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>')
@@ -1291,10 +1292,11 @@ function renderRoles(d){
           +'</div>';
       }
     }
-    return '<div class="tl-card" data-key="role-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
-      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">👤 '+esc(r.role)+'</b>'
+    return '<div class="tl-card fold" data-key="role-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
+      +'<div class="fold-head" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="fold-arrow">▶</span><b style="color:var(--accent);font-size:14px">👤 '+esc(r.role)+'</b>'
       +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span></div>'
       +(r.one_liner?'<div style="font-size:12.5px;margin-top:4px">'+esc(r.one_liner)+'</div>':'')
+      +'<div class="fold-body">'
       +'<div class="muted" style="font-size:11px;margin-top:5px">cwd <span class="mono">'+esc(r.cwd||'?')+'</span> · mode '+esc(r.mode||'?')+' · caps '+(caps||'—')+'</div>'
       +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">'
       +col('启动流程',r.startup_flow,'🚀')
@@ -1302,6 +1304,7 @@ function renderRoles(d){
       +col('隐式输入(自举读锚)',r.implicit_inputs,'🧭')+'</div>'
       +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
       +cblock
+      +'</div>'
       +'</div>';
   }).join('')+abstractCards);
 }
@@ -1373,16 +1376,18 @@ function renderBizRoles(d){
       :'<div class="muted" style="font-size:11px">—</div>')+'</div>';
   morphInto(box, roles.map(r=>{
     const caps=(r.caps||[]).map(c=>'<span class="cap-chip">'+esc(c)+'</span>').join('');
-    return '<div class="tl-card" data-key="bizrole-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
-      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent);font-size:14px">🏢 '+esc(r.role)+'</b>'
+    return '<div class="tl-card fold" data-key="bizrole-'+esc(r.role)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
+      +'<div class="fold-head" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="fold-arrow">▶</span><b style="color:var(--accent);font-size:14px">🏢 '+esc(r.role)+'</b>'
       +'<span class="cap-chip" style="background:rgba(91,157,255,.14);color:var(--accent)">'+esc(r.layer||'')+'</span></div>'
       +(r.one_liner?'<div style="font-size:12.5px;margin-top:4px">'+esc(r.one_liner)+'</div>':'')
+      +'<div class="fold-body">'
       +'<div class="muted" style="font-size:11px;margin-top:5px">cwd <span class="mono">'+esc(r.cwd||'?')+'</span> · mode '+esc(r.mode||'?')+' · caps '+(caps||'—')+'</div>'
       +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">'
       +col('启动流程',r.startup_flow,'🚀')
       +col('明式输入(显式派)',r.explicit_inputs,'📥')
       +col('隐式输入(自举读锚)',r.implicit_inputs,'🧭')+'</div>'
       +(r.boundary?'<div style="font-size:11.5px;margin-top:8px;background:rgba(245,166,35,.08);border-left:2px solid var(--warn);padding:4px 8px;border-radius:4px"><b class="muted">边界:</b>'+esc(r.boundary)+'</div>':'')
+      +'</div>'
       +'</div>';
   }).join('')||'<div class="muted" style="padding:8px 16px">（无业务角色）</div>');
 }
@@ -1571,11 +1576,13 @@ function renderLongrange(d){
     const spark=_lrSpark(t.complexity_series);
     const cxHtml=Object.keys(cx).length?('<div style="margin-top:6px;font-size:11px" class="muted">⑥复杂度:节点'+esc(''+(cx.nodes_total||0))+'/边'+esc(''+(cx.edges_total||0))+' · 活节点'+esc(''+(cx.nodes_live||0))+' · 宽'+esc(''+(cx.width_max||0))+'/深'+esc(''+(cx.depth||0))+' · 合并'+esc(''+(cx.merges||0))+'/跨任务边'+esc(''+(cx.cross_task_edges||0))+(cx.note?(' <i>['+esc(cx.note)+']</i>'):'')
       +(spark?('<div style="margin-top:4px">📈成长曲线(净规模/时间):'+spark+'</div>'):'<div style="margin-top:2px;font-size:10px">📈成长曲线:待 MasterAgent emit t.complexity_series(读 longrange_events.jsonl 成长史)</div>')+'</div>'):'';
-    return '<div class="tl-card" data-key="lr-'+esc(''+t.id)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
-      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:var(--accent)">🗂️ '+esc(t.title||t.id)+'</b>'
+    return '<div class="tl-card fold" data-key="lr-'+esc(''+t.id)+'" style="border:1px solid var(--line);border-radius:8px;margin:8px 16px;padding:10px 14px">'
+      +'<div class="fold-head" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="fold-arrow">▶</span><b style="color:var(--accent)">🗂️ '+esc(t.title||t.id)+'</b>'
       +(t.status?'<span class="cap-chip" style="font-size:10px">'+esc(t.status)+'</span>':'')
       +savedBadge
+      +'<span class="cap-chip" style="font-size:10px" title="进度(分母可生长·详情展开看④)">'+esc(''+pct)+'%</span>'
       +'<span class="spacer" style="flex:1"></span><span class="muted" style="font-size:11px">更新 '+esc(t.updated||'')+'</span></div>'
+      +'<div class="fold-body">'
       +rolesHtml
       +trackerHtml
       +'<div style="margin-top:8px"><b class="muted" style="font-size:11.5px">①锚点脊柱(👤user方向里程碑/🤖machine收敛检查点·状态upcoming灰/active蓝/reached绿):</b><div class="lr-spine">'+(sp||'<span class="muted">(无脊柱)</span>')+'</div></div>'
@@ -1583,6 +1590,7 @@ function renderLongrange(d){
       +'<div style="margin-top:8px"><b class="muted" style="font-size:11.5px">②当前活跃段'+(seg.from_anchor?(' ['+esc(seg.from_anchor)+'→'+esc(seg.to_anchor||'')+']'):'')+'(pending灰/ready浅蓝/running蓝/blocked红/await_decision黄/done绿):</b><div class="lr-net">'+nodes+'</div></div>'
       +'<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><b class="muted" style="font-size:11.5px">④进度:</b>'+pbar+'<span class="mono" style="font-size:12px">'+esc(''+pct)+'%</span><span class="muted" style="font-size:10px">段 '+(pg.done_segments||0)+'/'+(pg.total_segments||0)+' · 段内节点 '+(pg.seg_done_nodes||0)+'/'+(pg.seg_total_nodes||0)+'</span>'+gw+'</div>'
       +cxHtml
+      +'</div>'
       +'</div>';
   }).join(''));
 }
@@ -1910,4 +1918,11 @@ loadFleetState(); setInterval(loadFleetState, 30000); // 30s 轮询(fleet_state_
 
 loadHealth(); setInterval(loadHealth, 25000);   // 🩺 健康徽标:25s 轮询(后端缓存,零扫描)
 loadCtx(); setInterval(loadCtx, 15000);          // 🧠 上下文占用徽标+看板:15s 轮询(后端缓存,请求零现读)— 全局告警,不分 tab
+
+// U5b 全站交互原语(块认知):钳行点击展开 / 折叠卡头点击开合(正文默认收敛·标题即块锚点)
+document.addEventListener('click',e=>{
+  if(e.target.closest('a,button,select,input,textarea,summary,.arch-sid')) return;
+  const c=e.target.closest('.clampable'); if(c){ c.classList.toggle('open'); return; }
+  const fh=e.target.closest('.fold-head'); if(fh){ const f=fh.closest('.fold'); if(f) f.classList.toggle('open'); }
+});
 """

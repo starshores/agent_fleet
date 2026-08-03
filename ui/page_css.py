@@ -396,4 +396,18 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 #fleetBody .badge.vbadge.live{background:rgba(var(--live-rgb),.10)}  /* verdict 主徽标保留极淡底=可扫读 */
 #fleetBody .qcount.dn{background:transparent;color:var(--dim)}       /* done 计数=历史信息,安静 */
 #fleetBody .qcount.ib{font-weight:700}                                /* inbox 待领=要人处理,加重 */
+
+/* U5b 全站原语(块认知三原则):钳行(点击展开)/折叠卡(标题即锚点·正文默认收)/chip 降噪 */
+.clampable{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:s-resize}
+.clampable.open{display:block;-webkit-line-clamp:unset;cursor:n-resize}
+.fold>.fold-body,.fold .fold-body{display:none}
+.fold.open>.fold-body,.fold.open .fold-body{display:block}
+.fold-head{cursor:pointer;user-select:none}
+.fold-arrow{display:inline-block;transition:transform .12s ease;color:var(--dim);font-size:11px}
+.fold.open .fold-arrow{transform:rotate(90deg)}
+/* 能力/标签 chip 全站降噪:次要信息安静(色底只留给状态/风险语义) */
+.cap-chip{background:transparent;border:1px solid var(--line);color:var(--dim)}
+.cap-chip.live{border-color:rgba(var(--live-rgb),.4);color:var(--live)}
+.cap-chip.warn{border-color:rgba(var(--warn-rgb),.5);color:var(--warn)}
+.cap-chip.none{border-color:var(--line-muted);color:var(--none)}
 """
