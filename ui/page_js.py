@@ -10,7 +10,10 @@ let state=null, pollTimer=null, lastTasksOpen=new Set();
 //  · getNodeKey 用 id 或 data-key(列表项给稳定业务 key)→ 原地更新、不重建 → 不闪、滚动不跳。
 //  · onBeforeElUpdated 跳过【正在输入/选择】的表单控件 → 光标/未提交输入/下拉态不被刷新冲掉。
 function _keyOf(n){ if(n.nodeType!==1) return null; return n.id || n.getAttribute('data-key') || null; }
-function _onBeforeUpd(f){ if(f===document.activeElement && (f.tagName==='INPUT'||f.tagName==='TEXTAREA'||f.tagName==='SELECT')) return false; return true; }
+function _onBeforeUpd(f,t){ if(f===document.activeElement && (f.tagName==='INPUT'||f.tagName==='TEXTAREA'||f.tagName==='SELECT')) return false;
+  // fold/clampable 展开态活在 DOM class(渲染串不带 open)→ morph 前把 open 抄到目标,数据刷新不收起(Master数分 U5b finding 修死)
+  if(t&&f.classList&&f.classList.contains('open')&&t.classList&&(t.classList.contains('fold')||t.classList.contains('clampable'))) t.classList.add('open');
+  return true; }
 function morphInto(el, innerHtml){
   if(!el) return;
   const tag=el.tagName.toLowerCase();
