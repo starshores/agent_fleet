@@ -52,6 +52,7 @@ MUST_KEYS = {
     "/api/archive": ["ok", "retired", "resume"],
     "/api/usage": ["totals", "daily", "by_project"],
     "/api/ctx": ["ok", "rows"],
+    "/api/sessions": ["ok", "sessions", "live_count", "dead_count"],
 }
 LOADING_OK = {"/api/health", "/api/ctx"}
 
@@ -154,6 +155,19 @@ def run_tests(base, port):
         add("GET-route-query", st == 200 and j.get("ok") is True and hit, "recs=%d" % len(j.get("recs") or []))
     except Exception as e:
         add("GET-route-query", False, repr(e))
+
+    # ── 会话归属四态(Master数分口径 2026-08-03):role_src 必在枚举内;死会话绝不 bound(不伪造可靠度)──
+    try:
+        st, body = _get(base, "/api/sessions")
+        j = json.loads(body.decode("utf-8"))
+        rows = j.get("sessions") or []
+        legal = all(s.get("role_src") in ("bound", "ledger", "archive", "inferred", "unknown") for s in rows)
+        no_fake = all(not (s.get("state") == "死" and s.get("role_src") == "bound") for s in rows)
+        honest = all(bool(s.get("role")) == (s.get("role_src") != "unknown") for s in rows)
+        add("sessions-role-4state", st == 200 and legal and no_fake and honest,
+            "n=%d legal=%s no_fake=%s honest=%s" % (len(rows), legal, no_fake, honest))
+    except Exception as e:
+        add("sessions-role-4state", False, repr(e))
 
     # ── SSE 连通:读到前导注释帧即通(短超时防挂死)──
     try:

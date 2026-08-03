@@ -21,6 +21,7 @@ def _touch_presence(role, mode, extra=None):
     _set_current_task(claim/done)并发整写会互相丢字段;②心跳继承 current_task/current_title
     ——原实现整写抹掉、靠"领取与完成之间不发心跳"的时序假设,daemon 模式该假设不成立。"""
     pf = BUS / role / "presence.json"
+    pres = None
     claude_pid, cwd, chain = _claude_ancestor()   # 进程探查在锁外(慢:psutil 走祖先链)
     if not claude_pid:
         # parent-walk 失败(本 harness 下 Bash 子 shell 父链偶发够不到 claude.exe)→ 按 session_id
@@ -65,6 +66,41 @@ def _touch_presence(role, mode, extra=None):
             _write_json(pf, pres)
     except TimeoutError:
         pass   # 抢不到锁(极端)→ 本次心跳丢弃,下次补;绝不裸写覆盖
+    if pres:
+        _record_session_role(role, pres.get("session_id"))   # 锁外落账本(独立文件,自有锁)
+
+
+def _record_session_role(role, sid):
+    """sid↔role append-only 持久账本(2026-08-03 Master数分口径·根治死会话 role 无从判):
+    presence 只存每 role【最新】session_id,rebind 即覆盖=历史绑定丢(实测 54% 死会话无从判归属)。
+    hello/心跳时把绑定永久留账 session_role_map.json → 此后每个 hello 过的会话,死了也能查到权威 role。
+    首绑即记、同 sid 已记同 role 直接返回(热路径零写);同 sid 换 role(罕见误绑)追加 history 不抹。"""
+    if not (role and sid):
+        return
+    f = BUS / "session_role_map.json"
+    try:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+        except Exception:
+            m = {}
+        if (m.get(sid) or {}).get("role") == role:
+            return   # 热路径:已记同绑定,不进锁不写盘
+        from bus.config import _now as _now_fn
+        with json_lock(f, tries=20):
+            try:
+                m = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+            except Exception:
+                m = {}
+            cur = m.get(sid)
+            if cur and cur.get("role") == role:
+                return
+            rec = {"role": role, "ts": _now_fn()}
+            if cur:
+                rec["history"] = (cur.get("history") or []) + [{"role": cur.get("role"), "ts": cur.get("ts")}]
+            m[sid] = rec
+            _write_json(f, m)
+    except Exception:
+        pass   # 账本尽力而为,绝不影响 presence 主流程
 
 
 def _set_current_task(role, tid, title):

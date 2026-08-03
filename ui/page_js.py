@@ -1083,6 +1083,11 @@ function renderSessions(){
     const act = live
       ? `<span class="badge live" title="该会话正在运行,勿 resume">在跑</span>`
       : `<button class="btn mini copy" onclick="copyResume('${esc(s.id)}',this)">复制 resume</button>`;
+    // 属于角色(Master数分四态·不伪造未知):✓=权威(presence绑定/hello账本/归档manifest),~=标题推断非权威,—=无从判不猜
+    const srcTip={bound:'presence 实时绑定·权威',ledger:'hello 账本 session_role_map·权威',archive:'session-archive manifest·权威',inferred:'标题启发推断·非权威(标题提到≠属于)',unknown:'无可靠归属源·不猜'};
+    const roleChip = s.role
+      ? `<span class="role-chip src-${esc(s.role_src)}" title="${srcTip[s.role_src]||''}">${s.role_src==='inferred'?'~':'✓'}${esc(s.role)}</span>`
+      : `<span class="role-chip src-unknown" title="${srcTip.unknown}">—未知</span>`;
     return `<div class="sess-row ${live?'live':'dead'} ${s.is_agent?'agent':''}" data-key="ss-${esc(s.id)}">
       <div class="sess-main">
         <div class="sess-title" title="${esc(s.title)}">${st} ${own} ${esc(s.title||'(无标题)')} ${tags}</div>
@@ -1095,7 +1100,7 @@ function renderSessions(){
           <span class="mono">${esc((s.id||'').slice(0,8))}…</span>
         </div>
       </div>
-      ${act}
+      <div class="sess-side">${roleChip}${act}</div>
     </div>`;
   }).join(''));
 }

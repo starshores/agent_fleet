@@ -213,7 +213,7 @@
   {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=208445"
+   "note": "200 bytes=196360"
   },
   {
    "name": "keys /api/state",
@@ -223,7 +223,7 @@
   {
    "name": "GET /api/health",
    "ok": true,
-   "note": "200 bytes=1247"
+   "note": "200 bytes=2437"
   },
   {
    "name": "keys /api/health",
@@ -248,7 +248,7 @@
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=5195"
+   "note": "200 bytes=6104"
   },
   {
    "name": "GET /api/live",
@@ -283,12 +283,12 @@
   {
    "name": "GET /api/longrange",
    "ok": true,
-   "note": "200 bytes=18923"
+   "note": "200 bytes=25794"
   },
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4778"
+   "note": "200 bytes=4991"
   },
   {
    "name": "keys /api/bi",
@@ -298,12 +298,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=35316"
+   "note": "200 bytes=35315"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=27907"
+   "note": "200 bytes=28824"
   },
   {
    "name": "keys /api/usage",
@@ -318,12 +318,17 @@
   {
    "name": "GET /api/sessions",
    "ok": true,
-   "note": "200 bytes=34892"
+   "note": "200 bytes=38923"
+  },
+  {
+   "name": "keys /api/sessions",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=4307"
+   "note": "200 bytes=6209"
   },
   {
    "name": "keys /api/ctx",
@@ -333,7 +338,7 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=4537"
+   "note": "200 bytes=6534"
   },
   {
    "name": "GET /api/prompts",
@@ -358,7 +363,7 @@
   {
    "name": "GET /api/storage",
    "ok": true,
-   "note": "200 bytes=2817"
+   "note": "200 bytes=2818"
   },
   {
    "name": "GET /api/lifecycle",
@@ -368,7 +373,7 @@
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=11953"
+   "note": "200 bytes=12859"
   },
   {
    "name": "GET /api/fleet-state",
@@ -441,11 +446,16 @@
    "note": "recs=1"
   },
   {
+   "name": "sessions-role-4state",
+   "ok": true,
+   "note": "n=97 legal=True no_fake=True honest=True"
+  },
+  {
    "name": "SSE-connect",
    "ok": true,
    "note": "202 bytes"
   }
  ],
- "test_count": 77,
- "pass": 77
+ "test_count": 79,
+ "pass": 79
 }

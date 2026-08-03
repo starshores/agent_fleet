@@ -210,6 +210,13 @@ canvas{display:block;width:100%}
 .sess-state.live{background:rgba(62,207,142,.16);color:var(--live)}
 .sess-state.dead{background:rgba(125,138,160,.14);color:var(--idle)}
 .sess-state .role{color:var(--live);font-weight:700}
+/* 属于角色 chip(卡片右上·四态可靠度口径 2026-08-03):权威=实底,推断=虚线弱化,未知=灰 */
+.sess-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.role-chip{font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;white-space:nowrap}
+.role-chip.src-bound{background:rgba(62,207,142,.16);color:var(--live)}
+.role-chip.src-ledger,.role-chip.src-archive{background:rgba(91,157,255,.15);color:var(--accent)}
+.role-chip.src-inferred{border:1px dashed var(--line);color:var(--dim);font-weight:400}
+.role-chip.src-unknown{color:var(--none);font-weight:400}
 /* 🏷 标签 chip */
 .sess-tags{display:inline-flex;gap:5px;flex-wrap:wrap}
 .tag-chip{font-size:11px;padding:1px 8px;border-radius:20px;background:rgba(91,157,255,.15);color:var(--accent);border:1px solid rgba(91,157,255,.3)}

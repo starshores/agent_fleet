@@ -1556,6 +1556,47 @@ _sess_lock = threading.Lock()
 _AGENT_CWD_HINTS = ("agent_fleet",)
 
 
+def _session_role_lookup():
+    """死会话 role 归属源(Master数分口径 2026-08-03·四态可靠度,绝不伪造未知):
+    ledger=agent_bus/session_role_map.json(hello/心跳 append-only 账本·权威)
+    archive=session-archive/manifest.json(归档策展·权威)
+    roles=在册角色名(标题启发推断用·长名优先防 Master/MasterAgent 子串误配)。"""
+    ledger, archive = {}, {}
+    try:
+        ledger = json.loads((ABDIR / "session_role_map.json").read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    try:
+        mf = json.loads((Path(r"C:/apphome/agent_fleet/session-archive/manifest.json")).read_text(encoding="utf-8"))
+        for e in (mf.get("entries") or []):
+            if e.get("session_id") and e.get("role"):
+                archive[e["session_id"]] = e["role"]
+    except Exception:
+        pass
+    names = sorted({v.get("role") for v in ledger.values() if isinstance(v, dict) and v.get("role")}
+                   | set(archive.values()) | set(_roles()),
+                   key=len, reverse=True)
+    names = [n for n in names if n and n not in ("用户", "unknown") and len(n) >= 3]
+    return ledger, archive, names
+
+
+def _role_of_session(s, ledger, archive, names):
+    """(role, src) 四态:bound=运行中 presence 绑定 / ledger·archive=权威 / inferred=标题启发·非权威 / unknown=不猜。"""
+    if s.get("state") == "运行中" and s.get("live_role"):
+        return s["live_role"], "bound"
+    sid = s.get("id") or ""
+    rec = ledger.get(sid)
+    if isinstance(rec, dict) and rec.get("role"):
+        return rec["role"], "ledger"
+    if sid in archive:
+        return archive[sid], "archive"
+    title = s.get("title") or ""
+    for n in names:
+        if n in title:
+            return n, "inferred"
+    return None, "unknown"
+
+
 def read_sessions():
     with _sess_lock:
         if _sess_cache["data"] is not None and (time.time() - _sess_cache["ts"]) < _SESS_TTL:
@@ -1567,12 +1608,16 @@ def read_sessions():
         rows = json.loads(raw) if raw.strip() else []
     except Exception as e:
         return {"ok": False, "error": str(e), "sessions": []}
+    ledger, archive, role_names = _session_role_lookup()
     out = []
     for s in rows:
         cwd = s.get("cwd") or ""
         proj = s.get("project") or ""
         is_agent = any(h in cwd or h in proj for h in _AGENT_CWD_HINTS)
+        r_role, r_src = _role_of_session(s, ledger, archive, role_names)
         out.append({
+            # 属于角色(Master数分四态口径 2026-08-03):role+role_src,src∈bound/ledger/archive/inferred/unknown
+            "role": r_role, "role_src": r_src,
             "id": s.get("id"),
             "project": proj,
             "cwd": cwd,
