@@ -180,14 +180,12 @@ def _wait_for_reply(from_role, tid, timeout):
     return _read_consume() if target.exists() else None
 
 
-def _kill_prior_waits(role):
-    """per-role 幂等:挂 wait 前清掉【该 role 已存活的独立 agentbus wait 进程】(排除自己)。
-    防 naive 重挂累积多 wait 抢同一 notice→即时空唤醒死循环(Master数分 2026-07-02 提:全队防坑,不靠各 agent 纪律)。
-    只杀独立 `agentbus.py wait --role <role>` 的 python 进程;daemon 的 wait 在 worker_daemon 进程内跑(cmdline 不同)不受影响。
-    正常流(旧 wait 已 fire 退出)扫不到东西=无副作用;只有真累积(旧 wait 仍阻塞)时才清,是纪律滑坡的安全网。返回清掉数。"""
+def _prior_wait_procs(role):
+    """扫【该 role 已存活的独立 agentbus wait 进程】(排除自己;只认 name=python 的真 wait,
+    bash 包装壳/daemon 内嵌 wait cmdline 不匹配、天然排除)。返回 psutil.Process 列表。"""
     if psutil is None:
-        return 0
-    me = os.getpid(); killed = 0
+        return []
+    me = os.getpid(); found = []
     for p in psutil.process_iter(["name"]):
         try:
             if p.pid == me or "python" not in (p.info.get("name") or "").lower():
@@ -197,8 +195,22 @@ def _kill_prior_waits(role):
                 continue
             for i, x in enumerate(cl):
                 if x == "--role" and i + 1 < len(cl) and cl[i + 1] == role:
-                    p.kill(); killed += 1
+                    found.append(p)
                     break
+        except Exception:
+            continue
+    return found
+
+
+def _kill_prior_waits(role):
+    """(takeover 路径)清掉该 role 已存活的旧 wait。⚠ 不再是重挂默认——默认走 yield-not-kill
+    (见 _serve_wait):杀旧会触发 kill-churn 自持振荡(2026-08-03 业务侧 ~15s 热循环实证:
+    新挂杀旧 → 旧 wait 后台任务"完成"(空输出)→ harness 唤醒会话 → 纪律重挂 → 又杀刚挂的 → 循环)。
+    仅 serve(前台执行体显式接管)与 wait --takeover 走此路径。返回清掉数。"""
+    killed = 0
+    for p in _prior_wait_procs(role):
+        try:
+            p.kill(); killed += 1
         except Exception:
             continue
     return killed
@@ -228,7 +240,8 @@ def _start_wait_heartbeat(role, mode, extra, interval=None):
     return stop
 
 
-def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, include_approval=False):
+def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, include_approval=False,
+                takeover=False):
     # ── 中断 / 自恢复机制(用户 2026-07-15 令·好设计):遇不可恢复问题不崩溃、不空转,睡 5 分钟再自恢复 ──
     # ① 维护窗口哨兵:计划内停摆(bus 目录迁移等)期间【原地睡等,绝不 mkdir 重建 bus】——
     #    否则 _role_dir/_touch_presence 会在被搬走的路径上重建出一个空 bus、分裂状态。哨兵清除后继续正常 wait。
@@ -238,7 +251,32 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
             sys.stderr.write("🛠 bus 维护窗口(.bus_maintenance)——原地睡等,不重建 bus...\n")
         time.sleep(15); waited += 15
 
-    _kill_prior_waits(role)   # per-role 幂等:先清同 role 旧 wait,防累积(Master数分 2026-07-02)
+    # ── per-role 幂等:yield-not-kill(2026-08-03 kill-churn 根治)──────────────────────
+    # 旧行为(挂前杀同 role 旧 wait)会把一次意外双挂放大成自持振荡:杀旧 → 旧 wait 的后台任务
+    # "完成"(空输出)→ harness 唤醒会话 → 纪律"空唤醒→重挂" → 又杀刚挂的 → 无限 ~15s 热循环
+    # (业务侧实证)。新默认:已有【更老的】同 role 活 wait → 本次让位(不杀、不覆写它的
+    # wait_trace),打印 already_armed 即退——在岗的耳朵始终活着,冗余重挂自然收敛(selfwake 仍 ✓在岗)。
+    # 只比自己老的才让(create_time 严格序 + pid tie-break),防两个同时挂互让成零 wait。
+    # serve(前台执行体显式接管)与 wait --takeover 保留旧杀清语义(如旧 wait 聋死需强制换新)。
+    if takeover:
+        _kill_prior_waits(role)
+    else:
+        try:
+            mine = psutil.Process().create_time() if psutil else 0.0
+            holders = [p for p in _prior_wait_procs(role)
+                       if (p.create_time(), p.pid) < (mine, os.getpid())]
+        except Exception:
+            holders = []
+        if holders:
+            h = holders[0]
+            try:
+                _touch_presence(role, presence_mode, dict(presence_extra or {}))  # 顺手刷心跳
+            except Exception:
+                pass
+            print(json.dumps({"already_armed": True, "role": role, "holder_pid": h.pid,
+                              "note": "已有在岗 wait,本次让位不重挂(防 kill-churn);"
+                                      "确要强制换新用 --takeover"}, ensure_ascii=False))
+            return
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
     # 掉线尸检 trace(2026-07-28 会话可靠性立项):进场记 start,干净退场补 exit;
     # 事后 trace 有 start 无 exit = wait 进程【异常死亡】(被杀/休眠丢/宿主壳回收),guard 可据此分类根因,
@@ -276,7 +314,8 @@ def cmd_wait(args):
     to = args.timeout
     if to is None or to <= 0:               # 哨兵 --timeout 0 → 日/夜 idle 策略(日2h/夜6h·真事件仍即时接活)
         to = _idle_timeout_policy()
-    _serve_wait(args.role, to, include_approval=args.include_approval)
+    _serve_wait(args.role, to, include_approval=args.include_approval,
+                takeover=getattr(args, "takeover", False))
 
 
 def cmd_serve(args):
@@ -285,7 +324,7 @@ def cmd_serve(args):
     if not role:
         _fail("未识别本 tab 身份,请先运行一次:agentbus hello --role <本tab名>")
         return
-    _serve_wait(role, args.timeout)
+    _serve_wait(role, args.timeout, takeover=True)   # serve=前台执行体显式接管,保留杀清旧 wait 语义
 
 
 def cmd_request(args):

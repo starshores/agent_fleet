@@ -42,7 +42,7 @@ ab register --role X                            # 建 role 目录
 ab send --to X --from Master --title "..." --task "..."   # (Master 派任务)打印 task id
 ab peek --role X                                # 看某 role 待办(不领取)
 ab serve [--timeout 590]                        # (worker 用·通用)自动认出本 tab 角色 → 阻塞等任务(需先 hello 一次)
-ab wait --role X [--timeout 110]                # (worker 用·指定角色)阻塞到有任务,领取并打印 JSON
+ab wait --role X [--timeout 110] [--takeover]   # (worker 用·指定角色)阻塞到有任务,领取并打印 JSON。重挂幂等(2026-08-03):同 role 已有活 wait → 让位打 already_armed 即退、不杀旧(防 kill-churn 15s 热循环);确要强制换新才加 --takeover(杀旧再挂);serve 默认接管语义(杀旧)
 ab done --id <id> [--role X] --result "..." [--status ok|error] [--notify auto|always|never]  # (worker 用)回填;--role 省略自动识别
 ab replies --role Master [--clear]              # (Master 收)读回填给我的结果
 ```
