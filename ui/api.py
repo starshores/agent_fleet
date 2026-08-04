@@ -229,7 +229,10 @@ def bus_tray_counts():
                 continue
             ts = None
             try:
-                ts = _parse_claimed_epoch(json.loads(Path(f).read_text(encoding="utf-8")).get("claimed", ""))
+                obj = json.loads(Path(f).read_text(encoding="utf-8"))
+                if obj.get("from") == "bus守卫" or obj.get("kind") == "notice":
+                    continue          # 系统消息(自醒守卫提醒/完成通知)≠ 在跑任务,不计(2026-08-04 用户抓虚高)
+                ts = _parse_claimed_epoch(obj.get("claimed", ""))
             except Exception:
                 ts = None
             if ts is None:
@@ -1123,6 +1126,21 @@ def send_task(to, title, task, requires_approval=False, notify="auto"):
         except Exception:
             pass
     return tid
+
+
+def done_task(task_id, role, result, status="ok"):
+    """手动 done 一条 processing/inbox 任务(UI 手动 done 按钮入口)。"""
+    if not task_id or not role:
+        raise ValueError("task_id/role 必填")
+    cmd = [sys.executable, str(ABDIR / "agentbus.py"), "done",
+           "--id", task_id, "--role", role,
+           "--result", result or "手动done",
+           "--status", status]
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       creationflags=_NO_WINDOW, timeout=15)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip() or "done 失败")
+    return {"ok": True, "id": task_id, "role": role}
 
 
 def clear_replies(role, file=None):

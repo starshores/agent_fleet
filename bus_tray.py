@@ -117,7 +117,10 @@ def _probe_local():
             ts = None
             try:
                 with open(f, encoding="utf-8") as fh:
-                    ts = _parse_claimed(json.load(fh).get("claimed", ""))
+                    obj = json.load(fh)
+                if obj.get("from") == "bus守卫" or obj.get("kind") == "notice":
+                    continue          # 系统消息(自醒守卫提醒/完成通知)≠ 在跑任务,不计
+                ts = _parse_claimed(obj.get("claimed", ""))
             except Exception:
                 ts = None
             if ts is None:
@@ -209,7 +212,7 @@ def _poll_loop():
             state = "运转中" if n else "全部离线"
             tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
                 state, n, m, k, p, (" · 卡claim%d" % stale) if stale else "", hhmm)
-            _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑任务的 agent 数
+            _update_tray(n, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在岗 agent 数(设计口径·2026-08-04 修:原画在跑数与实际在岗对不上)
         time.sleep(POLL_SEC)
 
 
@@ -255,7 +258,7 @@ def _refresh_once():
         tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
             "运转中" if n else "全部离线", n, m, k, p,
             (" · 卡claim%d" % stale) if stale else "", time.strftime("%H:%M:%S"))
-        _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑任务的 agent 数
+        _update_tray(n, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在岗 agent 数(设计口径,同 _poll_loop)
 
 
 def _on_destroy(hwnd, msg, wparam, lparam):

@@ -28,6 +28,18 @@ function toggleTasks(tr){
   const role=tr.dataset.role; const vis=det.style.display!=='none';
   det.style.display=vis?'none':''; if(vis) lastTasksOpen.delete(role); else lastTasksOpen.add(role);
 }
+async function manualDone(taskId,role,btn){
+  const result=window.prompt('done 结果(留空=手动done)','手动done');
+  if(result===null) return;
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch('/api/done',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({task_id:taskId,role:role,result:result||'手动done'})});
+    const d=await r.json();
+    if(d.ok){toast('✅ done: '+taskId); btn.textContent='已done';}
+    else{toast('done失败:'+(d.error||'?'),true); btn.disabled=false; btn.textContent='done ✓';}
+  }catch(e){toast('请求失败:'+e,true); btn.disabled=false; btn.textContent='done ✓';}
+}
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtAge(a){ if(a==null) return '?'; if(a<60) return a+'s'; if(a<3600) return Math.floor(a/60)+'m'+(a%60)+'s'; return Math.floor(a/3600)+'h'+Math.floor((a%3600)/60)+'m';}
@@ -40,23 +52,32 @@ function swBadge(s,detail){
   return ` <span class="badge none" title="未自醒 ${t}">—</span>`;
 }
 // turn 状态(turn_state.py hook 实时盖):thinking=turn内思考 / tool=正跑工具 / idle=空闲。
-// 稳健化(2026-07-10 用户「不够灵敏 + 中断后卡住」):
-//  ① armed(有 wait 进程=阻塞等消息)→ 权威判空闲待命,覆盖任何陈旧 thinking(此时不可能在思考);
-//  ② thinking/tool 但 ts 超 STALE 秒无新事件 → 判「停顿?」——治中断/漏 Stop 卡在思考不回落
-//     (PreToolUse/PostToolUse 每步刷新 ts,正常多工具干活 age 一直很小;冻住=中断或超长单工具)。
-//  数据只来自 hook 事件 + wait 进程,非推断。
-// 分状态陈旧阈:思考态推理很少 >30s,冻这么久多是【中断】(中断不触发任何 hook·官方证实);
-// 工具态本可跑很久(长 bash 等),放宽到 300s 才疑,免误报正常长工具。
+// 稳健化(2026-07-10 用户「不够灵敏 + 中断后卡住」;2026-08-04 用户抓错「armed 盖掉真在干活」重排):
+//  ① 【新鲜活动态优先】thinking/tool 且 age 未超陈旧阈 → 判在干活——前台 cli+后台 wait 是主流形态,
+//     armed(后台 wait 挂着)与会话正在干活【并存】,armed 不可再无条件盖成空闲(Master数分 Orchestrating
+//     16min 被显示成「空闲·待命」实证);旧假设「有 wait=阻塞等=不可能在思考」只对 /loop serve worker 成立。
+//  ② armed 只接管【无新鲜活动】的情形(idle/无状态/陈旧)→ 空闲·待命——仍治 2026-07-10 的
+//     「中断后 thinking 卡住不回落」(中断不触发任何 hook,状态冻住变陈旧 → armed 收口成空闲)。
+//  ③ 非 armed 且 thinking/tool 超 STALE 秒无新事件 → 判「停顿?」。数据只来自 hook 事件 + wait 进程,非推断。
+// 分状态陈旧阈:思考态推理很少 >30s;工具态本可跑很久(长 bash/Agent 编排等),放宽到 300s 才疑。
 const TURN_STALE={thinking:30, tool:300};
 function turnBadge(tn, sw){
-  if(sw==='armed') return `<span class="badge idle" title="有 wait 进程·阻塞等消息=空闲待命(不可能在思考)">⚪ 空闲·待命</span>`;
-  if(!tn||!tn.state) return '<span class="badge none" title="无 turn 状态(未装 hook / 非 bus 成员 / 尚无事件)">–</span>';
-  const age=tn.age, ag=(age==null?'':' '+fmtAge(age));
-  if(tn.state==='idle') return `<span class="badge idle" title="turn 已结束(Stop/idle_prompt)·空闲${ag}">⚪ 空闲${ag}</span>`;
-  const stale=TURN_STALE[tn.state]||60;
+  const st=tn&&tn.state, age=tn?tn.age:null, ag=(age==null?'':' '+fmtAge(age));
+  const stale=st?(TURN_STALE[st]||60):0;
+  const freshActive=st&&st!=='idle'&&age!=null&&age<=stale;
+  if(freshActive){
+    if(st==='tool') return `<span class="badge warn" title="正在执行工具 ${esc(tn.tool||'')}${ag}(后台 wait 可并存)">🔧 ${esc(tn.label)}${ag}</span>`;
+    return `<span class="badge live" title="在 turn 内(思考/执行中)${ag}(后台 wait 可并存)">🟢 ${esc(tn.label||'思考/执行中')}${ag}</span>`;
+  }
+  if(sw==='armed'){
+    const note=(st&&st!=='idle')?`(最近状态「${esc(tn.label||st)}」已冻 ${fmtAge(age)}:长工具编排中或已中断,无新 hook 事件)`:'';
+    return `<span class="badge idle" title="后台 wait 在·无新鲜 turn 事件=空闲待命${note}">⚪ 空闲·待命</span>`;
+  }
+  if(!st) return '<span class="badge none" title="无 turn 状态(未装 hook / 非 bus 成员 / 尚无事件)">–</span>';
+  if(st==='idle') return `<span class="badge idle" title="turn 已结束(Stop/idle_prompt)·空闲${ag}">⚪ 空闲${ag}</span>`;
   if(age!=null && age>stale)
-    return `<span class="badge none" title="状态为「${esc(tn.label||tn.state)}」但已 ${fmtAge(age)} 无新 hook 事件 → 判停顿(用户中断不触发任何 hook·官方证实 / 或异常结束)">◌ 停顿?${ag}</span>`;
-  if(tn.state==='tool') return `<span class="badge warn" title="正在执行工具 ${esc(tn.tool||'')}${ag}">🔧 ${esc(tn.label)}${ag}</span>`;
+    return `<span class="badge none" title="状态为「${esc(tn.label||st)}」但已 ${fmtAge(age)} 无新 hook 事件 → 判停顿(用户中断不触发任何 hook·官方证实 / 或异常结束)">◌ 停顿?${ag}</span>`;
+  if(st==='tool') return `<span class="badge warn" title="正在执行工具 ${esc(tn.tool||'')}${ag}">🔧 ${esc(tn.label)}${ag}</span>`;
   return `<span class="badge live" title="在 turn 内(思考/执行中)${ag}">🟢 ${esc(tn.label||'思考/执行中')}${ag}</span>`;
 }
 
@@ -92,13 +113,17 @@ function render(){
       let inner='<div class="task-wrap">';
       (r.tasks||[]).forEach(t=>{
         const appr=(t.sub==='inbox'&&t.requires_approval);
+        const canDone=(t.sub==='processing'||t.sub==='inbox'||t.sub==='failed');
         inner+=`<div class="task-card"><div class="t-h">
           <span class="badge ${subBadge[t.sub]||'idle'}">${esc(t.sub)}</span>
           ${appr?'<span class="badge appr">⚠ requires_approval</span>':''}
           ${(t.requeue_count>0)?'<span class="badge warn">requeue×'+esc(t.requeue_count)+'</span>':''}
           <span class="mono">${esc(t.id)}</span> · from <b>${esc(t.from)}</b>
           <span class="t-title">${esc(t.title)}</span>
-          ${t.claimed?'· claimed '+esc(t.claimed):''}</div>
+          ${t.claimed?'· claimed '+esc(t.claimed):''}
+          <span class="spacer" style="flex:1"></span>
+          ${canDone?`<button class="btn ghost mini" style="font-size:11px;padding:2px 8px;color:var(--ok)" onclick="manualDone('${esc(t.id)}','${esc(r.role)}',this)">done ✓</button>`:''}
+          </div>
           ${appr?'<div class="hint">高风险任务:自动监听者(serve/daemon/wait)不会领取 → 有人值守的 tab 用 <code>wait --include-approval</code> 显式领取执行</div>':''}
           <pre>${esc(t.task)}</pre></div>`;
       });
