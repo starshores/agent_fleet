@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 bus_tray.py —— agent bus 运转状态 · Windows 系统托盘指示器
-- 托盘图标上直接画【在岗 agent 数】,颜色反映 bus 健康:
+- 托盘图标上直接画【在跑任务的 agent 数】(用户 2026-08-04 定口径:一眼判断是否在干活,0=没活),颜色反映 bus 健康:
     🟢 绿 = 有 agent 在跑任务 / 🔵 蓝 = 在岗但全 idle / 🟠 橙 = 有静默异常 / 🔴 红 = 全部离线 / ⚪ 灰 = 探测失败
-- 悬停 tooltip:在岗N · 在跑M · 静默K · 休眠P · 更新时间
+- 悬停 tooltip 看健康:在岗N · 在跑M · 静默K · 休眠P · 更新时间
 - 双击 = 打开本机控制台 WebUI;右键 = 刷新 / 打开控制台 / 退出
 纯本机运行(只跑本机 agentbus.py who --json + 打开 127.0.0.1 控制台),不联网、不外发任何数据。
 数据口径由 Master数分2(bus 监控)定义;数据源 = agentbus.py who --json。
@@ -212,7 +212,7 @@ def _poll_loop():
             state = "运转中" if n else "全部离线"
             tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
                 state, n, m, k, p, (" · 卡claim%d" % stale) if stale else "", hhmm)
-            _update_tray(n, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在岗 agent 数(设计口径·2026-08-04 修:原画在跑数与实际在岗对不上)
+            _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑 agent 数(用户 2026-08-04 定:0=没在干活;在岗数悬停看)
         time.sleep(POLL_SEC)
 
 
@@ -258,7 +258,7 @@ def _refresh_once():
         tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
             "运转中" if n else "全部离线", n, m, k, p,
             (" · 卡claim%d" % stale) if stale else "", time.strftime("%H:%M:%S"))
-        _update_tray(n, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在岗 agent 数(设计口径,同 _poll_loop)
+        _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑 agent 数(同 _poll_loop)
 
 
 def _on_destroy(hwnd, msg, wparam, lparam):
