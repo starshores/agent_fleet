@@ -8,7 +8,8 @@
 ### 1. bus 核心(agent_bus/bus/ + agentbus.py)——【封板区·只修不拆】
 - BUS 2.0 P0-P5 已全交付封板(3267 行单体→180 薄分发+16 模块),**不再发起结构性重构**;只做 bug 修与新机制增量。
 - **慎动点**:`core.py`(全员自醒命脉,wait/done/hello 每回合 shell 它)、`mailbox.py` O_EXCL 并发 claim、`io.json_lock` 并发原语。动这些=全员风险,必须 bus_smoke 全绿 + 实测并发 gate(N 争 1 恰 1 胜)。
-- **known debt(sanctioned 待做,非急)**:①role verdict 仍散 4 处独立各算(agentbus `_who_data`/`cmd_who` + server `fleet`/`_status_of`)→ 收敛读 `_who_data` 单一源;改任何状态语义前必 4 处全改+逐视图实测。②`health.py` 755 行为包内最大,可按 P1 抽公共模式瘦身——候选、不立项。
+- **known debt(sanctioned 待做,非急)**:`health.py` 755 行为包内最大,可按 P1 抽公共模式瘦身——候选、不立项。
+- **勘误(2026-08-06)**:role verdict 4 处散算已在 2.0 P2 收敛到 `_who_data` 单一源(BUS_2.0_CHANGELOG 二;ui/api.py:34 实证吃权威源),初版误列为待做,删除。改状态语义仍须逐视图实测(单一源≠免验)。
 - **re-export 盲点铁律**:抽层时凡被外部 `ab.*` 引用的符号必 re-export(worker_daemon 引 `ab._wait_core` 等)。
 
 ### 2. agent_bus 根周边执行体——【维护区·不重构】
@@ -58,5 +59,6 @@ BUS 2.0 P0-P5 全部决议(含 P5 决议 B:运行时操作锚点留根)/ UI 2.0 
 | B2:todos-archive + start_maint 周期 reap | MasterUI 运行位 | 待排期(todos.json 168 完成态未清出=看板虚高源) |
 | D6:cost→token 口径 | MasterUI 运行位 | 待排期 |
 | E7:长会话轮换 | MasterAgent+用户 | 待议(非急) |
-| role verdict 收敛单一源 | MasterAgent | known debt,候选 |
 | health.py / api.py 体量优化 | MasterAgent | 候选,不立项;api.py 待稳定一个周期后再议 |
+
+> 勘误:初版曾列「role verdict 收敛单一源」——经核 2.0 P2 已完成(_who_data 单一源),移除。
