@@ -200,6 +200,17 @@ class Handler(BaseHTTPRequestHandler):
             # 📂路径页 explorer 打开:127.0.0.1 only(Origin 头已在 do_POST 头部检查)
             b = self._body_json()
             self._send(200, api.open_path((b.get("path") or "").strip()))
+        elif path == "/api/done":
+            # 手动 done 一条任务(舰队总览 done 按钮 · 127.0.0.1 only)
+            b = self._body_json()
+            task_id = (b.get("task_id") or "").strip()
+            role = (b.get("role") or "").strip()
+            result = (b.get("result") or "手动done").strip()
+            status = (b.get("status") or "ok").strip()
+            try:
+                self._send(200, done_task(task_id, role, result, status))
+            except Exception as e:
+                self._send(200, {"ok": False, "error": str(e)})
         else:
             self._send(404, {"error": "not found"})
 

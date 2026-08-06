@@ -1140,6 +1140,7 @@ def done_task(task_id, role, result, status="ok"):
                        creationflags=_NO_WINDOW, timeout=15)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip() or "done 失败")
+    _bump()
     return {"ok": True, "id": task_id, "role": role}
 
 

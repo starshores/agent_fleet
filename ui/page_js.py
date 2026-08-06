@@ -96,7 +96,13 @@ function render(){
   // fleet table —— 增量 morph(展开态由 lastTasksOpen 声明式驱动 + 委托 onclick,刷新中展开/滚动不丢)
   const subBadge={inbox:'idle',processing:'warn',held:'held',failed:'failed'};
   let fleetHtml='';
-  f.roles.forEach(r=>{
+  const _mkey=m=>(!m||m==='-')?'￿':m;
+  const sortedRoles=[...f.roles].sort((a,b)=>{
+    const aModel=_mkey(a.model),bModel=_mkey(b.model);
+    if(aModel!==bModel) return aModel.localeCompare(bModel);
+    return (a.role||'').localeCompare(b.role||'');
+  });
+  sortedRoles.forEach(r=>{
     const hasTasks=(r.inbox+r.processing+(r.held||0)+(r.failed||0))>0;
     const open=lastTasksOpen.has(r.role);
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>

@@ -358,7 +358,7 @@ def _find_task(role, tid):
     任务(_gen_id 时间戳开头,同毫秒/复制粘贴截断都可能撞),回执路由给错人;只认精确 id。
     ②查找含 archive/——done 崩在归档后回执前(或回执补发)时,任务已在 archive,
     仍能找回原 from 正确路由,不再落 unknown。"""
-    for sub in ("processing", "inbox", "archive"):
+    for sub in ("processing", "inbox", "failed", "archive"):
         p = BUS / role / sub / (tid + ".json")
         if p.exists():
             return p
