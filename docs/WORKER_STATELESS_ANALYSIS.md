@@ -49,3 +49,36 @@
 3. **Master 派活规则微调**(Master):杂活默认 dispatch(执行已有 doctrine)、主线活照旧 send;观察一段再定是否要更强机制。
 
 > 相关:业务侧记忆 worker_stateless_fresh_context(发起方视角);本文 = 基建侧分析。拍板项:①是否按"混合规则"走(vs 硬规则);②E7 是否升优先级启动。
+
+---
+
+# 二、具体设计深化(2026-08-06 续·用户令"思考工人问题")
+
+## 5. stale 度量:三信号,compact 为主判据
+
+| 信号 | 含义 | 数据源 | 现状 |
+|---|---|---|---|
+| **S2 compact 次数** | 有损压缩已发生几次 | `reinject_post_compact` hook 在 compact 时必跑 → 顺手原子 bump `<role>/compact_count.json` | **待加一行**(hook 生命线,动前广播) |
+| S1 ctx 占用 | 距 65% 自动压还有多远 | `build_ctxpanel`(session_id 精确绑定 role,pct/level/margin **已有**) | 已有,零新建 |
+| S3 任务数 | 距上次 fresh 已办几单 | events.jsonl claim 计数 by role since presence.started | 可算,不新增采集 |
+
+**判据**:`stale = compact_count ≥ 1`(主)或 `ctx level ≥ yellow 且 tasks ≥ N`(辅)。
+为什么 compact 是主判据:对照实验实证【文本 survive ≠ 遵守】——程序约束遵守力随 compact 衰减,压过一次的 worker 已是有损态;ctx 占用只是"将要有损"的前瞻。**最优轮换时机 = S1 红档、压缩发生之前**(主动轮换 = 无损交接;等 compact = 已损)。
+
+## 6. E7 轮换 SOP(可靠 reset 的操作化)
+
+1. **触发**:S1 red(压前主动·最优)/ S2 ≥1(已损·尽快)/ S3 ≥N(兜底);先人工触发,advisory 自动提醒后补。
+2. **落档**(旧会话):在飞任务与下一步写工作态档;新经验落角色记忆库 + 索引行;能 done 的先 done。
+3. **交接**(新 tab):`hello --role X`(presence 换绑新 session_id)→ boot 流程(角色页+记忆索引+必读)→ `boot-check` ✅。
+4. **接管耳朵**:新 tab `wait --role X --timeout 0 --takeover`——**必须 --takeover**:旧会话的 wait 还活着时,普通重挂会让位给它(512064a yield 语义),消息会被聋会话领走。
+5. **旧会话退出**;`selfwake` 验新会话 ✓在岗收尾。
+> 顺序铁律:先落档 → 新 tab 接管 → 旧退。短暂无执行体可接受(inbox 不丢),双执行体不可。
+
+## 7. advisory 接线(不硬拦)
+
+- **WebUI 派活表单**:route chip 旁加 stale 徽标(ctxpanel 已有 per-role pct/level,纯前端消费)。
+- **`ab send` stderr 提示**:CLI 侧读 `<role>/compact_count.json`(S2,文件读=便宜;S1 的 jsonl 扫描 CLI 侧太贵不做),目标 stale 时提示"建议 dispatch 或让其轮换",与 `_warn_unreachable` 同位同风格。
+- 豁免:requires-approval / 交互确认活 / 会话粘连活照常 send。
+
+## 8. 实施顺序(待拍板后)
+① hook 加 compact_count(一行原子写;hooks=生命线,动前广播)→ ② E7 SOP 试点一个角色(候选=compact 过的常驻)→ ③ send/表单 advisory → ④ 观察一个周期再定是否收紧为半自动轮换。
