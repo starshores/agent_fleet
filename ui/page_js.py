@@ -715,18 +715,25 @@ function applyRange(r){
   const t=d.totals||{};
   const rangeCost=daily.reduce((s,x)=>s+(x.cost_usd||0),0);
   const rl=r?(r+'d'):'全历史';
-  const cacheDenom=(t.cache_read||0)+(t.input||0)+(t.cache_write_5m||0)+(t.cache_write_1h||0);
-  const cacheHit=cacheDenom?(Math.floor((t.cache_read||0)/cacheDenom*1000)/10).toFixed(1)+'%':'–';
+  // 范围内 输入/输出/缓存 分项(仅逐条 ETL 段 src=messages 有拆分;backfill 日聚合段无、不计入)
+  const msgs=daily.filter(x=>x.src==='messages'&&x.input!=null);
+  const rIn=msgs.reduce((s,x)=>s+(x.input||0),0), rOut=msgs.reduce((s,x)=>s+(x.output||0),0);
+  const rCr=msgs.reduce((s,x)=>s+(x.cache_read||0),0);
+  const rCw=msgs.reduce((s,x)=>s+(x.cache_write_5m||0)+(x.cache_write_1h||0),0);
+  const rDenom=rCr+rIn+rCw;
+  const cacheHit=rDenom?(Math.floor(rCr/rDenom*1000)/10).toFixed(1)+'%':'–';
   // 用户定 BI 口径:token 消耗提主位;总 token + io(有效工作量)并列对照 + cache_read 单列标注;$ 标(参考)
   const tk=_tokTotals(t);
   morphInto(document.getElementById('usageKpis'), [
     ['总 token(全历史)', fmtN(tk.total),'acc','input+output+cache_read+cache_write,固定物理量(不随 plan/定价浮动)'],
     ['io 有效工作量', fmtN(tk.io),'','input+output —— 真正的新 work / 有效工作量(不含 cache 重复读)'],
+    ['输入 input('+rl+')', fmtN(rIn),'','每次调用的新输入 token(不含 cache 读写)· 仅逐条 ETL 段(05-11 起)有拆分,backfill 段不计'],
+    ['输出 output('+rl+')', fmtN(rOut),'','模型生成的输出 token · 仅逐条 ETL 段(05-11 起)有拆分,backfill 段不计'],
     ['cache_read 重复读', fmtN(tk.cache),'','重复读上下文 · 占总 token ~'+tk.cachePct+'%(总 token 被它灌水,故单列)'],
-    ['cache 命中', cacheHit,'good','cache_read /(cache_read + cache_creation + input),输入侧命中占比'],
+    ['cache 命中('+rl+')', cacheHit,'good','cache_read /(cache_read + cache_write + input),范围内输入侧命中占比(单日值悬停趋势图看)'],
     ['API calls(去重)', fmtN(t.calls),''],
     ['API 等价成本(参考)', usd(t.cost_usd),'warn','$ 随 plan/定价浮动、plan 下还会下沉,仅作 API 等价参考;token 才是固定量'],
-    ['范围成本('+rl+'·参考)', usd(rangeCost),'','daily 暂无 token 分项(token_stats 迁移后补),范围仍按 $ 参考'],
+    ['范围成本('+rl+'·参考)', usd(rangeCost),'','范围内 $ 合计(参考)'],
   ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${esc(k[3])}"`:''}><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
   drawTrend(daily,{cv:'uTrend',mode:'io',peak:'trendPeak',tip:'uTrendTip',legend:'trendLegend'});
   drawTrend(daily,{cv:'uTrendTotal',mode:'total',peak:'trendPeakTotal',tip:'uTrendTotalTip'});
@@ -770,7 +777,8 @@ function drawTrend(daily, opt){
   let pk=-1, pkv=-1;
   all.forEach((p,i)=>{ const v=vals[i]; if(v==null) return; if(v>pkv){pkv=v;pk=i;}
     const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,2.5,0,7); ctx.fillStyle=lineColor; ctx.fill();
-    pts.push({x:px,y:py,date:p.date,v:v,src:p.src,cost:p.cost_usd,calls:p.calls}); });
+    pts.push({x:px,y:py,date:p.date,v:v,src:p.src,cost:p.cost_usd,calls:p.calls,
+      inp:p.input,out:p.output,cr:p.cache_read,cw:(p.cache_write_5m||0)+(p.cache_write_1h||0)}); });
   if(pk>=0){ const px=X(pk),py=Y(pkv); ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fillStyle=UC.dead; ctx.fill(); }
   ctx.fillStyle=UC.dim;ctx.fillText(all[0].date.slice(5),padL-2,h-8);ctx.textAlign='right';ctx.fillText(all[n-1].date.slice(5),w-padR,h-8);ctx.textAlign='left';
   if(peakEl) peakEl.textContent='峰值 '+fmtN(pkv)+' tok · '+all[pk].date.slice(5)+' · '+n+'天';
@@ -795,9 +803,15 @@ function _bindTrendHover(cvId, tipId){
       : best.src==='vacation'
       ? '0 tok <span class="muted">(无使用)</span>'
       : fmtN(best.v)+' '+lbl+(best.cost!=null?' · '+usd(best.cost)+' 参考':'')+(best.calls!=null?' · '+fmtN(best.calls)+' calls':'');
+    // 单日 输入/输出/缓存比(仅逐条 ETL 段有拆分;缓存比=cache_read/(cache_read+cache_write+input))
+    if(best.inp!=null && best.src!=='backfill' && best.src!=='vacation'){
+      const dn=(best.cr||0)+(best.cw||0)+(best.inp||0);
+      const cp=dn?(Math.floor((best.cr||0)/dn*1000)/10).toFixed(1)+'%':'–';
+      line+='<br>入 '+fmtN(best.inp)+' · 出 '+fmtN(best.out)+' · 缓存比 '+cp;
+    }
     tip.innerHTML='<b>'+esc(best.date)+'</b>'+tag+'<br>'+line;
     tip.style.display='block';
-    let lx=best.x+10; if(lx>rect.width-130)lx=best.x-122;
+    let lx=best.x+10; if(lx>rect.width-170)lx=best.x-162;
     tip.style.left=Math.max(2,lx)+'px'; tip.style.top=Math.max(2,best.y-36)+'px';
   });
   cv.addEventListener('mouseleave',()=>{if(tip)tip.style.display='none';});
