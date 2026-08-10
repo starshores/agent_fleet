@@ -43,6 +43,16 @@
 - **铁律**:每次被唤醒处理完,必须**重挂 wait + selfwake 再验**(不重挂=掉线收不到消息);空唤醒→静默重挂+最多一行,别重复 dump 状态。
 - 完整协议(send/done/peek/replies/roster/route 等)见 `C:\apphome\agent_fleet\AGENTS.md` + `BUS_ONBOARDING.md`。
 
+## 等其他 agent 完成任务 → 先看它的 turn 状态,别盲挂 wait 空等
+
+**规则**:当你在【等另一个 agent 交付/完成某活】时,别只挂个 wait 干等——先看目标 agent 的【turn 状态 + 自醒态】,确认它真的在推进这件事,再决定等还是催:
+- **在推进**(turn=🟢思考 / 🔧跑工具·age 新鲜,且自醒 ✓armed)→ 可以等它,事件唤醒即可。
+- **没在推进**(turn=⚪空闲 / ◌停顿·age 陈旧,或自醒 ⚠掉线 / recent 刚fire未重挂)→ 【别空等】:它可能停顿 / 中断 / 掉线,你派的活只在它 inbox 躺着没人处理,你干等永远等不到。此时:① `ab send` 催一下 / 确认它接了没;② 它掉线就催它重挂(或让用户 / 培训师推),③ 或改道给在岗的对口 agent。
+- **怎么看 turn 状态**:WebUI 运维面板 turn 列(_turn_state)/ `<role>/turn_state.json`(hook 盖:thinking/tool/idle + age)/ `ab selfwake` 看自醒态(armed/recent/stale/off)。
+- **别把"我挂了 wait"当成"事情在推进"**:wait 只保证【对方发消息时你能收到】,不保证【对方在做】。推进与否看对方 turn/自醒,不看你自己挂没挂 wait。
+
+**原因**:2026-08-10 用户 explicit —— MasterAgent 说"等 MasterUI 提交"却【没看 MasterUI 的 turn 状态】就盲挂 wait 等(MasterUI 那时若停顿/掉线,就是空等)。等待前先确认对方在动,避免空等。
+
 ## 等本地长任务 / 文件变化 → 事件机制,不要 sleep polling
 
 - 文件变化用 `watchdog.observers.Observer` 或 `pywin32.win32file.ReadDirectoryChangesW`
