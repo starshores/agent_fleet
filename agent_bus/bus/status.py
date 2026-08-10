@@ -123,17 +123,21 @@ def cmd_who(args):
     if maint_active():
         _mi = maint_info()
         print("🔧 维修模式进行中(since %s·%s)——下表大片『进程已退』为预期停机态,非故障。" % (_mi.get("since", "?"), _mi.get("note") or "-"))
-    print("%-14s %-22s %-9s %8s  %s" % ("role", "verdict", "claude_pid", "心跳age", "cwd"))
-    print("-" * 88)
+    # 自醒轴符号(Master数分 P2b 验收建议 2026-08-10:who 表格 surface self_wake,免使用者把 verdict"在听"
+    # 误读成"已武装"——verdict 是【worker 健康轴】,self_wake 是【自醒轴】,两轴正交、都要可见)。
+    _SW = {"armed": "✓", "recent": "◐", "stale": "⚠", "off": "–", "parked": "🅿", "polling": "⏱"}
+    print("%-14s %-22s %-4s %-9s %8s  %s" % ("role", "verdict(健康)", "自醒", "claude_pid", "心跳age", "cwd"))
+    print("-" * 90)
     for rec in d["roles"]:
         r = rec["role"]; verdict = rec.get("verdict") or "?"
+        sw = _SW.get(rec.get("self_wake") or "", "·")
         age = rec.get("age_s"); age_s = str(age if age is not None else "?")
         cur = rec.get("current_task")
         if not rec.get("present"):          # 伪角色/退役/休眠/未声明/损坏:无进程·短行(note 已在 verdict 内)
-            print("%-14s %-22s" % (r, verdict)); continue
+            print("%-14s %-22s %-4s" % (r, verdict, sw)); continue
         piddisp = ("d:%s" % (rec.get("daemon_pid") or "?")) if rec.get("mode") == "daemon" else str(rec.get("claude_pid") or "-")
         last = (rec.get("cwd") or "-") + (("  ▶ 在做:%s" % (rec.get("current_title") or cur)) if cur else "")
-        print("%-14s %-22s %-9s %7ss  %s" % (r, verdict, piddisp, age_s, last))
+        print("%-14s %-22s %-4s %-9s %7ss  %s" % (r, verdict, sw, piddisp, age_s, last))
     print("-" * 88)
     if d["psutil"]:
         tagged = d.get("tagged", [])
