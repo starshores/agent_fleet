@@ -150,7 +150,7 @@ ab storage-audit [--threshold-mb 5 --top 10 --json] # 存储体检(2.4):三分�
 ## 协调层交流协议(2026-06-23):后台 wait 自醒(回调唤起)+ 兜底自查
 协调位(Master/MasterAgent)**不 loop、不起 daemon**(给协调位起 daemon 实测不稳且会抢它的活),但要能收 Master↔MasterAgent 的消息。**正解:用"自己启动的后台任务完成→回调唤起本会话"做事件自醒**:
 
-**机制**:协调位**挂一个后台 `ab wait --role <自己> --timeout 0`**(run_in_background;`--timeout 0`=按日/夜 idle 策略,日 2h/夜 6h,砍闲置空唤醒重读)阻塞等自己 inbox;**真消息一到 watchdog 事件即时触发**(与 timeout 长短无关)→ 该后台任务完成 → **harness 用 task-notification 回调唤起本会话** → 读出消息处理 → **再挂一个后台 wait 继续等**。于是【可对话 + 事件自醒 + 少空转】兼得:后台任务不锁对话、消息一来就把我唤起处理、没活时不再每小时空唤醒重读,**不用 toast 喊人、不用 daemon、不用 /loop 锁对话**。`--timeout 0` 走 config.json idle_timeout_policy(日/夜边界+时长可调)。
+**机制**:协调位**挂一个后台 `ab wait --role <自己> --timeout 0`**(run_in_background;`--timeout 0`=block 真无限阻塞·有消息才醒·消灭 idle 冷唤醒白烧,2026-08-10 改·旧日2h/夜6h 已废)阻塞等自己 inbox;**真消息一到 watchdog 事件即时触发**(与 timeout 长短无关)→ 该后台任务完成 → **harness 用 task-notification 回调唤起本会话** → 读出消息处理 → **再挂一个后台 wait 继续等**。于是【可对话 + 事件自醒 + 少空转】兼得:后台任务不锁对话、消息一来就把我唤起处理、没活时不再每小时空唤醒重读,**不用 toast 喊人、不用 daemon、不用 /loop 锁对话**。`--timeout 0` 走 config.json idle_timeout_policy(日/夜边界+时长可调)。
 - 触发是"**自己启的后台任务完成**"(协调位合法唤醒途径之一),不是"外部消息直接唤醒 idle 会话"——这是绕过"叫不醒 idle 会话"那堵墙的正解。把人喊回来(toast)不是本意,只作可选旁路。
 - **每次被唤起、处理完,必须重新挂一个后台 wait** 保持耳朵开着(否则后续消息就收不到)。
 - **兜底**:用户开口唤起时也先 `peek` 自己 inbox(防后台 wait 恰好在 idle-timeout 间隙)。
@@ -158,6 +158,15 @@ ab storage-audit [--threshold-mb 5 --top 10 --json] # 存储体检(2.4):三分�
 - 注意:后台 `wait` 会 claim 进来的消息(移到 processing),处理完按需 `done`;高风险任务(requires_approval)wait 默认跳过、留 inbox。
 - **完成通知触发自醒(v1.1)**:`done` 回填给一个【自醒在岗的协调位】(Master/MasterAgent)时,会中心化地往其 inbox 投一条 `kind:"notice"` 轻量完成通知 → 触发其后台 wait 自醒 → 它醒来读 `<self>/done/<id>` 取完整结果。于是"派活→worker 干完→发起方自动被唤起"闭环,不用人盯 done。worker 无需改(集中在 `agentbus.done`)。防环/防噪:只对自醒协调位投、`sync` request 应答不投、`--notify never` 不投、notice 的 done 因 from=worker 不再触发 notice。
 - **收到 `kind:"notice"` 的处理协议**:读 `notice_of` 指向的 `<self>/done/<id>.json` 取完整结果 → `done` 掉该 notice → **别把它当普通任务执行、别回灌**。
+
+## wait 注册表(P0→P3·2026-08-10 用户令)—— wait 从匿名进程升级为注册在册受管实体
+> 治"后台 wait 接了任务移 processing 但没回报前台会话"(跨会话孤儿 claim);设计 `docs/WAIT_REGISTRY_DESIGN.md`,机制条目见 `bus_mechanisms.json`「自醒与可靠性」类。
+- **`<role>/wait.reg.json`(每 role 一个·独立文件)**:登记在册 wait 的 wait_pid/host_claude_pid/host_session_id/generation/started/last_heartbeat/status。竞争裁决 + 自醒态 + 观测的**单一真相源**。
+- **宿主自检自杀(根治孤儿正道)**:wait 心跳线程每 10s 检启动宿主 claude 活否;宿主死→孤儿 wait 自杀(不再抢 inbox 致聋),而非靠别人杀/reap 兜。host_pid 多源(父链→session_id 反查→presence.claude_pid)。
+- **重挂 yield-not-kill**:让位只对【同会话】更老 wait(session_id 判据·防 kill-churn),跨会话孤儿 takeover 接管;`ab wait --takeover` 强制换新。
+- **block 真无限自醒**:`ab wait --timeout 0` = `ev.wait(None)` 永久阻塞·有消息才醒(消灭 idle 冷唤醒白烧;⚠别传巨大 timeout=>2^31ms≈24.8 天会 OverflowError)。config `idle_timeout_policy.sentinel_mode=block`,可回退 daynight。
+- **竞争/自醒态判据走 reg**:`_serve_wait`(裁决)+ `_self_wake_state`(自醒态)读 reg 单一源,psutil 降为纯清场执行器。
+- **观测**:WebUI「⏱ wait 注册表」tab / `GET /api/waitreg`——各 role wait 生命周期,孤儿(wait 活+宿主死)标红。
 
 ## 责任边界
 worker 自动执行收到的任务。**高风险(写库/外发)** 派给"先审后做"的 tab,或在 task 里要求 worker 先 EXPLAIN/确认;SQL 写库仍走 sql_agent 审批协议。

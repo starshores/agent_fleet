@@ -100,9 +100,45 @@
     },
     {
      "name": "_self_wake_state 四态判活",
-     "does": "armed在岗/recent待确认瞬时/stale掉线/off未醒",
+     "does": "armed在岗/recent待确认瞬时/stale掉线/off未醒;P2b(08-10)判据优先读wait.reg.json(_reg_wait_state)回退psutil",
      "carrier": "_self_wake_state()",
-     "status": "在用·2026-07-08三态化"
+     "status": "在用·2026-07-08三态化·08-10 reg优先"
+    },
+    {
+     "name": "wait 注册表 wait.reg.json(P1)",
+     "does": "每role登记在册wait:wait_pid/host_claude_pid/host_session_id/代数generation/在册时长/心跳/status·独立文件·竞争裁决+自醒态+观测的单一真相源",
+     "carrier": "_wait_reg_path()/_serve_wait登记",
+     "status": "在用·2026-08-10 P1"
+    },
+    {
+     "name": "wait 宿主自检自杀(P1·根治孤儿)",
+     "does": "心跳线程每10s检启动宿主claude活否;宿主死(pid没了/复用成非claude)→孤儿wait自杀os._exit·被接管(reg.wait_pid≠我)→退出。host_pid多源(父链→session_id反查→presence.claude_pid)。根治'接活不回报前台'",
+     "carrier": "_start_wait_heartbeat()/_wait_self_exit()",
+     "status": "在用·2026-08-10 P1/P1.1"
+    },
+    {
+     "name": "wait 重挂 yield-not-kill 精确化(P0)",
+     "does": "重挂让位只对【同会话】更老wait(session_id env判据·防父链断误判)·跨会话孤儿takeover杀掉接管;治kill-churn 15s热循环+治'让位给孤儿致聋'。--takeover强制换新",
+     "carrier": "_serve_wait竞争块/_prior_wait_procs()",
+     "status": "在用·2026-08-03/08-10"
+    },
+    {
+     "name": "自醒哨兵 block 真无限",
+     "does": "ab wait --timeout 0走_idle_timeout_policy返None→_wait_core ev.wait(None)永久阻塞(有消息才醒·消灭idle冷唤醒白烧~周$361);巨大timeout会OverflowError(>2^31ms≈24.8天)故用None。config sentinel_mode可回退daynight",
+     "carrier": "_idle_timeout_policy()/_wait_core()",
+     "status": "在用·2026-08-10"
+    },
+    {
+     "name": "竞争裁决走reg(P2a)",
+     "does": "_serve_wait读wait.reg.json判让位(同会话活持有者)/接管(takeover/无reg/持有者死/跨会话→清场覆盖reg);psutil降为纯清场执行器·判据归reg",
+     "carrier": "_serve_wait/_wait_reg_path()",
+     "status": "在用·2026-08-10 P2a"
+    },
+    {
+     "name": "wait 注册表观测面板(P3)",
+     "does": "WebUI「⏱wait注册表」tab展示各role wait生命周期(wait_pid/宿主+活否/代数/在册时长/心跳/status·孤儿=wait活+宿主死标红);/api/waitreg聚合wait.reg.json",
+     "carrier": "build_waitreg()/GET /api/waitreg/page_body+page_js",
+     "status": "在用·2026-08-10 P3"
     },
     {
      "name": "selfwake 自醒检测",
