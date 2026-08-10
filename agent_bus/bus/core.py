@@ -13,7 +13,7 @@ from bus.config import BUS, METRICS, cfg, _now, _idle_timeout_policy
 from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics, _fail
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
-from bus.proc import _claude_ancestor, _proc_claude_ancestor, _proc_session_id, _proc_scan, _alive_claude_pids, _age_seconds
+from bus.proc import _claude_ancestor, _proc_claude_ancestor, _proc_session_id, _claude_by_session, _proc_scan, _alive_claude_pids, _age_seconds
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.notify import _toast_throttled, _fire_toast, _maybe_toast, _emit_completion_notice
@@ -312,7 +312,19 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
     #   的旧 wait 一律【takeover 杀掉接管】(符合"一 role 一执行体"铁律)。宿主 pid 判据比 session_id 准
     #   (--resume 复用 sid,但每个活 claude.exe 是独立 pid);见 proc._proc_claude_ancestor。
     mine_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    mine_host = _claude_ancestor()[0]               # 本 wait 的启动宿主 claude 会话 pid(P1 reg + 宿主自检用)
+    # 本 wait 的启动宿主 claude 会话 pid(P1 reg + 宿主自检用)。多源回退(P1.1·2026-08-10):
+    # 本 harness 下后台 shell 父链【普遍】够不到 claude.exe(reboot-hello 记的坑)→ _claude_ancestor 常返
+    # None → 宿主自检形同虚设。故回退:① 父链;② session_id 反查活 claude(--resume 会话命令行带 sid);
+    # ③ presence 里 hello 绑定的 claude_pid(死 pid 已治本不永续=要么活 pid 要么 None,用它安全)。
+    # 全 None(极端)才降级跳过自检(不误杀)。
+    mine_host = _claude_ancestor()[0]
+    if mine_host is None and mine_sid:
+        mine_host = _claude_by_session(mine_sid)[0]
+    if mine_host is None:
+        try:
+            mine_host = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("claude_pid")
+        except Exception:
+            mine_host = None
     if takeover:
         _kill_prior_waits(role)
     else:
