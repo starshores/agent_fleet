@@ -20,7 +20,12 @@ while read -r old new ref; do
   case "$new" in *[!0]*) ;; *) continue ;; esac   # new 全 0 = 删 tag,跳过(只在建/移 tag 时 snapshot)
   tag="${ref#refs/tags/}"
   mkdir -p "$REL"
-  out="$REL/${NAME}_${tag}.zip"
+  # fork 前缀(用户令 2026-08-10):发布包带本 bus 实例名 → <fork>_agent_fleet_<版本>.zip
+  # 供多 bus 场景区分谁的发布(见 fork_exchange/README.md)。单一源=fork_exchange/FORK_NAME;
+  # 读不到则退化为原命名(无前缀),不阻断发版。
+  FORK=""
+  [ -f "$REPO/fork_exchange/FORK_NAME" ] && FORK="$(head -n1 "$REPO/fork_exchange/FORK_NAME" | tr -d ' \r\n')"
+  if [ -n "$FORK" ]; then out="$REL/${FORK}_${NAME}_${tag}.zip"; else out="$REL/${NAME}_${tag}.zip"; fi
   # 强移 tag(git tag -f)也重打 snapshot,保 zip 与 tag 指向一致(P2 修:原"已存在即跳过"
   # 会让强移后的 zip 停在旧内容,与"snapshot=该 tag 时刻"的注释矛盾)。旧 zip 先留 .prev 一代可回看。
   [ -f "$out" ] && { mv -f "$out" "$out.prev" 2>/dev/null; echo "[release-hook] $tag 已存在→刷新(旧件留 .prev)"; }
