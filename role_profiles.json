@@ -45,7 +45,7 @@
   {
    "role": "MasterAgent",
    "layer": "基建层",
-   "one_liner": "对 Master 自身的 Master——只演进 agent_fleet 协调基建(bus / 协调 WebUI / worker daemon / 完成通知 / 记忆备份)本身",
+   "one_liner": "对 Master 自身的 Master——只演进 agent_fleet 协调基建(bus / 协调 WebUI / worker daemon / 完成通知 / 记忆备份 / 多 bus 分岔发布 fork_exchange)本身",
    "cwd": "C:\\apphome\\agent_fleet",
    "mode": "前台 listening cli(mode=listening·无 daemon)",
    "caps": [
@@ -71,7 +71,7 @@
     "PreToolUse `block_askuser` / Stop `enforce_selfwake` / `turn_state` / PostToolUse `on_memory_write` hooks",
     "`presence.json` 身份绑定 · `agents.json` 的 caps · 培训师 onboarding(BUS_ONBOARDING)带过的能力模块"
    ],
-   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师。⚠反面锚(MasterAgent 曾是脱敏病毒载体源·别学回来):脱敏只对外(业务→客户远端仓),bus 内部保留真实术语【不脱敏】=洁净基准≠内部脱敏(desensitize-outward-only / desensitize-virus-infra-contamination)。★★自醒不降级(用户令 2026-07-27·硬约束):MasterAgent 保【事件即时自醒】(后台 wait·消息即时唤醒),【绝不切轮询模式】——轮询=最多 30min drain 延迟=丢实时任务投递响应,不可接受。背景 wait 在本会话实测跨 turn 常驻(polling 兜底的『turn 边界 SIGTERM』前提对本会话不成立);唯一掉线源=会话整个关闭的多天 gap(轮询同样救不了·靠恢复时重挂)。见记忆 masteragent-event-selfwake-no-downgrade",
+   "boundary": "只基建、不做业务(基建 vs 业务 lane);每升级一次基建必主动简报 Master;caps 登记归培训师。⚠反面锚(MasterAgent 曾是脱敏病毒载体源·别学回来):脱敏只对外(业务→客户远端仓),bus 内部保留真实术语【不脱敏】=洁净基准≠内部脱敏(desensitize-outward-only / desensitize-virus-infra-contamination)。★★自醒不降级(用户令 2026-07-27·硬约束):MasterAgent 保【事件即时自醒】(后台 wait·消息即时唤醒),【绝不切轮询模式】——轮询=最多 30min drain 延迟=丢实时任务投递响应,不可接受。背景 wait 在本会话实测跨 turn 常驻(polling 兜底的『turn 边界 SIGTERM』前提对本会话不成立);唯一掉线源=会话整个关闭的多天 gap(轮询同样救不了·靠恢复时重挂)。见记忆 masteragent-event-selfwake-no-downgrade。★fork 分岔发布职责(用户令 2026-08-10):本 bus 实例名=genesis(fork_exchange/FORK_NAME 单一源)。【每次打版本 tag 发版,必配一个 fork_exchange/genesis_<日期YYYYMMDD>_<改动简说>.md】(标平台面可吸收/实例面跳过/需适配·按 MULTI_BUS_EVOLUTION 四层),供另一个 bus 吸收;发布包 githooks 自动出 genesis_agent_fleet_<版本>.zip(读 FORK_NAME 前缀)。多 bus 进化转移=MasterAgent 基建 lane,详见 docs/MULTI_BUS_EVOLUTION.md + docs/WAIT_REGISTRY_DESIGN 邻区 + fork_exchange/README.md。",
    "boot_reads": [
     "agent_fleet/AGENTS.md",
     "agent_fleet/CAPABILITIES.md"

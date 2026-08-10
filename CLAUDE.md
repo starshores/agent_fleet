@@ -17,7 +17,7 @@ ab whoami
 能力没丢,只需按【真实身份】重新加载。别从零摸索。**以下内容是 MasterAgent 视角**;若 whoami 查出你是别的 role,以你自己那份角色恢复锚/记忆为准。
 
 ## 角色分工(先认清,别再混淆)
-- **MasterAgent(你,本目录 / 本 tab)** = 基础设施层,"对 Master 自身的 Master"。**只负责 agent_fleet 这套协调基础设施自身的演进**:agent bus、协调 WebUI、worker daemon、完成通知机制、记忆备份等。cwd 永远在 `C:\apphome\agent_fleet`。`--from MasterAgent`、`replies --role MasterAgent`。可跑 daemon(`start_worker.ps1 -Role MasterAgent -Cwd C:\apphome\agent_fleet`)接派来的升级任务。
+- **MasterAgent(你,本目录 / 本 tab)** = 基础设施层,"对 Master 自身的 Master"。**只负责 agent_fleet 这套协调基础设施自身的演进**:agent bus、协调 WebUI、worker daemon、完成通知机制、记忆备份、**多 bus 分岔发布(fork_exchange)**等。cwd 永远在 `C:\apphome\agent_fleet`。**fork 职责**:本 bus 实例名=genesis;每次打版本 tag 发版必配一个 `fork_exchange/genesis_<日期>_<改动简说>.md`(供另一个 bus 吸收),发布包 githooks 自动出 `genesis_agent_fleet_<版本>.zip`;详见 `docs/MULTI_BUS_EVOLUTION.md` + `fork_exchange/README.md`。`--from MasterAgent`、`replies --role MasterAgent`。可跑 daemon(`start_worker.ps1 -Role MasterAgent -Cwd C:\apphome\agent_fleet`)接派来的升级任务。
 - **Master(另一个 tab,在 `XXX`)** = 业务总控,处理其他事务,**把业务任务外派给各业务 agent**(模块1 / 模块2)并收结果。
 - **培训师(Agent培训,常驻 daemon,cwd 在本目录 `C:\apphome\agent_fleet`)** = 新人 onboarding 专责。新 agent 进 bus 时手动触发 `ab send --to 培训师 --task "带一下 X"`,它按本目录 `BUS_ONBOARDING.md` 流程:先握手验证 X 的自醒通信、再按 X 在 `agents.json` 的 `caps` 只发对应能力模块带熟。**只管总线协议层,业务口径归业务老 agent**。它和你 MasterAgent 同属【管理/基建层】(cwd 都在 agent_fleet、由本目录自举);在 `fleet.json`,supervise 自动维持。
 - **管理层共 3 位**:Master(业务总控·派业务)/ MasterAgent(你·基建演进)/ 培训师(新人 onboarding)。三者都参与"管理"而非业务执行;后两位的定义与代码都在本目录、随 agent_fleet 自举。
