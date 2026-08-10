@@ -98,7 +98,7 @@ def _print_onboarding(role):
     print("\n【★★ 你的第一个动作·立刻照做,别往下读、也别先扎进任务 ★★】")
     print("你现在【还没在岗·收不到任何消息】。【开始任何任务之前】,先把下面这条 wait 挂成后台任务、再验在岗——【先在岗,再开工】。")
     print("就算你是被叫来干某个活的:也【先挂 wait 再干活】,否则干活期间收不到新消息、干完也没挂=直接掉线,bus 上没人联系得到你:")
-    print('  ① 后台跑(交互 tab 用 run_in_background、别前台阻塞): ab wait --role %s --timeout 0   (0=自动日2h/夜6h idle·真消息仍即时唤醒)' % role)
+    print('  ① 后台跑(交互 tab 用 run_in_background、别前台阻塞): ab wait --role %s --timeout 0   (0=block 真无限·有消息才醒)' % role)
     print('  ② 验在岗: ab selfwake   (看本 role 是否 ✓在岗;没起来就再挂+再验,直到确认)')
     print("  ③ 确认 ✓在岗后,才开始做你被交代的任务;之后每次被唤起、处理完,都要【再挂一次】wait(不重挂=掉线)。")
     print("  " + fb)
@@ -106,7 +106,7 @@ def _print_onboarding(role):
     print("\n==== 你的基本能力(每个 agent 都该会;详见 agent_fleet/AGENTS.md + agent_fleet/BUS_ONBOARDING.md)====")
     print("\n[基本能力 1] 事件自醒(可对话又不漏消息;交互 tab 建议挂上):")
     print("把下面这条当【后台任务】跑(别前台阻塞):有人给你发消息/派活时它就完成 → 你的会话被自动唤起去处理:")
-    print('  ab wait --role %s --timeout 0   (0=自动日2h/夜6h idle 空返·真消息事件仍即时唤醒接活)' % role)
+    print('  ab wait --role %s --timeout 0   (0=block 真无限·有消息才醒·真事件即时接活)' % role)
     print("【铁律①】每次被唤起、处理完,必须【再挂一个】同样的 wait —— 不重挂就掉线,之后的消息收不到。")
     print("【铁律②】用短入口 `ab`(已固化【正确 env python + 真实项目根路径 + UTF-8】,免掉裸 `python`/长路径/junction/反斜杠诸坑)。" + fb)
     print("【铁律③·最重要】后台重挂会【偶发 127 静默失败】(harness 后台 shell 启动层抽风,非你的错)——")
@@ -390,7 +390,7 @@ def cmd_selfwake_guard(args):
             "id": tid, "from": "bus守卫", "to": role,   # 2.3 P1:系统名义,不再伪造 MasterAgent(回执归 bus守卫 桶·卫生代谢清)
             "title": marker + " 你掉了自醒",
             "task": ("自醒巡检【连续2次】发现你掉了自醒(%s;尸检:%s)。看到即请【后台 run_in_background】跑 "
-                     "`ab wait --role %s --timeout 0`(0=自动日2h/夜6h),再 `ab selfwake` 验在岗(别用 shell &)。"
+                     "`ab wait --role %s --timeout 0`(0=block 真无限·有消息才醒),再 `ab selfwake` 验在岗(别用 shell &)。"
                      "★禁轮询(用户令2026-07-28:轮询=错误·全员事件 wait;定时只允许闹钟式到点一次醒)。"
                      % (detail, _wait_autopsy(role), role)),
             "created": _now(), "status": "pending",

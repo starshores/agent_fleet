@@ -531,7 +531,7 @@ def cmd_done(args):
     try:
         if role and role not in ("用户", "unknown") and role not in _wait_proc_roles():
             print("⚠ 自醒提示:你(%s)当前无 armed wait 进程,done 后请【后台 run_in_background】重挂 "
-                  "`wait --role %s --timeout 0`(0=自动日2h/夜6h),否则空闲后新消息事件唤不醒你。" % (role, role))
+                  "`wait --role %s --timeout 0`(0=block 真无限·有消息才醒),否则空闲后新消息事件唤不醒你。" % (role, role))
     except Exception:
         pass
 
