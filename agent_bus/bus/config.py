@@ -53,7 +53,10 @@ def _idle_timeout_policy():
     p = cfg("idle_timeout_policy", {}) or {}
     mode = p.get("sentinel_mode", "block")
     if mode == "block":
-        return int(p.get("block_timeout_s", 604800))   # 默认 7 天(实践=阻塞到消息;大有限值留极限自愈)
+        # 真无限(Master数分 spec 修正 2026-08-10·实证):返 None → _wait_core 走 ev.wait(None) 永久阻塞,
+        # "有消息才醒"、零周期空返、无溢出。❌ 绝不返巨大秒数:wait 底层按毫秒,>2^31-1 ms≈24.8 天
+        # 抛 OverflowError(Master数分试 --timeout 25920000=300天 实证;虽被 _serve_wait 异常兜底不崩,但等于没生效)。
+        return None
     day_start = int(p.get("day_start_hour", 7))
     night_start = int(p.get("night_start_hour", 23))
     day_s = int(p.get("day_timeout_s", 7200))       # 日间 2h

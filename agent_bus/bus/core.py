@@ -119,21 +119,27 @@ def _wait_core(role, timeout, include_approval=False):
         if not obj:
             # 循环等到截止:被【无关/竞态/惊群没抢到】的事件唤醒但没领到时,清标志继续等剩余,
             # 而非直接返回 idle(一次 spurious 就空返 = 自醒被白白唤起费 token)。惊群败者走这条=优雅续等(gate②)。
-            deadline = time.monotonic() + timeout
+            # ★timeout=None = 真无限阻塞(block 语义·Master数分 spec 2026-08-10):ev.wait(None) 永久等到事件,
+            #   零周期空返、无 OverflowError(别传巨大秒数,>2^31-1 ms≈24.8天 底层溢出)。无限时不算 deadline。
+            infinite = timeout is None
+            deadline = None if infinite else time.monotonic() + timeout
             while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break                             # 真超时,无任务 → idle
+                if not infinite:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break                         # 真超时,无任务 → idle
                 if obs_ok:
-                    woke = ev.wait(timeout=remaining)
+                    woke = ev.wait(timeout=(None if infinite else remaining))
                     obj = _try_claim()
                     if obj:
                         break                         # 领到(自己 inbox 或组池)
-                    if not woke:
-                        break                         # ev.wait 超时返回(非事件)→ idle
+                    if not woke:                      # ev.wait 超时返回(非事件)
+                        if infinite:
+                            ev.clear(); continue      # 无限:理论只在 set 时返回,防御性续等(绝不空返)
+                        break                         # 有限超时 → idle
                     ev.clear()                        # 被事件唤醒但没领到(惊群没抢到/竞态/无关)→ 续等剩余
                 else:
-                    time.sleep(min(remaining, 2.0))   # 降级:轮询阻塞(别秒返),≤2s 发现新任务(含组 inbox)
+                    time.sleep(2.0 if infinite else min(remaining, 2.0))  # 降级:轮询阻塞(别秒返),≤2s 发现新任务
                     obj = _try_claim()
                     if obj:
                         break
