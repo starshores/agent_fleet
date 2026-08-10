@@ -9,7 +9,9 @@
  "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
  "usage_db": "~/.claude/agent_bus/usage.db",
  "idle_timeout_policy": {
-  "_comment": "协调位自醒 idle timeout(秒)按日/夜(用户 2026-07-21 令:日 2h·夜 6h)。真任务事件即时接活不受此影响,只砍没活时的 idle 空唤醒重读。ab wait --timeout 0 走此策略;显式正 timeout 覆盖。日间=[day_start_hour, night_start_hour)。",
+  "_comment": "ab wait --timeout 0 哨兵的空返超时。真任务事件即时接活不受此影响。sentinel_mode=block(用户令 2026-08-10:自醒改'有消息才被叫醒',消灭 idle 冷唤醒白烧~周$361)→返回 block_timeout_s(默认7天=实践上阻塞到消息;大有限值留极限自愈,防 harness 清理后永久掉聋)。改回 daynight 则按日/夜(day/night_timeout_s)。切换/调时长改此处一处。",
+  "sentinel_mode": "block",
+  "block_timeout_s": 604800,
   "day_start_hour": 7,
   "night_start_hour": 23,
   "day_timeout_s": 7200,

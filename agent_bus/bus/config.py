@@ -38,12 +38,22 @@ def _now():
 
 
 def _idle_timeout_policy():
-    """自醒 idle timeout 按【日/夜】返回秒数(用户 2026-07-21 令:日间 2h·夜间 6h)。
-    ★真任务事件【即时接活】:watchdog Observer 对 inbox 事件的响应与 timeout 无关,有活立刻触发。
-    本策略只调"没活时多久空返一次 idle"= 砍闲置协调位的 idle 空唤醒重读,【不牺牲接活】。
-    `ab wait --timeout 0`(哨兵)走此策略;显式正 timeout 仍覆盖。边界/时长可 config.json
-    的 idle_timeout_policy 覆盖(换机/调整改一处)。本机 local time(Shanghai)。"""
+    """`ab wait --timeout 0`(哨兵)的空返超时秒数。真任务事件【即时接活】:watchdog Observer
+    对 inbox 事件的响应与 timeout 无关,有活立刻触发——本策略只调"没活时多久空返一次 idle"。
+
+    ★sentinel_mode(用户令 2026-08-10:自醒改"有消息才被叫醒",消灭 idle 冷唤醒白烧):
+      - "block"(默认):返回 block_timeout_s(默认 7 天)= 实践上"阻塞到消息才醒",极限消灭
+        idle 空返触发的 context 冷重建(缓存 TTL 1h 已过期,每次空唤醒白付整窗冷建 ~$4.2·
+        近两周 171 次 ≈ 周 $361;Master数分 usage.db 实证)。用【大有限值】非真无限=保留极限
+        自愈:万一 harness 清理超长后台任务,7 天到点仍空返一次触发重挂,不永久掉聋。
+      - "daynight"(旧·可回退):按日/夜返回(日 2h·夜 6h,用户 2026-07-21 旧令)。
+    为何不牺牲可靠性:2h/6h 空返本就不防进程猝死(死进程不会 timeout 空返),只带来周期重挂
+    churn;真·死 wait 兜底=bus守卫 selfwake 巡检+用户再激活,与本策略无关。改 config.json
+    一处即可切换/调时长(换机同)。本机 local time(Shanghai)。"""
     p = cfg("idle_timeout_policy", {}) or {}
+    mode = p.get("sentinel_mode", "block")
+    if mode == "block":
+        return int(p.get("block_timeout_s", 604800))   # 默认 7 天(实践=阻塞到消息;大有限值留极限自愈)
     day_start = int(p.get("day_start_hour", 7))
     night_start = int(p.get("night_start_hour", 23))
     day_s = int(p.get("day_timeout_s", 7200))       # 日间 2h

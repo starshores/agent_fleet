@@ -312,7 +312,7 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
 def cmd_wait(args):
     # --include-approval:有人值守的 tab 显式领取 requires_approval 高风险任务(默认不领,留 inbox 待审)
     to = args.timeout
-    if to is None or to <= 0:               # 哨兵 --timeout 0 → 日/夜 idle 策略(日2h/夜6h·真事件仍即时接活)
+    if to is None or to <= 0:               # 哨兵 --timeout 0 → _idle_timeout_policy(默认 block:阻塞到消息·真事件仍即时接活)
         to = _idle_timeout_policy()
     _serve_wait(args.role, to, include_approval=args.include_approval,
                 takeover=getattr(args, "takeover", False))
