@@ -68,6 +68,14 @@
      "owner": "MasterAgent"
     },
     {
+     "id": "fork-exchange",
+     "name": "多 bus 分岔进化交换区",
+     "path": "C:\\apphome\\agent_fleet\\fork_exchange",
+     "kind": "dir",
+     "desc": "多 bus 各自进化后的转移内容交换区。FORK_NAME=本实例名单一源(=genesis);每次发版配一份 genesis_<日期>_<改动>.md(标平台面可吸收/实例面跳过/需适配,按 docs/MULTI_BUS_EVOLUTION 四层),供另一 bus 吸收。.md/FORK_NAME 进 git;发布 .zip(githooks 出 <fork>_agent_fleet_<版本>.zip)不进 git。",
+     "owner": "MasterAgent"
+    },
+    {
      "id": "retired-roster",
      "name": "退役档案花名册",
      "path": "C:\\apphome\\agent_fleet\\agent_bus\\retired_roster.json",

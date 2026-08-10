@@ -96,10 +96,11 @@
 |---|---|
 | `ui/` | 协调 WebUI 控制台（`server.py` @ 127.0.0.1:8799；`start_ui.ps1`/`stop_ui.ps1`；`WEBUI_FEATURES.md` 功能文档；`install_autostart.ps1`）——MasterUI lane |
 | `hooks/` | Claude Code 生命周期 hook：`reinject_post_compact.py`（compact 后自定位）/ `block_askuser.py`（防阻塞询问转待办池）/ `enforce_selfwake.py`（自醒守卫）/ `turn_state.py`（回合观测）/ `on_memory_write.py`（记忆写触发重链）|
-| `docs/` | 设计 / 评审 / 简报 / 计划文档（本文所在；ARCHITECTURE_REVIEW / BUS_2.0_PLAN / BUS_2.0_P2_DESIGN / NEWINFRA_* / LONGRANGE_HOWTO …）|
+| `docs/` | 设计 / 评审 / 简报 / 计划文档（本文所在；ARCHITECTURE_REVIEW / BUS_2.0_PLAN / BUS_2.0_P2_DESIGN / NEWINFRA_* / LONGRANGE_HOWTO / WAIT_REGISTRY_DESIGN / MULTI_BUS_EVOLUTION / WORKER_STATELESS_ANALYSIS / REFACTOR_BOUNDARIES / OPS_FINDINGS …）|
 | `memory/` | MasterAgent 运行记忆硬链镜像（源 = `~/.claude/projects/XXX/memory`；只镜像 MasterAgent/bus 运行记忆，不含业务知识）|
 | `host_config/` | 宿主全局配置（`CLAUDE.global.md` = 全局 `~/.claude/CLAUDE.md` **物理原件**·宿主路径是文件软链接·2026-07-27 + `settings.snapshot.json` 快照；换机回填用，含 Compact 指令 + 早压 env + hook 注册）|
-| `githooks/` | 发版钩子（`reference-transaction`：打 vX tag 时自动 zip 快照到同级 `agent_fleet_releases/`）|
+| `githooks/` | 发版钩子（`reference-transaction`：打 vX tag 时自动 zip 快照到同级 `agent_fleet_releases/`，zip 名带 fork 前缀 `<fork>_agent_fleet_<版本>.zip`）|
+| `fork_exchange/` | 多 bus 分岔进化交换区（`FORK_NAME` = 本实例名单一源 = `genesis`；每次发版配一份 `genesis_<日期>_<改动>.md` 标平台面可吸收/实例面跳过/需适配，供另一 bus 按 `MULTI_BUS_EVOLUTION` 四层吸收）——MasterAgent lane。`.md`/`FORK_NAME` 进 git，发布 `.zip` 不进 |
 | `session-archive/` | 退役会话 jsonl 归档 + manifest（轮换时冻结存档，可 --resume 回溯）|
 | `proposals/` | 待提议的外部变更草案（如 `XXX_CLAUDE.md.proposed`）|
 | `__pycache__/` | Python 字节码缓存（自动生成，非源码）|

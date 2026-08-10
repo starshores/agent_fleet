@@ -25,7 +25,8 @@ hooks/             Claude Code 生命周期 hook(自定位/防阻塞询问/compa
 docs/              设计 / 评审 / 简报 / 计划文档(ARCHITECTURE_REVIEW / NEWINFRA_* / BUS_2.0_PLAN …)
 memory/            基座运行记忆硬链镜像(源=~/.claude/projects/XXX/memory)
 host_config/       宿主全局配置快照(~/.claude/CLAUDE.md + settings.json)
-githooks/          发版 tag 时自动 zip 快照
+githooks/          发版 tag 时自动 zip 快照(名带 fork 前缀)
+fork_exchange/     多 bus 分岔进化交换区(FORK_NAME=genesis·每次发版配 genesis_<日期>_*.md)
 scripts (根)       sync_code.ps1 / sync_memory.ps1 / sync_host_config.ps1(硬链镜像维护)
 bus_smoke.py       回归冒烟金标准(46 命令面 + 39 用例·2.0 重构回归闸)
 bus_mechanisms.json 机制注册表(单一源·供 WebUI 🔧机制 tab)
