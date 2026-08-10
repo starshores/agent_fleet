@@ -227,12 +227,38 @@ _MAINT_SENTINEL = BUS.parent / ".bus_maintenance"
 
 # wait 阻塞期心跳间隔(会话考古上报 2026-07-29:原来只在 _serve_wait 进场 touch 一次,
 # 2h/6h 阻塞期 last_seen 不刷新 → who 心跳持续老化像掉线)。presence 多写者安全(json_lock)。
-_WAIT_HB_INTERVAL = float(os.environ.get("AGENTBUS_WAIT_HB_INTERVAL", 120))
+# 2026-08-10 用户令:P1 注册表宿主自检也走这拍,间隔 120→10s(循环程序消耗低·10s 内发现宿主死够快)。
+_WAIT_HB_INTERVAL = float(os.environ.get("AGENTBUS_WAIT_HB_INTERVAL", 10))
+
+# wait 注册表文件(P1·2026-08-10 用户令·独立文件):每 role 一个,记本 wait 身份+宿主+心跳+代数。
+def _wait_reg_path(role):
+    return BUS / role / "wait.reg.json"
 
 
-def _start_wait_heartbeat(role, mode, extra, interval=None):
-    """后台心跳线程:wait 阻塞期间每 interval 秒刷一次 presence(daemon 线程·best-effort)。
-    返回 stop Event——wait 返回后 set() 停线程(最迟 interval 秒后退出,daemon=True 不阻进程退出)。"""
+def _wait_self_exit(reg_path, my_pid, why):
+    """孤儿/被接管 wait 自杀(P1 宿主自检):清掉自己持有的 reg,stderr 记因,os._exit 立即终止
+    (从 daemon 心跳线程调用=连同阻塞在 ev.wait 的主线程一起终止;这正是"孤儿 wait 自己消失"的正道)。"""
+    try:
+        sys.stderr.write("[wait] %s\n" % why)
+    except Exception:
+        pass
+    if reg_path is not None and my_pid is not None:
+        try:
+            cur = json.loads(reg_path.read_text(encoding="utf-8"))
+            if cur.get("wait_pid") == my_pid:
+                reg_path.unlink()
+        except Exception:
+            pass
+    os._exit(0)
+
+
+def _start_wait_heartbeat(role, mode, extra, host_pid=None, reg_path=None, my_pid=None, interval=None):
+    """后台心跳线程:wait 阻塞期间每 interval 秒(默认 10s)刷 presence + reg 心跳(daemon 线程·best-effort)。
+    P1 宿主自检(用户令 2026-08-10·根治孤儿):
+      ① 启动宿主 claude 已退(pid 没了 / pid 复用成非 claude)→ 本 wait 是孤儿(claim 走任务也没人处理)
+         → 自杀,不再抢 inbox。这比"新 wait 去杀孤儿"或"reap 兜底"都干净——孤儿自己消失。
+      ② reg 已被别的 wait 覆盖(wait_pid != 我)→ 被接管 → 退出,让位单一执行体。
+    host_pid=None(父链断追不到宿主)→ 跳过宿主自检(安全降级:不误杀,靠 P0 yield/reap 兜)。"""
     stop = threading.Event()
 
     def _beat():
@@ -241,6 +267,24 @@ def _start_wait_heartbeat(role, mode, extra, interval=None):
                 _touch_presence(role, mode, extra)
             except Exception:
                 pass                      # 心跳绝不影响 wait 主流程(bus 路径瞬失等,下一拍再试)
+            # ① 宿主自检:宿主 claude 死 → 孤儿自杀(psutil 缺失则跳过,不误杀)
+            if host_pid is not None and psutil is not None:
+                try:
+                    alive = "claude" in (psutil.Process(host_pid).name() or "").lower()
+                except Exception:
+                    alive = False         # pid 没了 / 读不到 → 判宿主已退
+                if not alive:
+                    _wait_self_exit(reg_path, my_pid, "宿主 claude(pid=%s)已退→孤儿 wait 自杀(P1)" % host_pid)
+            # ② 被接管自检 + 刷 reg 心跳
+            if reg_path is not None and my_pid is not None:
+                try:
+                    cur = json.loads(reg_path.read_text(encoding="utf-8"))
+                    if cur.get("wait_pid") != my_pid:
+                        _wait_self_exit(None, None, "reg 已被 wait_pid=%s 接管→本 wait 退出(P1)" % cur.get("wait_pid"))
+                    cur["last_heartbeat"] = _now()
+                    _write_json(reg_path, cur)
+                except Exception:
+                    pass
 
     threading.Thread(target=_beat, daemon=True).start()
     return stop
@@ -267,6 +311,8 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
     #   _owner_live 是 role 级、本会话 wait 仍在岗 → 要拖到 age>ttl 4000s 才退回)。故跨会话/追不到宿主
     #   的旧 wait 一律【takeover 杀掉接管】(符合"一 role 一执行体"铁律)。宿主 pid 判据比 session_id 准
     #   (--resume 复用 sid,但每个活 claude.exe 是独立 pid);见 proc._proc_claude_ancestor。
+    mine_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    mine_host = _claude_ancestor()[0]               # 本 wait 的启动宿主 claude 会话 pid(P1 reg + 宿主自检用)
     if takeover:
         _kill_prior_waits(role)
     else:
@@ -275,8 +321,6 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
         except Exception:
             mine_ct = 0.0
         mine_pid = os.getpid()
-        mine_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
-        mine_host = _claude_ancestor()[0]           # 本 wait 的启动宿主 claude 会话 pid
 
         def _same_session(pid):
             """判某 wait 进程是否与本会话同源。判据优先级(稳→次稳→保守):
@@ -322,13 +366,28 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
             sys.stderr.write("[wait] 清掉 %d 个跨会话/孤儿 wait(它们持 %s 耳朵会致本会话聋),本会话接管。\n"
                              % (len(cross), role))
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
+    # ── wait 注册表登记(P1·2026-08-10 用户令·独立文件):登记本 wait 身份供竞争/宿主自检/观测 ──
+    # 走到这=本 wait 决定挂(P0 yield 已让路给同会话更老 wait);覆盖旧 reg(接管者/被杀孤儿的),generation+1。
+    _reg_path = _wait_reg_path(role)
+    try:
+        _gen = int(json.loads(_reg_path.read_text(encoding="utf-8")).get("generation", 0)) + 1
+    except Exception:
+        _gen = 1
+    try:
+        _write_json(_reg_path, {"role": role, "wait_pid": os.getpid(),
+                                "host_claude_pid": mine_host, "host_session_id": mine_sid,
+                                "started": _now(), "timeout": timeout, "last_heartbeat": _now(),
+                                "status": "listening", "generation": _gen})
+    except Exception:
+        pass
     # 掉线尸检 trace(2026-07-28 会话可靠性立项):进场记 start,干净退场补 exit;
     # 事后 trace 有 start 无 exit = wait 进程【异常死亡】(被杀/休眠丢/宿主壳回收),guard 可据此分类根因,
     # 不再靠猜。单文件覆盖写(只留最近一次),历史轨迹靠 events.jsonl 不重复存。
     _tracef = BUS / role / "wait_trace.json"
     _trace = {"pid": os.getpid(), "started": _now(), "timeout": timeout, "exit": None}
     _write_json(_tracef, _trace)
-    _hb_stop = _start_wait_heartbeat(role, presence_mode, extra)   # 阻塞期周期心跳(会话考古上报修)
+    _hb_stop = _start_wait_heartbeat(role, presence_mode, extra,      # 阻塞期周期心跳 + P1 宿主自检
+                                     host_pid=mine_host, reg_path=_reg_path, my_pid=os.getpid())
     try:
         _touch_presence(role, presence_mode, extra)       # 声明身份 + 心跳
         obj = _wait_core(role, timeout, include_approval)
@@ -345,6 +404,11 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
             obj = None
     finally:
         _hb_stop.set()
+        try:                                          # P1:正常退出清掉自己持有的 reg(reg 只在 wait 活跃期存在)
+            if json.loads(_reg_path.read_text(encoding="utf-8")).get("wait_pid") == os.getpid():
+                _reg_path.unlink()
+        except Exception:
+            pass
     try:
         _trace.update(exit=("task" if obj else "idle"), exited=_now())
         _write_json(_tracef, _trace)
