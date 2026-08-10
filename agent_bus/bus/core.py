@@ -325,58 +325,41 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
             mine_host = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("claude_pid")
         except Exception:
             mine_host = None
-    if takeover:
-        _kill_prior_waits(role)
-    else:
+    # ── 竞争裁决走 reg(P2·2026-08-10 用户令):判据从 psutil 扫+environ 归到 wait.reg.json 单一源 ──
+    # reg 记录本 role 当前在册 wait(wait_pid/host_session_id)。裁决:
+    #   · 让位(非 takeover + reg 有【同会话】活持有者)→ 治 kill-churn(P0/P1 一脉),判据读 reg 一个文件
+    #     取代"扫全进程 process_iter + 逐个读 environ"(更快·更稳:environ() Windows 偶发读不到,reg 文件总能读)。
+    #     同会话任一 wait 完成都唤醒同一前台,让位安全。
+    #   · 接管(takeover / 无 reg / 持有者已死 / 跨会话)→ 清场(kill 旧 wait 进程)后登记 reg 覆盖(下方)。
+    #     走到接管的旧 wait=跨会话孤儿/陈旧/takeover 换新(同会话活持有者已被让位分支拦截);清掉=治"接活不
+    #     回报"(孤儿持耳朵不唤醒本会话)。P1 宿主自检已让孤儿在其宿主死后自杀,此处清场是即时兜底。
+    #   psutil 在此仅作【清场执行器】(kill 进程),竞争【判据】已归 reg——即 P2 目标"退役 psutil 猜"。
+    _reg0_path = _wait_reg_path(role)
+    try:
+        _reg0 = json.loads(_reg0_path.read_text(encoding="utf-8"))
+    except Exception:
+        _reg0 = None
+    _holder = _reg0.get("wait_pid") if _reg0 else None
+    _holder_alive = bool(_holder and _holder != os.getpid() and psutil and psutil.pid_exists(_holder))
+    if (not takeover) and _holder_alive and mine_sid and _reg0.get("host_session_id") == mine_sid:
         try:
-            mine_ct = psutil.Process().create_time() if psutil else 0.0
+            _touch_presence(role, presence_mode, dict(presence_extra or {}))   # 顺手刷心跳
         except Exception:
-            mine_ct = 0.0
-        mine_pid = os.getpid()
-
-        def _same_session(pid):
-            """判某 wait 进程是否与本会话同源。判据优先级(稳→次稳→保守):
-              ① CLAUDE_CODE_SESSION_ID env 相同(最稳·不受父链断影响);
-              ② 回退 claude 宿主 pid 相同;
-              ③ 两者都判不了 → 保守【当同会话】(让位不杀=退回 08-03 纯 yield,宁可偶尔靠 reap 兜
-                 也【绝不误杀同会话 wait 致 kill-churn】——实测教训:纯 host-pid 判据会把父链偶发
-                 断裂的同会话背景 wait 误判跨会话杀掉)。"""
-            psid = _proc_session_id(pid)
-            if psid and mine_sid:
-                return psid == mine_sid
-            phost = _proc_claude_ancestor(pid)
-            if phost is not None and mine_host is not None:
-                return phost == mine_host
-            return True
-
-        same_older, cross = [], []
-        for p in _prior_wait_procs(role):
-            if _same_session(p.pid):
-                try:
-                    if (p.create_time(), p.pid) < (mine_ct, mine_pid):
-                        same_older.append(p)         # 同会话且更老 → 让位(治 kill-churn)
-                except Exception:
-                    pass
-            else:
-                cross.append(p)                      # 确证跨会话 → 孤儿/抢占,接管防聋
-        for p in cross:                              # 杀掉跨会话孤儿(它们持本 role 耳朵=本会话聋)
-            try:
-                p.kill()
-            except Exception:
-                pass
-        if same_older:                               # 同会话已有更老 wait 在岗 → 让位不重挂
-            h = same_older[0]
-            try:
-                _touch_presence(role, presence_mode, dict(presence_extra or {}))  # 顺手刷心跳
-            except Exception:
-                pass
-            print(json.dumps({"already_armed": True, "role": role, "holder_pid": h.pid,
-                              "note": "已有同会话在岗 wait,本次让位不重挂(防 kill-churn);"
-                                      "确要强制换新用 --takeover"}, ensure_ascii=False))
-            return
-        if cross:
-            sys.stderr.write("[wait] 清掉 %d 个跨会话/孤儿 wait(它们持 %s 耳朵会致本会话聋),本会话接管。\n"
-                             % (len(cross), role))
+            pass
+        print(json.dumps({"already_armed": True, "role": role, "holder_pid": _holder,
+                          "note": "reg 记同会话在岗 wait,本次让位(P2·防 kill-churn);确要强制换新用 --takeover"},
+                         ensure_ascii=False))
+        return
+    _killed = 0                                       # 接管清场:让位分支已拦同会话活持有者,此处清的是孤儿/陈旧/takeover
+    for p in _prior_wait_procs(role):
+        if p.pid == os.getpid():
+            continue
+        try:
+            p.kill(); _killed += 1
+        except Exception:
+            pass
+    if _killed:
+        sys.stderr.write("[wait] P2 接管 %s:清掉 %d 个旧 wait(reg 判据·孤儿/陈旧/takeover)\n" % (role, _killed))
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
     # ── wait 注册表登记(P1·2026-08-10 用户令·独立文件):登记本 wait 身份供竞争/宿主自检/观测 ──
     # 走到这=本 wait 决定挂(P0 yield 已让路给同会话更老 wait);覆盖旧 reg(接管者/被杀孤儿的),generation+1。
