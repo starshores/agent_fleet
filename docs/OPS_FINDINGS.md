@@ -41,3 +41,14 @@
 - **判定规则(可复用)**:①走不走中转看【实际连接 IP】(netstat→RDAP),别看配置名表面;②`base_url` = `api.anthropic.com` 或空 → 直连,= 其它域名 → 中转、该域名运营方看得到全部明文;③删/查 env 用 .NET 精确名枚举,别被隐藏字符骗(reg query 里的 `f` 不是噪声、是真名的一部分)。
 - **教训**:我最初凭 env 里"看着像 ANTHROPIC_BASE_URL"就报警"全程走中转",是**配置表面误读**;实测连接 IP 才把真相纠回来。data-truthfulness 对自己的结论同样适用。
 - 记录人:Master数分
+
+### 2026-08-10 · 连续3周周五被限但用量越克制 = 门槛降+fleet cache 消耗;三层机制拆解+idle 冷唤醒白烧新发现 · #usage-limit #cache #self-wake #cost
+
+- **用户困惑**:连续3周(07-24/07-31/08-07)周五被限,但近3周用量越来越克制。限额提示=「organization's usage credit cap」($计,非token计)。
+- **结论1(实测·反直觉)**:周$在暴跌却照样撞墙——$4,287(07-11窗)→$3,123(07-18)→$1,323(07-25,周五被限)→$1,239(08-01,周五被限)。撞墙点从">$4,287不限"掉到"~$1,200就限"=**门槛本身7月底阶梯降~3倍**,非用量涨。周五"用量近零"(07-31=8calls/08-07=81calls)是【被限的症状】非没用。用户克制是真的(token 6.86B→1.09B、模型分流sonnet/fable)但追不上门槛下降。根因链接 [2026-07-27 +50%到期] 条,叠加疑组织额度收紧(claude.ai 后台待用户核)。
+- **结论2(实测)**:近30天 io(真新work)仅0.2%,cache=99.8%(cache_read 97.6%)。成本90%=opus-4-8 cache_read($9,010/全期~$10k)。
+- **结论3(实测+权威文档双证·三层机制)**:①**resume 不重放原始旧历史**(官方sessions/prompt-caching:从compact后存档态恢复,不涨回原始;实证context全天稳564K无暴涨)——"resume重读旧历史"漏损不存在。②每活跃轮 cache_read 全量重读运行context(~500K,97%是健康预期形态,按~10%价但计入额度)。③**【新发现】idle 冷唤醒 cache_creation**:自醒日2h间隔>缓存TTL1h→每次日间唤醒缓存全过期→整个context重新materialize(更贵),**空唤醒也付~$4.2/次**。近两周171次、$723≈**周$361**(占cache_creation成本29%),我自己会话69fac8e7头号($260/2wk)。compact 是唯一能压小②③的工具(降阈值/勤compact/clear),非独立"resume修剪器"。
+- **依据**:usage.db 逐消息 ts 曲线(cache_read锯齿+2h间隔cache_new尖峰542K)+ claude-code-guide 权威文档核实 + 分层SQL量化。脚本 scratchpad/{friday_limit,cost_by_week,targets,seq_usage,idlewake_cost}.py。
+- **改进(已路由MasterAgent·2026-08-10)**:用户令"自醒改有消息才唤醒"→消灭C层冷唤醒白烧。机制已确认:心跳已解耦(_start_wait_heartbeat core.py:227,120s刷presence)、_wait_core可无限阻塞、guard按活进程判活不误报stale;只需 _idle_timeout_policy()(config.py:39-52)sentinel改"阻塞到消息"。收益周$361;叠加 opus→sonnet 机械turn路由(周~$300)可钻回~$1200门槛。
+- **启示**:①限额是$(credit)非token,分析该按$;②长会话+高频自醒=fleet基线消耗与用户手动用量解耦,克制个人输入(0.2%)按不住;③空唤醒非零成本(付整个context冷重建)=禁轮询/idle纪律有真金白银价值;④门槛为何降需用户在claude.ai组织后台核(库看不到组织配置)。
+- 记录人:Master数分
