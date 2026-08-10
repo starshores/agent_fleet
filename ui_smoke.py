@@ -11,6 +11,7 @@
 import argparse
 import json
 import os
+import re
 import socket
 import sys
 import urllib.request
@@ -89,6 +90,19 @@ def run_tests(base, port):
         add("page-200", st == 200, "GET / = %s" % st)
         for a in PAGE_ANCHORS:
             add("anchor-%s" % a, a in html, "页面含 %s" % a)
+        # ── tab 白名单闭合校验 ──
+        # showTab() 门卫 if(!TAB_NAMES[t])t='fleet' → 任何 data-t 按钮若漏登记 TAB_NAMES
+        # 会被静默打回舰队页(端点通/section在/锚点在,但用户点了打不开)。
+        # 静态断言:每个 tabbar 的 data-t 按钮都在 TAB_NAMES 有键(P3 waitreg 漏登记复发闸)。
+        try:
+            m = re.search(r"const TAB_NAMES=\{(.*?)\};", html)
+            tab_keys = set(re.findall(r"(?:^|,)\s*'?([A-Za-z_]\w*)'?\s*:", m.group(1))) if m else set()
+            btns = set(re.findall(r'class="tab"[^>]*data-t="([^"]+)"', html))
+            missing = sorted(b for b in btns if b not in tab_keys)
+            add("tabs-in-TAB_NAMES", bool(btns) and not missing,
+                ("漏登记: %s" % missing) if missing else "%d 个 tab 按钮全在 TAB_NAMES" % len(btns))
+        except Exception as e:
+            add("tabs-in-TAB_NAMES", False, repr(e))
     except Exception as e:
         add("page-200", False, repr(e))
         for a in PAGE_ANCHORS:
