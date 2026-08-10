@@ -13,7 +13,7 @@ from bus.config import BUS, METRICS, cfg, _now, _idle_timeout_policy
 from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics, _fail
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
-from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds
+from bus.proc import _claude_ancestor, _proc_claude_ancestor, _proc_session_id, _proc_scan, _alive_claude_pids, _age_seconds
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.notify import _toast_throttled, _fire_toast, _maybe_toast, _emit_completion_notice
@@ -251,32 +251,70 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
             sys.stderr.write("🛠 bus 维护窗口(.bus_maintenance)——原地睡等,不重建 bus...\n")
         time.sleep(15); waited += 15
 
-    # ── per-role 幂等:yield-not-kill(2026-08-03 kill-churn 根治)──────────────────────
-    # 旧行为(挂前杀同 role 旧 wait)会把一次意外双挂放大成自持振荡:杀旧 → 旧 wait 的后台任务
-    # "完成"(空输出)→ harness 唤醒会话 → 纪律"空唤醒→重挂" → 又杀刚挂的 → 无限 ~15s 热循环
-    # (业务侧实证)。新默认:已有【更老的】同 role 活 wait → 本次让位(不杀、不覆写它的
-    # wait_trace),打印 already_armed 即退——在岗的耳朵始终活着,冗余重挂自然收敛(selfwake 仍 ✓在岗)。
-    # 只比自己老的才让(create_time 严格序 + pid tie-break),防两个同时挂互让成零 wait。
-    # serve(前台执行体显式接管)与 wait --takeover 保留旧杀清语义(如旧 wait 聋死需强制换新)。
+    # ── per-role 幂等:yield-not-kill 精确化(2026-08-03 治 kill-churn · 2026-08-10 治"让位给孤儿")──
+    # 旧行为(挂前杀同 role 旧 wait)会把双挂放大成自持振荡(杀旧→旧 wait 空输出"完成"→harness 唤醒
+    # →纪律重挂→又杀刚挂的→~15s 热循环)。08-03 改 yield:已有更老同 role wait 就让位不杀,治 churn。
+    # ★08-10 精确化(治"接了任务不回报前台"bug):让位只对【同会话】(同 claude 宿主 pid)的更老 wait——
+    #   同会话任一 wait claim 到任务、其后台进程完成都唤醒【同一前台会话】,让位安全。而【跨会话】的旧
+    #   wait=孤儿/抢占(上次会话没退净 / 别的 tab / daemon 遗留 / resume 前身),让位给它=把耳朵交给
+    #   【不唤醒本会话】的进程 → 它 claim 走任务后本会话永远收不到通知、任务卡 processing(reap 因
+    #   _owner_live 是 role 级、本会话 wait 仍在岗 → 要拖到 age>ttl 4000s 才退回)。故跨会话/追不到宿主
+    #   的旧 wait 一律【takeover 杀掉接管】(符合"一 role 一执行体"铁律)。宿主 pid 判据比 session_id 准
+    #   (--resume 复用 sid,但每个活 claude.exe 是独立 pid);见 proc._proc_claude_ancestor。
     if takeover:
         _kill_prior_waits(role)
     else:
         try:
-            mine = psutil.Process().create_time() if psutil else 0.0
-            holders = [p for p in _prior_wait_procs(role)
-                       if (p.create_time(), p.pid) < (mine, os.getpid())]
+            mine_ct = psutil.Process().create_time() if psutil else 0.0
         except Exception:
-            holders = []
-        if holders:
-            h = holders[0]
+            mine_ct = 0.0
+        mine_pid = os.getpid()
+        mine_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        mine_host = _claude_ancestor()[0]           # 本 wait 的启动宿主 claude 会话 pid
+
+        def _same_session(pid):
+            """判某 wait 进程是否与本会话同源。判据优先级(稳→次稳→保守):
+              ① CLAUDE_CODE_SESSION_ID env 相同(最稳·不受父链断影响);
+              ② 回退 claude 宿主 pid 相同;
+              ③ 两者都判不了 → 保守【当同会话】(让位不杀=退回 08-03 纯 yield,宁可偶尔靠 reap 兜
+                 也【绝不误杀同会话 wait 致 kill-churn】——实测教训:纯 host-pid 判据会把父链偶发
+                 断裂的同会话背景 wait 误判跨会话杀掉)。"""
+            psid = _proc_session_id(pid)
+            if psid and mine_sid:
+                return psid == mine_sid
+            phost = _proc_claude_ancestor(pid)
+            if phost is not None and mine_host is not None:
+                return phost == mine_host
+            return True
+
+        same_older, cross = [], []
+        for p in _prior_wait_procs(role):
+            if _same_session(p.pid):
+                try:
+                    if (p.create_time(), p.pid) < (mine_ct, mine_pid):
+                        same_older.append(p)         # 同会话且更老 → 让位(治 kill-churn)
+                except Exception:
+                    pass
+            else:
+                cross.append(p)                      # 确证跨会话 → 孤儿/抢占,接管防聋
+        for p in cross:                              # 杀掉跨会话孤儿(它们持本 role 耳朵=本会话聋)
+            try:
+                p.kill()
+            except Exception:
+                pass
+        if same_older:                               # 同会话已有更老 wait 在岗 → 让位不重挂
+            h = same_older[0]
             try:
                 _touch_presence(role, presence_mode, dict(presence_extra or {}))  # 顺手刷心跳
             except Exception:
                 pass
             print(json.dumps({"already_armed": True, "role": role, "holder_pid": h.pid,
-                              "note": "已有在岗 wait,本次让位不重挂(防 kill-churn);"
+                              "note": "已有同会话在岗 wait,本次让位不重挂(防 kill-churn);"
                                       "确要强制换新用 --takeover"}, ensure_ascii=False))
             return
+        if cross:
+            sys.stderr.write("[wait] 清掉 %d 个跨会话/孤儿 wait(它们持 %s 耳朵会致本会话聋),本会话接管。\n"
+                             % (len(cross), role))
     extra = dict(presence_extra or {}); extra["wait_timeout"] = timeout
     # 掉线尸检 trace(2026-07-28 会话可靠性立项):进场记 start,干净退场补 exit;
     # 事后 trace 有 start 无 exit = wait 进程【异常死亡】(被杀/休眠丢/宿主壳回收),guard 可据此分类根因,

@@ -67,6 +67,43 @@ def _claude_ancestor():
     return claude_pid, cwd, chain
 
 
+def _proc_claude_ancestor(pid):
+    """从【给定 pid】向上 walk 父链找 claude.exe 祖先 pid(判"某 wait 进程属哪个活会话实例"用)。
+    与 _claude_ancestor 的区别:那个走当前进程,这个走任意 pid。追不到(父链断/进程没了)返 None。
+    ★为何用 claude 祖先 pid 而非 session_id 判同会话:--resume 会复用 session_id(旧/新会话同 sid),
+    但每个活 claude.exe 是独立进程 pid → 祖先 pid 才精确区分"同一个活跃会话实例"。"""
+    if psutil is None:
+        return None
+    try:
+        p = psutil.Process(pid)
+        for _ in range(15):
+            p = p.parent()
+            if p is None:
+                break
+            try:
+                if "claude" in (p.name() or "").lower():
+                    return p.pid
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def _proc_session_id(pid):
+    """读某进程环境变量 CLAUDE_CODE_SESSION_ID(判 wait 进程属哪个 CC 会话)。
+    ★比父链祖先 pid 更稳:env 在进程创建时固定,【不受 harness 背景 shell 父链偶发断裂影响】
+    (reboot-hello 记的坑:背景进程 parent-walk 偶发够不到 claude.exe → _proc_claude_ancestor 误返
+    None → 曾把同会话 wait 误判跨会话杀掉)。Windows 上 p.environ() 对同用户进程通常可读;
+    读不到/无权限/进程没了返 None(调用方回退父链判据)。"""
+    if psutil is None:
+        return None
+    try:
+        return (psutil.Process(pid).environ() or {}).get("CLAUDE_CODE_SESSION_ID")
+    except Exception:
+        return None
+
+
 _PROC_SCAN = {"ts": 0.0, "claude": None, "wait_roles": None}
 _PROC_SCAN_TTL = 2.0
 
