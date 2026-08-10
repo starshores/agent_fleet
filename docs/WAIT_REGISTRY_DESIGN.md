@@ -64,7 +64,8 @@ wait 心跳线程每 N 秒:①`host_claude_pid` 还活着吗?死了→**自己�
 - **P0 已交付**(commit 9435b90):yield 精确化(session_id 判据),止血"让位给跨会话孤儿"。过渡态。
 - **block 真无限**(commit 281162d·Master数分 spec):_wait_core 收 None 走 ev.wait(None) 永久阻塞(巨大 timeout 会 OverflowError)。
 - **P1 已交付**(commit 8d1f470):建 `<role>/wait.reg.json`(独立文件)+ 登记(P0 yield 让路后覆盖旧 reg·gen+1)+ **宿主自检**(心跳线程每 10s 检宿主 claude 活否·死则孤儿自杀 os._exit)+ 被接管自检 + 退出清 reg。实测 reg 字段正确 + host_pid=999999 秒级自杀。**直接根治孤儿(要素 ①⑤⑥):孤儿宿主死后自己消失,不再抢 inbox 致"接活不回报"。**
-- **P2 待启(整合)**:竞争/让位/通信全走 reg(要素 ⑦⑧·reg 抢注册权用 O_EXCL),退役 psutil 猜;selfwake-guard/who/reap 改读 reg。当前 P0 psutil yield 与 P1 reg 并存(reg 供自检+观测,裁决仍 psutil);P2 收敛单一源。
+- **P2a 已交付**(commit 4ec4a0b):竞争裁决走 reg——_serve_wait 读 wait.reg.json 判让位(非 takeover+reg 有同会话活持有者)/接管(takeover/无 reg/持有者死/跨会话→清场+覆盖 reg),取代 P0 的 psutil 全扫+environ 判据(psutil 降为纯清场执行器)。实测同会话让位(holder 读自 reg)+ 跨会话 FAKE 孤儿被接管清场+reg 覆盖。
+- **P2b 待启(观测统一)**:selfwake-guard/who/reap 改读 reg 判"wait 在否/宿主活否"。⚠ 涉 role-verdict 敏感区(记忆 role-verdict-computed-in-4-places:判据散多处·改需逐视图实测+Master数分验),故独立一轮谨慎做,不与 P2a 混。O_EXCL 严格注册权(N 争 1 恰 1 胜)按需在此轮加固。
 - **P3 待启(观测)**:WebUI 展示 wait 注册表(每 role 的 wait 生命周期/代数/宿主/预期唤醒一目了然)。
 每阶段:bus_smoke 全绿 + 实测竞争(N 争 1 恰 1 胜)+ 宿主死自杀实测 + Master数分验收。
 
