@@ -108,6 +108,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/ctxpanel":
             # 纯上下文预算看板:内存 ctx_cache(+who_cache 仅校验 role 标签),请求路径零扫描/零读盘
             self._send(200, build_ctxpanel())
+        elif path == "/api/waitreg":
+            # P3 wait 注册表观测:聚合各 role wait.reg.json(请求路径直读小文件·手动刷新/20s 轮询)
+            self._send(200, build_waitreg())
         elif path == "/api/tasklines":
             self._send(200, build_tasklines())
         elif path == "/api/groups":

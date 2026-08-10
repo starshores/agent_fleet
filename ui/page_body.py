@@ -30,6 +30,7 @@ BODY = r"""<header>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
   <button class="tab" data-t="ctx">🧠 上下文</button>
+  <button class="tab" data-t="waitreg">⏱ wait 注册表</button>
   <button class="tab" data-t="prompts">📝 提示词审核</button>
   <button class="tab" data-t="tasklines">🎯 任务线看板</button>
   <button class="tab" data-t="groups">🧩 工作组</button>
@@ -303,6 +304,23 @@ BODY = r"""<header>
         <tbody id="ctxBody"></tbody>
       </table>
       <div class="foot muted" id="ctxFoot"></div>
+    </div>
+  </section>
+
+  <!-- ⏱ wait 注册表观测(P3·2026-08-10):每个 role 的后台 wait 生命周期 -->
+  <section data-tab="waitreg">
+    <div class="sec-h">⏱ wait 注册表观测
+      <span class="sub">每个 role 在册的后台 wait 进程生命周期:<span class="mono">wait_pid / 宿主 claude / 代数 / 在册时长 / 心跳 / 状态</span>。宿主 claude 死而 wait 仍活=<b>孤儿</b>(P1 宿主自检 10s 内自杀)。数据源 <span class="mono">&lt;role&gt;/wait.reg.json</span></span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="wrMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="wrRefresh">刷新</button>
+    </div>
+    <div class="sec-b">
+      <table>
+        <thead><tr><th>role</th><th>wait_pid</th><th>宿主 claude</th><th>代数</th><th>在册时长</th><th>心跳 age</th><th>状态</th></tr></thead>
+        <tbody id="wrBody"></tbody>
+      </table>
+      <div class="foot muted" id="wrFoot"></div>
     </div>
   </section>
 

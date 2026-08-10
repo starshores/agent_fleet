@@ -1049,6 +1049,43 @@ function renderCtxBadge(){
 document.getElementById('ctxRefresh').onclick=()=>loadCtx();
 document.getElementById('ctxBadge').onclick=()=>showTab('ctx');
 
+// ⏱ wait 注册表观测(P3·2026-08-10):每 role 后台 wait 生命周期(morph 增量渲染)
+let _wr=null;
+function renderWaitreg(){
+  const d=_wr; const body=document.getElementById('wrBody'); if(!body) return;
+  const meta=document.getElementById('wrMeta'), foot=document.getElementById('wrFoot');
+  if(!d || d.error){ morphInto(body,'<tr><td colspan="7" class="muted">读取失败:'+esc(d&&d.error||'?')+'</td></tr>'); return; }
+  if(meta) meta.textContent='更新 '+esc(d.as_of||'');
+  const rows=d.rows||[];
+  if(!rows.length){ morphInto(body,'<tr><td colspan="7" class="muted" style="padding:8px">暂无在册 wait(reg 为空)</td></tr>'); if(foot)foot.textContent=''; return; }
+  let orphans=0;
+  const html=rows.map(r=>{
+    const host = r.host_claude_pid!=null
+      ? esc(r.host_claude_pid)+(r.host_alive===false?' <span class="badge dead">✗死</span>':(r.host_alive?' <span class="badge live">✓</span>':''))
+      : '<span class="muted">–</span>';
+    let stat;
+    if(r.orphan){ orphans++; stat='<span class="badge dead">⚠ 孤儿(宿主死·P1将杀)</span>'; }
+    else if(!r.wait_alive){ stat='<span class="badge warn">wait 进程已退(陈旧 reg)</span>'; }
+    else{ stat='<span class="badge live">✓ '+esc(r.status||'listening')+'</span>'; }
+    const tmo = r.timeout==null?'∞(block)':(esc(r.timeout)+'s');
+    return `<tr data-key="wr-${esc(r.role)}">
+      <td><b>${esc(r.role)}</b></td>
+      <td class="mono">${esc(r.wait_pid!=null?r.wait_pid:'–')}</td>
+      <td class="mono">${host}</td>
+      <td class="mono" title="接管代数(每次 takeover +1)">${r.generation!=null?esc(r.generation):'–'}</td>
+      <td class="mono" title="timeout=${tmo}">${r.age_s!=null?fmtAge(r.age_s):'–'}</td>
+      <td class="mono">${r.hb_age_s!=null?fmtAge(r.hb_age_s):'–'}</td>
+      <td>${stat}</td></tr>`;
+  }).join('');
+  morphInto(body,html);
+  if(foot) foot.textContent='共 '+rows.length+' 个在册 wait'+(orphans?(' · ⚠ '+orphans+' 孤儿(宿主已死·P1 自检将自杀)'):'');
+}
+async function loadWaitreg(){
+  try{ const r=await fetch('/api/waitreg'); _wr=await r.json(); }catch(e){ /* 保留上次 */ }
+  renderWaitreg();
+}
+document.getElementById('wrRefresh').onclick=()=>loadWaitreg();
+
 // ===== 📝 提示词审核(只读·手动刷新)=====
 let _promptsLoaded=false, _promptsData=null;
 const openPrompts=new Set();   // 展开的提示词节序号(状态驱动·morph 刷新不丢)
@@ -1658,6 +1695,7 @@ function showTab(t){
   else if(t==='usage') loadUsage(true);
   else if(t==='caps') loadCaps();
   else if(t==='ctx') loadCtx();
+  else if(t==='waitreg') loadWaitreg();
   else if(t==='prompts'){ if(!_promptsLoaded) loadPrompts(); }
   else if(t==='tasklines') loadTasklines();
   else if(t==='groups') loadGroups();

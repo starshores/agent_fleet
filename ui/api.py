@@ -2037,6 +2037,50 @@ def build_ctxpanel():
 
 
 # =============================================================
+#  wait 注册表观测(P3·2026-08-10 用户令)—— GET /api/waitreg
+#  聚合各 role 的 wait.reg.json,展示每个后台 wait 的生命周期:宿主/代数/在册时长/心跳/status。
+#  宿主 claude 活否判孤儿(wait 活但宿主死=P1 自检将杀的孤儿窗口)。请求路径只读、轻量(glob 小文件)。
+# =============================================================
+def build_waitreg():
+    try:
+        import psutil as _ps
+    except Exception:
+        _ps = None
+    rows = []
+    now = time.time()
+    for f in sorted(glob.glob(str(BUS / "*" / "wait.reg.json"))):
+        try:
+            reg = json.loads(Path(f).read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        wp = reg.get("wait_pid")
+        wait_alive = bool(wp and _ps and _ps.pid_exists(wp))
+        hp = reg.get("host_claude_pid")
+        host_alive = None
+        if hp and _ps:
+            try:
+                host_alive = "claude" in (_ps.Process(hp).name() or "").lower()
+            except Exception:
+                host_alive = False
+        started = _parse_claimed_epoch(reg.get("started") or "")
+        hb = _parse_claimed_epoch(reg.get("last_heartbeat") or "")
+        rows.append({
+            "role": reg.get("role"),
+            "wait_pid": wp, "wait_alive": wait_alive,
+            "host_claude_pid": hp, "host_alive": host_alive,
+            "host_session_id": (reg.get("host_session_id") or "")[:8],
+            "generation": reg.get("generation"), "status": reg.get("status"),
+            "timeout": reg.get("timeout"),                       # None=block 真无限(有消息才醒)
+            "started": reg.get("started"),
+            "age_s": (int(now - started) if started else None),  # 在册时长
+            "hb_age_s": (int(now - hb) if hb else None),         # 距上次心跳(应 ≤ 心跳间隔 10s+)
+            "orphan": bool(wait_alive and host_alive is False),  # 孤儿:wait 活但宿主死(P1 宿主自检将杀)
+        })
+    rows.sort(key=lambda x: x.get("role") or "")
+    return {"ok": True, "as_of": time.strftime("%H:%M:%S"), "rows": rows, "n": len(rows)}
+
+
+# =============================================================
 #  派活建议对口(UI2.0 U3 · 防误派)—— GET /api/route?q=<标题+任务文本>
 #  评分单一源 = bus.roles.route_scores(与 `ab route` CLI 同一逻辑);此处只做关键词化:
 #  ASCII 词(≥2字符)+ CJK bigram(中文标题/描述无空格分词,bigram 对 desc 子串命中效果好)。

@@ -25,7 +25,7 @@ GET_ENDPOINTS = [
     "/api/live", "/api/tasklines", "/api/groups", "/api/mechanisms",
     "/api/role-profiles", "/api/role-profiles-biz", "/api/longrange",
     "/api/bi", "/api/caps", "/api/usage", "/api/dispatch_metrics",
-    "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/prompts",
+    "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/waitreg", "/api/prompts",
     "/api/archive", "/api/paths", "/api/storage", "/api/lifecycle",
     "/api/fleet-log", "/api/fleet-state", "/api/route",
 ]
@@ -34,7 +34,7 @@ PAGE_ANCHORS = [
     "fleetBody", "todoBox", "sessBox", "liveBox", "fleetStateBar", "morphdom",   # 核心
     "biKpis", "biRunning", "biSysBody", "biModels",                              # BI
     "usageKpis", "uProj",                                                        # 历史用量(canvas 周边)
-    "grpBox", "mechBox", "lrBox", "ctxBody", "promptsBox", "pathsBox",           # 组池/机制/长程/上下文/提示词/路径
+    "grpBox", "mechBox", "lrBox", "ctxBody", "wrBody", "promptsBox", "pathsBox",  # 组池/机制/长程/上下文/wait注册表/提示词/路径
     "archRetired", "archResumeBody", "bizRolesBox",                              # 归档/业务角色
     "sendTask", "tviewActive", "tviewHistory",                                   # 派活表单/任务视图
     "dmKpis", "dmRoles", "dmKind", "dmTop",                                      # 派工效率(U2 复活的死码面板)
@@ -52,6 +52,7 @@ MUST_KEYS = {
     "/api/archive": ["ok", "retired", "resume"],
     "/api/usage": ["totals", "daily", "by_project"],
     "/api/ctx": ["ok", "rows"],
+    "/api/waitreg": ["ok", "rows"],
     "/api/sessions": ["ok", "sessions", "live_count", "dead_count"],
 }
 LOADING_OK = {"/api/health", "/api/ctx"}
