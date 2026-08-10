@@ -66,8 +66,9 @@ wait 心跳线程每 N 秒:①`host_claude_pid` 还活着吗?死了→**自己�
 - **P1 已交付**(commit 8d1f470):建 `<role>/wait.reg.json`(独立文件)+ 登记(P0 yield 让路后覆盖旧 reg·gen+1)+ **宿主自检**(心跳线程每 10s 检宿主 claude 活否·死则孤儿自杀 os._exit)+ 被接管自检 + 退出清 reg。实测 reg 字段正确 + host_pid=999999 秒级自杀。**直接根治孤儿(要素 ①⑤⑥):孤儿宿主死后自己消失,不再抢 inbox 致"接活不回报"。**
 - **P2a 已交付**(commit 4ec4a0b):竞争裁决走 reg——_serve_wait 读 wait.reg.json 判让位(非 takeover+reg 有同会话活持有者)/接管(takeover/无 reg/持有者死/跨会话→清场+覆盖 reg),取代 P0 的 psutil 全扫+environ 判据(psutil 降为纯清场执行器)。实测同会话让位(holder 读自 reg)+ 跨会话 FAKE 孤儿被接管清场+reg 覆盖。
 - **P2b 已交付**(commit 2f3629b):`_self_wake_state`(自醒态单一判据源)加 reg 优先——`_reg_wait_state` 读 wait.reg.json 判 armed(验 wait_pid 确是 agentbus wait 防 pid 复用 + 宿主孤儿识别),回退 psutil(兼容无 reg)。因单一源改一处、消费方(who/selfwake/运维面板/guard/notify/pool)自动一致。逐视图自验四视图全一致 armed。**部署注意:改 selfwake.py 需重启 WebUI 才在运维面板生效**。⚠ `_owner_live`/reap 本轮不动:孤儿回收安全网,P1 宿主自检+P2a 接管已从源头治孤儿,动它风险>收益;除非 Master数分验收发现 reap 口径问题再议。O_EXCL 严格注册权(N 争 1 恰 1 胜)待真需并发压测时加。
-- **P3 待启(观测)**:WebUI 展示 wait 注册表(每 role 的 wait 生命周期/代数/宿主/预期唤醒一目了然)。
-每阶段:bus_smoke 全绿 + 实测竞争(N 争 1 恰 1 胜)+ 宿主死自杀实测 + Master数分验收。
+- **P3 已交付**(commit c115a93):WebUI「⏱ wait 注册表」tab+面板——每 role 后台 wait 生命周期(wait_pid/宿主 claude+活否/代数/在册时长/心跳/status),孤儿(wait 活+宿主死)标红。后端 build_waitreg 聚合 wait.reg.json + /api/waitreg 端点;前端照 ctxpanel 模式(morph 增量·进 tab 拉·手动刷·不全局轮询省 psutil)。ui_smoke 82/82(新增端点用例+wrBody 锚)。MasterUI lane·已通报MasterUI验收。
+
+**★wait 注册表全线(P0→P3)收官(2026-08-10)**:P0 yield 精确化止血 → block 真无限 → P1/P1.1 注册表核心+宿主自检(多源宿主 pid) → P2a 竞争裁决走 reg → P2b 自醒态判据走 reg(who 双轴) → P3 WebUI 观测。Master数分 P0/P2a/P2b 全 APPROVE。剩余可选:P2b 的 reap/_owner_live 读 reg(本轮判定风险>收益未做)、O_EXCL 严格注册权(真需并发压测时)、CJK 表格显示宽对齐(既有老问题)。
 
 ## 五、待用户拍板
 ①P1 是否启动(注册表是较大架构件,值得先评审本设计再动)?②reg 独立文件 vs 并入 presence?③宿主自检心跳间隔(建议复用 _WAIT_HB_INTERVAL=120s)?
