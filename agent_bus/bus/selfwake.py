@@ -21,6 +21,38 @@ def _wait_proc_roles():
     return _proc_scan()[1]
 
 
+def _reg_wait_state(role):
+    """P2b(2026-08-10 用户令):读 <role>/wait.reg.json 判 role 有无【健康在册 wait】(reg 单一源·
+    附宿主孤儿识别)。返回 (True, detail)=有活 wait;(None, None)=reg 不可用/持有者已退→调用方【回退
+    psutil wait_roles】(兼容无 reg 的 wait·过渡期 P1 前遗留)。
+    ★验 reg.wait_pid 确是 agentbus wait 进程(cmdline·只查这一个 pid=便宜)防 pid 复用误判在岗;
+     宿主 claude 死=孤儿(P1 宿主自检将自杀·如实标注,不假报健康在岗)。"""
+    if psutil is None:
+        return (None, None)
+    try:
+        reg = json.loads((BUS / role / "wait.reg.json").read_text(encoding="utf-8"))
+    except Exception:
+        return (None, None)
+    wp = reg.get("wait_pid")
+    if not wp:
+        return (None, None)
+    try:
+        cl = psutil.Process(wp).cmdline()
+        if "wait" not in cl or not any("agentbus" in str(x) for x in cl):
+            return (None, None)          # pid 复用成非 wait / 持有者已退 → reg 陈旧,回退 psutil
+    except Exception:
+        return (None, None)              # 进程没了 → reg 陈旧,回退
+    hp = reg.get("host_claude_pid")      # 宿主孤儿识别
+    if hp:
+        try:
+            host_alive = "claude" in (psutil.Process(hp).name() or "").lower()
+        except Exception:
+            host_alive = False
+        if not host_alive:
+            return (True, "reg 在册 wait 但宿主 claude(%s)已退=孤儿(P1 自检将自杀)" % hp)
+    return (True, "会话自醒(reg 在册·wait %s 在跑)" % wp)
+
+
 def _parked_path(role):
     return BUS / role / "parked.json"
 
@@ -100,10 +132,14 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
             return ("armed", "daemon 自醒(watchdog 阻塞)")
         return ("stale", "daemon 已退,自醒掉线")
     # 非 daemon:协调位/会话自醒 = 独立 wait 进程(不刷心跳)→ 优先按进程判活
+    # P2b(2026-08-10 用户令):判据优先读 reg(单一源·附宿主孤儿识别)→ 回退 psutil wait_roles(兼容无 reg)
+    reg_armed, reg_detail = _reg_wait_state(role)
+    if reg_armed:
+        return ("armed", reg_detail)
     if wait_roles is None:
         wait_roles = _wait_proc_roles()
     if role in wait_roles:
-        return ("armed", "会话自醒(后台 wait 进程在跑)")
+        return ("armed", "会话自醒(后台 wait 进程在跑·无 reg)")
     if mode == "listening":
         pid = pr.get("claude_pid")
         alive = bool(psutil is not None and pid and psutil.pid_exists(pid))
