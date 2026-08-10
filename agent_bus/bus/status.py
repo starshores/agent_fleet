@@ -126,18 +126,21 @@ def cmd_who(args):
     # 自醒轴符号(Master数分 P2b 验收建议 2026-08-10:who 表格 surface self_wake,免使用者把 verdict"在听"
     # 误读成"已武装"——verdict 是【worker 健康轴】,self_wake 是【自醒轴】,两轴正交、都要可见)。
     _SW = {"armed": "✓", "recent": "◐", "stale": "⚠", "off": "–", "parked": "🅿", "polling": "⏱"}
-    print("%-14s %-22s %-4s %-9s %8s  %s" % ("role", "verdict(健康)", "自醒", "claude_pid", "心跳age", "cwd"))
+    # 自醒列【前置到 verdict 前】(Master数分 P2b 验收揪出:verdict 非固定宽,伪角色/parked 的长描述会撑破
+    # 列宽把自醒符号挤到行尾错位)。自醒符号短固定 → 放 verdict 前永不被撑歪;verdict 放最后可变长
+    # 列(present 行后接 pid/age/cwd 用 %-22s 对齐;短行 verdict 用 %s 收尾长文本不挤任何列)。
+    print("%-14s %-4s %-22s %-9s %8s  %s" % ("role", "自醒", "verdict(健康)", "claude_pid", "心跳age", "cwd"))
     print("-" * 90)
     for rec in d["roles"]:
         r = rec["role"]; verdict = rec.get("verdict") or "?"
         sw = _SW.get(rec.get("self_wake") or "", "·")
         age = rec.get("age_s"); age_s = str(age if age is not None else "?")
         cur = rec.get("current_task")
-        if not rec.get("present"):          # 伪角色/退役/休眠/未声明/损坏:无进程·短行(note 已在 verdict 内)
-            print("%-14s %-22s %-4s" % (r, verdict, sw)); continue
+        if not rec.get("present"):          # 伪角色/退役/休眠/未声明/损坏:无进程·短行(verdict 收尾·长文本不挤列)
+            print("%-14s %-4s %s" % (r, sw, verdict)); continue
         piddisp = ("d:%s" % (rec.get("daemon_pid") or "?")) if rec.get("mode") == "daemon" else str(rec.get("claude_pid") or "-")
         last = (rec.get("cwd") or "-") + (("  ▶ 在做:%s" % (rec.get("current_title") or cur)) if cur else "")
-        print("%-14s %-22s %-4s %-9s %7ss  %s" % (r, verdict, sw, piddisp, age_s, last))
+        print("%-14s %-4s %-22s %-9s %7ss  %s" % (r, sw, verdict, piddisp, age_s, last))
     print("-" * 88)
     if d["psutil"]:
         tagged = d.get("tagged", [])
