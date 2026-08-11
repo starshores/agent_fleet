@@ -6,9 +6,15 @@
 ## 这是什么
 本 bus(genesis)相对 fork 点的进化改动,打成【人可读 + 可吸收】的发布单元,供另一个 bus 拉取评审后吸收。**出港目录**:只放 genesis 流出的东西,不放吸收进来的(吸收进来的走各自 merge)。
 
+## 目录构成
+- **发布分岔 .md**(本目录根):每次发版一份,标该版本可吸收增量(见下"命名规范")。
+- **`problems/` 问题库**(一问题一文档):已诊断的问题/发现,一个问题一个 .md,供另一个 bus 自查同病 + 吸收修法。问题文档随诊断即记(不等发版),含现象/根因(实测)/可吸收性/修法/验收/状态。命名 `<问题-ASCII-slug>.md`(如 `webui-bi-endpoint-gil-freeze.md`)。
+- **`FORK_NAME`**:本 bus 实例名单一源(=`genesis`)。
+
 ## 命名规范
 - **分岔改动说明**(本目录 .md):`<fork名>_<日期YYYYMMDD>_<改动简说>.md`
   例:`genesis_20260810_selfwake-reliability.md`。文件名用 ASCII 简说(跨机/跨 bus 安全,避 GBK 坑),标题/正文中文详述。
+- **问题文档**(`problems/*.md`):`<问题-ASCII-slug>.md`,一问题一文档;正文按"吸收方视角"写(现象→根因实测→可吸收性→吸收单元/修法→验收→状态)。
 - **发布包**(生成在 `../agent_fleet_releases/`):`<fork名>_agent_fleet_<版本>.zip`
   例:`genesis_agent_fleet_v2.8.zip`。打 `vX` tag 时 githooks/reference-transaction 自动生成,前缀读 `FORK_NAME`。
 
