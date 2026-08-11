@@ -979,11 +979,48 @@ _change_cv = threading.Condition()
 _change_ver = 0
 
 
-def _bump():
+def _emit_change():
     global _change_ver
     with _change_cv:
         _change_ver += 1
         _change_cv.notify_all()
+
+
+_bump_lock = threading.Lock()
+_bump_pending = False
+_bump_active = False          # 去抖冷却窗口内
+_BUMP_DEBOUNCE = 1.0          # 秒:合并此窗口内的多次变更为一次 SSE 推送
+
+
+def _schedule_bump_flush():
+    t = threading.Timer(_BUMP_DEBOUNCE, _bump_flush)
+    t.daemon = True
+    t.start()
+
+
+def _bump_flush():
+    global _bump_pending, _bump_active
+    with _bump_lock:
+        if not _bump_pending:
+            _bump_active = False   # 窗口内无新变更 → 结束冷却,回到即时态
+            return
+        _bump_pending = False      # 有合并的变更 → 推后沿,再排一个冷却窗口
+    _emit_change()
+    _schedule_bump_flush()
+
+
+def _bump():
+    """SSE 变更推送(去抖·MasterAgent 建议安全网 2026-08-11):首次即时推(前沿·send/done 等真事件零延迟),
+    冷却窗口(~1s)内的后续变更合并,窗口末尾至多再推一次(后沿)——防将来某高频 .json 刷屏 SSE。
+    当前噪声源(presence/wait.reg 心跳)已在 watcher._hit 直接静音,本去抖是二道网。"""
+    global _bump_pending, _bump_active
+    with _bump_lock:
+        if _bump_active:
+            _bump_pending = True   # 冷却中:标记待推,窗口末尾统一发
+            return
+        _bump_active = True
+    _emit_change()                 # 前沿:立即推
+    _schedule_bump_flush()
 
 
 # --- 通知/消息管理(新架构:daemon 不再执行,执行交可见 CLI tab;通知收进常驻 WebUI)---
@@ -1120,8 +1157,11 @@ def start_watcher():
     class H(FileSystemEventHandler):
         def _hit(self, path):
             s = str(path)
-            if s.endswith("fleet_status.json"):
-                return False   # 5s 定时战报文件,自己写的,不触发 SSE(否则 5s 刷屏)
+            # 自写心跳/计时文件:纯周期噪声(每 10s×~20 角色),不触发 SSE(否则刷屏顶 CPU·MasterAgent 实测 3次/秒)。
+            #  · fleet_status.json = 5s 定时战报;presence.json = 角色心跳(真变更由 fleet 刷新器 20s + send/done 显式 _bump 覆盖);
+            #  · wait.reg.json = 自醒 wait 心跳(UI 无需实时·MasterUI 2026-08-11 wait 注册表引入·翻倍了 presence 噪声)。
+            if s.endswith(("fleet_status.json", "presence.json", "wait.reg.json")):
+                return False
             return s.endswith(".json")
 
         def on_created(self, e):
