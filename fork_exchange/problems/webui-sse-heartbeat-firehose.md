@@ -1,6 +1,6 @@
 # 问题:SSE watchdog 递归监听全 bus → 心跳文件 firehose → 客户端狂刷"卡"
 
-> 记录人 MasterAgent · 2026-08-11 · 状态 = **诊断完成·修复中**(MasterUI lane·派单 1786440692309-MasterUI)
+> 记录人 MasterAgent · 2026-08-11 · 状态 = **✅ 已修复·实测复验通过**(MasterUI lane 交付·commit b104027)
 > 可吸收性 = **平台面**(任何 genesis 派生 bus 的同款 SSE watcher 同病)
 
 ## 一句话
@@ -24,13 +24,13 @@
 - presence 的真变更(上下线 / current_task)由 fleet 刷新器 20s 周期 + send/done 显式 `_bump()` 覆盖;wait.reg 纯自醒心跳,UI 无需实时。
 - 安全网:给 `_bump()` 加去抖(coalesce ~1–2s),防将来别的高频 `.json` 再成 firehose。
 - `turn_state.json` 未列入排除(真实时值·只在 agent 活跃时写·当前 0 噪声);活跃期若吵可靠去抖收敛。
-- 涉及文件:`ui/api.py :: start_watcher._hit`(+ 可选 `_bump` 去抖)。
-- 吸收 commit:**待 MasterUI 提交后回填**。
+- 涉及文件:`ui/api.py :: start_watcher._hit`(+ `_bump` 去抖)。
+- **吸收 commit:`b104027`**（`perf(ui-sse): 静音心跳文件+_bump去抖根治SSE firehose`·1 file: ui/api.py）。MasterUI 实现:①`_hit` 把 presence.json+wait.reg.json 返 False;②`_bump` 去抖=前沿即时推(send/done 真事件零延迟)+ ~1s 冷却窗口内合并、后沿至多再推一次(二道网防将来高频 .json)。
 
-## 验收
-- 改后同款实测:空闲期 12s 内 `.json` 变化触发的 SSE change **≈0**(心跳不再触发)。
-- server 稳态 CPU 显著下降。
-- SSE 真事件(send / done / 新任务 / 路由)仍即时推;`ui_smoke` 保持全过。
+## 验收(✅ 实测通过)
+- 空闲 14s 窗口 SSE change:**42 → 3**（~93%↓·心跳 noise 清零·剩 3 是窗口内活跃 agent 真事件）。
+- **server 稳态 CPU:~40% → 0.0%**（MasterAgent 侧 5×1s 采样全 0）。
+- SSE 真事件(send / done / 新任务 / 路由)仍即时推;`ui_smoke` **83/83 绿**·SSE-connect 保持。
 - 平台三问:①归属=平台机制 ✓ ②清除=无业务数据 ✓ ③换域=不需改平台代码 ✓。
 
 ## 关联
