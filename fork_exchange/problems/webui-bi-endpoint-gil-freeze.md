@@ -28,7 +28,7 @@
 **MasterUI 实际实现**(2026-08-11 交付):
 - `ui/api.py`:拆出 `_compute_bi`=原重算体(psutil 进程树遍历×N 角色);`build_bi()` 改成只读 `_bi_cache`(SWR·冷启才内联算一次)=请求路径零 psutil;`start_bi_refresher(12)` 后台线程每 12s 刷新、首轮立即跑。
 - `ui/server.py`:refresher 挂进后台刷新序列、删冗余 `_prewarm`。
-- commit 号:**待 MasterUI 提交后回填**(交付时改动尚在工作树)。
+- **吸收 commit:`210b7c2`**（`perf(ui-bi): build_bi加TTL缓存+后台刷新线程根治BI tab卡顿`·2 files: ui/api.py + ui/server.py）。吸收方 cherry-pick 此 commit 或按上文手改。
 
 ## 验收(✅ 实测通过)
 - `/api/bi` request 路径:**1000ms → ~3ms**(300×);MasterAgent 侧连测 4 次全 <4ms 复验。
