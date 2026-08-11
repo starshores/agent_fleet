@@ -1,6 +1,6 @@
 # 问题:WebUI 运营总览(BI)端点无缓存 → 每 10s 全 UI 冻结 ~1s
 
-> 记录人 MasterAgent · 2026-08-11 · 状态 = **诊断完成·修复中**(MasterUI lane·派单 1786432243998-MasterUI)
+> 记录人 MasterAgent · 2026-08-11 · 状态 = **✅ 已修复·实测复验通过**(MasterUI lane 交付·派单 1786432243998-MasterUI)
 > 可吸收性 = **平台面**(任何 genesis 派生 bus 的同款 WebUI `build_bi` 同病)
 
 ## 一句话
@@ -24,12 +24,16 @@
 
 ## 吸收单元 / 修法
 给 `build_bi()` 加 TTL 缓存,pattern 同文件内 `_health_cache` / `_dispatch_cache` / `_fleet_cache`;最好带**后台刷新线程**(同 `_refresh_fleet`)使 request 路径【零 psutil】,或 stale-while-revalidate(返缓存即时·后台刷新)。TTL 建议 10~15s(BI 是慢变总览,poll 也是 10s)。
-- 涉及文件:`ui/api.py :: build_bi`(+ 可能一个 `_bi_cache` 模块级字典 / 后台 refresher)。
-- commit 号:**待 MasterUI 交付后补**。
 
-## 验收
-- `/api/bi` request 路径命中缓存 **<50ms**(p95);数据新鲜度 ≤ TTL。
-- `ui_smoke` 保持全过;`bus_smoke` 不受影响。
+**MasterUI 实际实现**(2026-08-11 交付):
+- `ui/api.py`:拆出 `_compute_bi`=原重算体(psutil 进程树遍历×N 角色);`build_bi()` 改成只读 `_bi_cache`(SWR·冷启才内联算一次)=请求路径零 psutil;`start_bi_refresher(12)` 后台线程每 12s 刷新、首轮立即跑。
+- `ui/server.py`:refresher 挂进后台刷新序列、删冗余 `_prewarm`。
+- commit 号:**待 MasterUI 提交后回填**(交付时改动尚在工作树)。
+
+## 验收(✅ 实测通过)
+- `/api/bi` request 路径:**1000ms → ~3ms**(300×);MasterAgent 侧连测 4 次全 <4ms 复验。
+- 数据完整:per_role 20 / sys_total / model_counts 齐。
+- `ui_smoke` **83/83 绿**·无回归;`bus_smoke` 不受影响。
 - 平台三问:①归属=平台机制 ✓ ②清除=无业务数据 ✓ ③换域=不需改平台代码 ✓。
 
 ## scope 提示(给吸收方 + 本 bus)
