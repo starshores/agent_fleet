@@ -776,7 +776,8 @@ function drawTrend(daily, opt){
     }); })();
   let pk=-1, pkv=-1;
   all.forEach((p,i)=>{ const v=vals[i]; if(v==null) return; if(v>pkv){pkv=v;pk=i;}
-    const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,2.5,0,7); ctx.fillStyle=lineColor; ctx.fill();
+    const zero=(p.src==='zero'||p.src==='vacation');   // 无使用日=弱化点(浅色·小)区别真测行(Master数分契约:src=zero 视觉可辨)
+    const px=X(i),py=Y(v); ctx.beginPath(); ctx.arc(px,py,zero?1.6:2.5,0,7); ctx.fillStyle=zero?UC.dim:lineColor; ctx.fill();
     pts.push({x:px,y:py,date:p.date,v:v,src:p.src,cost:p.cost_usd,calls:p.calls,
       inp:p.input,out:p.output,cr:p.cache_read,cw:(p.cache_write_5m||0)+(p.cache_write_1h||0)}); });
   if(pk>=0){ const px=X(pk),py=Y(pkv); ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fillStyle=UC.dead; ctx.fill(); }
@@ -797,11 +798,14 @@ function _bindTrendHover(cvId, tipId){
     pts.forEach(p=>{const dd=Math.abs(p.x-mx); if(dd<bd){bd=dd;best=p;}});
     const lbl=cv._mode==='total'?'tok 总':'tok io';
     const tag = best.src==='backfill' ? ' <span style="color:'+UC.idle+'">·backfill日聚合</span>'
-              : best.src==='vacation' ? ' <span style="color:'+UC.idle+'">·无使用</span>' : '';
+              : best.src==='vacation' ? ' <span style="color:'+UC.idle+'">·无使用</span>'
+              : best.src==='zero' ? ' <span style="color:'+UC.idle+'">·无使用</span>' : '';
     let line = best.src==='backfill'
       ? fmtN(best.v)+' tok <span class="muted">(stats-cache·口径或异)</span>'
       : best.src==='vacation'
       ? '0 tok <span class="muted">(无使用)</span>'
+      : best.src==='zero'
+      ? '0 tok <span class="muted">(当天无使用·已知零)</span>'
       : fmtN(best.v)+' '+lbl+(best.cost!=null?' · '+usd(best.cost)+' 参考':'')+(best.calls!=null?' · '+fmtN(best.calls)+' calls':'');
     // 单日 输入/输出/缓存比(仅逐条 ETL 段有拆分;缓存比=cache_read/(cache_read+cache_write+input))
     if(best.inp!=null && best.src!=='backfill' && best.src!=='vacation'){

@@ -1467,6 +1467,22 @@ def _augment_daily_with_backfill(data):
                        "cost_usd": None, "calls": None, "messages": msgs, "sessions": sess,
                        "tool_calls": tools, "by_model": bymodel, "source": source})
             bf_dates.add(dt)
+        # backfill 区间【内部】缺口(daily_backfill 表本身跳过的日子·多为 3-4 月周末无使用)→ 补 src='zero'。
+        # 数据真实性:落在连续 backfill 数据区间 [min,max] 内、两侧有数据(=stats-cache 当时在跑)→
+        # 无记录=当天真无使用=【已知的零】(非丢失/非插值,沿用 vacation 段同口径·Master数分 2026-08-10 收尾建议)。
+        bfzero = []
+        if bf_dates:
+            try:
+                cur = date.fromisoformat(min(bf_dates))
+                last = date.fromisoformat(max(bf_dates))
+                while cur < last:
+                    ds = cur.isoformat()
+                    if ds not in bf_dates and ds not in existing:
+                        bfzero.append({"date": ds, "src": "zero", "tokens_total": 0,
+                                       "tokens_io": 0, "cost_usd": 0, "calls": 0})
+                    cur += timedelta(days=1)
+            except Exception:
+                pass
         gap = []
         if bf_dates and existing:
             try:
@@ -1482,12 +1498,12 @@ def _augment_daily_with_backfill(data):
                     cur += timedelta(days=1)
             except Exception:
                 pass
-        merged = bf + gap + daily
+        merged = bf + bfzero + gap + daily
         merged.sort(key=lambda x: x.get("date") or "")
         data["daily"] = merged
         _first = (merged[0]["date"] if merged else None)   # 历史真起点(=最早一条,当前=stats-cache firstSessionDate 2026-03-27)
         data["backfill_meta"] = {
-            "n_backfill": len(bf), "n_gap": len(gap),
+            "n_backfill": len(bf), "n_gap": len(gap), "n_bfzero": len(bfzero),
             "bf_from": (min(bf_dates) if bf_dates else None),
             "bf_to": (max(bf_dates) if bf_dates else None),
             "vac_from": (gap[0]["date"] if gap else None),

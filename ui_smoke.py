@@ -57,6 +57,9 @@ MUST_KEYS = {
     "/api/sessions": ["ok", "sessions", "live_count", "dead_count"],
 }
 LOADING_OK = {"/api/health", "/api/ctx"}
+# 慢端点单独放宽 HTTP 超时:reap 无缓存·每次 shell agentbus reap --dry-run 做 psutil 全进程扫描
+# (裸跑 ~13s,并发压力下更久),其子进程超时=40s → smoke 默认 30s 会先超时误报回归。给它 >40s。
+SLOW_EP = {"/api/reap": 50}
 
 
 def _get(base, path, timeout=30):
@@ -112,7 +115,7 @@ def run_tests(base, port):
     for ep in GET_ENDPOINTS:
         name = "GET " + ep
         try:
-            st, body = _get(base, ep)
+            st, body = _get(base, ep, timeout=SLOW_EP.get(ep, 30))
             j = json.loads(body.decode("utf-8"))
             add(name, st == 200 and isinstance(j, (dict, list)), "%s bytes=%d" % (st, len(body)))
             if ep in MUST_KEYS and isinstance(j, dict):
