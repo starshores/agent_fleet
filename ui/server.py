@@ -140,23 +140,15 @@ def main():
     start_health_refresher(25)        # 唯一健康刷新者:25s 子进程 health --json 刷新 _health_cache(请求路径零扫描)
     start_ctx_refresher(12)           # 唯一上下文占用刷新者:12s bounded jsonl 尾读刷新 _ctx_cache(1M 撞墙预警,请求路径零现读)
     start_who_refresher(20)           # 唯一 who 刷新者:20s 子进程 who --json 刷新 _who_cache(供上下文模块校验 role 在岗,请求路径零扫描)
+    start_bi_refresher(12)            # 唯一 BI 刷新者:12s 跑 _compute_bi(psutil 进程树遍历)刷新 _bi_cache(请求路径零 psutil·根治 BI tab 卡顿 2026-08-11)
     start_status_pusher(15)           # daemon→agent 定时通信:15s 刷新 fleet_status.json(复用上面缓存的扫描,不再自扫)
     if not args.no_supervise:
         start_supervisor()
     start_selfwake_guard(180)         # 常驻自醒探测网(Master令·B):180s 跑 ab selfwake-guard,掉自醒→inbox提醒+toast(8799 always-on 驱动,不依赖 agent 醒着)
     start_maint(1800)                 # B2+B3(2026-07-21):30min 维护心跳=reap(退卡死/孤儿)+ todos-archive(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态·安全无人值守
     start_route_reap(300)             # 工作组路由超时自愈(MasterAgent令·2026-07-23):5min 独立 tick 跑 ab route-reap(超15min未done路由任务re-route)·不搭30min start_maint(任务池太粗)·幂等no-op
-    # 预热缓存(后台线程,不阻塞启动):
-    #  · build_bi() 跑一遍 → 填充 _proc_cache(psutil.Process 对象 + cpu_percent 基线),
-    #    使【首个真实 /api/bi】~220ms 而非冷启 ~4.5s(_proc_cache 无 TTL,长期受益,首屏 BI 关键)。
-    #  · compute_fleet_cached() → 首个 /api/state 若在 3s TTL 内命中热缓存(快速重连时受益)。
-    #  · 舰队缓存由 start_fleet_refresher 首轮立即填充(~4s),无需在此预热。
-    def _prewarm():
-        try:
-            build_bi()
-        except Exception:
-            pass
-    threading.Thread(target=_prewarm, daemon=True).start()
+    # BI 预热 + 保鲜已由 start_bi_refresher(12) 首轮立即跑接管(暖 _proc_cache + 填 _bi_cache),
+    # 原一次性 _prewarm build_bi() 已并入,不再单列。舰队缓存由 start_fleet_refresher 首轮填充。
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     srv.daemon_threads = True
     url = "http://%s:%d/" % (args.host, args.port)

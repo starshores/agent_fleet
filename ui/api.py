@@ -389,8 +389,14 @@ def _agg_metrics(rows):
     return d
 
 
-def build_bi():
-    """运营总览口径:今日/近24h 全队总消耗 + 各角色排名(近24h)+ 当前在跑 + 系统资源快照。"""
+_bi_cache = {"ts": 0.0, "data": None}
+_bi_lock = threading.Lock()
+
+
+def _compute_bi():
+    """运营总览口径:今日/近24h 全队总消耗 + 各角色排名(近24h)+ 当前在跑 + 系统资源快照。
+    ⚠ 重:含 _proc_tree_usage psutil 进程树遍历 × N 角色(~1s),绝不在请求线程直接调——
+    经 build_bi() 的 TTL 缓存 + 后台刷新线程(start_bi_refresher)间接产出(请求路径零 psutil)。"""
     now = time.time()
     day0 = _local_day_start(now)
     h24 = now - 86400
@@ -519,6 +525,49 @@ def build_bi():
         "psutil": ab.psutil is not None,
         "model_counts": model_counts,        # ← 各模型会话数([{model,sessions,roles}])
     }
+
+
+def _refresh_bi():
+    try:
+        data = _compute_bi()
+        with _bi_lock:
+            _bi_cache["data"] = data
+            _bi_cache["ts"] = time.time()
+    except Exception:
+        pass   # 失败保留上次缓存,下个 tick 再试(绝不退回请求线程现算 psutil)
+
+
+def build_bi():
+    """/api/bi 请求入口:只读 _bi_cache(后台线程保鲜)→ 请求路径零 psutil、<50ms 返回。
+    根治 WebUI 卡顿(MasterAgent 定位 2026-08-11):原每次现算 _proc_tree_usage×N 角色 ~1s 同步跑在
+    请求线程,ThreadingHTTPServer+GIL 下 BI tab 每 10s 轮询即冻结全 UI ~1s。
+    stale-while-revalidate:缓存已就绪则即时返(哪怕略 stale·BI 是慢变总览);冷启未就绪才内联算一次。"""
+    with _bi_lock:
+        data = _bi_cache["data"]
+    if data is not None:
+        return data
+    _refresh_bi()                       # 冷启:缓存未就绪 → 算一次(仅首个请求付费),之后后台线程接管
+    with _bi_lock:
+        return _bi_cache["data"] or {"now": time.strftime("%H:%M:%S", time.localtime()),
+                                     "per_role": [], "running": [], "psutil": ab.psutil is not None}
+
+
+def start_bi_refresher(interval=12):
+    """唯一的 BI 刷新者:后台线程每 interval 秒跑一次 _compute_bi() 刷新 _bi_cache。
+    psutil 进程树遍历移出请求线程 → 请求零扫描、不再周期性握 GIL 冻结 UI。BI 是慢变总览,12s 足够新。
+    首轮立即跑(启动即暖 _proc_cache + 填 _bi_cache,替代原 _prewarm 的一次性 build_bi)。"""
+    stop = threading.Event()
+
+    def loop():
+        while True:
+            _refresh_bi()
+            if stop.wait(interval):
+                break
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print("[bi] 后台 BI 刷新线程已启动,间隔 %ds(psutil 进程树遍历移出请求线程,请求零扫描)" % interval)
+    return t
 
 
 # =============================================================
