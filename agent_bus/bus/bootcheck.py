@@ -82,13 +82,27 @@ def _session_reads(role, sid):
 
 
 def _sid_of(role):
-    sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if sid:
-        return sid
+    """确定用哪个 session_id 过滤【目标 role】的 session_reads.jsonl。
+    关键:目标 role 的 reads 只该用【它自己会话】的 sid 过滤。env CLAUDE_CODE_SESSION_ID 是
+    【调用方】的 sid——仅当查的就是【本会话绑定的 role】时它才等于目标 sid;跨角色查(--role 别人)
+    误用它会拿调用方 sid 过滤对方 reads → 全不匹配 → 假 ⛔(培训师 2026-08-12 抓:培训师查云文档假报未装载)。"""
+    env_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    # 查自己(role == 本会话绑定角色):用 env sid——本会话真实、且比 presence.json 更新(presence 可能 stale)。
     try:
-        return json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("session_id")
+        from bus.mailbox import _resolve_self_role
+        if env_sid and role == _resolve_self_role():
+            return env_sid
     except Exception:
-        return None
+        pass
+    # 查别人 / 未绑定:用【目标 role】presence.json 的 session_id(不是调用方的 env sid)。
+    try:
+        psid = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("session_id")
+        if psid:
+            return psid
+    except Exception:
+        pass
+    # 兜底:目标无 presence → env(退化,总比 None 强);自己也没 env → None。
+    return env_sid
 
 
 def boot_check(role, sid=None):
