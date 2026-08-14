@@ -213,9 +213,10 @@ def bus_tray_counts():
         if r.get("parked") or vc == "parked":
             p += 1
             continue                     # 故意暂离,不算掉线
-        # 掉线口径(Master数分2 定·MasterUI 对齐 2026-08-14):dead(进程已退·注册过角色但进程死) ∪
-        #   self_wake stale(⚠掉线·会话在但 wait 进程/心跳超期);已排 parked + pseudo(上面 continue)。
-        if vc == "dead" or r.get("self_wake") == "stale":
+        # 掉线口径(Master数分2 定·MasterUI 对齐 2026-08-14):【只】self_wake == "stale"(⚠掉线=在场但断连·
+        #   会话进程还活着但 wait/心跳超期=收不到消息)。不含 dead(=缺席/退出·崩溃vs正常关tab有歧义·
+        #   塞进会虚高告警);"所有不可用"是另一指标(该正名"不可用数")。天然排 parked(态≠stale)+ pseudo(self_wake=None)。
+        if r.get("self_wake") == "stale":
             offline += 1
         if vc in ("live", "idle", "warn"):
             n += 1
@@ -253,6 +254,7 @@ def bus_tray_counts():
                 stale += 1
     return {"ok": True, "loading": loading, "present": n, "running": len(running),
             "silent": k, "parked": p, "stale": stale, "offline": offline,
+            "maint": bool(get_maintenance().get("active")),   # 维修模式:托盘据此弱化掉线spike(Master数分2 caveat·别让预期停机看着像故障)
             "as_of": time.strftime("%H:%M:%S"),
             "source": "webui-fleet-cache"}
 
