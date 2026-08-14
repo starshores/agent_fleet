@@ -205,12 +205,18 @@ def bus_tray_counts():
     fl = compute_fleet_cached()
     roles = fl.get("roles", []) or []
     loading = bool(fl.get("loading"))
-    alive_names, n, k, p = set(), 0, 0, 0
+    alive_names, n, k, p, offline = set(), 0, 0, 0, 0
     for r in roles:
         vc = r.get("vclass")
+        if r.get("pseudo"):
+            continue                     # 伪角色(bus守卫/unknown)不计任何轴
         if r.get("parked") or vc == "parked":
             p += 1
-            continue
+            continue                     # 故意暂离,不算掉线
+        # 掉线口径(Master数分2 定·MasterUI 对齐 2026-08-14):dead(进程已退·注册过角色但进程死) ∪
+        #   self_wake stale(⚠掉线·会话在但 wait 进程/心跳超期);已排 parked + pseudo(上面 continue)。
+        if vc == "dead" or r.get("self_wake") == "stale":
+            offline += 1
         if vc in ("live", "idle", "warn"):
             n += 1
             alive_names.add(r.get("role"))
@@ -246,7 +252,7 @@ def bus_tray_counts():
             else:
                 stale += 1
     return {"ok": True, "loading": loading, "present": n, "running": len(running),
-            "silent": k, "parked": p, "stale": stale,
+            "silent": k, "parked": p, "stale": stale, "offline": offline,
             "as_of": time.strftime("%H:%M:%S"),
             "source": "webui-fleet-cache"}
 

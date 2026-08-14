@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 bus_tray.py —— agent bus 运转状态 · Windows 系统托盘指示器
-- 托盘图标上直接画【在跑任务的 agent 数】(用户 2026-08-04 定口径:一眼判断是否在干活,0=没活),颜色反映 bus 健康:
-    🟢 绿 = 有 agent 在跑任务 / 🔵 蓝 = 在岗但全 idle / 🟠 橙 = 有静默异常 / 🔴 红 = 全部离线 / ⚪ 灰 = 探测失败
-- 悬停 tooltip 看健康:在岗N · 在跑M · 静默K · 休眠P · 更新时间
+- 托盘图标数字【优先级】(用户 2026-08-14):掉线数>0 → 画【掉线数】(异常态醒目·比在跑更该一眼看到);
+    否则画【在跑数 M】(用户 2026-08-04 口径:一眼判断是否在干活,0=没活)。颜色反映 bus 健康:
+    🔴 红 = 有掉线 agent(优先) / 🟢 绿 = 有 agent 在跑任务 / 🔵 蓝 = 在岗但全 idle / 🟠 橙 = 有静默异常 / 🔴 红 = 全部离线 / ⚪ 灰 = 探测失败
+- 悬停 tooltip 看健康:⚠掉线X(有则提最前) · 在岗N · 在跑M · 静默K · 休眠P · 更新时间
 - 双击 = 打开本机控制台 WebUI;右键 = 刷新 / 打开控制台 / 退出
 纯本机运行(只跑本机 agentbus.py who --json + 打开 127.0.0.1 控制台),不联网、不外发任何数据。
 数据口径由 Master数分2(bus 监控)定义;数据源 = agentbus.py who --json。
@@ -72,7 +73,8 @@ def _probe_webui():
         if not d.get("ok") or d.get("loading"):
             return None
         return (int(d.get("present", 0)), int(d.get("running", 0)),
-                int(d.get("silent", 0)), int(d.get("parked", 0)), int(d.get("stale", 0)))
+                int(d.get("silent", 0)), int(d.get("parked", 0)), int(d.get("stale", 0)),
+                int(d.get("offline", 0)))
     except Exception:
         return None
 
@@ -101,6 +103,11 @@ def _probe_local():
     n = len(present)
     k = sum(1 for r in present if "静默" in (r.get("verdict") or ""))
     p = sum(1 for r in roles if real(r) and r.get("parked"))
+    # 掉线口径(对齐 WebUI bus_tray_counts·Master数分2 定 2026-08-14):dead(注册过但进程死=present且not alive)
+    #  ∪ self_wake stale(⚠掉线);排 parked+pseudo+retired(real() 已排 pseudo/retired)。who --json 无 vclass,
+    #  用 present&not alive 等价 dead。WebUI 在跑时走 _probe_webui 读权威 offline,本兜底仅 WebUI down 时用。
+    offline = sum(1 for r in roles if real(r) and not r.get("parked")
+                  and ((r.get("present") and not r.get("alive")) or r.get("self_wake") == "stale"))
 
     now = time.time()
     running = set()
@@ -133,7 +140,7 @@ def _probe_local():
                     running.add(role)
             else:
                 stale += 1
-    return (n, len(running), k, p, stale)
+    return (n, len(running), k, p, stale, offline)
 
 
 def _probe():
@@ -144,7 +151,9 @@ def _probe():
     return _probe_local()
 
 
-def _pick_color(n, m, k, stale):
+def _pick_color(n, m, k, stale, offline=0):
+    if offline > 0:
+        return "down"   # 有掉线 agent = 异常态醒目(告警红·优先于一切·用户 2026-08-14)
     if n == 0:
         return "down"
     if m > 0:
@@ -200,6 +209,19 @@ def _update_tray(n, tip, color):
             pass
 
 
+def _fmt_tray(n, m, k, p, stale, offline):
+    """算托盘图标数字 + tooltip。图标数字【优先级】(用户 2026-08-14):
+    掉线数>0 → 图标显示【掉线数】(异常态醒目·比在跑更该一眼看到);否则显示【在跑数 m】(正常态·维持现状口径)。
+    tooltip 恒列全轴,掉线>0 时把「⚠掉线X」提到最前醒目位。返回 (图标数字, tooltip 串)。"""
+    num = offline if offline > 0 else m
+    state = "运转中" if n else "全部离线"
+    off = ("⚠掉线%d · " % offline) if offline else ""
+    tip = "bus %s · %s在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
+        state, off, n, m, k, p, (" · 卡claim%d" % stale) if stale else "",
+        time.strftime("%H:%M:%S"))
+    return num, tip
+
+
 def _poll_loop():
     while True:
         r = _probe()
@@ -207,12 +229,9 @@ def _poll_loop():
             tip = "bus 探测失败(agentbus who 无响应)"
             _update_tray("?", tip, "err")
         else:
-            n, m, k, p, stale = r
-            hhmm = time.strftime("%H:%M:%S")
-            state = "运转中" if n else "全部离线"
-            tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
-                state, n, m, k, p, (" · 卡claim%d" % stale) if stale else "", hhmm)
-            _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑 agent 数(用户 2026-08-04 定:0=没在干活;在岗数悬停看)
+            n, m, k, p, stale, offline = r
+            num, tip = _fmt_tray(n, m, k, p, stale, offline)
+            _update_tray(num, tip, _pick_color(n, m, k, stale, offline))
         time.sleep(POLL_SEC)
 
 
@@ -254,11 +273,9 @@ def _refresh_once():
     if r is None:
         _update_tray("?", "bus 探测失败", "err")
     else:
-        n, m, k, p, stale = r
-        tip = "bus %s · 在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
-            "运转中" if n else "全部离线", n, m, k, p,
-            (" · 卡claim%d" % stale) if stale else "", time.strftime("%H:%M:%S"))
-        _update_tray(m, tip, _pick_color(n, m, k, stale))  # 图标数字 = 在跑 agent 数(同 _poll_loop)
+        n, m, k, p, stale, offline = r
+        num, tip = _fmt_tray(n, m, k, p, stale, offline)
+        _update_tray(num, tip, _pick_color(n, m, k, stale, offline))
 
 
 def _on_destroy(hwnd, msg, wparam, lparam):

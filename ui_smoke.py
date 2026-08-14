@@ -49,7 +49,7 @@ MUST_KEYS = {
     "/api/bi": ["per_role", "today_usage", "running"],
     "/api/fleet-state": ["state", "icon", "counts", "guard"],
     "/api/health": ["healthy", "selfwake", "queues"],
-    "/api/tray": ["ok", "running", "stale"],
+    "/api/tray": ["ok", "running", "stale", "offline"],
     "/api/archive": ["ok", "retired", "resume"],
     "/api/usage": ["totals", "daily", "by_project"],
     "/api/ctx": ["ok", "rows"],
