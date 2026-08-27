@@ -1,6 +1,7 @@
 {
-  "_comment": "执行 daemon 工作池。【2026-07-01 用户令:全部 daemon 移除、拉出自启名单】→ 全队前台 CLI。【2026-08-27 用户令:重启 daemon 路径】——因 per-role effort 只有 daemon/dispatch 面能全自动注入 --effort(交互 tab 注入不到),故用 daemon 承载。supervise 拉起、worker_daemon 每任务 claude -p 按角色注入 effort/model(#1 机制)。要加/恢复 daemon:{role,cwd,wait_timeout} 进 daemons 数组;停某 daemon:移除其条目(supervise 下轮当孤儿回收)。【2026-08-27 舰队 daemon 化·轨A kill-convert 推进中】:Master数分定候选+失能自评+kill交互 pid,MasterAgent加条目+supervise拉起。已转:示例组员5(max硬案)。",
+  "_comment": "执行 daemon 工作池。【2026-07-01 用户令:全部 daemon 移除、拉出自启名单】→ 全队前台 CLI。【2026-08-27 用户令:重启 daemon 路径】——因 per-role effort 只有 daemon/dispatch 面能全自动注入 --effort(交互 tab 注入不到),故用 daemon 承载。supervise 拉起、worker_daemon 每任务 claude -p 按角色注入 effort/model(#1 机制)。要加/恢复 daemon:{role,cwd,wait_timeout} 进 daemons 数组;停某 daemon:移除其条目(supervise 下轮当孤儿回收)。【2026-08-27 舰队 daemon 化·轨A kill-convert 推进中】:Master数分定候选+失能自评+kill交互 pid,MasterAgent加条目+supervise拉起。已转:示例组员5(max硬案)、会话考古(用户令·cwd=agent_fleet·离散per-session提炼天然daemon-fit·先unpark)。其余角色按候选+失能自评逐步推进。",
   "daemons": [
-    {"role": "示例组员5", "cwd": "C:/BaseSpace/XXX", "wait_timeout": 300}
+    {"role": "示例组员5", "cwd": "C:/BaseSpace/XXX", "wait_timeout": 300},
+    {"role": "会话考古", "cwd": "C:/apphome/agent_fleet", "wait_timeout": 300}
   ]
 }

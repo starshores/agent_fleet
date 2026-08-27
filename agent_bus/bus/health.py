@@ -706,9 +706,12 @@ def cmd_supervise(args):
         if args.dry_run:
             actions.append(("将重启(dry-run)", role)); continue
         try:
+            # encoding+errors 显式(2026-08-27):PowerShell 输出常含 GBK 字节(0xcc…),裸 text=True 在
+            # PYTHONUTF8=1 下按 utf-8 解码会 UnicodeDecodeError 崩读取线程(批量拉起时踩过)→ errors=replace 容错。
+            # "STARTED" 是 ASCII 信号、replace 不损;daemon 已 detached 先起,读崩也不影响拉起,只丢自报。
             r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(sw),
                                 "-Role", role, "-Cwd", str(cwd), "-WaitTimeout", str(wt)],
-                               capture_output=True, text=True, timeout=40)
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40)
             out = (r.stdout or "").strip()
             actions.append(("已拉起" if "STARTED" in out else ("被拒/跳过:" + out), role))
         except Exception as e:
