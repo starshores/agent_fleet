@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 94,
+  "total": 96,
   "generated": "2026-07-10",
   "generated_by": "Master数分2 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -17,7 +17,9 @@
    "计划": "设计中未实现",
    "退役": "已停用"
   },
-  "freshness_rule": "机制增/改/退役时同步更新本文件(纳入 1+1 纪律),避免又漂成 stale。"
+  "freshness_rule": "机制增/改/退役时同步更新本文件(纳入 1+1 纪律),避免又漂成 stale。",
+  "last_updated": "2026-08-27",
+  "last_updated_by": "MasterAgent(补 effort注入+daemon接续 两机制·按 freshness_rule 同步)"
  },
  "categories": [
   {
@@ -524,6 +526,18 @@
      "carrier": "_oldest_claimable()+_wait_core()",
      "status": "在用",
      "gated_by_cap": "high-risk"
+    },
+    {
+     "name": "per-role/per-task effort+model 注入",
+     "does": "daemon/dispatch 起 claude -p 时按角色/任务注入 --effort(推理档)与 --model;优先级 dispatch任务级>agents.json[role].effort>全局settings。交互tab注入不到=吃全局。",
+     "carrier": "claude_run.resolve_effort()/resolve_model()+run_streaming()注 --effort/--model",
+     "status": "在用·2026-08-27(commit 28306a3)"
+    },
+    {
+     "name": "daemon 跨任务上下文接续(外置·三层)",
+     "does": "daemon绝不进程内背全上下文。A|工作态落档_workstate/<thread>.json+--continue-from-state重读(默认·省);B|CLI协调位持线程传指针;C|--resume-session全上下文(贵·session_id从上轮回执取)。",
+     "carrier": "claude_run.resolve_continue()+run_streaming(resume_session/session_id);_workstate/README schema",
+     "status": "在用·2026-08-27(commit f219e82·bus_smoke 43/43)"
     }
    ]
   },
