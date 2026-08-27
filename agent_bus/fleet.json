@@ -1,4 +1,6 @@
 {
-  "_comment": "执行 daemon 工作池。【2026-07-01 用户令:全部 daemon 移除、拉出自启名单】—— daemons 清空后 supervise 不再自动拉起任何后台 daemon,全队转前台 CLI 形态(符合前台化趋势 onboarding-execution-body-migration)。要恢复某 role daemon:把其条目 {role,cwd,wait_timeout} 加回 daemons 数组即可。",
-  "daemons": []
+  "_comment": "执行 daemon 工作池。【2026-07-01 用户令:全部 daemon 移除、拉出自启名单】→ 全队前台 CLI。【2026-08-27 用户令:重启 daemon 路径】——因 per-role effort 只有 daemon/dispatch 面能全自动注入 --effort(交互 tab 注入不到),故用 daemon 承载【示例组员5·effort=max 硬案专跑复制体】:supervise 拉起它、worker_daemon 每任务 claude -p 带 --effort max(#1 机制)。要加/恢复 daemon:{role,cwd,wait_timeout} 进 daemons 数组;停某 daemon:移除其条目(supervise 下轮当孤儿回收)。",
+  "daemons": [
+    {"role": "示例组员5", "cwd": "C:/BaseSpace/XXX", "wait_timeout": 300}
+  ]
 }

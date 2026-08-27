@@ -7,17 +7,20 @@
  "Master": {
   "registered": "2026-06-22T11:27:43",
   "desc": "业务总控:处理其他事务,把业务任务外派给各业务 agent 并收结果。协调层,不 loop。",
-  "caps": ["bus-comms", "self-wake", "confidentiality"]
+  "caps": ["bus-comms", "self-wake", "confidentiality"],
+  "effort": "xhigh"
  },
  "MasterUI": {
   "registered": "2026-06-22T11:39:32",
   "desc": "agent bus 可视化 WebUI(127.0.0.1:8799)的开发与维护专责。",
-  "caps": ["bus-comms", "self-wake", "confidentiality", "webui"]
+  "caps": ["bus-comms", "self-wake", "confidentiality", "webui"],
+  "effort": "xhigh"
  },
  "MasterAgent": {
   "registered": "2026-06-22T15:47:39",
   "desc": "基础设施层(对 Master 自身的 Master):演进 agent bus / WebUI / daemon / 通知机制 / 记忆备份;协调层,不 loop。",
-  "caps": ["bus-comms", "self-wake", "confidentiality"]
+  "caps": ["bus-comms", "self-wake", "confidentiality"],
+  "effort": "xhigh"
  },
  "GIT管理": {
   "registered": "2026-06-23T16:55:55",
@@ -28,7 +31,8 @@
   "registered": "2026-06-24T10:30:00",
   "desc": "新人培训师:把新加入 bus 的 agent 带熟(只管总线协议层,不碰业务口径)。手动触发——收到「带一下 X」任务时,读 agent_fleet/BUS_ONBOARDING.md 按流程:① 握手验证 X 的自醒通信;② 按 X 在 agents.json 的 caps 只发对应能力模块并逐项确认;③ 回报掌握情况。",
   "caps": ["bus-comms", "self-wake", "confidentiality"],
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "effort": "medium"
  },
  "示例成员": {
   "registered": "2026-07-03T14:57:13"
@@ -51,7 +55,8 @@
    "sql-fetch",
    "high-risk"
   ],
-  "desc": "示例组数据分析/数仓诊断:候选层/ETL/拉链表、跨库一致性核查、输出差异根因;写操作只设计+核验、走审批不绕过。路由'数据对不对/跨库对账/输出差异'找它 【示例组池·与示例组员同职互换成员】"
+  "desc": "示例组数据分析/数仓诊断:候选层/ETL/拉链表、跨库一致性核查、输出差异根因;写操作只设计+核验、走审批不绕过。路由'数据对不对/跨库对账/输出差异'找它 【示例组池·与示例组员同职互换成员】",
+  "effort": "high"
  },
  "示例组员3": {
   "registered": "2026-07-08T10:12:50",
@@ -62,7 +67,8 @@
    "sql-fetch",
    "high-risk"
   ],
-  "desc": "示例组数据分析/数仓诊断(示例组可互换复制体·与示例组员同能力池):候选层/ETL/拉链表、跨库一致性核查(键绑定指纹/段对账)、源库对账、字段迁移核对/落库复核;写操作只设计+核验走审批不绕过。可互换承接示例组池活。"
+  "desc": "示例组数据分析/数仓诊断(示例组可互换复制体·与示例组员同能力池):候选层/ETL/拉链表、跨库一致性核查(键绑定指纹/段对账)、源库对账、字段迁移核对/落库复核;写操作只设计+核验走审批不绕过。可互换承接示例组池活。",
+  "effort": "high"
  },
  "__wgm1__": {
   "registered": "2026-07-10T15:44:58",
@@ -89,7 +95,8 @@
    "data-analysis",
    "bus-monitoring",
    "token-usage-etl"
-  ]
+  ],
+  "effort": "high"
  },
  "会话考古": {
   "registered": "2026-07-15T09:48:55",
@@ -102,5 +109,19 @@
  },
  "示例成员2": {
   "registered": "2026-07-15T11:23:54"
+ },
+ "示例组员5": {
+  "registered": "2026-08-27T10:00:00",
+  "caps": [
+   "bus-comms",
+   "self-wake",
+   "confidentiality",
+   "sql-fetch",
+   "high-risk"
+  ],
+  "desc": "示例组数据分析/数仓诊断(示例组员复制体·示例组同能力池·【硬案max档】):专跑多层深根因/连续5+次探测的硬诊断;写操作只设计+核验走审批。effort=max常驻(区别于示例组员的high·硬案路由到它,免逐案--effort)。",
+  "effort": "max",
+  "trained": true,
+  "trained_by": "继承示例组员同能力池(复制体)"
  }
 }
