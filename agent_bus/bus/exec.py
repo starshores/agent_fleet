@@ -31,6 +31,8 @@ def cmd_dispatch(args):
         "id": tid, "from": frm, "name": args.name or "adhoc",
         "title": args.title or "", "task": args.task, "cwd": cwd,
         "timeout": args.timeout, "created": _now(), "kind": "adhoc",
+        # per-task effort/model 覆盖(2026-08-27):非空则单次拉满(如硬诊断 --effort max),平时吃 role/全局
+        "effort": getattr(args, "effort", None), "model": getattr(args, "model", None),
     }
     dd = BUS / "_dispatch"
     dd.mkdir(parents=True, exist_ok=True)

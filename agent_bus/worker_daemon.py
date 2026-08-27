@@ -69,7 +69,10 @@ def run_task(role, cwd, task):
     # (prompt 经 stdin 传,避免 claude.cmd 批处理 shim 在首换行截断多行 argv。)
     import claude_run
     live = ab.BUS / role / "live.log"
-    return claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600)
+    # per-role effort/model 解析(镜像·2026-08-27):agents.json[role].effort/model → 无则继承全局
+    eff = claude_run.resolve_effort(role)
+    mdl = claude_run.resolve_model(role)
+    return claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600, effort=eff, model=mdl)
 
 
 def main():

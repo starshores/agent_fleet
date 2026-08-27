@@ -60,7 +60,10 @@ def main():
     # 流式跑 claude -p,过程实时写 live.log(tail -f 可看),并拿最终结果
     import claude_run
     live = ab.BUS / "_dispatch" / (args.id + ".live.log")
-    status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout)
+    # per-task effort 覆盖(2026-08-27):rec.effort(dispatch --effort) > name 的 role 声明 > 全局继承
+    eff = claude_run.resolve_effort(name, rec.get("effort"))
+    mdl = rec.get("model") or claude_run.resolve_model(name)
+    status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout, effort=eff, model=mdl)
     ab.record_metric(name, args.id, title, status, meta, kind="dispatch")   # BI 资源消耗埋点
 
     # 回填给派发方(直接写 <from>/done/<id>.json,无需 inbox 任务)

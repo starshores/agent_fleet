@@ -25,13 +25,54 @@ def _now():
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
 
 
-def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600):
+def resolve_effort(role, task_effort=None, agents_path=None):
+    """解析某 role 本次 claude -p 的 effort(推理档位)。
+    优先级(镜像 per-role 模型解析·2026-08-27 用户令):
+      task_effort(per-task/dispatch 覆盖) > agents.json[role].effort(role 级声明) > None(继承全局 settings effortLevel)。
+    返回 effort 字符串(low/medium/high/xhigh/max)或 None(=不加 --effort,claude 吃全局)。"""
+    if task_effort:
+        return task_effort
+    try:
+        if agents_path is None:
+            agents_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents.json")
+        d = json.load(open(agents_path, encoding="utf-8"))
+        ags = d.get("agents", d) if isinstance(d, dict) else {}
+        rec = ags.get(role) if isinstance(ags, dict) else None
+        if isinstance(rec, dict) and rec.get("effort"):
+            return rec["effort"]
+    except Exception:
+        pass
+    return None
+
+
+def resolve_model(role, agents_path=None):
+    """解析某 role 的 model 声明(agents.json[role].model);None=继承全局 settings model。
+    (顺带接线:此前 agents.json 的 model 字段声明了但无代码读取=空转;现与 effort 同处解析。)"""
+    try:
+        if agents_path is None:
+            agents_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents.json")
+        d = json.load(open(agents_path, encoding="utf-8"))
+        ags = d.get("agents", d) if isinstance(d, dict) else {}
+        rec = ags.get(role) if isinstance(ags, dict) else None
+        if isinstance(rec, dict) and rec.get("model"):
+            return rec["model"]
+    except Exception:
+        pass
+    return None
+
+
+def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, model=None):
     """返回 (status, result_text, meta)。过程实时写 live_log。
     meta = {tokens_in, tokens_out, cache_read, cache_creation, cost_usd, duration_ms, num_turns}
-    (从 stream-json 的 result 事件抓,供 BI 资源消耗统计;抓不到则为空 dict。)"""
+    (从 stream-json 的 result 事件抓,供 BI 资源消耗统计;抓不到则为空 dict。)
+    effort/model:非空则注入 claude -p 的 --effort/--model(per-role/per-task);None=继承全局 settings。"""
     meta = {}
     cmd = [claude_bin, "-p", "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions"]
+    if model:
+        cmd += ["--model", str(model)]
+    if effort:
+        cmd += ["--effort", str(effort)]
     try:
         lf = open(live_log, "w", encoding="utf-8", errors="replace")
     except Exception:
