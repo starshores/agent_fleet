@@ -1685,7 +1685,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -1710,7 +1710,94 @@ function showTab(t){
   else if(t==='fleet') load();
   else if(t==='paths'){ loadPaths(); loadStorage(); }
   else if(t==='fleetlog') loadFleetLog();
+  else if(t==='asr') loadASR();
 }
+// 🎙 语音转写(本地 ASR·实时)——设备选择 + 启停 + 转录行轮询滚动
+let _asrTimer=null, _asrDevInit=false;
+async function loadASR(){
+  if(!_asrDevInit){ await asrLoadDevices(); _asrDevInit=true; }
+  await asrPollStatus();
+  asrStartPolling();
+}
+async function asrLoadDevices(){
+  const box=document.getElementById('asrDeviceBox'); if(!box) return;
+  box.innerHTML='<div class="muted">读取设备…</div>';
+  try{
+    const d=await (await fetch('/api/asr/devices')).json();
+    if(!d.ok){ box.innerHTML='<div class="muted">设备读取失败:'+esc(d.error||'?')+'</div>'; return; }
+    const models=(d.models||[]).map(m=>'<option value="'+esc(m)+'"'+(m===d.default_model?' selected':'')+'>'+esc(m)+'</option>').join('')||'<option value="">(无模型)</option>';
+    const spk=(d.speakers||[]).map(s=>esc(s.name)).join('、')||'(无)';
+    const mics=(d.mics||[]).map(m=>'<option value="'+esc(m.name)+'">'+esc(m.name)+'</option>').join('');
+    box.innerHTML=
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">'+
+        '<label>音频源:<select id="asrSource">'+
+          '<option value="loopback" selected>🔊 系统声音(线上会议对方)</option>'+
+          '<option value="mic">🎤 麦克风(现场/自己说话)</option>'+
+        '</select></label>'+
+        '<label>模型:<select id="asrModel">'+models+'</select></label>'+
+        '<span class="muted" id="asrSrcHint" style="font-size:11.5px">系统声=默认扬声器回环:'+esc(spk)+'</span>'+
+      '</div>'+
+      '<div id="asrMicWrap" style="display:none;margin-top:6px"><label>麦克风:<select id="asrMic">'+mics+'</select></label></div>';
+    const ss=document.getElementById('asrSource');
+    ss.onchange=()=>{ document.getElementById('asrMicWrap').style.display=ss.value==='mic'?'':'none'; };
+  }catch(e){ box.innerHTML='<div class="muted">设备读取异常:'+esc(e)+'</div>'; }
+}
+async function asrPollStatus(){
+  try{
+    const d=await (await fetch('/api/asr/status')).json();
+    const running=!!d.running, det=d.detail||{}, sess=d.session||{};
+    const sB=document.getElementById('asrStartBtn'), pB=document.getElementById('asrStopBtn'), st=document.getElementById('asrStatus');
+    if(sB) sB.style.display=running?'none':'';
+    if(pB) pB.style.display=running?'':'none';
+    if(st){
+      if(running){ st.textContent='● 转写中 · '+(det.device_name||sess.source||'')+' · 模型 '+(sess.model||''); st.style.color='#3ecf8e'; }
+      else if(det.state==='error'){ st.textContent='⚠ '+(det.msg||'出错'); st.style.color='var(--warn)'; }
+      else { st.textContent='就绪'; st.style.color=''; }
+    }
+    await asrLoadLines(running);
+  }catch(e){}
+}
+async function asrLoadLines(running){
+  const box=document.getElementById('asrLinesBox'); if(!box) return;
+  try{
+    const d=await (await fetch('/api/asr/lines?since=0')).json();
+    if(!d.ok) return;
+    if(!d.lines||!d.lines.length){ box.innerHTML='<div class="muted">'+(running?'监听中…开口说话即出字':'尚无转写。选好音频源点“启动转写”')+'</div>'; return; }
+    const atBottom = box.scrollTop+box.clientHeight >= box.scrollHeight-30;
+    box.innerHTML=d.lines.map(l=>{
+      const t=new Date((l.ts||0)*1000).toLocaleTimeString();
+      const play=l.audio?('<button class="btn ghost mini" style="flex:0 0 auto;font-size:11px;padding:0 6px" title="回放原声" onclick="asrPlay(this,\''+esc(l.audio)+'\')">▶</button>'):'';
+      return '<div style="padding:5px 8px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center">'+play+'<span class="muted mono" style="font-size:11px;flex:0 0 auto">'+t+'</span><span style="flex:1">'+esc(l.text||'')+'</span></div>';
+    }).join('');
+    if(atBottom) box.scrollTop=box.scrollHeight;
+  }catch(e){}
+}
+function asrStartPolling(){ if(_asrTimer) return; _asrTimer=setInterval(()=>{ if(curTab==='asr') asrPollStatus(); else { clearInterval(_asrTimer); _asrTimer=null; } },1500); }
+let _asrAudio=null;
+function asrPlay(btn,rel){
+  try{ if(_asrAudio){ _asrAudio.pause(); _asrAudio=null; } }catch(e){}
+  _asrAudio=new Audio('/api/asr/audio?f='+encodeURIComponent(rel));
+  _asrAudio.play().catch(e=>toast('回放失败:'+e,true));
+  if(btn){ btn.textContent='♪'; _asrAudio.onended=()=>{ btn.textContent='▶'; }; }
+}
+document.getElementById('asrRefresh').onclick=()=>{ _asrDevInit=false; loadASR(); };
+document.getElementById('asrStartBtn').onclick=async()=>{
+  const source=(document.getElementById('asrSource')||{}).value||'loopback';
+  const model=(document.getElementById('asrModel')||{}).value||'';
+  const name=source==='mic'?((document.getElementById('asrMic')||{}).value||''):'';
+  try{
+    const r=await (await fetch('/api/asr/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source,model,name})})).json();
+    if(r.ok){ toast('✅ 转写已启动'); asrPollStatus(); asrStartPolling(); }
+    else toast('启动失败:'+(r.error||'?'),true);
+  }catch(e){ toast('启动异常:'+e,true); }
+};
+document.getElementById('asrStopBtn').onclick=async()=>{
+  try{
+    const r=await (await fetch('/api/asr/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+    if(r.ok) toast('✅ 已停止'); else toast('停止失败:'+(r.error||'?'),true);
+    asrPollStatus();
+  }catch(e){ toast('停止异常:'+e,true); }
+};
 // 🎯 长期任务线看板:卡片 + ⧗待决策徽标 + 展开 current/deps/decisions(待用户决策红/黄高亮)
 async function loadTasklines(){
   const box=document.getElementById('tlBox'); if(box&&!box.innerHTML) box.innerHTML='<div class="muted" style="padding:8px 16px">读取中…</div>';

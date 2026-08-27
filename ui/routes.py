@@ -147,6 +147,24 @@ class Handler(BaseHTTPRequestHandler):
             # 派活建议对口(U3 防误派):bus.roles.route_scores 单一源,只读
             q = parse_qs(u.query).get("q", [""])[0]
             self._send(200, build_route(q))
+        elif path == "/api/asr/devices":
+            # 🎙语音转写:列音频源(loopback 扬声器/麦克风)+ 可用模型(调 asr_venv list_devices)
+            self._send(200, build_asr_devices())
+        elif path == "/api/asr/status":
+            # 转写运行态 + 会话 + 服务自报状态(轮询用)
+            self._send(200, build_asr_status())
+        elif path == "/api/asr/lines":
+            # 当前会话转录行(since=已收行数,取增量)
+            since = parse_qs(u.query).get("since", ["0"])[0]
+            self._send(200, build_asr_lines(since=since))
+        elif path == "/api/asr/audio":
+            # 原声片段回放(f=lines 里的 audio 相对路径;路径校验在 asr_audio 内)
+            f = parse_qs(u.query).get("f", [""])[0]
+            r = asr_audio(f)
+            if r is None:
+                self._send(404, {"error": "audio not found"})
+            else:
+                self._send(200, r[0], ctype=r[1])
         else:
             self._send(404, {"error": "not found"})
 
@@ -214,6 +232,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, done_task(task_id, role, result, status))
             except Exception as e:
                 self._send(200, {"ok": False, "error": str(e)})
+        elif path == "/api/asr/start":
+            # 🎙启动语音转写子进程(127.0.0.1 only·Origin 已在头部校验)
+            b = self._body_json()
+            self._send(200, start_asr(source=(b.get("source") or "loopback"),
+                                      name=(b.get("name") or ""), model=(b.get("model") or ""),
+                                      silence_ms=b.get("silence_ms", 500)))
+        elif path == "/api/asr/stop":
+            self._send(200, stop_asr())
         else:
             self._send(404, {"error": "not found"})
 

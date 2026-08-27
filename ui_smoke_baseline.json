@@ -19,6 +19,7 @@
   "/api/sessions",
   "/api/ctx",
   "/api/ctxpanel",
+  "/api/waitreg",
   "/api/prompts",
   "/api/archive",
   "/api/paths",
@@ -26,7 +27,10 @@
   "/api/lifecycle",
   "/api/fleet-log",
   "/api/fleet-state",
-  "/api/route"
+  "/api/route",
+  "/api/asr/devices",
+  "/api/asr/status",
+  "/api/asr/lines"
  ],
  "anchors": [
   "fleetBody",
@@ -45,6 +49,7 @@
   "mechBox",
   "lrBox",
   "ctxBody",
+  "wrBody",
   "promptsBox",
   "pathsBox",
   "archRetired",
@@ -146,6 +151,11 @@
    "note": "页面含 ctxBody"
   },
   {
+   "name": "anchor-wrBody",
+   "ok": true,
+   "note": "页面含 wrBody"
+  },
+  {
    "name": "anchor-promptsBox",
    "ok": true,
    "note": "页面含 promptsBox"
@@ -211,9 +221,14 @@
    "note": "页面含 routeChips"
   },
   {
+   "name": "tabs-in-TAB_NAMES",
+   "ok": true,
+   "note": "19 个 tab 按钮全在 TAB_NAMES"
+  },
+  {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=196360"
+   "note": "200 bytes=517092"
   },
   {
    "name": "keys /api/state",
@@ -223,17 +238,17 @@
   {
    "name": "GET /api/health",
    "ok": true,
-   "note": "200 bytes=2437"
+   "note": "200 bytes=17"
   },
   {
    "name": "keys /api/health",
    "ok": true,
-   "note": "必含键齐"
+   "note": "冷启 loading 占位(合约内)"
   },
   {
    "name": "GET /api/tray",
    "ok": true,
-   "note": "200 bytes=149"
+   "note": "200 bytes=212"
   },
   {
    "name": "keys /api/tray",
@@ -248,7 +263,7 @@
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=6104"
+   "note": "200 bytes=14122"
   },
   {
    "name": "GET /api/live",
@@ -268,12 +283,12 @@
   {
    "name": "GET /api/mechanisms",
    "ok": true,
-   "note": "200 bytes=21456"
+   "note": "200 bytes=23827"
   },
   {
    "name": "GET /api/role-profiles",
    "ok": true,
-   "note": "200 bytes=41635"
+   "note": "200 bytes=48021"
   },
   {
    "name": "GET /api/role-profiles-biz",
@@ -288,7 +303,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4991"
+   "note": "200 bytes=5198"
   },
   {
    "name": "keys /api/bi",
@@ -298,12 +313,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=35315"
+   "note": "200 bytes=36560"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=28824"
+   "note": "200 bytes=39967"
   },
   {
    "name": "keys /api/usage",
@@ -313,12 +328,12 @@
   {
    "name": "GET /api/dispatch_metrics",
    "ok": true,
-   "note": "200 bytes=5380"
+   "note": "200 bytes=5528"
   },
   {
    "name": "GET /api/sessions",
    "ok": true,
-   "note": "200 bytes=38923"
+   "note": "200 bytes=47636"
   },
   {
    "name": "keys /api/sessions",
@@ -328,7 +343,7 @@
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=6209"
+   "note": "200 bytes=5560"
   },
   {
    "name": "keys /api/ctx",
@@ -338,17 +353,27 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=6534"
+   "note": "200 bytes=5813"
+  },
+  {
+   "name": "GET /api/waitreg",
+   "ok": true,
+   "note": "200 bytes=5068"
+  },
+  {
+   "name": "keys /api/waitreg",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET /api/prompts",
    "ok": true,
-   "note": "200 bytes=87530"
+   "note": "200 bytes=93610"
   },
   {
    "name": "GET /api/archive",
    "ok": true,
-   "note": "200 bytes=51949"
+   "note": "200 bytes=52473"
   },
   {
    "name": "keys /api/archive",
@@ -358,27 +383,27 @@
   {
    "name": "GET /api/paths",
    "ok": true,
-   "note": "200 bytes=14746"
+   "note": "200 bytes=15368"
   },
   {
    "name": "GET /api/storage",
    "ok": true,
-   "note": "200 bytes=2818"
+   "note": "200 bytes=3124"
   },
   {
    "name": "GET /api/lifecycle",
    "ok": true,
-   "note": "200 bytes=16130"
+   "note": "200 bytes=17148"
   },
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=12859"
+   "note": "200 bytes=24014"
   },
   {
    "name": "GET /api/fleet-state",
    "ok": true,
-   "note": "200 bytes=255"
+   "note": "200 bytes=290"
   },
   {
    "name": "keys /api/fleet-state",
@@ -389,6 +414,31 @@
    "name": "GET /api/route",
    "ok": true,
    "note": "200 bytes=34"
+  },
+  {
+   "name": "GET /api/asr/devices",
+   "ok": true,
+   "note": "200 bytes=326"
+  },
+  {
+   "name": "GET /api/asr/status",
+   "ok": true,
+   "note": "200 bytes=59"
+  },
+  {
+   "name": "keys /api/asr/status",
+   "ok": true,
+   "note": "必含键齐"
+  },
+  {
+   "name": "GET /api/asr/lines",
+   "ok": true,
+   "note": "200 bytes=37"
+  },
+  {
+   "name": "keys /api/asr/lines",
+   "ok": true,
+   "note": "必含键齐"
   },
   {
    "name": "GET-unknown-404",
@@ -448,7 +498,7 @@
   {
    "name": "sessions-role-4state",
    "ok": true,
-   "note": "n=97 legal=True no_fake=True honest=True"
+   "note": "n=118 legal=True no_fake=True honest=True"
   },
   {
    "name": "SSE-connect",
@@ -456,6 +506,6 @@
    "note": "202 bytes"
   }
  ],
- "test_count": 79,
- "pass": 79
+ "test_count": 88,
+ "pass": 88
 }

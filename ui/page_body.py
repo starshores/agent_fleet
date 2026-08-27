@@ -42,6 +42,7 @@ BODY = r"""<header>
   <button class="tab" data-t="live">🔴 实时</button>
   <button class="tab" data-t="paths">📁 路径</button>
   <button class="tab" data-t="fleetlog">📋 舰队日志</button>
+  <button class="tab" data-t="asr">🎙 语音转写</button>
   <span class="spacer" style="flex:1"></span>
   <span class="muted" style="font-size:11.5px;align-self:center" id="tabHint"></span>
 </nav>
@@ -455,6 +456,23 @@ BODY = r"""<header>
       <button class="btn ghost mini" id="flRefresh">刷新</button>
     </div>
     <div class="sec-b" id="flBox"><div class="muted" style="padding:8px 16px">加载中…</div></div>
+  </section>
+
+  <section data-tab="asr">
+    <div class="sec-h">🎙 语音转写
+      <span class="sub">本地实时语音转文字(faster-whisper·全程不上云)· 系统声/麦克风 → 断句 → 简体</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost mini" id="asrRefresh">刷新设备</button>
+    </div>
+    <div class="sec-b">
+      <div id="asrDeviceBox" style="padding:10px 16px"><div class="muted">加载中…</div></div>
+      <div style="padding:6px 16px 10px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line)">
+        <button class="btn" id="asrStartBtn">▶ 启动转写</button>
+        <button class="btn ghost" id="asrStopBtn" style="display:none">■ 停止</button>
+        <span id="asrStatus" class="muted">就绪</span>
+      </div>
+      <div id="asrLinesBox" style="padding:8px 16px;max-height:60vh;overflow-y:auto"><div class="muted">尚无转写。选好音频源点“启动转写”</div></div>
+    </div>
   </section>
 </main>
 

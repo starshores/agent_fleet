@@ -29,6 +29,7 @@ GET_ENDPOINTS = [
     "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/waitreg", "/api/prompts",
     "/api/archive", "/api/paths", "/api/storage", "/api/lifecycle",
     "/api/fleet-log", "/api/fleet-state", "/api/route",
+    "/api/asr/devices", "/api/asr/status", "/api/asr/lines",
 ]
 # 页面骨架锚(page.py 关键面板容器;拆分/morphdom 改造后必须仍在。一面板一锚,U1/U4 回归网·Master数分缺口2)
 PAGE_ANCHORS = [
@@ -55,6 +56,8 @@ MUST_KEYS = {
     "/api/ctx": ["ok", "rows"],
     "/api/waitreg": ["ok", "rows"],
     "/api/sessions": ["ok", "sessions", "live_count", "dead_count"],
+    "/api/asr/status": ["ok", "running"],
+    "/api/asr/lines": ["ok", "total", "lines"],
 }
 LOADING_OK = {"/api/health", "/api/ctx"}
 # 慢端点单独放宽 HTTP 超时:reap 无缓存·每次 shell agentbus reap --dry-run 做 psutil 全进程扫描

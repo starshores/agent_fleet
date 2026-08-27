@@ -292,6 +292,159 @@ def start_fleet_refresher(interval=20):
 
 
 # =============================================================
+#  🎙 ASR 实时语音转写(本机·不上云)——WebUI spawn 独立 asr_venv 子进程跑 asr_service.py。
+#  配置单一源 = agent_fleet/asr/config.json(venv python / 模型目录 / runtime);
+#  转录结果写 runtime_dir 的 session-*.jsonl,/api/asr/lines 读它推前端。单例(一次一路)。
+# =============================================================
+_ASR_CFG = None
+_asr_proc = None
+_asr_lock = threading.Lock()
+_asr_session = {}   # {out,status,started,source,model,name,pid}
+
+
+def _asr_cfg():
+    global _ASR_CFG
+    if _ASR_CFG is None:
+        # ABDIR 是 junction(~/.claude/agent_bus)→ realpath 解到物理 agent_fleet 家再取 asr/config.json
+        fleet_home = Path(os.path.realpath(str(ABDIR))).parent
+        p = fleet_home / "asr" / "config.json"
+        _ASR_CFG = json.loads(p.read_text(encoding="utf-8"))
+    return _ASR_CFG
+
+
+def build_asr_devices():
+    """列音频源(loopback 扬声器 + 麦克风)+ 可用模型。调 asr_venv 的 list_devices.py。"""
+    try:
+        cfg = _asr_cfg()
+        r = subprocess.run([cfg["venv_python"], cfg["list_devices_script"]],
+                           capture_output=True, text=True, encoding="utf-8",
+                           timeout=20, creationflags=_NO_WINDOW)
+        d = json.loads(r.stdout.strip()) if r.stdout.strip() else {}
+        if d.get("error"):
+            return {"ok": False, "error": d["error"], "speakers": [], "mics": []}
+        avail = [m for m in cfg.get("models", [])
+                 if os.path.exists(os.path.join(cfg["models_dir"], "faster-whisper-" + m, "model.bin"))]
+        return {"ok": True, "speakers": d.get("speakers", []), "mics": d.get("mics", []),
+                "default_speaker": d.get("default_speaker"), "default_mic": d.get("default_mic"),
+                "models": avail, "default_model": cfg.get("default_model"),
+                "default_source": cfg.get("default_source", "loopback")}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "speakers": [], "mics": []}
+
+
+def build_asr_status():
+    """当前转写运行态 + 会话信息 + 服务自报状态(status.json)。"""
+    with _asr_lock:
+        running = _asr_proc is not None and _asr_proc.poll() is None
+        st = dict(_asr_session)
+    detail = {}
+    sp = st.get("status")
+    if sp and os.path.exists(sp):
+        try:
+            detail = json.loads(Path(sp).read_text(encoding="utf-8"))
+        except Exception:
+            detail = {}
+    return {"ok": True, "running": running, "session": st, "detail": detail}
+
+
+def build_asr_lines(since=0):
+    """读当前会话转录行(JSONL)。since=已收行数,只返回增量。"""
+    with _asr_lock:
+        out = _asr_session.get("out")
+    lines = []
+    if out and os.path.exists(out):
+        try:
+            with open(out, encoding="utf-8") as f:
+                for ln in f:
+                    ln = ln.strip()
+                    if ln:
+                        lines.append(json.loads(ln))
+        except Exception:
+            pass
+    try:
+        since = int(since or 0)
+    except Exception:
+        since = 0
+    return {"ok": True, "total": len(lines), "lines": lines[since:]}
+
+
+def start_asr(source="loopback", name="", model="", silence_ms=500):
+    """启动 ASR 子进程(单例·asr_venv)。source=loopback(系统声)|mic(麦克风)。"""
+    global _asr_proc, _asr_session
+    with _asr_lock:
+        if _asr_proc is not None and _asr_proc.poll() is None:
+            return {"ok": False, "error": "转写已在运行(先停止再启)"}
+        try:
+            cfg = _asr_cfg()
+            model = model or cfg.get("default_model")
+            mdir = os.path.join(cfg["models_dir"], "faster-whisper-" + model)
+            if not os.path.exists(os.path.join(mdir, "model.bin")):
+                return {"ok": False, "error": "模型未就绪:%s" % model}
+            rt = cfg["runtime_dir"]
+            os.makedirs(rt, exist_ok=True)
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            out = os.path.join(rt, "session-%s.jsonl" % stamp)
+            status = os.path.join(rt, "status.json")
+            cmd = [cfg["venv_python"], cfg["service_script"],
+                   "--model", mdir, "--out", out, "--status", status,
+                   "--source", source, "--lang", "zh", "--silence-ms", str(int(silence_ms)),
+                   "--compute-type", cfg.get("compute_type", "int8")]
+            if cfg.get("hotwords"):
+                cmd += ["--hotwords", cfg["hotwords"]]
+            if name:
+                cmd += ["--name", name]
+            _asr_proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                         stderr=subprocess.DEVNULL, creationflags=_NO_WINDOW)
+            _asr_session = {"out": out, "status": status, "started": time.time(),
+                            "source": source, "model": model, "name": name or None,
+                            "pid": _asr_proc.pid}
+            return {"ok": True, "pid": _asr_proc.pid, "session": os.path.basename(out)}
+        except Exception as e:
+            _asr_proc = None
+            return {"ok": False, "error": str(e)}
+
+
+def stop_asr():
+    """停止 ASR 子进程。"""
+    global _asr_proc
+    with _asr_lock:
+        if _asr_proc is None or _asr_proc.poll() is not None:
+            _asr_proc = None
+            return {"ok": True, "note": "本就未运行"}
+        try:
+            pid = _asr_proc.pid
+            _asr_proc.terminate()
+            try:
+                _asr_proc.wait(timeout=8)
+            except Exception:
+                _asr_proc.kill()
+            _asr_proc = None
+            return {"ok": True, "stopped_pid": pid}
+        except Exception as e:
+            _asr_proc = None
+            return {"ok": False, "error": str(e)}
+
+
+def asr_audio(rel):
+    """读原声片段 wav 字节(rel=lines 里的 audio 相对路径)。硬校验必须在 runtime_dir 内(防路径穿越)。
+    返回 (bytes, 'audio/wav') 或 None。"""
+    try:
+        if not rel:
+            return None
+        cfg = _asr_cfg()
+        rt = os.path.realpath(cfg["runtime_dir"])
+        fp = os.path.realpath(os.path.join(rt, rel))
+        if not fp.startswith(rt + os.sep) or not fp.lower().endswith(".wav"):
+            return None
+        if not os.path.exists(fp):
+            return None
+        with open(fp, "rb") as f:
+            return f.read(), "audio/wav"
+    except Exception:
+        return None
+
+
+# =============================================================
 #  bus 健康徽标 —— 吃 `agentbus health --json`(内部 psutil 全扫 ~1-2s)。
 #  同 fleet:绝不在请求线程现扫 —— 后台线程跑子进程刷新缓存,/api/health 只读缓存。
 # =============================================================
