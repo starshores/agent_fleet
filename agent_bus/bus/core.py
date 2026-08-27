@@ -65,6 +65,17 @@ def _deliver(to, frm, task, audit_event="send"):
     _audit(audit_event, id=task["id"], frm=frm, to=to, title=task.get("title") or "")
 
 
+def _build_continue_from(args):
+    """从 CLI args 组装接续指令 continue_from(2026-08-27·daemon 跨任务外置接续)。返回 dict 或 None。
+    --continue-from-state <文件>(层A·读前序提炼工作态) / --resume-session <id>(层C·全上下文 --resume)。"""
+    d = {}
+    if getattr(args, "continue_from_state", None):
+        d["state_file"] = args.continue_from_state
+    if getattr(args, "resume_session", None):
+        d["resume_session"] = args.resume_session
+    return d or None
+
+
 def cmd_send(args):
     role = args.to
     frm = args.frm or os.environ.get("AGENTBUS_ROLE", "unknown")
@@ -76,6 +87,9 @@ def cmd_send(args):
     }
     if args.requires_approval:
         task["requires_approval"] = True   # 高风险:daemon 不执行,只交互 tab/人工批准后做
+    cf = _build_continue_from(args)        # 接续上下文(2026-08-27):状态文件/--resume 会话
+    if cf:
+        task["continue_from"] = cf
     _deliver(role, frm, task)
     print(tid)
 

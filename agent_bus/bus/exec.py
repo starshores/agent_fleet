@@ -34,6 +34,14 @@ def cmd_dispatch(args):
         # per-task effort/model 覆盖(2026-08-27):非空则单次拉满(如硬诊断 --effort max),平时吃 role/全局
         "effort": getattr(args, "effort", None), "model": getattr(args, "model", None),
     }
+    # 接续上下文(2026-08-27):--continue-from-state(层A)/ --resume-session(层C)→ rec.continue_from
+    _cf = {}
+    if getattr(args, "continue_from_state", None):
+        _cf["state_file"] = args.continue_from_state
+    if getattr(args, "resume_session", None):
+        _cf["resume_session"] = args.resume_session
+    if _cf:
+        rec["continue_from"] = _cf
     dd = BUS / "_dispatch"
     dd.mkdir(parents=True, exist_ok=True)
     _write_json(dd / (tid + ".json"), rec)

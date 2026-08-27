@@ -61,11 +61,32 @@ def resolve_model(role, agents_path=None):
     return None
 
 
-def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, model=None):
+def resolve_continue(continue_from):
+    """解析任务的接续上下文指令(daemon 跨任务不进程内背上下文·外置接续·2026-08-27 Master数分口径/MasterAgent机制)。
+    continue_from = None | {state_file?, resume_session?, session_id?}
+      · state_file(层A·默认·省+稳):约定路径 agent_bus/_workstate/<thread>.json,存前序任务【提炼工作态】
+        (summary/next/artifacts);存在则返回 prompt 前缀让本任务先读它接续,不进程内背全上下文。
+      · resume_session(层C·贵·仅A不足时):claude -p --resume <session> 全上下文接续。
+      · session_id:启动即指定会话 id(便于后续 --resume 引用)。
+    返回 (prompt_prefix, resume_session, session_id)。"""
+    if not continue_from or not isinstance(continue_from, dict):
+        return "", None, None
+    prefix = ""
+    sf = continue_from.get("state_file")
+    if sf:
+        prefix = ("【接续工作态·最先做】先读取状态文件恢复上文,再执行本任务:%s\n"
+                  "(该文件=前序任务落的提炼工作态:已完成/关键发现/下一步/产物路径;读完顺着它接着做,别从零重来。)\n\n" % sf)
+    return prefix, continue_from.get("resume_session"), continue_from.get("session_id")
+
+
+def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, model=None,
+                  resume_session=None, session_id=None):
     """返回 (status, result_text, meta)。过程实时写 live_log。
-    meta = {tokens_in, tokens_out, cache_read, cache_creation, cost_usd, duration_ms, num_turns}
-    (从 stream-json 的 result 事件抓,供 BI 资源消耗统计;抓不到则为空 dict。)
-    effort/model:非空则注入 claude -p 的 --effort/--model(per-role/per-task);None=继承全局 settings。"""
+    meta = {tokens_in, tokens_out, ..., session_id}(session_id 从 stream-json init 事件抓,供接续 --resume)。
+    effort/model:非空则注入 --effort/--model(per-role/per-task);None=继承全局 settings。
+    接续上下文(2026-08-27·daemon 跨任务不进程内背上下文·外置接续 层C):
+      resume_session:非空 → --resume <session>(全上下文接续·贵·仅提炼状态不够时用);
+      session_id:非空且无 resume → --session-id <uuid>(启动即指定会话 id·便于后续 --resume)。"""
     meta = {}
     cmd = [claude_bin, "-p", "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions"]
@@ -73,6 +94,10 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
         cmd += ["--model", str(model)]
     if effort:
         cmd += ["--effort", str(effort)]
+    if resume_session:
+        cmd += ["--resume", str(resume_session)]
+    elif session_id:
+        cmd += ["--session-id", str(session_id)]
     try:
         lf = open(live_log, "w", encoding="utf-8", errors="replace")
     except Exception:
@@ -123,6 +148,8 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
             except Exception:
                 w(line)  # 非 JSON,原样写
                 continue
+            if ev.get("session_id") and not meta.get("session_id"):
+                meta["session_id"] = ev["session_id"]   # init/system 事件带·供后续接续 --resume
             t = ev.get("type")
             if t == "assistant":
                 for b in (ev.get("message", {}).get("content") or []):
@@ -137,7 +164,7 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
                 final = ev.get("result")
                 is_err = bool(ev.get("is_error"))
                 u = ev.get("usage") or {}
-                meta = {
+                meta.update({          # update 而非重新赋值 —— 保留前面已捕获的 session_id(接续 --resume 用)
                     "tokens_in": u.get("input_tokens", 0) or 0,
                     "tokens_out": u.get("output_tokens", 0) or 0,
                     "cache_read": u.get("cache_read_input_tokens", 0) or 0,
@@ -145,7 +172,7 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
                     "cost_usd": ev.get("total_cost_usd", 0) or 0,
                     "duration_ms": ev.get("duration_ms", 0) or 0,
                     "num_turns": ev.get("num_turns", 0) or 0,
-                }
+                })
                 w("[%s] ■ 完成 is_error=%s tok=%s/%s $%.4f" % (
                     _now(), is_err, meta["tokens_in"], meta["tokens_out"], meta["cost_usd"]))
         p.wait()

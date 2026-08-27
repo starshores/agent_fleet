@@ -72,7 +72,12 @@ def run_task(role, cwd, task):
     # per-role effort/model 解析(镜像·2026-08-27):agents.json[role].effort/model → 无则继承全局
     eff = claude_run.resolve_effort(role)
     mdl = claude_run.resolve_model(role)
-    return claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600, effort=eff, model=mdl)
+    # 接续上下文(2026-08-27):task.continue_from → 状态文件前缀(层A)/ --resume(层C)
+    _pref, _resume, _sid = claude_run.resolve_continue(task.get("continue_from"))
+    if _pref:
+        prompt = _pref + prompt
+    return claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600,
+                                    effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
 
 
 def main():

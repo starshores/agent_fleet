@@ -63,12 +63,18 @@ def main():
     # per-task effort 覆盖(2026-08-27):rec.effort(dispatch --effort) > name 的 role 声明 > 全局继承
     eff = claude_run.resolve_effort(name, rec.get("effort"))
     mdl = rec.get("model") or claude_run.resolve_model(name)
-    status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout, effort=eff, model=mdl)
+    # 接续上下文(2026-08-27):rec.continue_from → 状态文件前缀(层A)/ --resume(层C)
+    _pref, _resume, _sid = claude_run.resolve_continue(rec.get("continue_from"))
+    if _pref:
+        prompt = _pref + prompt
+    status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout,
+                                                    effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
     ab.record_metric(name, args.id, title, status, meta, kind="dispatch")   # BI 资源消耗埋点
 
     # 回填给派发方(直接写 <from>/done/<id>.json,无需 inbox 任务)
     reply = {"id": args.id, "from": name, "to": frm, "title": title,
-             "status": status, "result": result[:4000], "finished": ab._now(), "kind": "adhoc"}
+             "status": status, "result": result[:4000], "finished": ab._now(), "kind": "adhoc",
+             "session_id": meta.get("session_id")}   # 接续用:编排方据此下轮 --resume-session 全上下文接续
     try:
         ab._role_dir(frm)
         ab._write_json(ab.BUS / frm / "done" / (args.id + ".json"), reply)

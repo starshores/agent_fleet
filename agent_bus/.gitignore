@@ -15,5 +15,8 @@
 !fleet.json
 !capabilities.json
 !retired_roster.json
+# _workstate 接续约定文档进 git;其运行态 <thread>.json 仍忽略(层A 提炼工作态·过境产物)
+!_workstate/
+!_workstate/README.md
 # 配置备份即便匹配上面也排除(运行时生成的 .bak-时间戳)
 *.bak-*
