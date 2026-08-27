@@ -48,10 +48,11 @@
 |---|---|---|---|
 | `28306a3` | claude_run/worker_daemon/dispatch_agent/bus.exec/agentbus | per-role/per-task effort+model 注入 claude -p(本文改动1) | ✅ 平台面 |
 | `dcbe4fc` | asr/asr_service·list_devices·config.json | 本地实时语音转写后端(soundcard→webrtcvad→whisper→原声wav·幻觉抑制) | ✅ 平台面(通用工具·hotwords值实例面) |
-| _待提交_ | agent_bus/agents.json + fleet.json | 示例组员5 max硬案daemon注册 + effort口径接线(本文改动2) | ◐ 实例面(genesis舰队/口径) |
+| `d0b5e55` | agent_bus/agents.json + fleet.json | 示例组员5 max硬案daemon注册 + effort口径接线(本文改动2) | ◐ 实例面(genesis舰队/口径) |
 | _待提交_ | ui/api·routes·page_body·page_js·ui_smoke(+baseline) | 语音转写 WebUI tab+端点+原声回放 | ✅ 平台面(UI结构需适配) |
 
-> ⚠ 后两行【暂缓提交】:工作树多 agent 并发缠结(page_js/page_body 99% EOL 翻转污染 + api.py 与 MasterUI 的 BI/tray/groups 语义改动同文件 + agents.json 我 json 重格式化)——盲提会扫别人未完成的活/出 EOL 垃圾 diff。待 MasterUI 侧 UI 工作先提交后叠加,再回填本表 commit 号。
+> ⚠ 末行【暂缓提交】:工作树多 agent 并发缠结(page_js/page_body 99% EOL 翻转污染 + api.py 与 MasterUI 的 BI/tray/groups 语义改动同文件 + agents.json 我 json 重格式化)——盲提会扫别人未完成的活/出 EOL 垃圾 diff。待 MasterUI 侧 UI 工作先提交后叠加,再回填本表 commit 号。
+> 注:`d0b5e55`(daemon 配置)用 `git apply` 式换-暂存-复原精确分离,只提交我的 effort+示例组员5,未扫别人同文件的「性能优化」新增/「模型侧」重置(仍留工作树待培训师提交);顺带修掉我早前 json.dump 的整文件重格式化(CRLF+1空格 → HEAD 格式)。
 
 ---
 **整体验收**:吸收后 bus_smoke 43/43 绿 + 平台三问(归属:机制归平台/档位值归业务口径;清除:移 fleet 条目+清 agents.json.effort 即空载;换域:换角色名即用)。
