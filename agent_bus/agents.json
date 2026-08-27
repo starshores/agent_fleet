@@ -123,5 +123,9 @@
   "effort": "max",
   "trained": true,
   "trained_by": "继承示例组员同能力池(复制体)"
+ },
+ "__smoke__": {
+  "registered": "2026-08-27T11:30:01",
+  "desc": "smoke test role"
  }
 }
