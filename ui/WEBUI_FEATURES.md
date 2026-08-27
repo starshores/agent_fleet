@@ -1,7 +1,7 @@
 # Bus 控制台 WebUI — 功能文档(MasterUI 维护)
 
 > 用户 2026-07-14 指名 MasterUI 维护本文档:现有面板 + 系统托盘件都进文档。
-> **数据口径**(在岗/在跑/静默/休眠/卡claim 等定义)归 **Master数分2**;**渲染/机制/文档** 归 **MasterUI**。要调口径找Master数分2 对齐。
+> **数据口径**(在岗/在跑/静默/休眠/卡claim 等定义)归 **Master数分**;**渲染/机制/文档** 归 **MasterUI**。要调口径找Master数分 对齐。
 > 单文件实现:`ui/server.py`(`ThreadingHTTPServer` @ 127.0.0.1:8799)。纯本机,不外发(符合"数据不出本机"红线)。
 
 ## 架构与实时机制
@@ -38,7 +38,7 @@
 - **tooltip**:`在岗N · 在跑M · 静默K · 休眠P · 卡claimS · 时间`。
 - **交互**:双击开 WebUI;右键 = 打开控制台 / 立即刷新 / 退出。poll 5s。
 - **数据源(单一源·实时)**:优先 GET **`/api/tray`**(与运维面板同吃 `compute_fleet_cached` 缓存口径,数字永远和面板一致);WebUI 不可达时退回本机 `agentbus who --json` + 扫 processing claim。
-- **口径(Master数分2 定)**:
+- **口径(Master数分 定)**:
   - **在岗N** = 进程活着的真角色(vclass live/idle/warn;排除 dead/none/parked)。
   - **在跑M** = `processing/` 里 non-notice claim 新鲜(<`RUN_TTL` 3600s)且 owner 在岗 → 真执行。
   - **静默K** = 在岗里 verdict 含"静默"(N 的子集)。

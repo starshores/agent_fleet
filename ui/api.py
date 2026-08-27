@@ -180,7 +180,7 @@ def compute_fleet_cached():
 
 # =============================================================
 #  bus 托盘/健康指示器计数 —— 单一源(与运维面板同吃 compute_fleet_cached 缓存,口径不漂移)。
-#  由 bus_tray.py(系统托盘)与本 WebUI 共用:数据口径归 Master数分2、渲染/机制归 MasterUI。
+#  由 bus_tray.py(系统托盘)与本 WebUI 共用:数据口径归 Master数分、渲染/机制归 MasterUI。
 #  用户 2026-07-14 指名把托盘交 UI 维护,并要求托盘实时/口径对齐运维面板。
 # =============================================================
 _TRAY_RUN_TTL = int(os.environ.get("BUS_TRAY_RUN_TTL", "3600"))  # processing claim 超此秒=僵尸,不计在跑
@@ -201,11 +201,11 @@ def bus_tray_counts():
       休眠P = parked(故意暂离·不计在岗);
       在跑M = processing/ 里 non-notice claim 新鲜(<RUN_TTL)且 owner 在岗 → 真执行;
       卡死stale = processing/ 里超 RUN_TTL 的 non-notice 僵尸 claim(rot·单列告警不计在跑)。
-    不用 who.current_task 当在跑源(该字段滞留在已卡死旧 claim 上→虚报在跑·Master数分2 口径坑①)。"""
+    不用 who.current_task 当在跑源(该字段滞留在已卡死旧 claim 上→虚报在跑·Master数分 口径坑①)。"""
     fl = compute_fleet_cached()
     roles = fl.get("roles", []) or []
     loading = bool(fl.get("loading"))
-    alive_names, n, k, p, offline = set(), 0, 0, 0, 0
+    alive_names, n, k, p, offline_roles = set(), 0, 0, 0, []
     for r in roles:
         vc = r.get("vclass")
         if r.get("pseudo"):
@@ -213,11 +213,18 @@ def bus_tray_counts():
         if r.get("parked") or vc == "parked":
             p += 1
             continue                     # 故意暂离,不算掉线
-        # 掉线口径(Master数分2 定·MasterUI 对齐 2026-08-14):【只】self_wake == "stale"(⚠掉线=在场但断连·
-        #   会话进程还活着但 wait/心跳超期=收不到消息)。不含 dead(=缺席/退出·崩溃vs正常关tab有歧义·
-        #   塞进会虚高告警);"所有不可用"是另一指标(该正名"不可用数")。天然排 parked(态≠stale)+ pseudo(self_wake=None)。
-        if r.get("self_wake") == "stale":
-            offline += 1
+        # 掉线口径(Master数分 定·用户修正 2026-08-21):【双条件】self_wake=='stale' AND turn=='idle'
+        #   (空闲待命 + wait 掉,两条件同时)。旧【单条件·只 stale】会误报【正在忙的 agent】——agent
+        #   干活时(turn=thinking/tool)本就没挂 wait(干完才重挂),那是正常态不是掉线(实证:Master数分
+        #   跑本修正时 turn=tool+stale 被旧口径误计为掉线)。细节口径(Master数分 定稿):
+        #   · 'stale' 已排除【刚 fire 瞬态】(那是 self_wake=='recent'、非 stale)→ 无需再加 idle-age 门槛;
+        #   · ◐待确认(有心跳无 wait)非 'stale' → 天然不计(对齐用户建议②);
+        #   · turn=None(daemon/无 turn hook)不判 idle → 保守【不计】(daemon 另有 supervise 探活);
+        #   · 维修期口径不变(offline 照算,托盘据 maint 弱化显示)。天然排 parked(上面 continue)+ pseudo(self_wake=None)。
+        #   不含 dead(=缺席/退出·崩溃vs正常关tab有歧义);"所有不可用"是另一指标。
+        _turn = r.get("turn") or {}
+        if r.get("self_wake") == "stale" and _turn.get("state") == "idle":
+            offline_roles.append(r.get("role"))   # 名字列表(供托盘 tooltip 列名·用户令 2026-08-21):同口径同一次遍历
         if vc in ("live", "idle", "warn"):
             n += 1
             alive_names.add(r.get("role"))
@@ -252,9 +259,15 @@ def bus_tray_counts():
                     running.add(role)
             else:
                 stale += 1
+    try:
+        todos = sum(1 for t in _load_todos() if isinstance(t, dict) and t.get("status") == "待办")
+    except Exception:
+        todos = 0                        # 待办球只数【待办】态(需用户处理)·排除【进行中】(已有人在做)+【完成】(用户令 2026-08-21)
     return {"ok": True, "loading": loading, "present": n, "running": len(running),
-            "silent": k, "parked": p, "stale": stale, "offline": offline,
-            "maint": bool(get_maintenance().get("active")),   # 维修模式:托盘据此弱化掉线spike(Master数分2 caveat·别让预期停机看着像故障)
+            "silent": k, "parked": p, "stale": stale,
+            "offline": len(offline_roles), "offline_roles": offline_roles,   # 计数 + 掉线 agent 名字列表(tooltip 列名·用户令 2026-08-21)
+            "todos": todos,                                   # 未完成待办数(托盘紫球·用户令 2026-08-21)
+            "maint": bool(get_maintenance().get("active")),   # 维修模式:托盘据此弱化掉线spike(Master数分 caveat·别让预期停机看着像故障)
             "as_of": time.strftime("%H:%M:%S"),
             "source": "webui-fleet-cache"}
 
@@ -1906,9 +1919,23 @@ def _fleet_enrich_model(data):
             sid_full = row.get("sid_full") or ""
             if sid_full:
                 sid_model[sid_full] = row.get("model") or ""
+    # 声明模型兜底:agents.json 的 model 字段(如 培训师=claude-sonnet-4-6·唯一显式声明);读不到={}。
+    try:
+        _aj = json.loads((ABDIR / "agents.json").read_text(encoding="utf-8"))
+        declared = {k: (v or {}).get("model") for k, v in _aj.items() if isinstance(v, dict)}
+    except Exception:
+        declared = {}
     for r in (data or {}).get("roles", []):
         sid = r.get("session_id") or ""
-        r["model"] = sid_model.get(sid, "") if sid else ""
+        m = sid_model.get(sid, "") if sid else ""         # ① 实测:ctx_cache 检出的真实运行 model
+        if not m:
+            m = declared.get(r.get("role")) or ""          # ② 声明兜底:agents.json model(培训师=sonnet)
+        # ③ 在线agent仍无模型 → 统一默认 claude-opus-4-8(用户令 2026-08-21):opus-4-8=舰队默认模型
+        #    (占量 94%);在岗(vclass live/idle/warn)但模型未检出且未声明 → 按默认注册,消除 model 列
+        #    空白/BI unknown 噪声。dead/none/pseudo/parked 不在线 → 不默认(无会话可归属)。
+        if not m and r.get("vclass") in ("live", "idle", "warn"):
+            m = "claude-opus-4-8"
+        r["model"] = m
 
 
 def get_fleet_state():
@@ -2593,7 +2620,7 @@ def build_groups():
 
 # =============================================================
 #  🔧 机制注册表 —— bus 提供哪些功能的单一视图(使用方 出数据·MasterUI render)。
-#  机制≠能力池:caps=谁被授权做什么(培训师·粗·授权),机制=bus 提供哪些功能(MasterAgent/数分·细·架构盘点)。
+#  机制≠能力池:caps=谁被授权做什么(培训师·粗·授权),机制=bus 提供哪些功能(MasterAgent/Master数分·细·架构盘点)。
 #  related_cap 只是"该类机制关联哪个 cap 族"的交叉链,非把机制塞进 caps。静态小文件请求路径直读·只读。
 # =============================================================
 _MECHANISMS = Path(r"C:\apphome\agent_fleet\bus_mechanisms.json")

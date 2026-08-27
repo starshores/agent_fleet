@@ -49,7 +49,7 @@ MUST_KEYS = {
     "/api/bi": ["per_role", "today_usage", "running"],
     "/api/fleet-state": ["state", "icon", "counts", "guard"],
     "/api/health": ["healthy", "selfwake", "queues"],
-    "/api/tray": ["ok", "running", "stale", "offline"],
+    "/api/tray": ["ok", "running", "stale", "offline", "offline_roles", "todos"],
     "/api/archive": ["ok", "retired", "resume"],
     "/api/usage": ["totals", "daily", "by_project"],
     "/api/ctx": ["ok", "rows"],
@@ -59,7 +59,7 @@ MUST_KEYS = {
 LOADING_OK = {"/api/health", "/api/ctx"}
 # 慢端点单独放宽 HTTP 超时:reap 无缓存·每次 shell agentbus reap --dry-run 做 psutil 全进程扫描
 # (裸跑 ~13s,并发压力下更久),其子进程超时=40s → smoke 默认 30s 会先超时误报回归。给它 >40s。
-SLOW_EP = {"/api/reap": 50}
+SLOW_EP = {"/api/reap": 50, "/api/supervise": 50}   # 慢端点(shell 子进程·psutil 扫描)HTTP 超时放宽
 
 
 def _get(base, path, timeout=30):
@@ -135,16 +135,22 @@ def run_tests(base, port):
         add("GET-unknown-404", e.code == 404, str(e.code))
     except Exception as e:
         add("GET-unknown-404", False, repr(e))
-    st, body = _post(base, "/api/send", {})                      # 缺 to/task → 400 拒
-    add("POST-send-empty-400", st == 400, str(st))
-    st, body = _post(base, "/api/supervise", {"dry_run": True})  # dry-run 无副作用
-    try:
+    try:                                                         # 缺 to/task → 400 拒(包 try:重载下超时记 fail 不崩 gate)
+        st, body = _post(base, "/api/send", {})
+        add("POST-send-empty-400", st == 400, str(st))
+    except Exception as e:
+        add("POST-send-empty-400", False, repr(e))
+    try:                                                         # dry-run 无副作用(spawns 子进程·SLOW_EP 放宽超时)
+        st, body = _post(base, "/api/supervise", {"dry_run": True}, timeout=SLOW_EP.get("/api/supervise", 30))
         j = json.loads(body.decode("utf-8"))
         add("POST-supervise-dryrun", st == 200 and isinstance(j, (dict, list)), str(st))
     except Exception as e:
         add("POST-supervise-dryrun", False, repr(e))
-    st, body = _post(base, "/api/no-such-endpoint", {})
-    add("POST-unknown-404", st == 404, str(st))
+    try:
+        st, body = _post(base, "/api/no-such-endpoint", {})
+        add("POST-unknown-404", st == 404, str(st))
+    except Exception as e:
+        add("POST-unknown-404", False, repr(e))
     # 其余 POST 的空入参校验面(Master数分缺口3:只挑【实现里空入参必拒·零副作用】的;
     # todos/add 空体会真建"(无标题)"待办、clear_replies 会真清 → 有副作用,不进 smoke)
     for name, path in (("POST-answer-empty", "/api/todos/answer"),

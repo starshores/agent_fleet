@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 bus_tray.py —— agent bus 运转状态 · Windows 系统托盘指示器
-- 托盘图标数字【优先级】(用户 2026-08-14):掉线数>0 → 画【掉线数】(异常态醒目·比在跑更该一眼看到);
-    否则画【在跑数 M】(用户 2026-08-04 口径:一眼判断是否在干活,0=没活)。颜色反映 bus 健康:
-    🔴 红 = 有掉线 agent(优先) / 🟢 绿 = 有 agent 在跑任务 / 🔵 蓝 = 在岗但全 idle / 🟠 橙 = 有静默异常 / 🔴 红 = 全部离线 / 🟣 紫 = 维修模式(掉线spike=预期·安静不告警) / ⚪ 灰 = 探测失败
-  掉线口径(Master数分2 定 2026-08-14)= self_wake=='stale'(在场但断连·收不到消息);不含 dead(缺席/退出有歧义)。维修期(maint)图标回落显在跑数·配紫。
-- 悬停 tooltip 看健康:🔧维修中(维修期) · ⚠掉线X(有则提最前) · 在岗N · 在跑M · 静默K · 休眠P · 更新时间
+- 托盘图标数字【优先级·最急者赢】(用户令 2026-08-14/08-21):掉线数>0→【掉线数】(救agent最急·红);
+    否则 待办>0→【待办数】(要用户拍板·紫);否则→【在跑数 M】(用户 2026-08-04:0=没活)。颜色反映 bus 健康:
+    🔴 红 = 有掉线 agent(最优先) / 🟣 紫 = 有待办待拍板(次优先) / 🟢 绿 = 有 agent 在跑 / 🔵 蓝 = 在岗全 idle / 🟠 橙 = 静默异常 / 🔴 红 = 全部离线 / 🩶 灰蓝 = 维修模式(安静态·不抢红/紫) / ⚪ 灰 = 探测失败
+  掉线口径(Master数分定·用户修正 2026-08-21)= self_wake=='stale' AND turn.state=='idle'(在场但断连+空闲·排除正在忙的agent);不含 dead。
+  待办数 = todos.json【待办】态条数(需用户处理·排除进行中/完成)。维修期图标回落显在跑数·配灰蓝。
+- 悬停 tooltip 看健康:🔧维修中(维修期) · ⚠掉线X:名1、名2…(列掉线名·超3截断+…+K防127溢出) · 📋待办X · 在岗N · 在跑M · 静默K · 休眠P · 更新时间
 - 双击 = 打开本机控制台 WebUI;右键 = 刷新 / 打开控制台 / 退出
 纯本机运行(只跑本机 agentbus.py who --json + 打开 127.0.0.1 控制台),不联网、不外发任何数据。
-数据口径由 Master数分2(bus 监控)定义;数据源 = agentbus.py who --json。
+数据口径由 Master数分(bus 监控)定义;数据源 = agentbus.py who --json。
 """
 import os
 import sys
@@ -50,7 +51,8 @@ COL = {
     "warn":   (245, 166, 35),   # 橙:有静默异常
     "down":   (255, 93, 93),    # 红:全部离线
     "err":    (125, 138, 160),  # 灰:探测失败
-    "maint":  (150, 130, 200),  # 紫:维修模式(掉线spike=预期·安静·不告警红·Master数分2 caveat)
+    "todo":   (150, 130, 200),  # 紫:有待办待用户拍板(醒目·用户明令待办=紫·2026-08-21)
+    "maint":  (110, 125, 150),  # 灰蓝:维修模式(掉线spike=预期·安静态·把紫让给待办·2026-08-21)
 }
 
 _state = {"hwnd": None, "hicon": None, "tip": "bus 托盘启动中…", "n": 0, "color": "err",
@@ -76,7 +78,8 @@ def _probe_webui():
             return None
         return (int(d.get("present", 0)), int(d.get("running", 0)),
                 int(d.get("silent", 0)), int(d.get("parked", 0)), int(d.get("stale", 0)),
-                int(d.get("offline", 0)), bool(d.get("maint")))
+                int(d.get("offline", 0)), bool(d.get("maint")),
+                list(d.get("offline_roles") or []), int(d.get("todos", 0)))
     except Exception:
         return None
 
@@ -105,10 +108,21 @@ def _probe_local():
     n = len(present)
     k = sum(1 for r in present if "静默" in (r.get("verdict") or ""))
     p = sum(1 for r in roles if real(r) and r.get("parked"))
-    # 掉线口径(对齐 WebUI bus_tray_counts·Master数分2 定 2026-08-14):【只】self_wake == "stale"(⚠掉线=在场
-    #  但断连);不含 dead(缺席/退出有歧义·虚高告警)。real() 已排 pseudo/retired;parked 态≠stale 天然排除。
+    # 掉线口径(对齐 WebUI bus_tray_counts·Master数分 定稿·用户修正 2026-08-21):【双条件】self_wake=='stale'
+    #  AND turn=='idle'(空闲待命 + wait 掉,两条件同时)。旧【单条件·只 stale】误报【正在忙的 agent】——
+    #  agent 干活时(turn=thinking/tool)本就没挂 wait(干完才重挂)=正常态非掉线。who --json 无 turn 字段
+    #  → 直接读 <role>/turn_state.json 取 state。turn=None(无 hook/daemon)保守【不计】、◐待确认(非 stale)
+    #  天然不计、'stale' 已排刚 fire 的 'recent' 瞬态(无需 idle-age 门槛)。real() 已排 pseudo/retired;parked 天然排。
     #  WebUI 在跑时走 _probe_webui 读权威 offline,本兜底仅 WebUI down 时用。
-    offline = sum(1 for r in roles if real(r) and r.get("self_wake") == "stale")
+    def _turn_idle(role):
+        try:
+            d = json.load(open(os.path.join(BUS_DIR, role, "turn_state.json"), encoding="utf-8"))
+            return d.get("state") == "idle"
+        except Exception:
+            return False
+    offline_roles = [r["role"] for r in roles
+                     if real(r) and r.get("self_wake") == "stale" and _turn_idle(r["role"])]
+    offline = len(offline_roles)   # 名字列表供 tooltip 列名(用户令 2026-08-21),计数=列表长度同口径
 
     now = time.time()
     running = set()
@@ -141,14 +155,21 @@ def _probe_local():
                     running.add(role)
             else:
                 stale += 1
-    # 维修模式(兜底路径):WebUI down 时直接读 maintenance.json(Master数分2 caveat·弱化掉线spike)
+    # 维修模式(兜底路径):WebUI down 时直接读 maintenance.json(Master数分 caveat·弱化掉线spike)
     maint = False
     try:
         with open(os.path.join(BUS_DIR, "maintenance.json"), encoding="utf-8") as fh:
             maint = bool(json.load(fh).get("active"))
     except Exception:
         maint = False   # 读不到=默认非维修(WebUI down 本身已异常,宁可显告警不误吞)
-    return (n, len(running), k, p, stale, offline, maint)
+    # 待办数(兜底路径直读 todos.json)·只数【待办】态(需用户处理)·排除【进行中】(已有人在做)+【完成】(用户令 2026-08-21)
+    todos = 0
+    try:
+        with open(os.path.join(BUS_DIR, "todos.json"), encoding="utf-8") as fh:
+            todos = sum(1 for t in json.load(fh) if isinstance(t, dict) and t.get("status") == "待办")
+    except Exception:
+        todos = 0
+    return (n, len(running), k, p, stale, offline, maint, offline_roles, todos)
 
 
 def _probe():
@@ -159,11 +180,14 @@ def _probe():
     return _probe_local()
 
 
-def _pick_color(n, m, k, stale, offline=0, maint=False):
+def _pick_color(n, m, k, stale, offline=0, maint=False, todos=0):
+    # 球一次只显一态·优先级=最急者赢(用户令 2026-08-21·待办vs掉线优先级已投待办池待用户定·暂用MasterAgent默认掉线>待办):
     if maint:
-        return "maint"  # 维修模式:整个 bus 有意停机,掉线spike=预期→安静紫·不报警红(Master数分2 caveat 2026-08-14)
+        return "maint"  # 维修模式:整个 bus 有意停机→安静灰蓝·不报警(Master数分 caveat·维修期不抢红/紫)
     if offline > 0:
-        return "down"   # 有掉线 agent = 异常态醒目(告警红·优先于一切·用户 2026-08-14)
+        return "down"   # 掉线 agent = 救 agent 最急(告警红·用户旧令优先·2026-08-14)
+    if todos > 0:
+        return "todo"   # 有待办 = 要用户拍板(醒目紫·次急·用户令 2026-08-21)
     if n == 0:
         return "down"
     if m > 0:
@@ -219,23 +243,35 @@ def _update_tray(n, tip, color):
             pass
 
 
-def _fmt_tray(n, m, k, p, stale, offline, maint=False):
-    """算托盘图标数字 + tooltip。图标数字【优先级】(用户 2026-08-14):
-    掉线数>0 → 图标显示【掉线数】(异常态醒目·比在跑更该一眼看到);否则显示【在跑数 m】(正常态·维持现状口径)。
-    维修模式(Master数分2 caveat):stale=预期态·掉线spike不代表故障 → 图标【回落显在跑数】(不被预期离线惊扰),
-    tooltip 冠「🔧维修中」并把掉线标注「(预期)」;配色由 _pick_color 走安静紫、不报警红。
-    tooltip 恒列全轴,非维修且掉线>0 时把「⚠掉线X」提到最前醒目位。返回 (图标数字, tooltip 串)。"""
+def _fmt_offline_names(roles, cap=3):
+    """列掉线 agent 名·超 cap 个则前 cap 名 + "…+K"(防 Windows tooltip 127 字符硬限被长名单挤爆·
+    别让在岗/在跑等关键计数溢出丢失·用户令 2026-08-21)。返回 ":名1、名2" 或 "" (无掉线)。"""
+    if not roles:
+        return ""
+    if len(roles) <= cap:
+        return ":" + "、".join(roles)
+    return ":" + "、".join(roles[:cap]) + "…+%d" % (len(roles) - cap)
+
+
+def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos=0):
+    """算托盘图标数字 + tooltip。图标数字【优先级·最急者赢】(用户令·2026-08-14/08-21):
+    掉线数>0 → 显【掉线数】(救agent最急·红);否则 待办>0 → 显【待办数】(要用户拍板·紫);否则 显【在跑数 m】。
+    维修模式(Master数分 caveat):stale=预期态 → 图标【回落显在跑数】(不被预期离线惊扰)+ 冠「🔧维修中」+ 掉线标(预期);
+    配色由 _pick_color 定(维修灰蓝/掉线红/待办紫/…)。tooltip 恒列全轴:掉线>0 提「⚠掉线X:名单」(超3截断+…+K
+    防 127 硬限)、待办>0 列「📋待办X」;维修期不列掉线名(预期离线名单吵)。返回 (图标数字, tooltip 串)。"""
+    names = _fmt_offline_names(offline_roles or [])
+    todo_seg = ("📋待办%d · " % todos) if todos else ""
     if maint:
         num = m                                        # 维修期:回落显在跑数,预期离线不占图标
         pre = "🔧维修中 · "
-        off = ("掉线%d(预期) · " % offline) if offline else ""
+        off = ("掉线%d(预期) · " % offline) if offline else ""   # 维修期不列名(预期离线名单吵)
     else:
-        num = offline if offline > 0 else m
+        num = offline if offline > 0 else (todos if todos > 0 else m)   # 优先级:掉线>待办>在跑
         pre = ""
-        off = ("⚠掉线%d · " % offline) if offline else ""
+        off = ("⚠掉线%d%s · " % (offline, names)) if offline else ""
     state = "运转中" if n else "全部离线"
-    tip = "bus %s%s · %s在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
-        pre, state, off, n, m, k, p, (" · 卡claim%d" % stale) if stale else "",
+    tip = "bus %s%s · %s%s在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
+        pre, state, off, todo_seg, n, m, k, p, (" · 卡claim%d" % stale) if stale else "",
         time.strftime("%H:%M:%S"))
     return num, tip
 
@@ -247,9 +283,9 @@ def _poll_loop():
             tip = "bus 探测失败(agentbus who 无响应)"
             _update_tray("?", tip, "err")
         else:
-            n, m, k, p, stale, offline, maint = r
-            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint)
-            _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint))
+            n, m, k, p, stale, offline, maint, offline_roles, todos = r
+            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos)
+            _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
         time.sleep(POLL_SEC)
 
 
@@ -291,9 +327,9 @@ def _refresh_once():
     if r is None:
         _update_tray("?", "bus 探测失败", "err")
     else:
-        n, m, k, p, stale, offline, maint = r
-        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint)
-        _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint))
+        n, m, k, p, stale, offline, maint, offline_roles, todos = r
+        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos)
+        _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
 
 
 def _on_destroy(hwnd, msg, wparam, lparam):
