@@ -41,6 +41,12 @@
 - **可吸收性**:✅ 平台面——通用决策质量 checklist。
 - **吸收单元**:记忆 `big-change-core-value-gate` + `docs/POSTMORTEM_daemon_direction_error.md`(10 根因四层)。
 
+### 7. 用户侧自醒对偶(user-absence detection)★平台面·设计中
+- **洞察(user 2026-08-28)**:agent 有自醒(心跳)探 agent 缺席;**用户侧没有对偶**→ pending 确认点烂在待办池、无人知"用户很久没回"。这是【会问阶梯 escalate-to-user 档】的落地缺口。
+- **可吸收性**:✅ 平台面——"给用户也建 last-seen + 缺席守卫"的对称模型,任何有人机确认点的 bus 通用。
+- **吸收单元(设计·待建)**:①inline user-checkpoint(确认点带 context_ref+age+status 嵌协作流·非孤立 todos)②user-last-seen 追踪(UserPromptSubmit hook 盖时间戳)③user-absence-guard(后台扫 pending checkpoint·age 超阈且用户无活动→升级 toast/PushNotification·类比 selfwake-guard)。草案 `scratchpad/user_absence_checkpoint_design.md`。分工:机制=MasterAgent·阈值口径+数据真实性=Master数分。
+- **状态**:设计中·Master数分 配阈值口径后建。
+
 ## 全量指针(供吸收方定位)
 - **回退 commit**:`d077bd59`(fleet 清空) · daemon 化 commit 见 `genesis_20260827_fleet-daemonization.md` 全量表。
 - **记忆**:`daemon-conversion-fleet-2026-08`(已标回退)/`failure-is-memory-inheritance`/`big-change-core-value-gate`/`bus-frequent-light-communication`/`data-truthfulness-first`。
