@@ -1733,7 +1733,11 @@ async function loadUserAbsence(force){
     head+=present?('<b>用户在场</b> <span class="ua-sub">present · idle '+idle+'min</span>')
                 :('<b>用户离席</b> <span class="ua-sub">away · idle '+idle+'min</span>');
     if(d.night) head+=' <span class="ua-night">🌙 夜间</span>';
-    head+='<span class="ua-count">🗳️待你决策 '+(d.pending_decision!=null?d.pending_decision:cps.filter(c=>c.kind!=='fyi').length)+' · 📄待你知悉 '+(d.pending_fyi!=null?d.pending_fyi:cps.filter(c=>c.kind==='fyi').length)+'</span></div>';
+    // 计数两栏(Master数分口径·某栏0则隐藏=正常态安静·不显'…0'噪音;两栏皆0显'✓无待确认')
+    const nDec=(d.pending_decision!=null?d.pending_decision:cps.filter(c=>c.kind!=='fyi').length);
+    const nFyi=(d.pending_fyi!=null?d.pending_fyi:cps.filter(c=>c.kind==='fyi').length);
+    const _seg=[]; if(nDec>0) _seg.push('🗳️待你决策 '+nDec); if(nFyi>0) _seg.push('📄待你知悉 '+nFyi);
+    head+='<span class="ua-count">'+(_seg.length?_seg.join(' · '):'✓ 无待确认')+'</span></div>';
     const ICON={escalate:'🔴',nudge:'🟡',fresh:'·',expireable:'⏰'}, KICON={decision:'🗳️',fyi:'📄'};
     // 排序:escalate>high-urgency>nudge>fresh 再 age desc(Master数分#2:让 away 时高优浮顶·别把今天高优埋底)
     const _uaRank=(c)=>c.state==='escalate'?0:(c.urgency==='high'?1:((c.state==='nudge'||c.state==='expireable')?2:3));
