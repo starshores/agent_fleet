@@ -42,7 +42,7 @@ _DEFAULT_CFG = {
         "low_after_min": 1440,                      # decision+low 超 24h 无答 → auto-expire(标注·不伪装已答)
         "normal_after_min": None,                   # decision+normal 不自动过期(持续挂+升级)
         "high_after_min": None,                     # decision+high 绝不自动过期(数据真实性红线·必须显式答)
-        "fyi_after_min": 1440,                      # ★fyi(知悉结论)超此→auto-archive 归档(留痕·超期无害·与 urgency 正交)
+        "fyi_after_min": 720,                       # ★fyi(知悉结论)超此→auto-archive 归档(Master数分:略短于 decision-low·超期无害·留痕;主路径=批量ack·此为兜底非激进)
     },
 }
 
@@ -133,7 +133,10 @@ def _urgency_of(item):
 
 # ── kind:待决策(decision)vs 待知悉结论(fyi)·Master数分口径 2026-08-28【2】────────────
 # 派生标记(缺显式 --kind 时用):decision 标记优先命中 → decision(安全默认偏向待决策)。
-_KIND_DECISION_MARKERS = ("需业务定", "拍板", "怎么办", "需定", "待信息", "?", "?", "二选", "选择", "确认是否")
+# ★含"待定/待确认/未决"→ decision:Master数分反例『[完成·待确认]…+2项待定』标题带"完成"像 fyi 但含未决点=decision,
+# 纯启发式误判 fyi 自动关=丢待定=数据真实性事故;显式识别未决标记 → 稳判 decision(不靠默认侥幸)。
+_KIND_DECISION_MARKERS = ("需业务定", "拍板", "怎么办", "需定", "待信息", "待定", "待确认", "未决",
+                          "?", "?", "二选", "选择", "确认是否")
 _KIND_FYI_MARKERS = ("[已完成]", "[完成]", "已完成", "结论", "报告", "report", "知悉", "fyi", "交付")
 
 

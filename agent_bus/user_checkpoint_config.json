@@ -14,6 +14,6 @@
   "low_after_min": 1440,
   "normal_after_min": null,
   "high_after_min": null,
-  "fyi_after_min": 1440
+  "fyi_after_min": 720
  }
 }
