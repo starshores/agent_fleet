@@ -473,4 +473,8 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .ua-ans-in{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:5px;color:var(--txt);padding:4px 8px;font-size:12px}
 .ua-ans-in:focus{outline:none;border-color:var(--live)}
 .ua-ans-send{flex:0 0 auto;background:var(--live);color:#06231a;border:none;border-radius:5px;padding:2px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.ua-cp .ua-kind{flex:0 0 auto;font-size:12px;opacity:.85}
+.ua-ack-btn{flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:1px 8px;font-size:11px;cursor:pointer}
+.ua-ack-btn:hover{border-color:var(--live);color:var(--live)}
+.ua-cp.k-fyi{background:rgba(var(--none-rgb),.03)}
 """

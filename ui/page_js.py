@@ -1733,8 +1733,8 @@ async function loadUserAbsence(force){
     head+=present?('<b>用户在场</b> <span class="ua-sub">present · idle '+idle+'min</span>')
                 :('<b>用户离席</b> <span class="ua-sub">away · idle '+idle+'min</span>');
     if(d.night) head+=' <span class="ua-night">🌙 夜间</span>';
-    head+='<span class="ua-count">'+cps.length+' 个确认点在等</span></div>';
-    const ICON={escalate:'🔴',nudge:'🟡',fresh:'·',expireable:'⏰'};
+    head+='<span class="ua-count">🗳️待你决策 '+(d.pending_decision!=null?d.pending_decision:cps.filter(c=>c.kind!=='fyi').length)+' · 📄待你知悉 '+(d.pending_fyi!=null?d.pending_fyi:cps.filter(c=>c.kind==='fyi').length)+'</span></div>';
+    const ICON={escalate:'🔴',nudge:'🟡',fresh:'·',expireable:'⏰'}, KICON={decision:'🗳️',fyi:'📄'};
     // 排序:escalate>high-urgency>nudge>fresh 再 age desc(Master数分#2:让 away 时高优浮顶·别把今天高优埋底)
     const _uaRank=(c)=>c.state==='escalate'?0:(c.urgency==='high'?1:((c.state==='nudge'||c.state==='expireable')?2:3));
     let rows;
@@ -1742,13 +1742,17 @@ async function loadUserAbsence(force){
     else{
       const sorted=cps.slice().sort((a,b)=>_uaRank(a)-_uaRank(b)||(b.age_min-a.age_min));
       rows=sorted.map(c=>{
-        const hi=c.urgency==='high'; const id=esc(c.id||'');
-        return '<div class="ua-cp st-'+esc(c.state||'')+(hi?' hi':'')+'">'
+        const hi=c.urgency==='high'; const id=esc(c.id||''); const fyi=c.kind==='fyi';
+        const act=fyi
+          ? '<button class="ua-ack-btn" title="知悉并批关(轻量ack·路由回提问方)" onclick="uaAck(event,\''+id+'\')">✓知悉</button>'
+          : '<button class="ua-ans-btn" onclick="uaAnsToggle(event,\''+id+'\')">✍答复</button>'
+            +'<div class="ua-ans" id="uaans-'+id+'" style="display:none"><input class="ua-ans-in" id="uaansin-'+id+'" placeholder="答复该确认点(回车发送)…" onkeydown="if(event.key===\'Enter\')uaAnsSend(\''+id+'\')"><button class="ua-ans-send" onclick="uaAnsSend(\''+id+'\')">发送</button></div>';
+        return '<div class="ua-cp st-'+esc(c.state||'')+' k-'+esc(c.kind||'')+(hi?' hi':'')+'">'
           +'<span class="ua-ico">'+(ICON[c.state]||'·')+'</span>'
+          +'<span class="ua-kind" title="'+(fyi?'待你知悉(结论·轻量ack)':'待你决策(需拍板)')+'">'+(KICON[c.kind]||'')+'</span>'
           +'<span class="ua-cp-title" title="点击去待办池" onclick="showTab(\'tasks\')">'+esc(c.title||'(无标题)')+'</span>'
           +'<span class="ua-cp-meta">'+(hi?'<span class="ua-urg">高</span>':'')+esc(c.from||'')+' · '+_uaAge(c.age_min)+'</span>'
-          +'<button class="ua-ans-btn" onclick="uaAnsToggle(event,\''+id+'\')">✍答复</button>'
-          +'<div class="ua-ans" id="uaans-'+id+'" style="display:none"><input class="ua-ans-in" id="uaansin-'+id+'" placeholder="答复该确认点(回车发送)…" onkeydown="if(event.key===\'Enter\')uaAnsSend(\''+id+'\')"><button class="ua-ans-send" onclick="uaAnsSend(\''+id+'\')">发送</button></div>'
+          +act
           +'</div>';
       }).join('');
     }
@@ -1766,6 +1770,14 @@ async function uaAnsSend(id){
     if(r && r.ok){ toast('已答复确认点·路由回提问方'); loadUserAbsence(true); load(); }
     else toast('答复失败:'+((r&&r.error)||'?'));
   }catch(e){ toast('答复异常:'+e); }
+}
+// fyi类(待你知悉结论)一键知悉批关(Master数分口径·轻量ack·区别decision的显式答复框)——复用 answer 端点 reply=已知悉·路由回提问方+批关
+async function uaAck(e,id){ e.stopPropagation();
+  try{
+    const r=await (await fetch('/api/todos/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,reply:'已知悉'})})).json();
+    if(r && r.ok){ toast('已知悉·批关该结论'); loadUserAbsence(true); load(); }
+    else toast('批关失败:'+((r&&r.error)||'?'));
+  }catch(e){ toast('批关异常:'+e); }
 }
 // 📖 操作说明 —— 渲染 repo 根 BUS_GUIDE.md(单一源·内容 MasterAgent 维护·MasterUI 只渲染)。左目录右正文·锚点跳转·静态文档加载一次
 let _guideLoaded=false;
