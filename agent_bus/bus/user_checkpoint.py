@@ -15,6 +15,11 @@
 口径(Master数分 v1·可调进 user_checkpoint_config.json·非硬编码):
 - ① 阈值 urgency × 日夜二维;② ★防误报=present/away 两正交信号拆开;③ age=now−created;
 - ④ 高风险绝不自动过期、auto-expire 必留痕不伪装已答;⑤ 升级梯度全程非阻塞。
+
+kind 维(Master数分 v2·2026-08-28·MasterUI 抛 P1c):checkpoint 分【待决策 decision】(需拍板/取舍·必显式答)
+vs【待知悉结论 fyi】(活已完成·交付报告·只需轻量 ack)。取值:显式 --kind 优先 → 标题标记派生 →
+★默认 decision(安全默认·拿不准当待决策·别误判成可自动关的 fyi=漏用户该做的决策=违④)。
+kind × urgency 正交(kind 管『要不要拍板』·urgency 管『多急』);面板分两栏计数不夸大开放决策数。
 """
 import json, os, time
 from bus.config import BUS, _now
@@ -33,21 +38,29 @@ _DEFAULT_CFG = {
         "high": 15, "normal": 45, "low": 120,
     },
     "night_defer": True,                            # 夜间压制 toast/push(除不可逆高风险)·队列次日白天首刻
-    "auto_expire": {                                # ④ 仅 low 可超长自动过期(必留痕)
-        "low_after_min": 1440,                      # low 超 24h 无答 → auto-expire(标注·不伪装已答)
-        "normal_after_min": None,                   # normal 不自动过期(持续挂+升级)
-        "high_after_min": None,                     # high 绝不自动过期(数据真实性红线·必须显式答)
+    "auto_expire": {                                # ④ auto-expire 阈值(必留痕·分 kind×urgency·Master数分口径 2026-08-28)
+        "low_after_min": 1440,                      # decision+low 超 24h 无答 → auto-expire(标注·不伪装已答)
+        "normal_after_min": None,                   # decision+normal 不自动过期(持续挂+升级)
+        "high_after_min": None,                     # decision+high 绝不自动过期(数据真实性红线·必须显式答)
+        "fyi_after_min": 1440,                      # ★fyi(知悉结论)超此→auto-archive 归档(留痕·超期无害·与 urgency 正交)
     },
 }
 
 
 def _load_cfg():
-    cfg = dict(_DEFAULT_CFG)
+    """默认口径 + 配置文件深合并(嵌套 dict 逐键并·非整块替换)。
+    ★深合并要紧:配置文件只需写要改的键;整块替换会让旧文件(缺新键如 fyi_after_min)覆盖掉新默认。"""
+    import copy
+    cfg = copy.deepcopy(_DEFAULT_CFG)
     try:
         if CKPT_CFG.exists():
             d = json.loads(CKPT_CFG.read_text(encoding="utf-8"))
             if isinstance(d, dict):
-                cfg.update(d)
+                for k, v in d.items():
+                    if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                        cfg[k].update(v)          # 嵌套 dict:逐键并(保未提及的默认键)
+                    else:
+                        cfg[k] = v
     except Exception:
         pass
     return cfg
@@ -118,6 +131,41 @@ def _urgency_of(item):
     return _URGENCY_BY_PRIO.get(item.get("priority"), "normal")
 
 
+# ── kind:待决策(decision)vs 待知悉结论(fyi)·Master数分口径 2026-08-28【2】────────────
+# 派生标记(缺显式 --kind 时用):decision 标记优先命中 → decision(安全默认偏向待决策)。
+_KIND_DECISION_MARKERS = ("需业务定", "拍板", "怎么办", "需定", "待信息", "?", "?", "二选", "选择", "确认是否")
+_KIND_FYI_MARKERS = ("[已完成]", "[完成]", "已完成", "结论", "报告", "report", "知悉", "fyi", "交付")
+
+
+def _kind_of(item):
+    """kind:显式 item.kind 优先(decision|fyi)→ 否则标题/detail 标记派生 → ★默认 decision。
+    ③安全默认(数据真实性):拿不准当【待决策】·别默认成可自动 ack/关的 fyi——把真决策误判成 fyi
+    自动关=漏掉用户该做的决策=违④。故 decision 标记优先于 fyi 标记,二者皆无 → decision。"""
+    k = (item.get("kind") or "").strip().lower()
+    if k in ("decision", "fyi"):
+        return k
+    # 只扫【标题】(Master数分口径【2】"由标题标记"·非 detail)——扫 detail 会过度促成 fyi、违安全默认精神。
+    text = item.get("title") or ""
+    tl = text.lower()
+    for m in _KIND_DECISION_MARKERS:            # decision 标记优先(安全默认偏待决策)
+        if m in text or m.lower() in tl:
+            return "decision"
+    for m in _KIND_FYI_MARKERS:
+        if m in text or m.lower() in tl:
+            return "fyi"
+    return "decision"                            # ③ 安全默认=待决策
+
+
+def _expire_after(cfg, kind, urg):
+    """该 checkpoint 的 auto-expire 阈值(分钟)·None=永不自动过期。kind×urgency 口径(Master数分【3】):
+    - fyi(知悉结论):超期无害 → fyi_after_min(与 urgency 正交)。
+    - decision(待决策):只 low 可超期(low_after_min);normal/high=None(★high 绝不·④红线)。"""
+    ae = cfg.get("auto_expire") or {}
+    if kind == "fyi":
+        return ae.get("fyi_after_min")
+    return ae.get(urg + "_after_min")            # decision:按 urgency(low 有值·normal/high=None)
+
+
 def _scan_checkpoints():
     """读 todos.json,取所有 pending 的确认点(source 以'确认·'起头)。"""
     tf = BUS / "todos.json"
@@ -135,25 +183,26 @@ def _scan_checkpoints():
 
 
 def _classify(cfg, item, now, present):
-    """给一条 checkpoint 定状态(★核心·Master数分口径 ②③⑤)。返回 (state, age_min, urgency)。
-    state ∈ fresh / nudge(present+未理+超attention) / escalate(away+未理+超阈) / expireable(low超期)。"""
+    """给一条 checkpoint 定状态(★核心·Master数分口径 ②③⑤ + kind 正交)。返回 (state, age_min, urgency, kind)。
+    state ∈ fresh / nudge(present+未理+超attention) / escalate(away+未理+超阈) / expireable(超期·kind×urg)。
+    kind 管『要不要拍板』·urgency 管『多急』·两轴正交(Master数分【4】)——escalate 仍按 urgency(fyi 也可 high 尽快知悉)。"""
     urg = _urgency_of(item)
+    kind = _kind_of(item)
     created = _parse_iso(item.get("created", ""))
     age = (now - created) / 60.0 if created else 0.0     # ③ age=now−created
     esc_th = (cfg.get("escalate_after_min") or {}).get(urg, 45)
-    # ④ auto-expire 仅 low·超长
-    exp_th = (cfg.get("auto_expire") or {}).get(urg + "_after_min")
+    exp_th = _expire_after(cfg, kind, urg)               # ④ kind×urgency:fyi→fyi_after_min·decision→仅low
     if exp_th and age >= exp_th:
-        return "expireable", age, urg
+        return "expireable", age, urg, kind
     # ② present/away × 未理(该 checkpoint 仍 pending=未 confirmed)
     if present:
         if age >= cfg.get("attention_min", 10):
-            return "nudge", age, urg          # 在场但没理这条 → 面板醒目·不打断
-        return "fresh", age, urg
+            return "nudge", age, urg, kind    # 在场但没理这条 → 面板醒目·不打断
+        return "fresh", age, urg, kind
     else:  # away
         if age >= esc_th:
-            return "escalate", age, urg       # 离席+未理+超阈 → 真『用户很久没回』
-        return "fresh", age, urg
+            return "escalate", age, urg, kind  # 离席+未理+超阈 → 真『用户很久没回』
+        return "fresh", age, urg, kind
 
 
 def cmd_user_absence_check(args):
@@ -170,9 +219,9 @@ def cmd_user_absence_check(args):
 
     rows, to_escalate, to_expire = [], [], []
     for it in cps:
-        state, age, urg = _classify(cfg, it, now, present)
+        state, age, urg, kind = _classify(cfg, it, now, present)
         row = {"id": it.get("id"), "title": (it.get("title") or "")[:60], "from": it.get("confirm_from"),
-               "ref": it.get("ref"), "urgency": urg, "age_min": round(age, 1), "state": state,
+               "ref": it.get("ref"), "urgency": urg, "kind": kind, "age_min": round(age, 1), "state": state,
                "created": it.get("created")}
         rows.append(row)
         if state == "escalate":
@@ -180,10 +229,13 @@ def cmd_user_absence_check(args):
         elif state == "expireable":
             to_expire.append((it, row))
 
+    # ⑤ 呈现 truthfulness(Master数分【5】):分两栏计数——『待你决策』vs『待你知悉』,不笼统一个『N待确认』(夸大开放决策数)
+    n_decision = sum(1 for r in rows if r["kind"] == "decision")
+    n_fyi = sum(1 for r in rows if r["kind"] == "fyi")
     result = {
         "as_of": _now(), "night": night,
         "user_present": present, "user_idle_min": round(idle_min, 1) if seen else None,
-        "pending": len(cps), "checkpoints": rows,
+        "pending": len(cps), "pending_decision": n_decision, "pending_fyi": n_fyi, "checkpoints": rows,
         "to_escalate": to_escalate, "expireable": [r for _, r in to_expire],
     }
 
@@ -202,14 +254,19 @@ def cmd_user_absence_check(args):
             try: todos = json.loads(tf.read_text(encoding="utf-8"))
             except Exception: todos = []
             byid = {t.get("id"): t for t in todos}
+            ae = cfg.get("auto_expire") or {}
             for it, row in to_expire:
                 t = byid.get(it.get("id"))
                 if not t: continue
-                # ★数据真实性红线:标 expired + 显式留痕,绝不伪装成"已答/完成"
+                # ★数据真实性红线:标 expired + 显式留痕,绝不伪装成"已答/完成"。留痕文案分 kind:
+                # fyi=知悉类超期归档(无害);decision=低紧急超期(用户从未回答·仍非已确认)。
                 t["status"] = "expired"; t["updated"] = _now()
-                t["expire_note"] = "用户从未回答·低紧急超期自动过期(age>%s min)·非用户确认" % (
-                    (cfg.get("auto_expire") or {}).get("low_after_min"))
-                t["detail"] = ((t.get("detail", "") or "") + " 〔⏰auto-expired·用户从未回答·非已确认〕").strip()
+                if row["kind"] == "fyi":
+                    t["expire_note"] = "已知悉结论·超期自动归档(age>%s min)·超期无害·非用户确认" % ae.get("fyi_after_min")
+                    t["detail"] = ((t.get("detail", "") or "") + " 〔⏰auto-archived·知悉类超期归档·非拍板/非已确认〕").strip()
+                else:
+                    t["expire_note"] = "用户从未回答·低紧急超期自动过期(age>%s min)·非用户确认" % ae.get("low_after_min")
+                    t["detail"] = ((t.get("detail", "") or "") + " 〔⏰auto-expired·用户从未回答·非已确认〕").strip()
                 acted.append(("expired", row["id"]))
             _write_json(tf, todos)
         for _, cid in acted:
@@ -226,10 +283,11 @@ def cmd_user_absence_check(args):
     # 打印摘要
     tag = "🌙夜" if night else "☀️日"
     who = ("在场present(idle %dmin)" % idle_min) if present else ("离席away(idle %dmin)" % idle_min if seen else "无last-seen记录")
-    print("用户缺席检测 [%s·%s] · pending确认 %d" % (tag, who, len(cps)))
+    print("用户缺席检测 [%s·%s] · pending确认 %d(待决策%d/待知悉%d)" % (tag, who, len(cps), n_decision, n_fyi))
     for r in rows:
         icon = {"escalate": "🔴升级", "nudge": "🟡nudge", "expireable": "⏰可过期", "fresh": "·"}.get(r["state"], "·")
-        print("  %s %s《%s》%s·age%dmin·from %s" % (icon, r["urgency"], r["title"], "", int(r["age_min"]), r["from"]))
+        kicon = "🗳️决策" if r["kind"] == "decision" else "📄知悉"
+        print("  %s %s %s《%s》·age%dmin·from %s" % (icon, kicon, r["urgency"], r["title"], int(r["age_min"]), r["from"]))
     if apply and (acted or esc_toast):
         print("  → 执行:auto-expired %d(留痕)· toast升级 %d" % (len(acted), len(esc_toast)))
     elif not apply and (to_escalate or to_expire):

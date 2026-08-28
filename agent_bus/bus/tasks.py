@@ -178,6 +178,9 @@ def cmd_ask_user(args):
         # 用户确认点缺席检测(2026-08-28):urgency 决定阈值/自动过期口径(高风险绝不自动过期)。
         # 显式 --urgency 优先;缺则 user_checkpoint._urgency_of 由 priority 派生。ref=关联协作上下文。
         "urgency": (getattr(args, "urgency", None) or "").strip().lower() or None,
+        # kind(Master数分 v2·2026-08-28):decision=待决策(需拍板) / fyi=待知悉结论(轻ack)。
+        # 显式 --kind 优先;缺则 user_checkpoint._kind_of 由标题标记派生·默认 decision(安全默认)。
+        "kind": (getattr(args, "kind", None) or "").strip().lower() or None,
     }
     with json_lock(f):   # 锁跨 RMW(P0)+ _write_json 原子落地(替换原手写 tmp+replace)
         try:
