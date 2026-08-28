@@ -410,4 +410,67 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .cap-chip.live{border-color:rgba(var(--live-rgb),.4);color:var(--live)}
 .cap-chip.warn{border-color:rgba(var(--warn-rgb),.5);color:var(--warn)}
 .cap-chip.none{border-color:var(--line-muted);color:var(--none)}
+/* 📖 操作说明(BUS_GUIDE.md 渲染)—— 左目录/右正文·块状认知·薄荷绿强调(user-visual-block-cognition) */
+.guide-wrap{display:grid;grid-template-columns:230px 1fr;gap:0;align-items:start}
+.guide-toc{position:sticky;top:56px;max-height:calc(100vh - 72px);overflow:auto;padding:14px 10px 20px 16px;border-right:1px solid var(--line);font-size:12.5px;line-height:1.7}
+.guide-toc .toc{padding:0}
+.guide-toc ul{list-style:none;margin:0;padding:0 0 0 10px}
+.guide-toc>.toc>ul{padding-left:0}
+.guide-toc li{margin:1px 0}
+.guide-toc a{display:block;color:var(--dim);text-decoration:none;padding:3px 8px;border-radius:6px;border-left:2px solid transparent}
+.guide-toc a:hover{background:var(--hover);color:var(--txt)}
+.guide-toc a.active{color:var(--live);border-left-color:var(--live);background:rgba(var(--live-rgb),.08);font-weight:600}
+.guide-body{padding:8px 30px 60px;max-width:900px;line-height:1.72;font-size:14px;color:var(--txt);overflow-wrap:break-word}
+.guide-body h1,.guide-body h2,.guide-body h3,.guide-body h4{line-height:1.3;font-weight:680}
+.guide-body h1{font-size:22px;margin:18px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.guide-body h2{font-size:18px;margin:30px 0 12px;padding-left:11px;border-left:4px solid var(--live);scroll-margin-top:60px}
+.guide-body h3{font-size:15px;margin:22px 0 8px;color:var(--txt);scroll-margin-top:60px}
+.guide-body h4{font-size:13.5px;margin:16px 0 6px;color:var(--dim);scroll-margin-top:60px}
+.guide-body p{margin:9px 0}
+.guide-body ul,.guide-body ol{margin:8px 0;padding-left:24px}
+.guide-body li{margin:4px 0}
+.guide-body a{color:var(--live);text-decoration:none;border-bottom:1px solid rgba(var(--live-rgb),.35)}
+.guide-body a:hover{border-bottom-color:var(--live)}
+.guide-body code{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--line-muted);border-radius:5px;padding:1px 6px;color:#cfe0ff}
+.guide-body pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;margin:12px 0}
+.guide-body pre code{background:none;border:none;padding:0;color:var(--txt)}
+.guide-body blockquote{margin:12px 0;padding:8px 14px;border-left:3px solid var(--live);background:rgba(var(--live-rgb),.05);border-radius:0 6px 6px 0;color:var(--dim)}
+.guide-body blockquote p{margin:4px 0}
+.guide-body table{border-collapse:collapse;margin:14px 0;width:100%;font-size:13px;display:block;overflow-x:auto}
+.guide-body th,.guide-body td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+.guide-body thead th{background:var(--panel2);color:var(--txt);font-weight:650;border-bottom:2px solid rgba(var(--live-rgb),.5)}
+.guide-body tbody tr:nth-child(even){background:rgba(var(--none-rgb),.05)}
+.guide-body hr{border:none;border-top:1px solid var(--line);margin:26px 0}
+.guide-body strong{color:var(--txt);font-weight:680}
+.guide-raw{white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;color:var(--txt)}
+@media(max-width:860px){.guide-wrap{grid-template-columns:1fr}.guide-toc{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line)}}
+/* 🙋 用户确认点/缺席面板(用户侧自醒对偶)—— 在场安静·离席/escalate 醒目·薄荷绿 #3ecf8e */
+.ua-panel{margin:10px 16px 4px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel2)}
+.ua-head{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:13px;border-left:3px solid var(--live);background:rgba(var(--live-rgb),.06)}
+.ua-head .ua-dot{width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(var(--live-rgb),.2);flex:0 0 auto}
+.ua-head.away{border-left-color:var(--warn);background:rgba(var(--warn-rgb),.08)}
+.ua-head.away .ua-dot{background:var(--warn);box-shadow:0 0 0 3px rgba(var(--warn-rgb),.2)}
+.ua-head.alert{border-left-color:var(--dead);background:rgba(var(--dead-rgb),.1)}
+.ua-head.alert .ua-dot{background:var(--dead);box-shadow:0 0 0 3px rgba(var(--dead-rgb),.25)}
+.ua-head .ua-sub{color:var(--muted);font-size:11.5px}
+.ua-head .ua-night{color:var(--idle);font-size:11.5px}
+.ua-head .ua-count{margin-left:auto;color:var(--dim);font-size:11.5px}
+.ua-list{max-height:220px;overflow:auto}
+.ua-empty{padding:10px 13px;color:var(--muted);font-size:12.5px}
+.ua-cp{display:flex;align-items:center;gap:9px;padding:7px 13px;border-top:1px solid var(--line-muted);cursor:pointer;font-size:12.5px}
+.ua-cp:hover{background:var(--hover)}
+.ua-cp .ua-ico{flex:0 0 auto;width:16px;text-align:center}
+.ua-cp .ua-cp-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)}
+.ua-cp .ua-cp-meta{flex:0 0 auto;color:var(--muted);font-size:11px;display:flex;align-items:center;gap:6px}
+.ua-cp .ua-urg{background:rgba(var(--dead-rgb),.16);color:var(--dead);border-radius:4px;padding:0 5px;font-size:10px;font-weight:600}
+.ua-cp.st-escalate .ua-cp-title{color:var(--dead);font-weight:600}
+.ua-cp.st-fresh{opacity:.92}
+.ua-cp.hi{background:rgba(var(--dead-rgb),.045)}
+.ua-cp{flex-wrap:wrap}
+.ua-ans-btn{flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:1px 8px;font-size:11px;cursor:pointer}
+.ua-ans-btn:hover{border-color:var(--live);color:var(--live)}
+.ua-ans{flex:1 1 100%;display:flex;gap:6px;margin-top:6px}
+.ua-ans-in{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:5px;color:var(--txt);padding:4px 8px;font-size:12px}
+.ua-ans-in:focus{outline:none;border-color:var(--live)}
+.ua-ans-send{flex:0 0 auto;background:var(--live);color:#06231a;border:none;border-radius:5px;padding:2px 12px;font-size:12px;font-weight:600;cursor:pointer}
 """

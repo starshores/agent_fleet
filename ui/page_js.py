@@ -427,6 +427,7 @@ async function load(role, fresh){
       d.fleet=state.fleet;
     }
     state=d; _loadFails=0; render();
+    loadUserAbsence();
     const ut=document.getElementById('updT'); ut.classList.remove('flash');void ut.offsetWidth; ut.classList.add('flash');
   }catch(e){
     // 韧性:后端偶发慢/超时/半截 —— 【绝不清空页面】,保留上次 state 与已渲染 DOM,标记重试;下次轮询/SSE 自动再拉
@@ -1685,7 +1686,7 @@ function renderLongrange(d){
 }
 
 // ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',guide:'📖 操作说明',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -1708,10 +1709,92 @@ function showTab(t){
   else if(t==='bizroles') loadBizRoles();
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
+  else if(t==='guide') loadGuide();
   else if(t==='paths'){ loadPaths(); loadStorage(); }
   else if(t==='fleetlog') loadFleetLog();
   else if(t==='asr') loadASR();
 }
+// 🙋 用户确认点/缺席面板(用户侧自醒对偶·MasterAgent 后端 ab user-absence-check·commit 36bd525)——谁在等用户拍板+用户离席多久
+function _uaAge(m){ m=Math.round(m||0); if(m<60) return m+'min'; const h=Math.floor(m/60); if(h<24) return h+'h'; return Math.floor(h/24)+'d'; }
+let _uaLast=0;
+async function loadUserAbsence(force){
+  const box=document.getElementById('uaPanel'); if(!box) return;
+  const now=+new Date();
+  if(!force && now-_uaLast<11000) return;   // 节流:子进程别太频
+  _uaLast=now;
+  try{
+    const d=await (await fetch('/api/user-absence')).json();
+    if(!d || !d.ok){ box.style.display='none'; return; }
+    const cps=d.checkpoints||[];
+    const present=!!d.user_present, idle=Math.round(d.user_idle_min||0);
+    const hasEsc=cps.some(c=>c.state==='escalate');
+    let head='<div class="ua-head'+(present?'':' away')+(hasEsc?' alert':'')+'">';
+    head+='<span class="ua-dot"></span>';
+    head+=present?('<b>用户在场</b> <span class="ua-sub">present · idle '+idle+'min</span>')
+                :('<b>用户离席</b> <span class="ua-sub">away · idle '+idle+'min</span>');
+    if(d.night) head+=' <span class="ua-night">🌙 夜间</span>';
+    head+='<span class="ua-count">'+cps.length+' 个确认点在等</span></div>';
+    const ICON={escalate:'🔴',nudge:'🟡',fresh:'·',expireable:'⏰'};
+    // 排序:escalate>high-urgency>nudge>fresh 再 age desc(Master数分#2:让 away 时高优浮顶·别把今天高优埋底)
+    const _uaRank=(c)=>c.state==='escalate'?0:(c.urgency==='high'?1:((c.state==='nudge'||c.state==='expireable')?2:3));
+    let rows;
+    if(!cps.length){ rows='<div class="ua-empty">✓ 无待用户确认点</div>'; }
+    else{
+      const sorted=cps.slice().sort((a,b)=>_uaRank(a)-_uaRank(b)||(b.age_min-a.age_min));
+      rows=sorted.map(c=>{
+        const hi=c.urgency==='high'; const id=esc(c.id||'');
+        return '<div class="ua-cp st-'+esc(c.state||'')+(hi?' hi':'')+'">'
+          +'<span class="ua-ico">'+(ICON[c.state]||'·')+'</span>'
+          +'<span class="ua-cp-title" title="点击去待办池" onclick="showTab(\'tasks\')">'+esc(c.title||'(无标题)')+'</span>'
+          +'<span class="ua-cp-meta">'+(hi?'<span class="ua-urg">高</span>':'')+esc(c.from||'')+' · '+_uaAge(c.age_min)+'</span>'
+          +'<button class="ua-ans-btn" onclick="uaAnsToggle(event,\''+id+'\')">✍答复</button>'
+          +'<div class="ua-ans" id="uaans-'+id+'" style="display:none"><input class="ua-ans-in" id="uaansin-'+id+'" placeholder="答复该确认点(回车发送)…" onkeydown="if(event.key===\'Enter\')uaAnsSend(\''+id+'\')"><button class="ua-ans-send" onclick="uaAnsSend(\''+id+'\')">发送</button></div>'
+          +'</div>';
+      }).join('');
+    }
+    box.innerHTML=head+'<div class="ua-list">'+rows+'</div>';
+    box.style.display='';
+  }catch(e){ /* 静默·保留上次 */ }
+}
+// 内联答复确认点(MasterAgent·P1·复用 /api/todos/answer→路由回提问方 inbox+标待办完成+盖 user_last_seen=答了即在场)——用户侧闭环:看到+答一步到位不用跳
+function uaAnsToggle(e,id){ e.stopPropagation(); const el=document.getElementById('uaans-'+id); if(!el) return; const show=el.style.display==='none'; el.style.display=show?'':'none'; if(show){ const inp=document.getElementById('uaansin-'+id); if(inp) inp.focus(); } }
+async function uaAnsSend(id){
+  const inp=document.getElementById('uaansin-'+id); if(!inp) return;
+  const reply=(inp.value||'').trim(); if(!reply){ inp.focus(); return; }
+  try{
+    const r=await (await fetch('/api/todos/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,reply:reply})})).json();
+    if(r && r.ok){ toast('已答复确认点·路由回提问方'); loadUserAbsence(true); load(); }
+    else toast('答复失败:'+((r&&r.error)||'?'));
+  }catch(e){ toast('答复异常:'+e); }
+}
+// 📖 操作说明 —— 渲染 repo 根 BUS_GUIDE.md(单一源·内容 MasterAgent 维护·MasterUI 只渲染)。左目录右正文·锚点跳转·静态文档加载一次
+let _guideLoaded=false;
+async function loadGuide(force){
+  const body=document.getElementById('guideBody'), toc=document.getElementById('guideToc'), meta=document.getElementById('guideMeta');
+  if(!body) return;
+  if(_guideLoaded && !force) return;
+  try{
+    const d=await (await fetch('/api/guide')).json();
+    if(!d.ok){ body.innerHTML='<div class="muted">加载失败:'+esc(d.error||'?')+'</div>'; return; }
+    body.innerHTML=d.html||'';
+    if(toc){
+      toc.innerHTML=d.toc||'<div class="muted">(无目录)</div>';
+      toc.querySelectorAll('a[href^="#"]').forEach(a=>{
+        a.onclick=(e)=>{ e.preventDefault();
+          const el=document.getElementById(a.getAttribute('href').slice(1));
+          if(el){ el.scrollIntoView({behavior:'smooth',block:'start'});
+            toc.querySelectorAll('a').forEach(x=>x.classList.remove('active')); a.classList.add('active'); } };
+      });
+    }
+    if(meta){ let s='源 BUS_GUIDE.md';
+      if(d.mtime){ try{ s+=' · 更新 '+new Date(d.mtime*1000).toLocaleString(); }catch(e){} }
+      if(d.degraded) s+=' · ⚠降级渲染(markdown 库缺失)';
+      meta.textContent=s; }
+    _guideLoaded=true;
+  }catch(e){ body.innerHTML='<div class="muted">请求异常:'+esc(''+e)+'</div>'; }
+}
+const _guideRefreshBtn=document.getElementById('guideRefresh');
+if(_guideRefreshBtn) _guideRefreshBtn.onclick=()=>loadGuide(true);
 // 🎙 语音转写(本地 ASR·实时)——设备选择 + 启停 + 转录行轮询滚动
 let _asrTimer=null, _asrDevInit=false;
 async function loadASR(){

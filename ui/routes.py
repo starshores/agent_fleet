@@ -129,6 +129,12 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/paths":
             # 路径注册表:path_registry.json + 健康校验(请求路径直读·手动刷新)
             self._send(200, api.build_paths())
+        elif path == "/api/guide":
+            # 📖操作说明:渲染 repo 根 BUS_GUIDE.md(单一源·内容 MasterAgent 维护·只读)
+            self._send(200, build_guide())
+        elif path == "/api/user-absence":
+            # 🙋用户确认点/缺席(用户侧自醒对偶·ab user-absence-check)·只读
+            self._send(200, build_user_absence())
         elif path == "/api/storage":
             # 存储全景:三分格局+项目根分布+违规候选(长 TTL 缓存·full du 数秒·别进 SSE)
             q = parse_qs(u.query)

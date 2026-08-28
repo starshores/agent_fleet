@@ -27,7 +27,7 @@ GET_ENDPOINTS = [
     "/api/role-profiles", "/api/role-profiles-biz", "/api/longrange",
     "/api/bi", "/api/caps", "/api/usage", "/api/dispatch_metrics",
     "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/waitreg", "/api/prompts",
-    "/api/archive", "/api/paths", "/api/storage", "/api/lifecycle",
+    "/api/archive", "/api/paths", "/api/guide", "/api/user-absence", "/api/storage", "/api/lifecycle",
     "/api/fleet-log", "/api/fleet-state", "/api/route",
     "/api/asr/devices", "/api/asr/status", "/api/asr/lines",
 ]
@@ -41,6 +41,7 @@ PAGE_ANCHORS = [
     "sendTask", "tviewActive", "tviewHistory",                                   # 派活表单/任务视图
     "dmKpis", "dmRoles", "dmKind", "dmTop",                                      # 派工效率(U2 复活的死码面板)
     "routeChips",                                                                # 建议对口 chip(U3 防误派)
+    "guideBody",                                                                 # 操作说明(BUS_GUIDE 渲染)
 ]
 
 # 关键数据端点"必含键"(Master数分缺口1:只验 JSON-parse 会放过 {} 空壳;键=当前真实响应的稳定子集)。
@@ -55,6 +56,7 @@ MUST_KEYS = {
     "/api/usage": ["totals", "daily", "by_project"],
     "/api/ctx": ["ok", "rows"],
     "/api/waitreg": ["ok", "rows"],
+    "/api/guide": ["ok", "html"],
     "/api/sessions": ["ok", "sessions", "live_count", "dead_count"],
     "/api/asr/status": ["ok", "running"],
     "/api/asr/lines": ["ok", "total", "lines"],

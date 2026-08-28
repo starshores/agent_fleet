@@ -26,6 +26,7 @@ BODY = r"""<header>
 </header>
 <nav class="tabbar" id="tabbar">
   <button class="tab" data-t="fleet">🛰 舰队/运维</button>
+  <button class="tab" data-t="guide">📖 操作说明</button>
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
@@ -68,6 +69,7 @@ BODY = r"""<header>
 <main>
   <section data-tab="fleet">
     <div class="sec-h">A · 舰队总览 <span class="sub">role 身份 / 心跳 / 队列(同 <span class="mono">who</span>+<span class="mono">list</span>)— 点行展开任务</span></div>
+    <div class="ua-panel" id="uaPanel" style="display:none"></div>
     <div id="maintBanner" style="display:none;background:rgba(255,165,0,.12);border-bottom:1px solid rgba(255,165,0,.3);padding:7px 16px;font-size:13px">🔧 <b>维修模式启动中</b> <span id="maintDetail" class="muted"></span></div>
     <div class="sec-b">
       <table>
@@ -214,6 +216,19 @@ BODY = r"""<header>
     </div>
     <div class="live-meta"><span id="liveDot" class="live-dot"></span><span id="liveStat">未选 role</span></div>
     <pre id="liveBox" class="livebox">（选一个 role 看它的 live.log）</pre>
+  </section>
+
+  <!-- 📖 操作说明 —— 渲染 repo 根 BUS_GUIDE.md(单一源·内容 MasterAgent 维护·MasterUI 只渲染)。左目录右正文·锚点跳转 -->
+  <section data-tab="guide">
+    <div class="sec-h">📖 操作说明 <span class="sub">bus 怎么正确用 · 数据源 <span class="mono">BUS_GUIDE.md</span>(单一源 · 内容 MasterAgent 维护 · 本页只渲染)· 本机可查不外发</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="guideMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="guideRefresh">刷新</button>
+    </div>
+    <div class="guide-wrap">
+      <aside class="guide-toc" id="guideToc"><div class="muted">加载目录…</div></aside>
+      <article class="guide-body" id="guideBody"><div class="muted">加载操作说明…</div></article>
+    </div>
   </section>
 
   <!-- 历史用量 BI (P0) —— 独立 tab(账单级全量,与运营/资源口径分开) -->

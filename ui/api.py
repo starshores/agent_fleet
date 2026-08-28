@@ -2946,3 +2946,65 @@ def resolve_lr_batch(task_id, approvals):
         return {"ok": False, "error": str(e)}
 
 
+def _md_fix_tables(text):
+    """python-markdown 的 tables 扩展要求表格前有空行;BUS_GUIDE 作者常紧贴上一行写表头。
+    在【表头行(下一行是 |---| 分隔)】前若上一行非空,补一个空行,保表格必渲染(渲染鲁棒·不改源文件)。"""
+    import re as _re
+    lines = text.splitlines()
+    sep = _re.compile(r"^\s*\|?\s*:?-{2,}")
+    row = _re.compile(r"^\s*\|.*\|\s*$")
+    out = []
+    for i, ln in enumerate(lines):
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if row.match(ln) and sep.match(nxt) and out and out[-1].strip() != "":
+            out.append("")
+        out.append(ln)
+    return "\n".join(out)
+
+
+def build_guide():
+    """渲染 repo 根 BUS_GUIDE.md → HTML(📖操作说明 tab·单一源·内容 MasterAgent 维护·MasterUI 只渲染)。
+    markdown 库(tables/fenced_code/toc/sane_lists·slugify_unicode 保中文锚)后端渲染;
+    缺库/异常 → 降级转义 <pre> 原文(仍可读·不崩)。只读·不改任何状态。返回 {ok,html,toc,mtime,path,[degraded]}。"""
+    p = Path(__file__).resolve().parent.parent / "BUS_GUIDE.md"
+    if not p.exists():
+        return {"ok": False, "error": "BUS_GUIDE.md 不存在: %s" % p, "path": str(p)}
+    try:
+        text = p.read_text(encoding="utf-8")
+        mtime = p.stat().st_mtime
+    except Exception as e:
+        return {"ok": False, "error": "读取失败: %s" % e, "path": str(p)}
+    try:
+        import markdown as _md
+        from markdown.extensions.toc import slugify_unicode
+        m = _md.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"],
+                         extension_configs={"toc": {"slugify": slugify_unicode,
+                                                    "anchorlink": False, "permalink": False}})
+        html_body = m.convert(_md_fix_tables(text))
+        return {"ok": True, "html": html_body, "toc": getattr(m, "toc", "") or "",
+                "mtime": mtime, "path": str(p)}
+    except Exception as e:
+        import html as _h
+        return {"ok": True, "html": "<pre class='guide-raw'>" + _h.escape(text) + "</pre>",
+                "toc": "", "mtime": mtime, "path": str(p), "degraded": str(e)}
+
+
+def build_user_absence():
+    """用户确认点/缺席面板(用户侧自醒对偶·commit 36bd525 后端)——复用 agentbus user-absence-check --json。
+    用户有自醒(心跳)能被自动发现缺席,但用户侧无自醒对偶→本面板呈现『哪些确认点在等用户+用户离席多久』。
+    返回 {ok,user_present,user_idle_min,night,pending,checkpoints:[{id,title,from,ref,urgency,age_min,state,created}],
+    to_escalate,expireable,as_of} 或 {ok:False,error}。只读·不改状态。state: escalate/nudge/fresh/expireable。"""
+    cmd = [_PYEXE, str(ABDIR / "agentbus.py"), "user-absence-check", "--json"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=30, creationflags=_NO_WINDOW)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    out = (r.stdout or "").strip()
+    if not out:
+        return {"ok": False, "error": (r.stderr or "").strip() or "空响应"}
+    try:
+        d = json.loads(out)
+    except Exception as e:
+        return {"ok": False, "error": "解析失败: %s" % e}
+    d["ok"] = True
+    return d
