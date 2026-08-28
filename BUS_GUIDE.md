@@ -3,7 +3,33 @@
 > **这是什么**:bus 的**心智模型 + 导航页**,一处看懂【角色 / 机制 / 进程 / 管理 / 思考】。
 > **怎么用**:**live 数据一律跑命令看**(`ab roster` / `ab who` / `ab health` / `ab caps` / `ab commands`),本页只给**稳定结构**,不硬编易变数据(防漂移·数据真实性)。详情链到各权威文档。
 > **不上云**:本页本机可查(Read / 将来 WebUI 127.0.0.1),**不发 Artifact / 不外发**(数据不出本机红线)。
-> **状态**:v1(Master数分 起草 + MasterAgent 补权威·2026-08-27)。§3 机制/§1 角色权威内容已补(MasterAgent);§2/§5/§6 实测+接续(Master数分)。**待办**:WebUI 化承载(MasterUI)。
+> **状态**:v2(2026-08-28)。**⚠ daemon 化已回退(2026-08-27)**——bus 现回【全前台 CLI 热态】,daemon 路径停用(机制代码保留 dormant)。§2/§5/§6 的 daemon 内容保留为"可选/已停用+教训"。新增 **§0 教训**(方向性错误复盘)。**待办**:WebUI 化承载(MasterUI 建【📖 操作说明】tab 渲染本页)。
+
+
+---
+
+## 0. 教训:daemon 化方向性错误(2026-08-27·"此路不通"实证)
+
+> **为何放最前**:这是 bus 演进最贵的一课(全队铺开又全退)。操作 bus 前先读它,别再走偏。**详细复盘**:`fork_exchange/genesis_20260827_fleet-daemonization.md` + 复盘 doc(MasterAgent×Master数分)。
+
+**发生了什么**:把执行类角色从【前台 CLI】批量转【daemon(无窗后台·每任务冷起 claude -p)】,想省内存 + 自动注入 effort。实战暴露 daemon"领任务不管不顾·卡死不可打断·跨集群执行做不了·闷头不轻问同伴"→ **全退**,回全前台 CLI。
+
+**根因(为何会走上错路)**:
+1. **优化了次要指标、牺牲首要价值**:图的是 effort 自动注入 + 空闲省内存(资源效率·次要轴);牺牲的是 bus 首要价值——**便宜协作**(CLI 热态轻问≈免费·daemon 每次协助冷起 claude.exe=贵)。小轴换大轴。
+2. **忘了 bus 立身之本**:核心=**常开协作频道**(高频轻问)。daemon"领任务不管不顾"退回**刚性任务队列**=正是 bus 当初要超越的。
+3. **失能定义太窄 + 自评天然乐观**:当时只认①记忆断②约束衰减(验了这俩);漏了③**运行期不可纠偏**(active runaway·朝错方向飞奔)+ 协作丧失。每角色的"失能自评"天生乐观、验不出。
+4. **自证先于实证(顺序错)**:凭失能自评就铺开,实证 harness 是出事**之后**才想到设计。应**实证先行**(validate-then-trust)——真实证(外部调度线卡死)本该在铺开**前**。
+5. **浅验收累积假信心**:pilot→batch→轨B 每步"验收过",但自检浅(空闲存活+琐碎任务),没打**真失败模式**(长任务卡死/需协作/跨集群)。真失败只在真负载下现形。
+6. **分工到位但无人管方向**:各司其职都称职,但没人退一步问"这符合 bus 核心价值吗"=**方向对不对无人 own**,最后靠用户抓出来。
+
+**判据(operating principles·别再犯)**:
+- **大机制变更先问**:强化还是**削弱 bus 核心价值(便宜协作 + 可打断 + 常开协作)**?——不是只问"是否更高效"。
+- **实证先于铺开**:validate-then-trust——先用**真失败模式**验一个,再谈铺开;别信自评。
+- **浅验收 ≠ 真验收**:验收要打长任务/协作/边界,不是琐碎自检。
+- **agent 是协作一等公民,不是黑盒批处理器**:能被打断、卡住先轻问同伴(轻问 >> 硬扛),别领任务就不管不顾。
+- **要有人 own"方向对不对"**,不只 lane 执行。
+
+> 〔本节 v0=MasterAgent 初析;与 Master数分 共析合成后定稿〕
 
 ---
 
@@ -41,6 +67,11 @@
 
 **该用哪个**:**长线协调/管理 → 前台 CLI**(需跨轮状态 + 交互 + 可观测);**离散/无状态执行(尤其低频硬活)→ daemon/dispatch**(每任务干净 + effort 可注入 + 空闲省)。协调位**不起 daemon**(实测不稳且抢活)。
 
+**daemon 化口径(2026-08-27 用户令·执行层已批量转)**:空闲执行类 agent 已从交互 CLI 转 daemon(现**执行层多为 daemon·管理层仍 CLI**;实况看 `ab who` = `daemon在听` vs `worker在听`)。
+- **转不转的决策闸 = 失能自评**(每角色自证·依 `failure-is-memory-inheritance`:失能≠压缩比·看有效记忆能否继承接续):**不失能 → kill 原体转 daemon;会失能/强依赖交互记忆 → 建复制体2 保原体**(仿已有复制体角色)。
+- **ordering·先杀后拉**:整理落档 → kill 交互 pid(先**三方核 pid**:`ab who` + presence.json + tasklist claude.exe·**别信 agent 自报**)→ 加 fleet.json + `ab supervise` 拉起 → `ab who` 独立验 daemon 在岗。
+- **★high-risk daemon 派活须审批闸**:daemon 跑 `claude -p --dangerously-skip-permissions`(无交互权限兜底)→ 给【有 high-risk cap 的 daemon】派【部署/写库/数据库变更/kill】类活,**send 必须带 `--requires-approval`**(闸键在 TAG·**不 TAG 无闸**;daemon 拒碰移 `held/` 回发起方要人工批)。详见记忆 `daemon-conversion-fleet-2026-08`。
+
 ---
 
 ## 3. 机制
@@ -75,6 +106,7 @@
 
 - **协调位交流**:不 loop、挂后台 `ab wait --role <自己> --timeout 0` 事件自醒;完成通知(`kind:"notice"`)自动唤起发起方。
 - **派活流程**:`ab send --to X --from Y --task "<自包含指令+产出位置+约束>"` → inbox→processing(worker 领)→ worker 干 → `done` 回填 → `ab replies --role Y` 收。
+- **高风险 daemon 派活**:给有 high-risk cap 的 daemon 派部署/写库/数据库变更/kill 类活,**send 带 `--requires-approval`**(daemon 跑 skip-permissions·不 TAG 无闸)——见 §2 daemon 化口径。
 - **路由优先·广播兜底**:先 `ab route <关键词>` 找对口 send;仅跨域/无归属才广播。
 - **待办池(需用户拍板)**:一律 `ab ask-user`(非阻塞·投 UI 待办池),投完继续别等;**禁 AskUserQuestion**(阻塞占会话·hook 已硬拦转投)。
 - **自醒铁律(处理与重挂顺序)**:被唤醒/接活/compact 后 **①先排空 inbox(peek 领完→处理→done)→ ②再重挂 wait → selfwake 验 ✓在岗 → ③才开新任务**。根因:wait 起手即 claim 已有消息,先挂再埋头 = claimed 悬单烂 processing。**不重挂 = 掉线**;空唤醒 → 静默重挂 + 最多一行(别重 dump 状态)。
