@@ -1,8 +1,4 @@
 {
-  "_comment": "执行 daemon 工作池。【2026-07-01 用户令:全部 daemon 移除、拉出自启名单】→ 全队前台 CLI。【2026-08-27 用户令:重启 daemon 路径】——因 per-role effort 只有 daemon/dispatch 面能全自动注入 --effort(交互 tab 注入不到),故用 daemon 承载。supervise 拉起、worker_daemon 每任务 claude -p 按角色注入 effort/model(#1 机制)。要加/恢复 daemon:{role,cwd,wait_timeout} 进 daemons 数组;停某 daemon:移除其条目(supervise 下轮当孤儿回收)。【2026-08-27 舰队 daemon 化·轨A kill-convert 推进中】:Master数分定候选+失能自评+kill交互 pid,MasterAgent加条目+supervise拉起。已转:示例组员5(max硬案)、会话考古(用户令·cwd=agent_fleet·离散per-session提炼天然daemon-fit·先unpark)、示例组员2(轨A收尾·high-risk须approval闸)。其余角色按候选+失能自评逐步推进。【轨B·复制体并行模式】原体保留不kill·另建daemon复制体:培训师登记caps+desc内嵌上岗必读记忆指针块(daemon无hello导航故走desc注入)。",
-  "daemons": [
-    {"role": "示例组员5", "cwd": "C:/BaseSpace/XXX", "wait_timeout": 300},
-    {"role": "会话考古", "cwd": "C:/apphome/agent_fleet", "wait_timeout": 300},
-    {"role": "示例组员2", "cwd": "C:/BaseSpace/XXX", "wait_timeout": 300}
-  ]
+  "_comment": "执行 daemon 工作池。【2026-08-27 用户令:daemon化回退·不再使用daemon】——舰队 daemon 化(前台/复制体两条路径)实战暴露核心缺陷(daemon 领任务不管不顾·不可打断·卡死只能手动 kill·跨集群执行做不了·退化 bus 协作频道为刚性队列)→全 daemon 停机·回退前台交互态·维修模式。daemons 清空。要恢复 daemon 路径见 git 史(fleet 曾载多条 daemon·commit a67e621 等)+ fork_exchange/genesis_20260827_fleet-daemonization.md。原前台名单见 fleet.json.bak-20260701-134654。",
+  "daemons": []
 }
