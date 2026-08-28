@@ -1,0 +1,18 @@
+{
+ "_comment": "用户确认点缺席检测口径(Master数分 v1 基线·可调)。时段 24h 制;阈值单位=分钟。",
+ "day_start": "09:00",
+ "day_end": "22:00",
+ "away_idle_min": 20,
+ "attention_min": 10,
+ "escalate_after_min": {
+  "high": 15,
+  "normal": 45,
+  "low": 120
+ },
+ "night_defer": true,
+ "auto_expire": {
+  "low_after_min": 1440,
+  "normal_after_min": null,
+  "high_after_min": null
+ }
+}

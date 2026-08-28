@@ -76,6 +76,7 @@ from bus.roles import (  # noqa: E402
 from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions, cmd_resume  # noqa: E402
 from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive  # noqa: E402
+from bus.user_checkpoint import cmd_user_seen, cmd_user_absence_check  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
@@ -192,8 +193,10 @@ def main():
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
-    p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
+    p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--urgency", default=None, help="确认点紧急度(high/normal/low·缺席检测阈值与自动过期口径按此;缺则由priority派生高=high/中=normal/低=low)"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)
     p = sub.add_parser("answer"); p.add_argument("--todo", required=True); p.add_argument("--reply", required=True); p.add_argument("--from", dest="frm", default=None); p.set_defaults(fn=cmd_answer)
+    p = sub.add_parser("user-seen"); p.add_argument("--source", default=None); p.add_argument("--session", default=None); p.set_defaults(fn=cmd_user_seen)
+    p = sub.add_parser("user-absence-check"); p.add_argument("--json", action="store_true"); p.add_argument("--apply", action="store_true", help="执行 auto-expire(留痕)+ toast 升级;缺=dry 只报"); p.set_defaults(fn=cmd_user_absence_check)
     p = sub.add_parser("todos-archive"); p.add_argument("--older-min", type=int, default=0, dest="older_min"); p.add_argument("--apply", action="store_true"); p.set_defaults(fn=cmd_todos_archive)
     p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)

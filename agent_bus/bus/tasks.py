@@ -126,6 +126,12 @@ def cmd_answer(args):
         item["status"] = "完成"; item["updated"] = _now()
         item["detail"] = (item.get("detail", "") + " 〔已答复→%s:%s〕" % (target, args.reply[:40])).strip()
         _write_json(tf, todos)
+    # 用户答了确认点=用户此刻在场→盖 user_last_seen(缺席检测信号①·2026-08-28)
+    try:
+        from bus.user_checkpoint import touch_user_seen
+        touch_user_seen(source="answer")
+    except Exception:
+        pass
     print("答复已路由给 %s(任务 %s),待办 %s 标完成。" % (target, tid, args.todo))
 
 
@@ -169,6 +175,9 @@ def cmd_ask_user(args):
         "created": _now(), "updated": _now(),
         "task_id": None, "dispatched_to": None,
         "confirm_from": frm, "ref": args.ref or None,
+        # 用户确认点缺席检测(2026-08-28):urgency 决定阈值/自动过期口径(高风险绝不自动过期)。
+        # 显式 --urgency 优先;缺则 user_checkpoint._urgency_of 由 priority 派生。ref=关联协作上下文。
+        "urgency": (getattr(args, "urgency", None) or "").strip().lower() or None,
     }
     with json_lock(f):   # 锁跨 RMW(P0)+ _write_json 原子落地(替换原手写 tmp+replace)
         try:

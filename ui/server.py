@@ -85,6 +85,22 @@ def start_selfwake_guard(interval=180):
     threading.Thread(target=loop, daemon=True).start()
 
 
+def start_user_absence_check(interval=300):
+    """常驻【用户缺席检测】(用户侧自醒对偶·2026-08-28):每 ~interval 秒跑 `ab user-absence-check --apply`——
+    扫 pending 确认 checkpoint,交叉 present/away × age × urgency:离席+超阈→toast 升级(夜间压制)、
+    低紧急超期→auto-expire(留痕不伪装已答)。对偶 start_selfwake_guard(那个探 agent 缺席·这个探用户缺席)。
+    同模子:8799 always-on 驱动;首轮先 sleep;try/except 静默不掀翻 8799;子进程 CREATE_NO_WINDOW 免弹窗。"""
+    def loop():
+        while True:
+            time.sleep(interval)
+            try:
+                subprocess.run([sys.executable, str(ABDIR / "agentbus.py"), "user-absence-check", "--apply"],
+                               capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+            except Exception:
+                pass
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def start_maint(interval=1800):
     """常驻 bus 维护心跳(B2+B3·2026-07-21·MasterAgent 联合分析):每 ~interval 秒后台跑【两件】——
     ① reap:退回 owner 死/超 ttl 的滞留 processing 到 inbox(requeue+1·poison 超 max-requeue 进 failed/);
@@ -145,6 +161,7 @@ def main():
     if not args.no_supervise:
         start_supervisor()
     start_selfwake_guard(180)         # 常驻自醒探测网(Master令·B):180s 跑 ab selfwake-guard,掉自醒→inbox提醒+toast(8799 always-on 驱动,不依赖 agent 醒着)
+    start_user_absence_check(300)     # 用户侧自醒对偶(2026-08-28):5min 跑 ab user-absence-check --apply,pending确认点离席+超阈→toast升级/低紧急超期auto-expire留痕(对偶selfwake-guard探用户缺席)
     start_maint(1800)                 # B2+B3(2026-07-21):30min 维护心跳=reap(退卡死/孤儿)+ todos-archive(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态·安全无人值守
     start_route_reap(300)             # 工作组路由超时自愈(MasterAgent令·2026-07-23):5min 独立 tick 跑 ab route-reap(超15min未done路由任务re-route)·不搭30min start_maint(任务池太粗)·幂等no-op
     # BI 预热 + 保鲜已由 start_bi_refresher(12) 首轮立即跑接管(暖 _proc_cache + 填 _bi_cache),

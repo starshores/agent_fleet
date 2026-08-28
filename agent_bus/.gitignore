@@ -20,3 +20,4 @@
 !_workstate/README.md
 # 配置备份即便匹配上面也排除(运行时生成的 .bak-时间戳)
 *.bak-*
+!user_checkpoint_config.json

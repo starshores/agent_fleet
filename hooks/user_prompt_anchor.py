@@ -83,6 +83,16 @@ def main():
         return
     if (data.get("hook_event_name") or "UserPromptSubmit") != "UserPromptSubmit":
         return
+    # 盖 user_last_seen(用户缺席检测信号①·2026-08-28):任一 session 用户发消息=用户在场。
+    # 直接写(不 import bus·hook 轻量鲁棒);格式对齐 user_checkpoint.touch_user_seen。写 agent_fleet 物理家(junction 同解)。
+    try:
+        import time as _t
+        _bus = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agent_bus")
+        with open(os.path.join(_bus, "user_last_seen.json"), "w", encoding="utf-8") as _f:
+            json.dump({"ts": _t.strftime("%Y-%m-%dT%H:%M:%S"), "epoch": _t.time(),
+                       "source": "prompt", "session": data.get("session_id", "")}, _f, ensure_ascii=False)
+    except Exception:
+        pass
     role = _role_of(data.get("session_id"))
     if not role:
         return
