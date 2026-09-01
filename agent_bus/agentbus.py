@@ -77,6 +77,7 @@ from bus.exec import cmd_dispatch  # noqa: E402
 from bus.sessions import cmd_sessions, cmd_resume  # noqa: E402
 from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive  # noqa: E402
 from bus.user_checkpoint import cmd_user_seen, cmd_user_absence_check  # noqa: E402
+from bus.memory_history import cmd_memory_history  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
@@ -198,6 +199,16 @@ def main():
     p = sub.add_parser("user-seen"); p.add_argument("--source", default=None); p.add_argument("--session", default=None); p.set_defaults(fn=cmd_user_seen)
     p = sub.add_parser("user-absence-check"); p.add_argument("--json", action="store_true"); p.add_argument("--apply", action="store_true", help="执行 auto-expire(留痕)+ toast 升级;缺=dry 只报"); p.set_defaults(fn=cmd_user_absence_check)
     p = sub.add_parser("todos-archive"); p.add_argument("--older-min", type=int, default=0, dest="older_min"); p.add_argument("--apply", action="store_true"); p.set_defaults(fn=cmd_todos_archive)
+    # 记忆分层(memory tiering·2026-09-01):active/historical/deleted 三级·历史空间=库外兄弟目录(CC 默认 recall 够不着)
+    p = sub.add_parser("memory-history", help="记忆分层:归档陈旧记忆到历史空间(默认 recall 够不着·需显式命令查·可逆)")
+    mh = p.add_subparsers(dest="mh_cmd")
+    _a = mh.add_parser("archive"); _a.add_argument("name"); _a.add_argument("--reason", default=None); _a.add_argument("--by", default=None); _a.add_argument("--lib", default=None)
+    _a = mh.add_parser("restore"); _a.add_argument("name"); _a.add_argument("--by", default=None); _a.add_argument("--lib", default=None)
+    _a = mh.add_parser("list"); _a.add_argument("--lib", default=None)
+    _a = mh.add_parser("show"); _a.add_argument("name"); _a.add_argument("--lib", default=None)
+    _a = mh.add_parser("recall"); _a.add_argument("query"); _a.add_argument("--lib", default=None)
+    _a = mh.add_parser("purge"); _a.add_argument("name"); _a.add_argument("--reason", default=None); _a.add_argument("--by", default=None); _a.add_argument("--from-active", dest="from_active", action="store_true"); _a.add_argument("--lib", default=None)
+    p.set_defaults(fn=cmd_memory_history)
     p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)
