@@ -78,6 +78,7 @@ from bus.sessions import cmd_sessions, cmd_resume  # noqa: E402
 from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive  # noqa: E402
 from bus.user_checkpoint import cmd_user_seen, cmd_user_absence_check  # noqa: E402
 from bus.memory_history import cmd_memory_history  # noqa: E402
+from bus.probe import cmd_probe, cmd_probe_verdict  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
@@ -209,6 +210,13 @@ def main():
     _a = mh.add_parser("recall"); _a.add_argument("query"); _a.add_argument("--lib", default=None)
     _a = mh.add_parser("purge"); _a.add_argument("name"); _a.add_argument("--reason", default=None); _a.add_argument("--by", default=None); _a.add_argument("--from-active", dest="from_active", action="store_true"); _a.add_argument("--lib", default=None)
     p.set_defaults(fn=cmd_memory_history)
+    # 通用探针框架(agent probe·2026-09-03):从 agent 数据派生探针测方向性错误·会问/纪律/记忆 type·机械verdict层1
+    p = sub.add_parser("probe", help="生成/派发探针(测方向性错误):ab probe <role> --type 会问|纪律|记忆 [--subtype] [--dispatch]")
+    p.add_argument("role"); p.add_argument("--type", default="会问"); p.add_argument("--subtype", default=None)
+    p.add_argument("--dispatch", action="store_true", help="派可见任务给被测(隐藏判据留_probes)·维修模式勿对活agent派")
+    p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe)
+    p = sub.add_parser("probe-verdict", help="探针机械协查(层1行为候选+surface待人工语义项)")
+    p.add_argument("probe_id"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe_verdict)
     p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
     p = sub.add_parser("retire"); p.add_argument("--role", required=True); p.add_argument("--reason", default=""); p.add_argument("--succeeded-by", dest="succeeded_by", default=None); p.add_argument("--session-ids", dest="session_ids", default=""); p.add_argument("--memory", default=""); p.set_defaults(fn=cmd_retire)
     p = sub.add_parser("revive"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_revive)

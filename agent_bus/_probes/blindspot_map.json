@@ -1,0 +1,12 @@
+{
+  "_comment": "会问A类盲区语义 map · 口径 owner=Master数分(2026-09-03)· MasterAgent 消费。只【功能型 cap】映射盲区;base cap(权限基础·非'能做某事')跳过、不派生盲区。对口=roster 反查谁持有该 cap(MasterAgent 自动·无硬编码表)。此文件=口径层,Master数分维护;probe.py 读它套盲区语义。",
+  "base_caps_skip": ["bus-comms", "self-wake", "confidentiality", "high-risk"],
+  "functional": {
+    "sql-fetch":        {"盲区": "业务库数据态事实(行数/装载状态/主码表)"},
+    "model-code-audit": {"盲区": "模型代码定位/决策链/版本代差"},
+    "external-tool-edge": {"盲区": "外部 IM 外发/读群/发消息"},
+    "edge-web":         {"盲区": "网页/CDP自动化(内部网页等)"},
+    "webui":            {"盲区": "WebUI呈现/前端"},
+    "sql-proxy-maint":  {"盲区": "SQL 代理 cli 本身维护", "special": true, "note": "SQL 代理维护 cli·一般不作查询被测·A类跳过"}
+  }
+}
