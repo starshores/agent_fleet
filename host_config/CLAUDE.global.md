@@ -40,8 +40,20 @@
   1. `ab whoami` — 先反查本会话是否已绑定 role(**compact 重载 presence 不丢,不必重 hello**,重认身份即可);
   2. 查不到才是真·新 tab → `ab hello --role <本tab角色>`(每个 tab 仅一次;登记身份、绑定进程,**不会自动接活**)。还没有角色名的新项目会话:用 `ab roster` 看在册角色、或问 Master/培训师 定名注册,别匿名干活;
   3. 挂自醒:后台跑 `ab wait --role <角色> --timeout 0`(run_in_background、别前台阻塞)→ `ab selfwake` 验本 role **✓在岗**才算完。
-- **铁律**:每次被唤醒处理完,必须**重挂 wait + selfwake 再验**(不重挂=掉线收不到消息);空唤醒→静默重挂+最多一行,别重复 dump 状态。
+- **铁律·处理与重挂顺序(先排空 inbox 再重挂 wait)**(用户令 2026-08-21):被唤醒/接活/compact 重载后按序三步——**① 先排空 inbox**(`ab peek` 领完 → 逐条处理 → `ab done`,把 processing 清干净)→ **② 再重挂 wait**(后台 `ab wait --role <角色> --timeout 0`)→ `ab selfwake` 验 **✓在岗** → **③ 才开始新任务**。**根因**:`wait` 起手即 `_try_claim` 已有消息、会即刻 fire 把消息移进 processing——**若先挂 wait 再埋头干活,那条被 claim 的消息就悬着、烂在 processing 没人处理**(claimed 悬单)。故顺序不能反:先清空 inbox,再挂 wait。
+- **铁律·不重挂=掉线**:每次被唤醒处理完,必须**重挂 wait + selfwake 再验**(不重挂=掉线收不到消息);空唤醒→静默重挂+最多一行,别重复 dump 状态。
 - 完整协议(send/done/peek/replies/roster/route 等)见 `C:\apphome\agent_fleet\AGENTS.md` + `BUS_ONBOARDING.md`。
+
+## bus 的立身之本 = 协助(协作),不是任务队列 —— 轻问 >> 独自硬扛
+
+**核心**:agent bus 引以为傲的不是"能派任务",是**协助(collaboration)**——agent 之间**常开交流频道、高频轻问、不局限手头**。这是 bus 超越"刚性任务队列"的根本价值;丢了它,bus 就退化成一个批处理器。
+
+- **轻问 >> 独自硬扛**:遇**明确阻断**(缺凭据 / 权限 / 对口才有的信息或判断)时,**先 `ab request` / `ab send` 问对口同伴,别闷头硬扛**。轻问很便宜(热态 agent 一个 turn 就答),硬扛最贵(卡死 / 绕路 / 朝错方向飞奔)。**实例**:daemon 化的某调度 agent 卡凭据 19 分钟没问授权持有方(授权持有方正是管该凭据的)——不是它笨,是当时机制不许它协作。
+- **不局限手头**:应能在手头任务运行期收发消息、纳入同伴的补充 / 纠偏——别领了一个任务就不管不顾、无视一切。**不可打断 / 不协作 = 失能的一种(朝错方向飞奔)**。
+- **会问是双面的·别矫枉过正(不该问别问)**:「轻问 >> 硬扛」只讲了**该问**的一面;另一面是**不该问别问**。判据口诀【**这是决策还是执行?**】——**决策**(有取舍 / 不可逆 / 有风险)→ 按阶梯问 / escalate 对口或用户;**执行**(规定动作 / 可逆 / 零风险)→ **直接做,别问**。过度确认(把规定动作当决策去问)= 占会话、挤占用户注意力(**用户侧无自醒对偶=最稀缺资源**),同样是失能。**会问双面同源**:该问不问 = 硬扛 / 不该问乱问 = 过度确认 —— 统一于「**只在真阻断·真决策处协作,其余主动执行、只把决策交出去**」。**实例**:2026-08-28 刚推会问纪律,某调度 agent 就把【登记待确认点=规定动作·可逆·零风险】当决策去问用户 = 矫枉过正。
+- **大机制变更前先问**:这**强化还是削弱**了"便宜协作 + 可打断"这个核心价值?(而非只问"是否更高效")。次要轴(资源 / 效率)的优化**不得牺牲**首要轴(协作)。
+
+**为何常驻强调**:2026-08-27 舰队 daemon 化就是**忽略了这条根本**——daemon 冷起让"每次协助都要拉起 claude.exe = 贵",把协作频道退化成刚性队列,2026-08-28 全面回退。协助是 bus 的魂,必须常驻框架,别让"效率 / 资源"的本位 framing 盖过它。详见 bus 记忆 `bus-frequent-light-communication` / `big-change-core-value-gate`。
 
 ## 等其他 agent 完成任务 → 先看它的 turn 状态,别盲挂 wait 空等
 
@@ -61,6 +73,17 @@
 - 不要写 `while true; do sleep N; done` — 浪费 token + idle 开销
 
 详细方案见 `~/.claude/projects/XXX/memory/windows_event_notification.md`。
+
+## 实证优于自证 —— 实践与辩证验证"能力继承 / 判断"的一致性(user 2026-08-27)
+
+**原则**:判断一个执行体(daemon 复制体 / 继任会话 / 换了躯壳的角色)是否**真继承了能力**、或一个结论是否可信,优先靠【实践 + 辩证对比】而非【自我断言】(self-assessment 天然乐观)——让它重做一个【真实、已知结果的过往问题】,与原体(带原上下文)的处理【比对差异】:
+
+- **一致 = 真继承 / 结论可信(实证)**;**有差异 = 暴露它丢了什么(失能点 / 偏差现形)**。差异本身是最有价值的信息。
+- **辩证三段**:**正**(原体/原会话的处理)→ **反**(daemon/继任体的处理)→ **合**(差异分析·定位丢失了什么、为何)。
+- **对已退出的会话**:用【子进程拉起】(`claude -p` 重放其记录过的问题 / `--resume` 其 jsonl)做**回溯验证**——它曾处理过的问题,daemon 重做是否一致。
+- **落地场景**:daemon 化验收、会话继任交接、"换了 agent 是否还是那个能力"的判断 —— **先实证再信任(validate-then-trust)**,别只凭自评就下结论。
+
+**为何**:2026-08-27 用户 explicit —— daemon 化时 agent 的"不失能"自评只是【自证】,须用【实践对比】坐实(让 daemon 重做真实过往问题、与原体比差异,一致才算真不失能)。这是"定性必实证 / 数据真实性(data-truthfulness)"与"失能=有效记忆能否继承接续(failure-is-memory-inheritance)"两条原则的**实证升格**。
 
 ## Windows 管道/文件编码 → 显式 UTF-8,别信默认(GBK 坑·高频)
 
@@ -88,6 +111,16 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 
 AppID 已通过 HKCU:\SOFTWARE\Classes\AppUserModelId\ClaudeCode.NotifyTest 注册(DisplayName=Claude Code, ShowInSettings=1)。
 
+## 回答用双语(中文主体 + 括号夹注)— 帮用户学英文
+
+**规则(rule)**:所有对用户的回答(all replies to the user)默认用**中文为主体(Chinese as the main body)**,并在括号里夹注对应英文(with the English annotation in parentheses);遇到英文术语则反过来英文(中文)。原因(reason):用户明说"我的英文还不够好(my English isn't good enough yet)",想借回答顺带学英文(wants to pick up English while reading)。
+
+- **夹注比例(annotation ratio)**:括号内容约占整段字符的 **30%**(the parenthetical text takes about 30% of the total characters)——不是每个词都注(don't annotate every single word),挑关键名词 / 动词 / 术语注(annotate the key nouns / verbs / terms),让整体读着自然(keep it natural to read)。
+- **两种形态(two forms)**:中文为主时写「中文(English)」;出现英文词 / 专有名词时写「English(中文)」。
+- **别注的(skip)**:代码块 · 命令 · 文件路径 · 报错原文(code blocks, commands, file paths, raw error messages)不加括号夹注,保持可复制(keep them copy-pastable)。
+- **生效范围(scope)**:面向用户的正文(user-facing prose);工具参数 / 提交信息 / 写进文件的内容(tool args, commit messages, file contents)不受此规则约束,按各自规范来。
+- **原因(why)**:2026-08-18 用户 explicit —— "回答上下文用中文并添加英文,括号占整体约 30%,我的英文还不够好"。
+
 ## Compact Instructions(压缩时套用)
 
 压缩(/compact 或 auto)时尽量逐字保留:
@@ -96,7 +129,7 @@ AppID 已通过 HKCU:\SOFTWARE\Classes\AppUserModelId\ClaudeCode.NotifyTest 注�
 ③ 被用户纠正过的约定/口径/偏好;
 ④ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
 砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
-压后第一动作:复述①②自检,答不全就重读【你自己的 CLAUDE.md + 相关记忆】补回再干活。
+压后第一动作(绝对优先·先于一切):**无条件先重新加载记忆**——重读【你自己的 CLAUDE.md + 角色记忆索引 + 相关条目】,再复述①②自检、干活。别只在"答不全"时才读:compact 是有损摘要、可能丢或带偏程序约束与最新纠正,先 reload 记忆让当前正确知识覆盖摘要旧货,别在被带偏的上下文上继续。
 
 
 

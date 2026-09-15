@@ -1,7 +1,14 @@
 {
  "_comment": "能力池(2026-06-24)。agent 按专项【最小授权】:agents.json 每个 role 的 caps 只列它需要的能力。培训师按 role 的 caps 只带对应模块——模块内容见 agent_fleet/BUS_ONBOARDING.md 的同名小节(## cap:<name>)。铁律:external-tool-edge 只给【对外 agent】,业务 agent 不直接操作云文档,要外发就把内容交给对外 agent。caps 初版为合理默认,可按角色实际调。",
  "capabilities": {
-  "bus-comms":       {"desc": "总线收发:hello / send / wait / request / done / notice / ask-user(待办记录:要用户拍板的事投进待办池,不滚走)", "default_for": "所有 agent(底座)", "reads": ["agent_fleet/AGENTS.md"]},
+  "bus-comms": {
+   "desc": "总线收发:hello / send / wait / request / done / notice / ask-user(待办投池不滚走)。【会问/协作·人人必持纪律·2026-08-28 用户令】遇【明确阻断】(缺凭据/权限/对口才有的信息或判断)→ 先 request/send 问对口,别独自硬扛;轻问>>硬扛;不局限手头(详见 collaboration_discipline)",
+   "collaboration_discipline": "【bus 立身之本=协助(协作),不是任务队列·2026-08-28 用户令升为公共能力】① 会问:遇明确阻断(缺凭据/权限/对口才有的信息或判断)先 ab request/send 问对口同伴,别闷头硬扛——轻问便宜(热态同伴一个 turn 就答)、硬扛最贵(卡死/绕路/朝错方向飞奔=失能③)。② 不局限手头:手头任务运行期也能收发消息、纳入同伴补充/纠偏(不可打断/不协作=失能一种)。③ 交流谱取最轻能解阻塞的:最轻 send 问一句(异步不等)→ 中 request 问且等答 → 重 route 整转交 → 顶 escalate 问用户。实例:某调度 agent 卡凭据 19min 没问授权持有方(授权持有方正管该凭据)=当时机制不许协作之痛。④【需用户确认点→inline进协作记录·别脱离·用户令2026-08-28】遇需用户拍板/确认的点:投 ab ask-user 待办池(非阻塞·硬拦AskUserQuestion不变·仍用)的【同时】,必须把该确认点嵌进当前 bus 任务的协作记录(inline·随协作线走·带问题+选项+时点),别只丢孤立待办池/散对话。为何:agent 有自醒(心跳)能被发现缺席,但【用户侧无自醒对偶】→用户久不回时没人自动发现;确认点脱离上下文/无 age 追踪=烂着没人知。放进协作记录=保上下文+age追踪+可被将来\"用户久未回\"检测捕获。此为会问阶梯 escalate-to-user 档(send<request<route<问用户)规范。⑤【会问边界·别过度确认(2026-08-28 某调度 agent 反模式实证)】会问阶梯每档触发【前提】=存在【真实阻断】(缺凭据/权限/对口信息)或【真实决策】(有取舍/不可逆/有风险)。判据口诀=【这是决策还是执行?】:决策(取舍/不可逆/有风险·如改数据方向)→按阶梯问/escalate;执行(规定动作/可逆/零风险·如登记待确认点、inline协作记录本身)→【直接做·别问】。反模式=把规定动作/可逆执行当决策去问用户\"要不要做\"=过度确认·把非决策当决策·占会话(尤其滥用 escalate-to-user=挤占用户唯一无心跳的注意力)。会问是【双面同源】:该问不问=硬扛(失能③朝错方向)/不该问乱问=过度确认(不推进·占会话)——两面统一于【只在真阻断/真决策处协作,其余主动执行、只交决策】。⑥【会说≠会做·execution侧·2026-09-03 wave2实证2/4命中】识别了对口后=【直接fire request/send给对口】·不是把\"我该问X\"当方案汇报回派活方等转达。会说(识别对口)≠会做(真fire)。实证:两个示例角色识别对口正确却先回派活方没真fire·需驱动才fire=execution gap。落点=真去fire·不是告诉派活方我打算问。呼应全局 CLAUDE.md 同名节 + 记忆 bus-frequent-light-communication。mechanism(ab request/send)已全员持有,本条是其【使用纪律】升格为确认持有的公共能力。",
+   "default_for": "所有 agent(底座)——协作纪律随 bus-comms 天然 100% 覆盖(每 agent 必持),无需逐个补",
+   "reads": [
+    "agent_fleet/AGENTS.md"
+   ]
+  },
   "self-wake":       {"desc": "事件自醒:后台 wait + 每次被唤起后重挂(交互会话/协调位需手动管;daemon 由 worker_daemon 自动具备)", "default_for": "协调位 + 以交互会话形态接异步派活的"},
   "confidentiality": {"desc": "安全与隐私最佳实践:基座与业务解耦 / 最小权限与数据最小化 / 凭据与披露(密钥·令牌·凭据·绝对路径不进版本库/日志/记忆/对话)", "default_for": "全员适用"},
   "external-tool-edge": {"desc": "CDP 操作云文档(写单元格/读群/发消息) + edge-lock 互斥锁", "default_for": "仅【对外 agent】——业务 agent 外发走对外 agent,自己不碰"},

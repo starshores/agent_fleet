@@ -7,8 +7,10 @@
   "note": "每角色:启动流程 + 明式输入(显式给的:CLI args/bus任务/用户话)+ 隐式输入(自动注入·没显式要:CLAUDE.md/hooks/记忆/presence/caps/onboarding)。单一真相源,供 WebUI「角色」tab 渲染。3 角色现均为【前台 listening cli】(mode=listening·无 daemon·前台化后)。 ｜ 2026-07-21 Master数分按用户令补 3 基建 lane 角色(MasterUI 条 _note 标待 MasterUI 自校)。",
   "common_rules_note": "全局通用操作铁律(所有 bus role 都适用)·compact hook render_common() 单一源;每条一子句,{role} 占位由 hook .format(role=role) 插值;搬自原 reinject_post_compact.py 硬编码 _COMMON_RULES(2026-07-21 两层全注册表化)。",
   "common_rules": [
+   "【绝对优先·compact 后第一动作·先于清inbox/挂wait/干活一切】无条件先重新加载记忆:重读你的角色记忆索引(memory/{role}.MEMORY.md·无则根 MEMORY.md)+ 按需展开相关条目。compact 是有损摘要,可能丢或带偏【程序约束/最新纠正】(实证:记忆探针查出纠正没 propagate 到 agent);先 reload 记忆让当前正确知识覆盖摘要旧货,别在被带偏的上下文上继续。",
    "done 回填必带 --role {role}",
    "自醒 wait 只用【后台 run_in_background】重挂、绝不用 shell `&`、上一个没 completed 前别重复挂(俩 wait 抢同一 notice 竞态)",
+   "compact后/接活/被唤起【按序三步·别乱序】:① 先清空 inbox(`ab peek` 看,有已到消息就逐条领取处理并 done、别留 claimed 悬着)→ ② 再后台 run_in_background 重挂 wait `ab wait --role {role} --timeout 0` 并 `ab selfwake` 验 ✓在岗 → ③ 才开始任务。为何【清 inbox 在挂 wait 之前】:wait 起手即 _try_claim 已有消息、会即刻 fire 把最老一条移进 processing,你若同时埋头任务=它 claimed 却没 done=烂在 processing;先清空、挂上的 wait 才干净只等新事件。别先埋头干活干完才想起重挂(中途/事后掉线=收不到派活与协作消息=协作断线)",
    "被唤起若 inbox 无新活→静默重挂+最多一行、绝不重 dump selfwake/who/状态(自灌上下文=加速 compact 降智)",
    "notice 读它 notice_of 指向的 done/<id>.json 取结果后 done 掉即弃",
    "被 wait 领进 processing 的消息必须当轮 done 闭合",

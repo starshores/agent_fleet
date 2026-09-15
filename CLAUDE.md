@@ -2,7 +2,7 @@
 
 如果你是**刚打开 / 被 compact 重载、上下文不全的 CLI**,当前工作目录 `C:\apphome\agent_fleet`:
 
-**⚠ 第一步:先反查你的【真实身份】,别默认自己是 MasterAgent。** 本 cwd 下多个 role 都自举于此(MasterAgent / 培训师 / Master数分2 / MasterUI 等)——只凭 cwd 会认错人(把 Master数分2/培训师 误当 MasterAgent)。跑:
+**⚠ 第一步:先反查你的【真实身份】,别默认自己是 MasterAgent。** 本 cwd 下多个 role 都自举于此(MasterAgent / 培训师 / Master数分 / MasterUI 等)——只凭 cwd 会认错人(把 Master数分/培训师 误当 MasterAgent)。跑:
 
 ```
 ab whoami
@@ -113,4 +113,4 @@ ab whoami
 ④ 被用户纠正过的约定/口径/偏好;
 ⑤ 关键文件路径、决策及理由、已排除别重查的方案、踩过的坑 + 修法。
 砍掉:探索性闲聊、被否方案冗长讨论、已解决的历史细节、重复内容。
-压后第一动作:复述①②③自检,答不全就重读【你自己的 CLAUDE.md + 相关记忆】补回再干活。
+压后第一动作(绝对优先·先于一切):**无条件先重新加载记忆**——重读【你自己的 CLAUDE.md + 角色记忆索引 + 相关条目】,再复述①②③自检、干活。别只在"答不全"时才读:compact 是有损摘要、可能丢或带偏程序约束与最新纠正(实证:记忆探针查出纠正没 propagate 到 agent),先 reload 记忆让当前正确知识覆盖摘要旧货,别在被带偏的上下文上继续。
