@@ -330,13 +330,13 @@ def _dispatch_probe(probe, args):
         json.dumps(inst, ensure_ascii=False, indent=2), encoding="utf-8")
     _audit("probe_dispatch", id=probe["id"], type=probe["type"], target=probe["target"])
     if vis:
-        # 走 bus send 把可见任务投给被测(隐藏判据不随任务走·留 _probes)
-        from bus.mailbox import cmd_send
+        # 走 bus send 把可见任务投给被测(隐藏判据不随任务走·留 _probes)。
+        # stub 属性集=cmd_send 实际引用的 5 个(to/frm/task/title/requires_approval·扫源核过),别猜别漏。
+        from bus.core import cmd_send
         neutral_title = (getattr(args, "title", None) or "").strip()  # 默认空 title=最中性(正常消息常无题)
         class _A:
             to = probe["target"]; frm = "培训师"; task = vis; title = neutral_title
-            reply_to = None; ref = None; priority = "中"; urgency = None; kind = None
-            deadline = ""; group = None; route = False
+            requires_approval = False
         cmd_send(_A())
         print("  → 已派可见任务给 %s(中性壳·隐藏判据留 _probes/instances/%s.json)" % (probe["target"], probe["id"]))
     else:
