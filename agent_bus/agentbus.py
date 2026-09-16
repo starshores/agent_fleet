@@ -60,7 +60,7 @@ from bus.pool import (  # noqa: E402
     cmd_route_reap, route_on_member_done, _route_send, _route_drain_group, _route_reap_group,
 )
 from bus.core import (  # noqa: E402
-    _warn_unreachable, cmd_send, _wait_core, _wait_for_reply, _kill_prior_waits, _serve_wait,
+    _warn_unreachable, cmd_send, cmd_ack_notices, _wait_core, _wait_for_reply, _kill_prior_waits, _serve_wait,
     cmd_wait, cmd_serve, cmd_request, _find_task, cmd_done, cmd_peek,
     cmd_replies,
 )
@@ -172,6 +172,7 @@ def main():
     p = sub.add_parser("serve"); p.add_argument("--timeout", type=float, default=590.0); p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("request"); p.add_argument("--to", required=True); p.add_argument("--task", required=True); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", default=""); p.add_argument("--chain", default=""); p.add_argument("--timeout", type=float, default=300.0); p.set_defaults(fn=cmd_request)
     p = sub.add_parser("done"); p.add_argument("--id", required=True); p.add_argument("--role", default=None); p.add_argument("--result", required=True); p.add_argument("--status", default="ok", choices=["ok", "error"]); p.add_argument("--notify", default="auto", choices=["auto", "always", "never"]); p.add_argument("--to", default=None, help="显式回执目标(任务已被归档/reap、找不到原 from 时用)"); p.set_defaults(fn=cmd_done)
+    p = sub.add_parser("ack-notices", help="批清纯回执(kind=notice·档A手动零误吞)"); p.add_argument("--role", default=None); p.add_argument("--dry", action="store_true"); p.set_defaults(fn=cmd_ack_notices)
     p = sub.add_parser("peek"); p.add_argument("--role", required=True); p.set_defaults(fn=cmd_peek)
     p = sub.add_parser("replies"); p.add_argument("--role", required=True); p.add_argument("--clear", action="store_true"); p.set_defaults(fn=cmd_replies)
     p = sub.add_parser("hello"); p.add_argument("--role", default=None); p.add_argument("--preview", action="store_true", help="只读预览 onboarding 文本(WebUI 提示词审核页用),不带 --role 也能跑、无副作用"); p.add_argument("--pid", type=int, default=None, help="显式指定本 tab 的 claude 进程 pid(parent-walk/session 反查都失败时的兜底)"); p.set_defaults(fn=cmd_hello)

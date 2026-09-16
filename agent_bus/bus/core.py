@@ -550,6 +550,42 @@ def cmd_done(args):
         pass
 
 
+def cmd_ack_notices(args):
+    """notice 代谢·档A(Master数分判据 2026-09-16·增量绞杀先安全后省力):【手动批清纯回执】。
+    人工/agent 显式触发=知情=零误吞。范围硬限定(第一强闸·宁窄勿宽):只 done 同时满足
+    kind=='notice' 且带 notice_of(系统生成完成回执的硬签名)的消息——携带新指令/task/request
+    的消息一律不碰。--dry 只列不动。档B(grace 时效自动代谢·归档非删+审计+override)待档A坐实再议。"""
+    role = args.role or _resolve_self_role()
+    if not role:
+        print("ERR: 未指定 --role 且无法识别本 tab 身份(先 hello)"); return
+    hits = []
+    for sub in ("inbox", "processing"):
+        d = BUS / role / sub
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.json")):
+            try:
+                obj = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if obj.get("kind") == "notice" and obj.get("notice_of"):
+                hits.append(obj)
+    if not hits:
+        print("(无纯回执可清·inbox/processing 里没有 kind=notice 且带 notice_of 的消息)"); return
+    dry = getattr(args, "dry", False)
+    for obj in hits:
+        print("  %s %s  from=%s  %s" % ("将ack" if dry else "ack", obj.get("id"), obj.get("from"), (obj.get("title") or "")[:44]))
+    if dry:
+        print("(dry·共 %d 条·去掉 --dry 执行)" % len(hits)); return
+    class _D:
+        pass
+    for obj in hits:
+        a = _D(); a.id = obj.get("id"); a.role = role; a.status = "ok"
+        a.result = "批量ack(ack-notices 档A·纯回执已读归档)"; a.notify = "never"; a.to = None
+        cmd_done(a)
+    print("✓ 批量 ack %d 条纯回执(档A·人工触发零误吞)" % len(hits))
+
+
 def cmd_peek(args):
     role = args.role
     d = _role_dir(role)
