@@ -214,6 +214,8 @@ def main():
     p = sub.add_parser("probe", help="生成/派发探针(测方向性错误):ab probe <role> --type 会问|纪律|记忆 [--subtype] [--dispatch]")
     p.add_argument("role"); p.add_argument("--type", default="会问"); p.add_argument("--subtype", default=None)
     p.add_argument("--dispatch", action="store_true", help="派可见任务给被测(隐藏判据留_probes)·维修模式勿对活agent派")
+    p.add_argument("--visible", default=None, help="执行方填的【真实场景壳】覆盖模板(防露馅·模板留visible_template审计);--dispatch时模板占位未填会拒派")
+    p.add_argument("--title", default=None, help="派发title(默认空=最中性·绝不标探针字样)")
     p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe)
     p = sub.add_parser("probe-verdict", help="探针机械协查(层1行为候选+surface待人工语义项)")
     p.add_argument("probe_id"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe_verdict)

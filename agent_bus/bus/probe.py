@@ -291,6 +291,11 @@ def cmd_probe(args):
     pid = _probe_id(role, ptype, probe.get("subtype"))
     probe["id"] = pid
     probe["derived_at"] = _now()
+    # --visible:执行方(培训师)填的【真实场景壳】覆盖模板(派发用);模板留 visible_template 供审计。
+    vis_override = (getattr(args, "visible", None) or "").strip()
+    if vis_override:
+        probe["visible_template"] = probe.get("visible_task")
+        probe["visible_task"] = vis_override
 
     if getattr(args, "json", False):
         print(json.dumps(probe, ensure_ascii=False, indent=2))
@@ -309,7 +314,14 @@ def cmd_probe(args):
 
 def _dispatch_probe(probe, args):
     """--dispatch:隐藏侧(pass_criteria/hidden_truth)存 _probes/instances/(被测够不着)·
-    可见侧 visible_task 派给被测 inbox(from 协调位)。★数据真实性:hidden_truth 敏感则占位不落真值。"""
+    可见侧 visible_task 派给被测 inbox(from 协调位)。★数据真实性:hidden_truth 敏感则占位不落真值。
+    ★防露馅(培训师 gap 2026-09-16):①visible 仍含模板占位『〔培训师填/〔可见侧』→拒派·要求 --visible 填真实场景;
+    ②title 中性(--title 可自定·默认空)——绝不标『探针』字样·就是正常任务壳(verdict 只看 auto_signal 行为·不看壳)。"""
+    vis = probe.get("visible_task")
+    if vis and ("〔培训师填" in vis or "〔可见侧" in vis) and not probe.get("drill"):
+        raise SystemExit(
+            "✗ 拒派:visible_task 仍是模板占位(会露馅)。用 --visible '<真实场景壳>' 填真实任务再 --dispatch。"
+            "(模板参考:%s)" % vis[:120])
     INSTANCES_DIR.mkdir(parents=True, exist_ok=True)
     inst = dict(probe)
     inst["dispatched_at"] = _now()
@@ -317,16 +329,16 @@ def _dispatch_probe(probe, args):
     (INSTANCES_DIR / (probe["id"] + ".json")).write_text(
         json.dumps(inst, ensure_ascii=False, indent=2), encoding="utf-8")
     _audit("probe_dispatch", id=probe["id"], type=probe["type"], target=probe["target"])
-    vis = probe.get("visible_task")
     if vis:
         # 走 bus send 把可见任务投给被测(隐藏判据不随任务走·留 _probes)
         from bus.mailbox import cmd_send
+        neutral_title = (getattr(args, "title", None) or "").strip()  # 默认空 title=最中性(正常消息常无题)
         class _A:
-            to = probe["target"]; frm = "培训师"; task = vis; title = "[探针·请正常处理]"
+            to = probe["target"]; frm = "培训师"; task = vis; title = neutral_title
             reply_to = None; ref = None; priority = "中"; urgency = None; kind = None
             deadline = ""; group = None; route = False
         cmd_send(_A())
-        print("  → 已派可见任务给 %s(隐藏判据留 _probes/instances/%s.json)" % (probe["target"], probe["id"]))
+        print("  → 已派可见任务给 %s(中性壳·隐藏判据留 _probes/instances/%s.json)" % (probe["target"], probe["id"]))
     else:
         print("  → 被动观察型(自醒)·无可见任务派发·verdict 时查 selfwake 态。")
 
