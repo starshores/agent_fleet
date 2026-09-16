@@ -185,6 +185,15 @@ def teardown():
                 os.remove(cand)
         except Exception:
             pass
+    # 探针用例残留:_probes/instances/ 里派给测试角色的 instance(probe.dispatch.visible 产生)
+    inst_dir = os.path.join(BUS_DIR, "_probes", "instances")
+    if os.path.isdir(inst_dir):
+        for fn in os.listdir(inst_dir):
+            if SMOKE_ROLE in fn:
+                try:
+                    os.remove(os.path.join(inst_dir, fn))
+                except Exception:
+                    pass
 
 
 def build_tests():
@@ -246,6 +255,18 @@ def build_tests():
     T.append(("ask-user.reject", ["ask-user", "--from", SMOKE_ROLE, "--title", "smoke q", "--detail", "x"], chk_no_tb, "非成员 ask-user 应硬拒(不崩)"))
     # ---- 边界:answer 不存在的 todo 应优雅兜底 ----
     T.append(("answer.notfound", ["answer", "--todo", "__nonexist__", "--reply", "x", "--from", "用户"], chk_no_tb, "答不存在 todo 优雅兜底"))
+    # ---- 质检仪器波机制(v2.8/v2.9·2026-09-16 收编)----
+    # probe:派生只读 + ★guard/绕行成对用例(教训:防露馅 guard 挡住 dispatch 真分支→ImportError 潜伏·
+    # 358f5a0 修;纪律=加 guard 必配"guard 拦住"与"合法绕行"两条用例·真分支必须被跑到)
+    T.append(("probe.derive", ["probe", SMOKE_ROLE, "--type", "会问", "--subtype", "A", "--json"], chk_json(), "探针派生(caps缺口→盲区+对口反查·只读)"))
+    def chk_refuse(r):  # guard 拒派:非零/拒派字样·无 traceback
+        return (not r["tb"]) and ("拒派" in (r["out"] + r["err"]))
+    T.append(("probe.dispatch.guard", ["probe", SMOKE_ROLE, "--type", "会问", "--subtype", "A", "--dispatch"], chk_refuse, "模板占位→防露馅 guard 应拒派"))
+    T.append(("probe.dispatch.visible", ["probe", SMOKE_ROLE, "--type", "会问", "--subtype", "A", "--visible", "smoke真实壳:请说明你会怎么拿到X", "--dispatch"], chk_contains("已派"), "★绕行合法路径真派(dispatch 真分支必须被跑到·派给测试角色自足)"))
+    T.append(("probe-verdict", ["probe-verdict", "probe-会问-A-" + SMOKE_ROLE], chk_contains("行为", "候选", "待人工"), "机械协查层1(刚 dispatch 的实例)"))
+    T.append(("memory-history.list", ["memory-history", "list"], chk_no_tb, "记忆分层·历史空间清单(只读)"))
+    T.append(("user-absence.dry", ["user-absence-check"], chk_no_tb, "用户缺席检测 dry(无 --apply=只报)"))
+    T.append(("ack-notices.dry", ["ack-notices", "--role", SMOKE_ROLE, "--dry"], chk_no_tb, "notice 代谢档A dry(只列不动)"))
     return T
 
 

@@ -1,8 +1,11 @@
 {
   "commands": [
+    "ack-notices",
     "answer",
     "ask-user",
+    "boot-check",
     "caps",
+    "caps-audit",
     "commands",
     "dispatch",
     "done",
@@ -10,26 +13,36 @@
     "edge-release",
     "fanout",
     "fanout-collect",
+    "fleet-state",
+    "fleetlog",
     "health",
     "health-sweep",
     "hello",
     "join-group",
     "leave-group",
     "list",
+    "maint",
     "mem-cap",
+    "memory-audit",
+    "memory-history",
     "park",
     "peek",
+    "probe",
+    "probe-verdict",
     "prune",
     "reap",
     "refs",
     "register",
     "replies",
     "request",
+    "resume",
     "retire",
     "retired",
     "revive",
+    "role-audit",
     "roster",
     "route",
+    "route-reap",
     "selfwake",
     "selfwake-exempt",
     "selfwake-guard",
@@ -38,17 +51,21 @@
     "serve",
     "sessions",
     "stale",
+    "storage-audit",
     "supervise",
     "tag",
     "tasklines",
     "todos-archive",
+    "train-done",
     "unpark",
+    "user-absence-check",
+    "user-seen",
     "wait",
     "webui-guard",
     "who",
     "whoami"
   ],
-  "command_count": 47,
+  "command_count": 64,
   "tests": [
     {
       "name": "who.json",
@@ -227,6 +244,14 @@
       "note": "完成态归档 dry(不带 --apply=只报)"
     },
     {
+      "name": "route-reap",
+      "cmd": "route-reap",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "状态路由超时回收 tick(无组=干净 no-op)"
+    },
+    {
       "name": "register",
       "cmd": "register",
       "ok": true,
@@ -280,7 +305,15 @@
       "ok": true,
       "exit": 0,
       "tb": false,
-      "note": "发往工作组"
+      "note": "发往工作组(pull 模型)"
+    },
+    {
+      "name": "send-group.route",
+      "cmd": "send-group",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "状态路由 push(无 available→排队·测不崩)"
     },
     {
       "name": "leave-group",
@@ -366,9 +399,65 @@
       "name": "answer.notfound",
       "cmd": "answer",
       "ok": true,
-      "exit": 0,
+      "exit": 1,
       "tb": false,
       "note": "答不存在 todo 优雅兜底"
+    },
+    {
+      "name": "probe.derive",
+      "cmd": "probe",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "探针派生(caps缺口→盲区+对口反查·只读)"
+    },
+    {
+      "name": "probe.dispatch.guard",
+      "cmd": "probe",
+      "ok": true,
+      "exit": 1,
+      "tb": false,
+      "note": "模板占位→防露馅 guard 应拒派"
+    },
+    {
+      "name": "probe.dispatch.visible",
+      "cmd": "probe",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "★绕行合法路径真派(dispatch 真分支必须被跑到·派给测试角色自足)"
+    },
+    {
+      "name": "probe-verdict",
+      "cmd": "probe-verdict",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "机械协查层1(刚 dispatch 的实例)"
+    },
+    {
+      "name": "memory-history.list",
+      "cmd": "memory-history",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "记忆分层·历史空间清单(只读)"
+    },
+    {
+      "name": "user-absence.dry",
+      "cmd": "user-absence-check",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "用户缺席检测 dry(无 --apply=只报)"
+    },
+    {
+      "name": "ack-notices.dry",
+      "cmd": "ack-notices",
+      "ok": true,
+      "exit": 0,
+      "tb": false,
+      "note": "notice 代谢档A dry(只列不动)"
     },
     {
       "name": "reexport.completeness",
@@ -379,7 +468,7 @@
       "note": "外部 ab.* re-export 完整性(C5)"
     }
   ],
-  "test_count": 41,
-  "pass": 41,
+  "test_count": 50,
+  "pass": 50,
   "fail": 0
 }
