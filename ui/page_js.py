@@ -1722,9 +1722,11 @@ async function loadUserAbsence(force){
   const now=+new Date();
   if(!force && now-_uaLast<11000) return;   // 节流:子进程别太频
   _uaLast=now;
+  // 加载态(正常态安静):仅首次未 populated 时显骨架·已有内容的刷新不闪(保留上次·隔离验证:不改 loaded 态)
+  if(!box.querySelector('.ua-list')){ box.style.display=''; box.innerHTML='<div class="ua-head"><span class="ua-dot" style="background:var(--none);box-shadow:none"></span><span class="ua-sub">加载确认点…</span></div>'; }
   try{
     const d=await (await fetch('/api/user-absence')).json();
-    if(!d || !d.ok){ box.style.display='none'; return; }
+    if(!d || !d.ok){ if(!box.querySelector('.ua-list')){ box.style.display=''; box.innerHTML='<div class="ua-head away"><span class="ua-dot"></span><span class="ua-sub">⚠ 确认点数据拉取失败'+((d&&d.error)?'('+esc(d.error)+')':'')+'·将自动重试</span></div>'; } return; }
     const cps=d.checkpoints||[];
     const present=!!d.user_present, idle=Math.round(d.user_idle_min||0);
     const hasEsc=cps.some(c=>c.state==='escalate');
@@ -1762,7 +1764,7 @@ async function loadUserAbsence(force){
     }
     box.innerHTML=head+'<div class="ua-list">'+rows+'</div>';
     box.style.display='';
-  }catch(e){ /* 静默·保留上次 */ }
+  }catch(e){ if(!box.querySelector('.ua-list')){ box.style.display=''; box.innerHTML='<div class="ua-head away"><span class="ua-dot"></span><span class="ua-sub">⚠ 确认点面板请求异常·将自动重试</span></div>'; } /* 有上次内容则保留不 blank */ }
 }
 // 内联答复确认点(MasterAgent·P1·复用 /api/todos/answer→路由回提问方 inbox+标待办完成+盖 user_last_seen=答了即在场)——用户侧闭环:看到+答一步到位不用跳
 function uaAnsToggle(e,id){ e.stopPropagation(); const el=document.getElementById('uaans-'+id); if(!el) return; const show=el.style.display==='none'; el.style.display=show?'':'none'; if(show){ const inp=document.getElementById('uaansin-'+id); if(inp) inp.focus(); } }
