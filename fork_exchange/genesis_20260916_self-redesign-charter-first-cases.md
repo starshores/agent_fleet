@@ -27,5 +27,4 @@
 
 ## 5. 追补(v2.9.1):notice 代谢档A + CRLF 陷阱破案 ✅平台面
 - **ab ack-notices [--role] [--dry]**:批清纯回执(Master数分判据·两档增量绞杀之档A=人工显式触发零误吞)。范围硬限定=kind==notice 且带 notice_of(系统回执硬签名)·带新内容消息零触碰。治「每 send 一条回执都要人工 done」的搬运痛(单角色单日 10+ 条)。档B(grace 自动代谢·归档非删+审计+override 五闸)待档A坐实。
-- **CRLF 陷阱破案(可吸收经验)**:python open(w) 文本模式在 Windows 把 
- 翻 CRLF→程序化改 git 文件产生整文件伪 diff(实锤此前 14 文件 2300 行漂移根因)。纪律=程序化改文件必字节级 rb/wb 或 newline=空串;commit 前 diff 行数异常先疑 EOL。记忆 python-text-write-crlf-trap(公共段)。
+- **CRLF 陷阱破案(可吸收经验)**:python open(w) 文本模式在 Windows 把换行符翻 CRLF→程序化改 git 文件产生整文件伪 diff(实锤此前 14 文件 2300 行漂移根因)。纪律=程序化改文件必字节级 rb/wb 或 newline=空串;commit 前 diff 行数异常先疑 EOL。记忆 python-text-write-crlf-trap(公共段)。
