@@ -25,3 +25,5 @@
 # _probes/ 其余(instances/ 隐藏判据 + hidden_truth + pilot 的 pass_criteria + spec)保持忽略=数据真实性:隐藏判据不落 git。
 !_probes/
 !_probes/blindspot_map.json
+# _probes/README.md 被上面全局 !README.md 意外放行 → 显式压回忽略(它=探针spec/pilot文档·同PROBE_FRAMEWORK不落git)
+_probes/README.md
