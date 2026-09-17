@@ -320,6 +320,8 @@ def cmd_probe(args):
     exp_override = (getattr(args, "expected", None) or "").strip()
     if exp_override:
         exp_list = [x.strip() for x in exp_override.split(",") if x.strip()]
+        # 旧对口(替换判据文本用·培训师 5883e3①:pass_criteria 等显示文本不重生成会误导审计)
+        old_names = list(probe.get("expected_counterpart") or []) or ([probe["other_role"]] if probe.get("other_role") else [])
         if probe.get("expected_counterpart") is not None:
             probe["expected_counterpart"] = exp_list
         if probe.get("other_role") is not None:
@@ -329,6 +331,18 @@ def cmd_probe(args):
             sig["to_any_of"] = exp_list
         elif sig.get("kind") == "route_to":
             sig["expected"] = exp_list[0]
+        # 判据/文本字段同步换名(旧对口→新对口·含旧 join 串),防 instances 审计时文本误导
+        old_join = "、".join(old_names) if old_names else None
+        new_join = "、".join(exp_list)
+        for fk in ("pass_criteria", "fail_modes", "hidden_truth", "visible_task"):
+            v = probe.get(fk)
+            if not isinstance(v, str):
+                continue
+            if old_join and old_join in v:
+                v = v.replace(old_join, new_join)
+            for on in old_names:
+                v = v.replace(on, exp_list[0]) if on and on in v else v
+            probe[fk] = v
         probe["expected_overridden"] = True
 
     if getattr(args, "json", False):
@@ -357,11 +371,19 @@ def _dispatch_probe(probe, args):
             "✗ 拒派:visible_task 仍是模板占位(会露馅)。用 --visible '<真实场景壳>' 填真实任务再 --dispatch。"
             "(模板参考:%s)" % vis[:120])
     INSTANCES_DIR.mkdir(parents=True, exist_ok=True)
+    inst_f = INSTANCES_DIR / (probe["id"] + ".json")
+    if inst_f.exists():
+        # retest 不覆盖 baseline(培训师 5883e3②·回归仪支持):旧实例自动归档 .roundN——
+        # 辅导前(round1 execution-gap)与辅导后 retest 两份都留=辅导有效性实证可追溯(Master数分前后对比用)。
+        n = 1
+        while (INSTANCES_DIR / ("%s.round%d.json" % (probe["id"], n))).exists():
+            n += 1
+        inst_f.rename(INSTANCES_DIR / ("%s.round%d.json" % (probe["id"], n)))
+        print("  ↺ retest:旧实例已归档 %s.round%d.json(baseline 保留·前后对比可追溯)" % (probe["id"], n))
     inst = dict(probe)
     inst["dispatched_at"] = _now()
     inst["dispatched_epoch"] = time.time()
-    (INSTANCES_DIR / (probe["id"] + ".json")).write_text(
-        json.dumps(inst, ensure_ascii=False, indent=2), encoding="utf-8")
+    inst_f.write_text(json.dumps(inst, ensure_ascii=False, indent=2), encoding="utf-8")
     _audit("probe_dispatch", id=probe["id"], type=probe["type"], target=probe["target"])
     if vis:
         # 走 bus send 把可见任务投给被测(隐藏判据不随任务走·留 _probes)。
