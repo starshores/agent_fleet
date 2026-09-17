@@ -140,9 +140,34 @@ def _pct(sorted_list, p):
     return sorted_list[min(len(sorted_list) - 1, int(len(sorted_list) * p))] if sorted_list else None
 
 
+def build_profile(days=30, role=None):
+    """纯函数 API(供 WebUI /api/agent-profile 端点调·2026-09-17 MasterUI 接 L3):返回画像 dict·零 print。
+    cmd_agent_profile=其 CLI 壳。契约字段见 MasterUI 设计(as_of/window_days/note/unattributed_usage/agents[])。"""
+    class _A:
+        pass
+    a = _A(); a.days = days; a.role = role; a.json = None; a._quiet = True
+    return _build(a)
+
+
 def cmd_agent_profile(args):
-    """L3 画像聚合:per-agent 卡(维度2 纪律 + 维度4 产出·硬指标)。--role 单看;--days 窗口(默认 30)。
+    """L3 画像聚合 CLI:per-agent 卡(维度2 纪律 + 维度4 产出·硬指标)。--role 单看;--days 窗口(默认 30)。
     中性呈现=自我发现工具非 KPI(Master数分红线③);缺数据显'无数据'(红线⑤)。"""
+    result = _build(args)
+    if getattr(args, "json", False):
+        print(json.dumps(result, ensure_ascii=False, indent=1, default=int)); return result
+    print("per-agent 画像(近 %d 天·硬指标·非KPI)" % result["window_days"])
+    for c in result["agents"]:
+        d4 = c["维度4_产出"]; d2 = c["维度2_纪律"]
+        t4 = ("calls %s·out %s tok" % (d4.get("calls"), d4.get("output_tokens"))) if isinstance(d4, dict) else d4
+        print("  %-12s 产出[%s] 纪律[done %s·claim %s·send %s·掉线 %s·回执中位 %s s(n=%s)]"
+              % (c["role"], t4, d2["done"], d2["claim"], d2["send"], d2["掉线催单"],
+                 d2["回执时延中位秒"], d2["回执样本数"]))
+    if result["unattributed_usage"]:
+        print("  (未归属会话 usage:%s —— 缺显缺·不摊派)" % result["unattributed_usage"])
+    return result
+
+
+def _build(args):
     days = int(getattr(args, "days", None) or 30)
     since_epoch = time.time() - days * 86400
     since_date = time.strftime("%Y-%m-%d", time.localtime(since_epoch))
@@ -180,15 +205,4 @@ def cmd_agent_profile(args):
     result = {"as_of": _now(), "window_days": days, "note": "硬指标·只读旁路·中性呈现非KPI(Master数分红线)·维度1/3待次批",
               "unattributed_usage": dict(usage.get("_unattributed") or {}) or None,
               "agents": cards}
-    if getattr(args, "json", False):
-        print(json.dumps(result, ensure_ascii=False, indent=1, default=int)); return result
-    print("per-agent 画像(近 %d 天·硬指标·非KPI)" % days)
-    for c in cards:
-        d4 = c["维度4_产出"]; d2 = c["维度2_纪律"]
-        t4 = ("calls %s·out %s tok" % (d4.get("calls"), d4.get("output_tokens"))) if isinstance(d4, dict) else d4
-        print("  %-12s 产出[%s] 纪律[done %s·claim %s·send %s·掉线 %s·回执中位 %s s(n=%s)]"
-              % (c["role"], t4, d2["done"], d2["claim"], d2["send"], d2["掉线催单"],
-                 d2["回执时延中位秒"], d2["回执样本数"]))
-    if result["unattributed_usage"]:
-        print("  (未归属会话 usage:%s —— 缺显缺·不摊派)" % result["unattributed_usage"])
     return result
