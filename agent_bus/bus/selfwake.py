@@ -118,6 +118,26 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return ("off", "无 presence")
+    return _verdict_body(role, pf, wait_roles)
+
+
+def _turn_busy(role, max_age=900):
+    """role 的 turn 是否活跃干活中(turn_state.json 由 hook 盖:PreToolUse/thinking 等)。
+    state∈{tool,thinking} 且 ts 距今 <max_age(默认 15min·长工具期间 ts 不刷新故放宽)→
+    返回 '跑工具:Bash·age 42s' 类描述;否则 None。读失败 None(fail-quiet 回落原判定)。"""
+    try:
+        t = json.loads((BUS / role / "turn_state.json").read_text(encoding="utf-8"))
+        if t.get("state") not in ("tool", "thinking"):
+            return None
+        age = _age_seconds(t.get("ts", ""))
+        if age is None or age >= max_age:
+            return None
+        return "%s·turn_ts %ss前" % (t.get("label") or t.get("state"), int(age))
+    except Exception:
+        return None
+
+
+def _verdict_body(role, pf, wait_roles):
     try:
         pr = json.loads(pf.read_text(encoding="utf-8"))
     except Exception:
@@ -146,6 +166,12 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
         if alive and fresh:
             return ("recent", "有心跳无 wait 进程(刚 fire 待重挂/交互中·非 event-armed·心跳 %ss)" % age)
         if alive:
+            # 交叉 turn_state(2026-09-17):活跃干活中(turn=tool/thinking·ts 较新)不算掉线——
+            # 干活期不挂 wait 是正常态,误标 ⚠掉线 会误导协调位发拉活/催单(实证:Master 对
+            # 示例组员2 turn=tool·cpu 6% 活跃中误发拉活)。真卡死判据=turn ts 长期不动或进程退。
+            ts_state = _turn_busy(role)
+            if ts_state:
+                return ("recent", "turn 活跃干活中(%s·无 wait=干活期正常态·非掉线)" % ts_state)
             return ("stale", "会话在但无 wait 进程、心跳超期 %ss——自醒掉线(没重挂?)" % age)
         return ("stale", "进程已退,自醒掉线")
     return ("off", "未自醒(mode=%s)" % mode)
