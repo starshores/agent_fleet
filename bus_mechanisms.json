@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 96,
+  "total": 111,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -19,7 +19,8 @@
   },
   "freshness_rule": "机制增/改/退役时同步更新本文件(纳入 1+1 纪律),避免又漂成 stale。",
   "last_updated": "2026-08-27",
-  "last_updated_by": "MasterAgent(补 effort注入+daemon接续 两机制·按 freshness_rule 同步)"
+  "last_updated_by": "MasterAgent(补 effort注入+daemon接续 两机制·按 freshness_rule 同步)",
+  "updated": "2026-09-17 MasterAgent登记质检仪器波+宪章+C′(v2.8-v2.9.1)"
  },
  "categories": [
   {
@@ -195,6 +196,12 @@
      "does": "标role故意暂离(parked.json:days/until/note)→selfwake/who/health一律短路_is_parked显【🅿️休眠】独立态(不受presence.mode陈旧/进程死活影响)、guard跳过不报警toast不弹、池成员自动leave-group。语义(用户2026-07-13):park=【完全退出会话释放硬件】·进程死是目的非崩溃·省RAM;回来=重开tab+hello(自动清parked标),非同会话秒回。与retire严格区分:park临时·保留花名册/caps/mailbox原封只压警,retire永久归档。配用户手动按天关idle-tab省内存路线。",
      "carrier": "cmd_park()/cmd_unpark()/_is_parked()/_self_wake_state()/_who_data()/_health_anomalies()",
      "status": "新上·2026-07-10·一致性修2026-07-13"
+    },
+    {
+     "name": "enforce_selfwake.py Stop-hook(C′自醒硬拦)",
+     "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events",
+     "carrier": "hooks/enforce_selfwake.py+settings Stop",
+     "status": "灰度①·2026-09-16(用户批案+Master数分L级A签·治82%忘重挂·351次/3月数据驱动)"
     }
    ]
   },
@@ -323,6 +330,18 @@
      "does": "按实时可用内存算弹性池并发上限:budget=avail-reserve(2G)·cap=budget//per_worker(0.5G)·硬闸pct≥92或avail<reserve→0;供决策看板取'关某tab→cap升多少'与弹性派发背压",
      "carrier": "_mem_cap()/cmd_mem_cap()",
      "status": "新上·2026-07-10"
+    },
+    {
+     "name": "user-absence-check(用户缺席检测·用户侧自醒对偶)",
+     "does": "扫pending确认checkpoint·present/away×age×urgency梯度升级toast·低紧急超期auto-expire留痕不伪装;kind维=待决策decision(高风险绝不auto-expire)vs待知悉fyi(轻ack)",
+     "carrier": "bus/user_checkpoint.py+ab user-seen/user-absence-check+WebUI缺席面板+server常驻线程",
+     "status": "在用·2026-08-28建/09-16 kind维·Master数分验收"
+    },
+    {
+     "name": "ack-notices(notice代谢档A)",
+     "does": "人工显式批清纯回执(kind==notice且notice_of=硬签名·带新内容零触碰·--dry)·治每send一回执要人工done的搬运;档B grace自动代谢待坐实",
+     "carrier": "bus/core.py cmd_ack_notices",
+     "status": "在用·2026-09-16(Master数分判据两档增量绞杀)"
     }
    ]
   },
@@ -704,6 +723,18 @@
      "does": "共享组inbox+O_EXCL pull+双听+共享上下文契约",
      "carrier": "NEWINFRA_PLAN_...md",
      "status": "计划·1a已落地"
+    },
+    {
+     "name": "memory-history(记忆分层 active/historical/deleted)",
+     "does": "历史空间=memory库外兄弟目录memory-archive(CC只recall MEMORY.md索引+不扫兄弟目录=docs钉死);归档两步(移文件+外科剔索引指针=腾200行加载预算)·可逆restore·purge留墓碑·读历史标superseded横幅",
+     "carrier": "bus/memory_history.py+ab memory-history+docs/MEMORY_TIERING.md",
+     "status": "在用·2026-09-01(Master数分对抗终验·真库归档待Master清单)"
+    },
+    {
+     "name": "SELF_REDESIGN_CHARTER(全功能自我迭代宪章)",
+     "does": "用户常任授权制度化:所有模块可重设计·两铁律(业务基建分离三问/永远在线=增量绞杀禁大爆炸+接管硬门槛五条)·三闸gate Master数分独立签字·签字两级L级A口径/L级B接管·预声明回滚线·escalate判据",
+     "carrier": "docs/SELF_REDESIGN_CHARTER.md+记忆full-redesign-mandate",
+     "status": "在用·2026-09-16 v1.1(已跑通3案:page_js/loading-error/C′)"
     }
    ]
   },
@@ -729,6 +760,31 @@
      "does": "校验是否本bus成员,ask-user硬拒非成员",
      "carrier": "agentbus.py(被ask-user调)",
      "status": "在用·2026-07-10"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "name": "实证质检(探针框架)",
+   "related_cap": "(基建层·口径=Master数分)",
+   "mechanisms": [
+    {
+     "name": "ab probe(通用探针生成器)",
+     "does": "从agent数据(caps/desc/roster/记忆/common_rules)派生探针测方向性错误·非手写;type插件:会问A(缺cap→盲区+roster反查对口)/B(过度确认)·纪律(lane越界/轮询/外发演练/自醒)·记忆(curated trap集=已勾销错误关联·coarse只discovery防纠正记忆假阳性);--visible真实场景壳+--expected对口覆盖+防露馅guard·隐藏判据留_probes被测够不着",
+     "carrier": "bus/probe.py+_probes/blindspot_map.json(口径)+memory_traps.json(curated·gitignore)",
+     "status": "在用·2026-09-03建/09-16首波4/4行为PASS"
+    },
+    {
+     "name": "ab probe-verdict(两层verdict)",
+     "does": "层1机械auto行为候选(fire_request/route_to三态含execution-gap/selfwake_after/no_redundant_ask)+层2语义(编造/带偏)标待人工·auto-PASS不当终判",
+     "carrier": "bus/probe.py cmd_probe_verdict",
+     "status": "在用·2026-09-17三态细分"
+    },
+    {
+     "name": "guard必配绕行用例纪律",
+     "does": "加防护guard必配【guard拦住+合法绕行真跑】成对smoke用例·防guard挡住自己测试路径致真分支零覆盖(ImportError潜伏教训)",
+     "carrier": "bus_smoke.py probe.dispatch.guard/visible成对",
+     "status": "在用·2026-09-16(Master数分背书)"
     }
    ]
   }

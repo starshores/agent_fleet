@@ -80,7 +80,7 @@
 
 ## 3. 机制
 
-**单一源**:`bus_mechanisms.json`(**96 机制 / 13 类**·机制注册表)——取代散落各提示词/代码/记忆的机制描述。**看全量**:WebUI 🔧机制 tab(127.0.0.1:8799)或读该文件;本节只给**分类地图**导航,不逐条 dump(防漂移)。
+**单一源**:`bus_mechanisms.json`(**111 机制 / 14 类**·机制注册表)——取代散落各提示词/代码/记忆的机制描述。**看全量**:WebUI 🔧机制 tab(127.0.0.1:8799)或读该文件;本节只给**分类地图**导航,不逐条 dump(防漂移)。
 > 机制注册表 ≠ 能力池:**caps**=agent 被授权做什么(粗·路由+最小授权·培训师管);**机制**=bus 提供什么功能(细·MasterAgent/Master数分)。
 
 **根基原语**(贯穿所有机制):`O_EXCL` 原子竞争(claim/edge/组 task 单胜者)· `watchdog` 事件驱动(零轮询)· `os.replace` 原子写 · `PYTHONUTF8`(GBK 兼容)。
@@ -101,8 +101,11 @@
 | **进程与身份** (6) | `_proc_scan`/`_claude_ancestor`/alive/orphan 判活 · webui-guard |
 | **架构/恢复与文档** (4) | recover.py · CLAUDE.md 自举 · 会话可靠性硬化主线 · 池化 |
 | **内部协议与守卫** (3) | run_in_background · block_askuser hook(硬拦 AskUserQuestion 转待办池) · `_is_bus_member` 门禁 |
+| **实证质检(探针)** (3) | **ab probe** 通用探针生成器(从 agent 数据派生·测方向性错误·会问/纪律/记忆 type 可插拔·curated trap 集) · **probe-verdict** 两层判(层1机械行为候选含 execution-gap 三态·层2语义待人工) · guard必配绕行用例纪律 |
 
-> ✓ **本轮新增已同步注册表**(2026-08-27·按 freshness_rule):派遣类 +2 = **effort+model 注入**(commit 28306a3)· **daemon 跨任务接续**(层A 落档重读 + 层C `--resume`·commit f219e82·详见 §6)。注册表 `meta.total` 94→96、`last_updated` 已记。
+> ✓ **质检仪器波+宪章已同步注册表**(2026-09-17·v2.8→v2.9.1):自醒类 +1 = **C′ Stop-hook 自醒硬拦**(灰度仅 MasterAgent·数据驱动:351 次掉线/3月·82%忘重挂);健康监控类 +2 = **user-absence 用户缺席检测**(kind 维=待决策/待知悉)· **ack-notices** notice 代谢档A;架构类 +2 = **memory-history 记忆分层**(active/historical/deleted·历史空间库外)· **SELF_REDESIGN_CHARTER 自我迭代宪章**(两铁律+三闸签字);新增类14 实证质检 +3。注册表 `meta.total` 96→111。
+
+**自我迭代闭环(2026-09-16 用户常任授权·宪章化)**:仪器采样(探针 verdict/记忆 trap 实证/缺席数据/per-agent 画像)→ 重设计候选池 → 三闸 gate(Master数分独立签字)→ 增量绞杀执行(byte-identical 优先·预声明回滚线)→ 接管硬门槛五条 → 自动发版(genesis+tag)。已跑通 3 案:page_js 拆分 · 缺席面板 loading/error · C′ Stop-hook。用户触发词「无方向自我迭代」=自主挑最高价值推进。
 
 ---
 
