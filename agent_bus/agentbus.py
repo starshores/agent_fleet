@@ -79,6 +79,7 @@ from bus.tasks import cmd_tasklines, cmd_answer, cmd_ask_user, cmd_todos_archive
 from bus.user_checkpoint import cmd_user_seen, cmd_user_absence_check  # noqa: E402
 from bus.memory_history import cmd_memory_history  # noqa: E402
 from bus.probe import cmd_probe, cmd_probe_verdict  # noqa: E402
+from bus.agent_data import cmd_agent_profile  # noqa: E402
 from bus.refs import cmd_refs  # noqa: E402
 from bus.health import (  # noqa: E402
     cmd_reap, cmd_prune, cmd_webui_guard, cmd_health_sweep, cmd_health, cmd_stale, cmd_supervise,
@@ -219,6 +220,7 @@ def main():
     p.add_argument("--title", default=None, help="派发title(默认空=最中性·绝不标探针字样)")
     p.add_argument("--expected", default=None, help="覆盖对口(逗号分隔·填真实场景时若标的lane换了须同步改·防auto误报)")
     p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe)
+    p = sub.add_parser("agent-profile", help="per-agent数据画像(维度2纪律+4产出·硬指标·只读非KPI)"); p.add_argument("--role", default=None); p.add_argument("--days", type=int, default=30); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_agent_profile)
     p = sub.add_parser("probe-verdict", help="探针机械协查(层1行为候选+surface待人工语义项)")
     p.add_argument("probe_id"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_probe_verdict)
     p = sub.add_parser("route"); p.add_argument("keywords", nargs="+"); p.set_defaults(fn=cmd_route)
