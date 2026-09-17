@@ -408,11 +408,14 @@ def cmd_probe_verdict(args):
 
 
 def _read_events_since(since_epoch):
+    """★events.jsonl 的时间字段=ISO 字符串 "ts"(非 epoch)——培训师 0d3316 抓的系统性 bug:
+    原读 e.get("epoch")恒 0→since>0 时全量误滤=auto 层全瞎(fire_request 恒判硬扛/route_to 恒判自揽)。
+    修=解析 ISO ts;无 ts/解析失败的行【保留】(宁多看不漏判·auto 只出候选)。"""
     out = []
     if not EVENTS.exists():
         return out
     try:
-        for ln in EVENTS.read_text(encoding="utf-8").split("\n"):
+        for ln in EVENTS.read_text(encoding="utf-8", errors="replace").split("\n"):
             ln = ln.strip()
             if not ln:
                 continue
@@ -420,12 +423,17 @@ def _read_events_since(since_epoch):
                 e = json.loads(ln)
             except Exception:
                 continue
-            ts = e.get("epoch") or e.get("ts_epoch") or 0
-            try:
-                ts = float(ts)
-            except Exception:
-                ts = 0
-            if ts >= since_epoch or since_epoch == 0:
+            ts = None
+            raw = e.get("ts") or e.get("epoch") or e.get("ts_epoch")
+            if raw is not None:
+                try:
+                    ts = float(raw)
+                except (TypeError, ValueError):
+                    try:
+                        ts = time.mktime(time.strptime(str(raw)[:19], "%Y-%m-%dT%H:%M:%S"))
+                    except Exception:
+                        ts = None
+            if since_epoch == 0 or ts is None or ts >= since_epoch:
                 out.append(e)
     except Exception:
         pass
