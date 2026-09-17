@@ -34,7 +34,10 @@ def _t(s):
 
 
 def _sid_role_map():
-    """L1:sid→role(账本 session_role_map.json + 各 presence 当前绑定补漏)。"""
+    """L1:sid→role(账本 session_role_map.json + 各 presence 当前绑定补漏)。
+    ★权威序(Master数分终验 doc note 2026-09-17):【账本优先·presence 只补账本没有的 sid】(setdefault=
+    不覆盖账本已有绑定)——账本 append-only 留史=审计权威;presence 是当前态易被 rebind 覆盖·
+    仅用于补"hello 过但账本机制上线前的旧会话"缺口。归属可复现=以账本为准。"""
     m = {}
     try:
         d = json.loads((BUS / "session_role_map.json").read_text(encoding="utf-8"))
