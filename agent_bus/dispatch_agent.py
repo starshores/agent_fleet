@@ -70,11 +70,13 @@ def main():
     status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout,
                                                     effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
     ab.record_metric(name, args.id, title, status, meta, kind="dispatch")   # BI 资源消耗埋点
-    # 归属账本:ad-hoc 子会话不 hello → sid→name 落账(消耗归属执行代号·缺显缺优于无归属;
-    # ad-hoc 代号是否单列口径归Master数分·账本 append-only 可追溯改判)。尽力而为不影响回填。
+    # 归属账本:ad-hoc 子会话不 hello → sid→name 落账。Master数分 Q1 口径(eeb4e5):代号∈在册 role→归
+    # 那个 role;ephemeral 代号(resume-test 等)→标 src=dispatch-adhoc·画像并 _adhoc 桶不单列。
     try:
         from bus.presence import record_session_role
-        record_session_role(name, (meta or {}).get("session_id"))
+        roster = json.loads((ab.BUS / "agents.json").read_text(encoding="utf-8"))
+        record_session_role(name, (meta or {}).get("session_id"),
+                            src=None if name in roster else "dispatch-adhoc")
     except Exception:
         pass
 

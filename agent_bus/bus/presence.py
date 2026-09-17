@@ -70,7 +70,7 @@ def _touch_presence(role, mode, extra=None):
         _record_session_role(role, pres.get("session_id"))   # 锁外落账本(独立文件,自有锁)
 
 
-def _record_session_role(role, sid):
+def _record_session_role(role, sid, src=None):
     """sid↔role append-only 持久账本(2026-08-03 Master数分口径·根治死会话 role 无从判):
     presence 只存每 role【最新】session_id,rebind 即覆盖=历史绑定丢(实测 54% 死会话无从判归属)。
     hello/心跳时把绑定永久留账 session_role_map.json → 此后每个 hello 过的会话,死了也能查到权威 role。
@@ -98,6 +98,8 @@ def _record_session_role(role, sid):
             if cur and cur.get("role") == role:
                 return
             rec = {"role": role, "ts": _now_fn()}
+            if src:
+                rec["src"] = src   # 归属来源标记(如 dispatch-adhoc=ephemeral 代号·画像并 _adhoc 桶·Master数分 Q1 口径)
             if cur:
                 rec["history"] = (cur.get("history") or []) + [{"role": cur.get("role"), "ts": cur.get("ts")}]
             m[sid] = rec

@@ -20,7 +20,7 @@
 
 命令:ab agent-profile [--role X] [--days N] [--json]
 """
-import json, os, glob, time, sqlite3
+import json, os, re, glob, time, sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
 from bus.config import BUS, cfg, _now
@@ -43,6 +43,9 @@ def _sid_role_map():
         d = json.loads((BUS / "session_role_map.json").read_text(encoding="utf-8"))
         for sid, v in d.items():
             r = v.get("role") if isinstance(v, dict) else v
+            # ephemeral dispatch 代号(src=dispatch-adhoc)并 _adhoc 桶不单列(Master数分 Q1 口径 eeb4e5)
+            if isinstance(v, dict) and v.get("src") == "dispatch-adhoc":
+                r = "_adhoc"
             if r:
                 m[sid] = r
     except Exception:
@@ -57,18 +60,53 @@ def _sid_role_map():
     return m
 
 
+def _proj_slug(p):
+    """路径→CC projects 目录名转义(C:\\apphome\\agent_fleet → C--apphome-master-agent)。"""
+    return re.sub(r"[^A-Za-z0-9]", "-", str(p or ""))
+
+
+def _bus_domains():
+    """bus 项目域集(Master数分 Q2 判据·全从数据派生零硬编码=换域不改平台代码):
+    agent_fleet home + default_worker_cwd + 各在册 role presence.cwd 的项目域转义。"""
+    doms = set()
+    for p in (cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2]),
+              cfg("default_worker_cwd")):
+        if p:
+            doms.add(_proj_slug(p))
+    for pf in BUS.glob("*/presence.json"):
+        try:
+            c = json.loads(pf.read_text(encoding="utf-8")).get("cwd")
+            if c:
+                doms.add(_proj_slug(c))
+        except Exception:
+            continue
+    return doms
+
+
+def _sid_domain(sid):
+    """会话 sid → 所在 CC projects 项目域(可溯源判据=会话 jsonl 物理位置);找不到返 None(模糊)。"""
+    hits = glob.glob(str(Path.home() / ".claude" / "projects" / "*" / (sid + ".jsonl")))
+    return os.path.basename(os.path.dirname(hits[0])) if hits else None
+
+
 def _usage_by_role(since_date, m):
     """L1+L2 维度4:usage.db ⋈ sid→role → per-role {calls,input,output,cache_read,cost}。
-    只读;无法归属的 session 计入 '_unattributed'(缺显缺·不摊派)。"""
+    只读;无归属 session 三分桶(Master数分 Q2 口径 eeb4e5·判据=会话 jsonl 项目域·可溯源):
+    '_non_bus'(项目域∉bus 域集=个人/非bus会话·排除主视图防 bus 指标膨胀)/
+    '_unattributed'(bus 域或域模糊=真缺口·缺显缺;模糊留缺>假精度)。_adhoc 由账本 src 判(见 _sid_role_map)。"""
     out = defaultdict(lambda: Counter())
     dbp = cfg("usage_db") or str(BUS / "usage.db")
+    busdoms = _bus_domains()
     try:
         db = sqlite3.connect("file:%s?mode=ro" % dbp.replace("\\", "/"), uri=True)
         cur = db.execute(
             "select session_id, count(*), sum(input), sum(output), sum(cache_read), sum(cost_usd)"
             " from messages where sh_date >= ? group by session_id", (since_date,))
         for sid, calls, inp, outp, cr, cost in cur:
-            role = m.get(sid) or "_unattributed"
+            role = m.get(sid)
+            if not role:
+                dom = _sid_domain(sid)
+                role = "_non_bus" if (dom and dom not in busdoms) else "_unattributed"
             c = out[role]
             c["calls"] += calls or 0; c["input"] += inp or 0; c["output"] += outp or 0
             c["cache_read"] += cr or 0; c["cost_usd"] += int((cost or 0) * 100)  # 分存·避浮点累加
@@ -164,6 +202,10 @@ def cmd_agent_profile(args):
                  d2["回执时延中位秒"], d2["回执样本数"]))
     if result["unattributed_usage"]:
         print("  (未归属会话 usage:%s —— 缺显缺·不摊派)" % result["unattributed_usage"])
+    if result["non_bus_usage"]:
+        print("  (非bus会话 usage:%s —— 个人/其他项目·不算bus消耗)" % result["non_bus_usage"])
+    if result["adhoc_usage"]:
+        print("  (ephemeral dispatch usage:%s —— 一次性代号合桶)" % result["adhoc_usage"])
     return result
 
 
@@ -177,8 +219,9 @@ def _build(args):
     drops, lat = _archive_metrics(since_epoch)
 
     roles = set(usage) | set(evs) | set(drops) | set(lat)
-    roles.discard("_error")
-    roles = {r for r in roles if not r.startswith("__")}   # __smoke__/__hooktest__ 等测试角色不入画像(非真agent)
+    # _ 前缀桶(_unattributed/_non_bus/_adhoc/_error)与 __ 测试角色都不入 per-agent 卡:
+    # 画像是 per-【稳定 role】·桶走 summary 字段 labeled 可见(Master数分 Q1/Q2 口径·缺显缺不藏不摊派)
+    roles = {r for r in roles if not r.startswith("_")}
     only = getattr(args, "role", None)
     if only:
         roles = {r for r in roles if r == only} or {only}
@@ -204,5 +247,7 @@ def _build(args):
 
     result = {"as_of": _now(), "window_days": days, "note": "硬指标·只读旁路·中性呈现非KPI(Master数分红线)·维度1/3待次批",
               "unattributed_usage": dict(usage.get("_unattributed") or {}) or None,
+              "non_bus_usage": dict(usage.get("_non_bus") or {}) or None,     # 个人/非bus会话·不算bus消耗(Q2)
+              "adhoc_usage": dict(usage.get("_adhoc") or {}) or None,         # ephemeral dispatch 代号合桶(Q1)
               "agents": cards}
     return result
