@@ -153,22 +153,23 @@ function apRender(){
   if(fr) fr.innerHTML='🔍 <b>自我发现工具</b> · 非考核 / 非排名 · 硬指标只读旁路 · 数字自证不评判。<span class="ap-win">近 '+esc(''+d.window_days)+' 天窗</span>';
   // 左列:后端稳定序(roster口径)·仅名字无内联metric(防从列表横比)·未归属独立首项不摊派
   const list=document.getElementById('apList');
-  let items='<div class="ap-item ap-unattr'+(_apSel==='__unattr__'?' on':'')+'" onclick="apPick(\'__unattr__\')">📦 未归属 usage<span class="ap-hint">不摊派</span></div>';
+  const _apBuckets=[['__unattr__','📦 未归属 usage'],['__nonbus__','👤 非 bus 会话'],['__adhoc__','⚡ 一次性 dispatch']];
+  let items=_apBuckets.map((bk,i)=>'<div class="ap-item'+(i===_apBuckets.length-1?' ap-unattr':'')+(_apSel===bk[0]?' on':'')+'" onclick="apPick(\''+bk[0]+'\')">'+bk[1]+'<span class="ap-hint">汇总·不摊派</span></div>').join('');
   items+=(d.agents||[]).map(a=>'<div class="ap-item'+(_apSel===a.role?' on':'')+'" onclick="apPick('+JSON.stringify(a.role)+')">'+esc(a.role)+'</div>').join('');
   list.innerHTML=items;
   // 右:单卡 drill-in
   const card=document.getElementById('apCard');
   if(!_apSel){ card.innerHTML='<div class="muted" style="padding:22px">← 选一个角色看它的画像(单卡自省 · 非横向对比)</div>'; return; }
-  if(_apSel==='__unattr__'){
-    const u=d.unattributed_usage||{};
-    card.innerHTML='<div class="ap-cardh">📦 未归属 usage <span class="ap-badge">不摊派各 agent</span> <span class="ap-win">近 '+esc(''+d.window_days)+' 天</span></div>'
-      +'<div class="ap-note">无归属会话的用量(不分派到任一 role·避免虚增个别 agent)。</div>'
-      +'<div class="ap-grp">产出</div>'
-      +_apRow('calls','usage 调用数',_apN(u.calls))
-      +_apRow('output_tokens','输出 token',_apN(u.output))
-      +_apRow('input_tokens','输入 token',_apN(u.input))
-      +_apRow('cache_read','缓存读 token',_apN(u.cache_read));
-    return;
+  const _apBucketDef={__unattr__:['📦 未归属 usage','unattributed_usage','无归属会话的用量(不分派到任一 role·避免虚增个别 agent)。'],
+    __nonbus__:['👤 非 bus 会话','non_bus_usage','个人/非 bus 会话用量·不计入 bus 消耗(Master数分 Q2 口径)。'],
+    __adhoc__:['⚡ 一次性 dispatch','adhoc_usage','ephemeral dispatch 代号合桶·干完即逝(Master数分 Q1 口径)。']};
+  if(_apBucketDef[_apSel]){
+    const bd=_apBucketDef[_apSel], u=d[bd[1]];
+    let bh='<div class="ap-cardh">'+bd[0]+' <span class="ap-badge">汇总·不摊派</span> <span class="ap-win">近 '+esc(''+d.window_days)+' 天</span></div>'
+      +'<div class="ap-note">'+esc(bd[2])+'</div><div class="ap-grp">产出</div>';
+    if(!u){ bh+='<div class="ap-nodata">无数据</div>'; }
+    else { bh+=_apRow('calls','usage 调用数',_apN(u.calls))+_apRow('output_tokens','输出 token',_apN(u.output))+_apRow('input_tokens','输入 token',_apN(u.input))+_apRow('cache_read','缓存读 token',_apN(u.cache_read)); }
+    card.innerHTML=bh; return;
   }
   const a=(d.agents||[]).find(x=>x.role===_apSel);
   if(!a){ card.innerHTML='<div class="muted">无此角色</div>'; return; }
