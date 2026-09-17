@@ -62,7 +62,7 @@ def _deliver(to, frm, task, audit_event="send"):
         sys.stderr.write("⚠ 目标 %s 处于🎓待训期(新注册·培训师未 train-done):简单明确活可派;"
                          "运维/写库/改基建类复杂活请等结业,或在任务里写明验证清单。(仍投递)\n" % to)
     _write_json(BUS / to / "inbox" / (task["id"] + ".json"), task)
-    _audit(audit_event, id=task["id"], frm=frm, to=to, title=task.get("title") or "")
+    _audit(audit_event, id=task["id"], frm=frm, to=to, title=task.get("title") or "", kind=task.get("kind") or "task")
 
 
 def _build_continue_from(args):
@@ -87,6 +87,11 @@ def cmd_send(args):
     }
     if args.requires_approval:
         task["requires_approval"] = True   # 高风险:daemon 不执行,只交互 tab/人工批准后做
+    # 维度1问答比字段(Master数分口径 2026-09-17):--kind task|request|fyi·缺省 task 不落字段(向后兼容;
+    # 绝不与系统回执 kind=notice 撞语义——ack-notices 判据=kind==notice 且带 notice_of 双条件·此处永不满足)。
+    mk = (getattr(args, "kind", None) or "").strip().lower()
+    if mk in ("request", "fyi"):
+        task["kind"] = mk
     cf = _build_continue_from(args)        # 接续上下文(2026-08-27):状态文件/--resume 会话
     if cf:
         task["continue_from"] = cf
