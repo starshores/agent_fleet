@@ -76,8 +76,16 @@ def run_task(role, cwd, task):
     _pref, _resume, _sid = claude_run.resolve_continue(task.get("continue_from"))
     if _pref:
         prompt = _pref + prompt
-    return claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600,
-                                    effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
+    status, result, meta = claude_run.run_streaming(CLAUDE, cwd, prompt, str(live), timeout=3600,
+                                                    effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
+    # 归属账本:claude -p 子会话无 CLAUDE_CODE_SESSION_ID 也不 hello → 在此落 sid→role
+    # (2026-09-17 归属缺口修·usage.db 画像 _unattributed 的 daemon 批根因)。尽力而为不影响主流程。
+    try:
+        from bus.presence import record_session_role
+        record_session_role(role, (meta or {}).get("session_id"))
+    except Exception:
+        pass
+    return status, result, meta
 
 
 def main():

@@ -70,6 +70,13 @@ def main():
     status, result, meta = claude_run.run_streaming(claude, cwd, prompt, str(live), timeout=timeout,
                                                     effort=eff, model=mdl, resume_session=_resume, session_id=_sid)
     ab.record_metric(name, args.id, title, status, meta, kind="dispatch")   # BI 资源消耗埋点
+    # 归属账本:ad-hoc 子会话不 hello → sid→name 落账(消耗归属执行代号·缺显缺优于无归属;
+    # ad-hoc 代号是否单列口径归Master数分·账本 append-only 可追溯改判)。尽力而为不影响回填。
+    try:
+        from bus.presence import record_session_role
+        record_session_role(name, (meta or {}).get("session_id"))
+    except Exception:
+        pass
 
     # 回填给派发方(直接写 <from>/done/<id>.json,无需 inbox 任务)
     reply = {"id": args.id, "from": name, "to": frm, "title": title,

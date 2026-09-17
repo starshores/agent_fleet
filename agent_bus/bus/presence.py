@@ -74,7 +74,10 @@ def _record_session_role(role, sid):
     """sid↔role append-only 持久账本(2026-08-03 Master数分口径·根治死会话 role 无从判):
     presence 只存每 role【最新】session_id,rebind 即覆盖=历史绑定丢(实测 54% 死会话无从判归属)。
     hello/心跳时把绑定永久留账 session_role_map.json → 此后每个 hello 过的会话,死了也能查到权威 role。
-    首绑即记、同 sid 已记同 role 直接返回(热路径零写);同 sid 换 role(罕见误绑)追加 history 不抹。"""
+    首绑即记、同 sid 已记同 role 直接返回(热路径零写);同 sid 换 role(罕见误绑)追加 history 不抹。
+    公共别名 record_session_role:daemon/dispatch 的 claude -p 子会话无 CLAUDE_CODE_SESSION_ID
+    也不 hello,run_streaming 拿到 meta.session_id 后由调用方落账(2026-09-17 归属缺口修·
+    实证 30 天窗 20 个无归属 session 里 7 个=8-27 daemon 试验批)。"""
     if not (role and sid):
         return
     f = BUS / "session_role_map.json"
@@ -101,6 +104,9 @@ def _record_session_role(role, sid):
             _write_json(f, m)
     except Exception:
         pass   # 账本尽力而为,绝不影响 presence 主流程
+
+
+record_session_role = _record_session_role   # 公共面:daemon/dispatch 落账用(见函数 docstring)
 
 
 def _set_current_task(role, tid, title):
