@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """ui.page_js_tabs —— page_js 拆分子模块 TABS(自我迭代波·案①·纯搬运字节一致·2026-09-16)。"""
 TABS = r"""// ===== tab 分页 =====
-const TAB_NAMES={fleet:'🛰 舰队/运维',guide:'📖 操作说明',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
+const TAB_NAMES={fleet:'🛰 舰队/运维',guide:'📖 操作说明',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',agentprofile:'📇 数据画像',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
 if(!TAB_NAMES[curTab]) curTab='fleet';
 function showTab(t){
@@ -26,6 +26,7 @@ function showTab(t){
   else if(t==='longrange') loadLongrange();
   else if(t==='fleet') load();
   else if(t==='guide') loadGuide();
+  else if(t==='agentprofile') loadAgentProfile();
   else if(t==='paths'){ loadPaths(); loadStorage(); }
   else if(t==='fleetlog') loadFleetLog();
   else if(t==='asr') loadASR();
@@ -129,6 +130,71 @@ async function loadGuide(force){
 }
 const _guideRefreshBtn=document.getElementById('guideRefresh');
 if(_guideRefreshBtn) _guideRefreshBtn.onclick=()=>loadGuide(true);
+// 📇 per-agent 数据画像(L3·MasterUI 接·2026-09-17)——中性自我发现工具·非KPI/非排名(Master数分红线)
+// A 自省非排行:单agent drill-in(左选择器仅名字·右单卡)·无并排横比grid·无极值高亮·无排序
+// B 原始计数不跨agent比:掉线/回执旁带活跃度caveat  C 无阈值/target/基准线  D 窗口+每指标定义透明
+let _apData=null, _apSel=null;
+function _apN(v){ return (v==null)?'—':(typeof v==='number'?v.toLocaleString():esc(''+v)); }
+function _apRow(label,def,val){ return '<div class="ap-row"><span class="ap-rk">'+esc(label)+'<span class="ap-def">'+esc(def)+'</span></span><span class="ap-rv">'+val+'</span></div>'; }
+async function loadAgentProfile(force){
+  const list=document.getElementById('apList'); if(!list) return;
+  const days=(document.getElementById('apDays')||{}).value||'30';
+  try{
+    const d=await (await fetch('/api/agent-profile?days='+days)).json();
+    if(!d||!d.ok){ list.innerHTML='<div class="muted">加载失败:'+esc((d&&d.error)||'?')+'</div>'; return; }
+    _apData=d; apRender();
+    const meta=document.getElementById('apMeta'); if(meta) meta.textContent='as_of '+esc((d.as_of||'').replace('T',' '));
+  }catch(e){ list.innerHTML='<div class="muted">请求异常:'+esc(''+e)+'</div>'; }
+}
+function apPick(role){ _apSel=role; apRender(); }
+function apRender(){
+  const d=_apData; if(!d) return;
+  const fr=document.getElementById('apFraming');
+  if(fr) fr.innerHTML='🔍 <b>自我发现工具</b> · 非考核 / 非排名 · 硬指标只读旁路 · 数字自证不评判。<span class="ap-win">近 '+esc(''+d.window_days)+' 天窗</span>';
+  // 左列:后端稳定序(roster口径)·仅名字无内联metric(防从列表横比)·未归属独立首项不摊派
+  const list=document.getElementById('apList');
+  let items='<div class="ap-item ap-unattr'+(_apSel==='__unattr__'?' on':'')+'" onclick="apPick(\'__unattr__\')">📦 未归属 usage<span class="ap-hint">不摊派</span></div>';
+  items+=(d.agents||[]).map(a=>'<div class="ap-item'+(_apSel===a.role?' on':'')+'" onclick="apPick('+JSON.stringify(a.role)+')">'+esc(a.role)+'</div>').join('');
+  list.innerHTML=items;
+  // 右:单卡 drill-in
+  const card=document.getElementById('apCard');
+  if(!_apSel){ card.innerHTML='<div class="muted" style="padding:22px">← 选一个角色看它的画像(单卡自省 · 非横向对比)</div>'; return; }
+  if(_apSel==='__unattr__'){
+    const u=d.unattributed_usage||{};
+    card.innerHTML='<div class="ap-cardh">📦 未归属 usage <span class="ap-badge">不摊派各 agent</span> <span class="ap-win">近 '+esc(''+d.window_days)+' 天</span></div>'
+      +'<div class="ap-note">无归属会话的用量(不分派到任一 role·避免虚增个别 agent)。</div>'
+      +'<div class="ap-grp">产出</div>'
+      +_apRow('calls','usage 调用数',_apN(u.calls))
+      +_apRow('output_tokens','输出 token',_apN(u.output))
+      +_apRow('input_tokens','输入 token',_apN(u.input))
+      +_apRow('cache_read','缓存读 token',_apN(u.cache_read));
+    return;
+  }
+  const a=(d.agents||[]).find(x=>x.role===_apSel);
+  if(!a){ card.innerHTML='<div class="muted">无此角色</div>'; return; }
+  const out=a['维度4_产出'], disc=a['维度2_纪律']||{};
+  let h='<div class="ap-cardh">'+esc(a.role)+' <span class="ap-win">近 '+esc(''+(a.window_days||d.window_days))+' 天窗</span></div>';
+  h+='<div class="ap-grp">产出 <span class="ap-gdef">硬指标 · 无目标值 · 数字自证</span></div>';
+  if(typeof out==='string'){ h+='<div class="ap-nodata">'+esc(out)+'</div>'; }
+  else if(out){ h+=_apRow('calls','usage 调用数',_apN(out.calls))
+      +_apRow('output_tokens','输出 token',_apN(out.output_tokens))
+      +_apRow('input_tokens','输入 token',_apN(out.input_tokens))
+      +_apRow('cache_read','缓存读 token',_apN(out.cache_read)); }
+  else { h+='<div class="ap-nodata">无数据</div>'; }
+  h+='<div class="ap-grp">纪律 <span class="ap-gdef">原始计数 · 随活跃度而变 · 不可跨 agent 直接比</span></div>';
+  h+=_apRow('done','完成回填数',_apN(disc.done))
+    +_apRow('claim','领取数',_apN(disc.claim))
+    +_apRow('send','发送数',_apN(disc.send))
+    +_apRow('掉线催单','guard 催重挂数(随活跃度)',_apN(disc['掉线催单']))
+    +_apRow('stop_hook_block','stop-hook 拦截数',_apN(disc.stop_hook_block))
+    +_apRow('回执时延·中位','notice created→done 秒',_apN(disc['回执时延中位秒']))
+    +_apRow('回执时延·P90','notice created→done 秒',_apN(disc['回执时延P90秒']))
+    +_apRow('回执样本数','参与时延统计的回执数',_apN(disc['回执样本数']));
+  h+='<div class="ap-caveat">⚠ 原始计数无法跨 agent 直接比较——活跃度不同(如 calls 多的天然掉线机会多);此处仅供该角色自我观察趋势·非评价。</div>';
+  card.innerHTML=h;
+}
+const _apRefreshBtn=document.getElementById('apRefresh'); if(_apRefreshBtn) _apRefreshBtn.onclick=()=>loadAgentProfile(true);
+const _apDaysSel=document.getElementById('apDays'); if(_apDaysSel) _apDaysSel.onchange=()=>loadAgentProfile(true);
 // 🎙 语音转写(本地 ASR·实时)——设备选择 + 启停 + 转录行轮询滚动
 let _asrTimer=null, _asrDevInit=false;
 async function loadASR(){

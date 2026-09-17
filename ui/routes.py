@@ -135,6 +135,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/user-absence":
             # 🙋用户确认点/缺席(用户侧自醒对偶·ab user-absence-check)·只读
             self._send(200, build_user_absence())
+        elif path == "/api/agent-profile":
+            # 📇per-agent数据画像(L3·硬指标·中性非KPI·Master数分红线)·12s TTL缓存·days窗可调
+            q = parse_qs(u.query)
+            self._send(200, build_agent_profile(days=(q.get("days", ["30"])[0])))
         elif path == "/api/storage":
             # 存储全景:三分格局+项目根分布+违规候选(长 TTL 缓存·full du 数秒·别进 SSE)
             q = parse_qs(u.query)

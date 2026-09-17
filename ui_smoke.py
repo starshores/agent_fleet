@@ -27,7 +27,7 @@ GET_ENDPOINTS = [
     "/api/role-profiles", "/api/role-profiles-biz", "/api/longrange",
     "/api/bi", "/api/caps", "/api/usage", "/api/dispatch_metrics",
     "/api/sessions", "/api/ctx", "/api/ctxpanel", "/api/waitreg", "/api/prompts",
-    "/api/archive", "/api/paths", "/api/guide", "/api/user-absence", "/api/storage", "/api/lifecycle",
+    "/api/archive", "/api/paths", "/api/guide", "/api/user-absence", "/api/agent-profile", "/api/storage", "/api/lifecycle",
     "/api/fleet-log", "/api/fleet-state", "/api/route",
     "/api/asr/devices", "/api/asr/status", "/api/asr/lines",
 ]
@@ -42,6 +42,7 @@ PAGE_ANCHORS = [
     "dmKpis", "dmRoles", "dmKind", "dmTop",                                      # 派工效率(U2 复活的死码面板)
     "routeChips",                                                                # 建议对口 chip(U3 防误派)
     "guideBody",                                                                 # 操作说明(BUS_GUIDE 渲染)
+    "apList",                                                                    # per-agent 数据画像(L3)
 ]
 
 # 关键数据端点"必含键"(Master数分缺口1:只验 JSON-parse 会放过 {} 空壳;键=当前真实响应的稳定子集)。

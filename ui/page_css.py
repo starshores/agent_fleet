@@ -477,4 +477,29 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .ua-ack-btn{flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:1px 8px;font-size:11px;cursor:pointer}
 .ua-ack-btn:hover{border-color:var(--live);color:var(--live)}
 .ua-cp.k-fyi{background:rgba(var(--none-rgb),.03)}
+/* 📇 per-agent 数据画像(L3·中性非KPI·Master数分红线:无排名/无褒贬色/无阈值·单卡drill-in)*/
+.ap-framing{margin:8px 16px;padding:8px 13px;border:1px dashed var(--line);border-radius:8px;background:rgba(var(--accent-rgb),.04);font-size:12px;color:var(--dim)}
+.ap-framing b{color:var(--txt)}
+.ap-framing .ap-win{color:var(--live);font-weight:600;margin-left:6px}
+.ap-wrap{display:grid;grid-template-columns:210px 1fr;gap:0;align-items:start}
+.ap-list{position:sticky;top:56px;max-height:calc(100vh - 96px);overflow:auto;padding:8px;border-right:1px solid var(--line)}
+.ap-item{padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--dim);border-left:2px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-item:hover{background:var(--hover);color:var(--txt)}
+.ap-item.on{background:rgba(var(--live-rgb),.08);color:var(--live);border-left-color:var(--live);font-weight:600}
+.ap-item.ap-unattr{color:var(--muted);border-bottom:1px solid var(--line-muted);border-radius:0;margin-bottom:4px;padding-bottom:8px}
+.ap-item .ap-hint{float:right;font-size:10px;color:var(--none);font-weight:400}
+.ap-card{padding:14px 20px 40px;max-width:640px}
+.ap-cardh{font-size:16px;font-weight:680;color:var(--txt);display:flex;align-items:center;gap:8px}
+.ap-cardh .ap-win{font-size:11.5px;color:var(--live);font-weight:600}
+.ap-badge{font-size:10.5px;background:rgba(var(--none-rgb),.14);color:var(--muted);border-radius:5px;padding:1px 7px;font-weight:400}
+.ap-note{font-size:11.5px;color:var(--muted);margin:6px 0 4px}
+.ap-grp{margin:16px 0 4px;font-size:12.5px;font-weight:650;color:var(--txt);border-bottom:1px solid var(--line);padding-bottom:4px}
+.ap-grp .ap-gdef{font-weight:400;font-size:10.5px;color:var(--none);margin-left:6px}
+.ap-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px;border-bottom:1px solid var(--line-muted);font-size:12.5px}
+.ap-row .ap-rk{color:var(--dim)}
+.ap-row .ap-def{color:var(--none);font-size:10.5px;margin-left:7px}
+.ap-row .ap-rv{font-family:var(--mono);color:var(--txt);font-variant-numeric:tabular-nums}
+.ap-nodata{padding:8px 2px;color:var(--muted);font-size:12.5px;font-style:italic}
+.ap-caveat{margin-top:12px;padding:7px 11px;border-left:3px solid var(--none);background:rgba(var(--none-rgb),.05);border-radius:0 6px 6px 0;font-size:11px;color:var(--muted);line-height:1.6}
+@media(max-width:820px){.ap-wrap{grid-template-columns:1fr}.ap-list{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px}}
 """

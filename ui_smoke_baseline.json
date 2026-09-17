@@ -25,6 +25,7 @@
   "/api/paths",
   "/api/guide",
   "/api/user-absence",
+  "/api/agent-profile",
   "/api/storage",
   "/api/lifecycle",
   "/api/fleet-log",
@@ -65,7 +66,8 @@
   "dmKind",
   "dmTop",
   "routeChips",
-  "guideBody"
+  "guideBody",
+  "apList"
  ],
  "tests": [
   {
@@ -229,14 +231,19 @@
    "note": "页面含 guideBody"
   },
   {
+   "name": "anchor-apList",
+   "ok": true,
+   "note": "页面含 apList"
+  },
+  {
    "name": "tabs-in-TAB_NAMES",
    "ok": true,
-   "note": "20 个 tab 按钮全在 TAB_NAMES"
+   "note": "21 个 tab 按钮全在 TAB_NAMES"
   },
   {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=488459"
+   "note": "200 bytes=477705"
   },
   {
    "name": "keys /api/state",
@@ -246,17 +253,17 @@
   {
    "name": "GET /api/health",
    "ok": true,
-   "note": "200 bytes=602"
+   "note": "200 bytes=17"
   },
   {
    "name": "keys /api/health",
    "ok": true,
-   "note": "必含键齐"
+   "note": "冷启 loading 占位(合约内)"
   },
   {
    "name": "GET /api/tray",
    "ok": true,
-   "note": "200 bytes=224"
+   "note": "200 bytes=212"
   },
   {
    "name": "keys /api/tray",
@@ -266,12 +273,12 @@
   {
    "name": "GET /api/reap",
    "ok": true,
-   "note": "200 bytes=169"
+   "note": "200 bytes=508"
   },
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=12075"
+   "note": "200 bytes=3499"
   },
   {
    "name": "GET /api/live",
@@ -286,17 +293,17 @@
   {
    "name": "GET /api/groups",
    "ok": true,
-   "note": "200 bytes=473"
+   "note": "200 bytes=738"
   },
   {
    "name": "GET /api/mechanisms",
    "ok": true,
-   "note": "200 bytes=24925"
+   "note": "200 bytes=29043"
   },
   {
    "name": "GET /api/role-profiles",
    "ok": true,
-   "note": "200 bytes=48021"
+   "note": "200 bytes=52869"
   },
   {
    "name": "GET /api/role-profiles-biz",
@@ -311,7 +318,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=5605"
+   "note": "200 bytes=5242"
   },
   {
    "name": "keys /api/bi",
@@ -321,12 +328,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=42503"
+   "note": "200 bytes=43134"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=40208"
+   "note": "200 bytes=45357"
   },
   {
    "name": "keys /api/usage",
@@ -341,7 +348,7 @@
   {
    "name": "GET /api/sessions",
    "ok": true,
-   "note": "200 bytes=58805"
+   "note": "200 bytes=59621"
   },
   {
    "name": "keys /api/sessions",
@@ -351,7 +358,7 @@
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=6543"
+   "note": "200 bytes=4607"
   },
   {
    "name": "keys /api/ctx",
@@ -361,12 +368,12 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=6880"
+   "note": "200 bytes=4841"
   },
   {
    "name": "GET /api/waitreg",
    "ok": true,
-   "note": "200 bytes=4196"
+   "note": "200 bytes=4516"
   },
   {
    "name": "keys /api/waitreg",
@@ -376,12 +383,12 @@
   {
    "name": "GET /api/prompts",
    "ok": true,
-   "note": "200 bytes=100436"
+   "note": "200 bytes=103619"
   },
   {
    "name": "GET /api/archive",
    "ok": true,
-   "note": "200 bytes=55586"
+   "note": "200 bytes=56416"
   },
   {
    "name": "keys /api/archive",
@@ -396,7 +403,7 @@
   {
    "name": "GET /api/guide",
    "ok": true,
-   "note": "200 bytes=22154"
+   "note": "200 bytes=23296"
   },
   {
    "name": "keys /api/guide",
@@ -406,27 +413,32 @@
   {
    "name": "GET /api/user-absence",
    "ok": true,
-   "note": "200 bytes=2363"
+   "note": "200 bytes=409"
+  },
+  {
+   "name": "GET /api/agent-profile",
+   "ok": true,
+   "note": "200 bytes=8432"
   },
   {
    "name": "GET /api/storage",
    "ok": true,
-   "note": "200 bytes=3338"
+   "note": "200 bytes=2967"
   },
   {
    "name": "GET /api/lifecycle",
    "ok": true,
-   "note": "200 bytes=19980"
+   "note": "200 bytes=20275"
   },
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=27232"
+   "note": "200 bytes=30802"
   },
   {
    "name": "GET /api/fleet-state",
    "ok": true,
-   "note": "200 bytes=369"
+   "note": "200 bytes=466"
   },
   {
    "name": "keys /api/fleet-state",
@@ -521,7 +533,7 @@
   {
    "name": "sessions-role-4state",
    "ok": true,
-   "note": "n=146 legal=True no_fake=True honest=True"
+   "note": "n=148 legal=True no_fake=True honest=True"
   },
   {
    "name": "SSE-connect",
@@ -529,6 +541,6 @@
    "note": "202 bytes"
   }
  ],
- "test_count": 92,
- "pass": 92
+ "test_count": 94,
+ "pass": 94
 }

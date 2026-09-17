@@ -3008,3 +3008,31 @@ def build_user_absence():
         return {"ok": False, "error": "解析失败: %s" % e}
     d["ok"] = True
     return d
+
+
+_agentprofile_cache = {}   # days -> (ts, result);12s TTL(MasterAgent 令·同其他面板缓存模式·避子进程/重算)
+
+
+def build_agent_profile(days=30):
+    """per-agent 数据画像(L3·2026-09-17 MasterUI 接·中性非KPI·Master数分红线)——直调 MasterAgent 纯函数
+    bus.agent_data.build_profile(days)(零 print·非 subprocess)·12s TTL 缓存(按 days 键)。
+    契约:{as_of,window_days,note,unattributed_usage,agents:[{role,维度4_产出,维度2_纪律}]}+ok。
+    中性呈现由前端保证(稳定序/无褒贬/无阈值/缺数据显'无数据');本层只取数不评判。"""
+    try:
+        days = int(days)
+    except Exception:
+        days = 30
+    if days not in (7, 30, 90):
+        days = 30
+    now = time.time()
+    hit = _agentprofile_cache.get(days)
+    if hit and (now - hit[0] < 12):
+        return hit[1]
+    try:
+        from bus.agent_data import build_profile
+        d = build_profile(days=days)
+        d["ok"] = True
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    _agentprofile_cache[days] = (now, d)
+    return d

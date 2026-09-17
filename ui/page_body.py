@@ -27,6 +27,7 @@ BODY = r"""<header>
 <nav class="tabbar" id="tabbar">
   <button class="tab" data-t="fleet">🛰 舰队/运维</button>
   <button class="tab" data-t="guide">📖 操作说明</button>
+  <button class="tab" data-t="agentprofile">📇 数据画像</button>
   <button class="tab" data-t="bi">📊 运营/资源</button>
   <button class="tab" data-t="usage">📈 历史用量</button>
   <button class="tab" data-t="caps">🧬 能力池</button>
@@ -228,6 +229,21 @@ BODY = r"""<header>
     <div class="guide-wrap">
       <aside class="guide-toc" id="guideToc"><div class="muted">加载目录…</div></aside>
       <article class="guide-body" id="guideBody"><div class="muted">加载操作说明…</div></article>
+    </div>
+  </section>
+
+  <!-- 📇 per-agent 数据画像(L3·中性自我发现工具·非KPI/非排名·Master数分红线)。单agent drill-in·无并排横比grid -->
+  <section data-tab="agentprofile">
+    <div class="sec-h">📇 数据画像 <span class="sub"><b>🔍 自我发现工具 · 非考核/排名</b> · per-agent 硬指标只读旁路 · 数据源 <span class="mono">agent-profile</span></span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="filt">窗口 <select id="apDays"><option value="7">近7天</option><option value="30" selected>近30天</option><option value="90">近90天</option></select></span>
+      <span id="apMeta" class="muted" style="font-size:11.5px"></span>
+      <button class="btn ghost mini" id="apRefresh">刷新</button>
+    </div>
+    <div class="ap-framing" id="apFraming"></div>
+    <div class="ap-wrap">
+      <aside class="ap-list" id="apList"><div class="muted">加载…</div></aside>
+      <article class="ap-card" id="apCard"><div class="muted" style="padding:22px">← 选一个角色看它的画像(单卡自省 · 非横向对比)</div></article>
     </div>
   </section>
 
