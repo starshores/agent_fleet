@@ -185,6 +185,18 @@ def teardown():
                 os.remove(cand)
         except Exception:
             pass
+    # 待办池防御清:__smoke__ 名下 ask-user 残留(2026-09-17 用户撞见"smoke q"垃圾待办=原用例
+    # 经已注册的 SMOKE_ROLE 真投了池;用例已改真非成员,此处兜底防回归)
+    tp = os.path.join(BUS_DIR, "todos.json")
+    try:
+        with open(tp, encoding="utf-8") as f:
+            todos = json.load(f)
+        keep = [x for x in todos if "__smoke" not in ((x.get("source") or "") + (x.get("title") or ""))]
+        if len(keep) != len(todos):
+            with open(tp, "w", encoding="utf-8", newline="") as f:
+                json.dump(keep, f, ensure_ascii=False, indent=1)
+    except Exception:
+        pass
     # 探针用例残留:_probes/instances/ 里派给测试角色的 instance(probe.dispatch.visible 产生)
     inst_dir = os.path.join(BUS_DIR, "_probes", "instances")
     if os.path.isdir(inst_dir):
@@ -252,7 +264,10 @@ def build_tests():
     # ---- 只读:hello 预览(不带 --role=无副作用)----
     T.append(("hello.preview", ["hello", "--preview"], chk_no_tb, "onboarding 预览(只读无副作用)"))
     # ---- 边界:ask-user 非成员应被拒(捕获拒绝行为)----
-    T.append(("ask-user.reject", ["ask-user", "--from", SMOKE_ROLE, "--title", "smoke q", "--detail", "x"], chk_no_tb, "非成员 ask-user 应硬拒(不崩)"))
+    # ★用 __smokeq__(故意不 register=真非成员)而非 SMOKE_ROLE:setup 已 register SMOKE_ROLE=成员
+    # → 原用例 ask-user 真投进用户待办池=每跑 smoke 污染一条"smoke q"垃圾(用户 2026-09-17 在 WebUI
+    # 撞见发问)。真非成员才走硬拒路径=用例意图恢复+零污染;teardown 另有 todos 防御清兜底。
+    T.append(("ask-user.reject", ["ask-user", "--from", "__smokeq__", "--title", "smoke q", "--detail", "x"], chk_contains("拒", "非 bus 成员", "硬拒"), "非成员 ask-user 应硬拒(真非成员·不入待办池)"))
     # ---- 边界:answer 不存在的 todo 应优雅兜底 ----
     T.append(("answer.notfound", ["answer", "--todo", "__nonexist__", "--reply", "x", "--from", "用户"], chk_no_tb, "答不存在 todo 优雅兜底"))
     # ---- 质检仪器波机制(v2.8/v2.9·2026-09-16 收编)----
