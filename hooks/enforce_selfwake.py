@@ -47,9 +47,10 @@ def _resolve_role(sid):
 #   armed = wait.reg.json present + status==listening + wait_pid 活;
 #   兜底 = wait_trace.json exit==null 且 pid 活(reg/trace 瞬时不同步时防误拦);
 #   grace = trace.exited 距今 <FIRE_GRACE 秒(wait 刚 fire 退出·harness 唤醒窗口内)→放行。
-# 灰度(L级B 前置·Master数分条件1):白名单二段灰度 ①MasterAgent(安全先行)→②+Master数分(代表性最难
-# case·42次/3月最高·rapid churn=误拦风险最高处)→③全员(白名单置 None)。
-GRAY_ROLES = {"MasterAgent"}      # 灰度①·L级B 验收(误拦率<5%/掉线趋0/无连环block)过→加 Master数分→None
+# 灰度(L级B 前置·Master数分条件1):白名单增量灰度 ①MasterAgent(安全先行)→②+Master(Master数分 APPROVE
+# 2026-09-17 b01e26:40/42掉线=忘重挂型·user-facing=代表性case;误拦率>5%或连环block→摘回)
+# →③+Master数分(42次/3月最高·rapid churn)→④全员(白名单置 None)。一次只加一个 busy role=可归因。
+GRAY_ROLES = {"MasterAgent", "Master"}  # 灰度②·L级B 验收(误拦率<5%/掉线趋0/无连环block)MasterAgent+Master两段合验
 FIRE_GRACE = 15                    # 秒:wait 刚 fire 退出的唤醒窗口·放行防竞态误拦
 
 
