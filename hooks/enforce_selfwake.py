@@ -140,6 +140,11 @@ def main():
     if GRAY_ROLES is not None and role not in GRAY_ROLES:
         return  # 灰度白名单外·放行(二段灰度=Master数分 L级B 条件1)
     armed, state = _armed_state(role)
+    if not armed:
+        # ★宽限重查(灰度首日误拦实证 2026-09-17 09:51:22:agent 回合末刚 run_in_background 挂 wait·
+        # bash壳→python→写reg 需 ~1-2s·hook 查早了=启动窗口竞态残余)。sleep 2s 二查·仍 absent 才 block。
+        time.sleep(2.0)
+        armed, state = _armed_state(role)
     if armed:
         return  # 已 armed(注册表判据)
     if _recently_blocked(role):
