@@ -6,7 +6,7 @@ bus_tray.py —— agent bus 运转状态 · Windows 系统托盘指示器
     🔴 红 = 有掉线 agent(最优先) / 🟣 紫 = 有待办待拍板(次优先) / 🟢 绿 = 有 agent 在跑 / 🔵 蓝 = 在岗全 idle / 🟠 橙 = 静默异常 / 🔴 红 = 全部离线 / 🩶 灰蓝 = 维修模式(安静态·不抢红/紫) / ⚪ 灰 = 探测失败
   掉线口径(Master数分定·用户修正 2026-08-21)= self_wake=='stale' AND turn.state=='idle'(在场但断连+空闲·排除正在忙的agent);不含 dead。
   待办数 = todos.json【待办】态条数(需用户处理·排除进行中/完成)。维修期图标回落显在跑数·配灰蓝。
-- 悬停 tooltip 看健康:🔧维修中(维修期) · ⚠掉线X:名1、名2…(列掉线名·超3截断+…+K防127溢出) · 📋待办X · 在岗N · 在跑M · 静默K · 休眠P · 更新时间
+- 悬停 tooltip 看健康:🔧维修中(维修期) · ⚠掉线X:名1、名2…(列掉线名·超3截断+…+K) · 📋待办X · 在岗N · ▶在跑M:名1、名2…(列在跑名·2026-09-18 用户令·和掉线一样) · 静默K · 休眠P · 更新时间;整条防 128 wchar 溢出截尾
 - 双击 = 打开本机控制台 WebUI;右键 = 刷新 / 打开控制台 / 退出
 纯本机运行(只跑本机 agentbus.py who --json + 打开 127.0.0.1 控制台),不联网、不外发任何数据。
 数据口径由 Master数分(bus 监控)定义;数据源 = agentbus.py who --json。
@@ -79,7 +79,8 @@ def _probe_webui():
         return (int(d.get("present", 0)), int(d.get("running", 0)),
                 int(d.get("silent", 0)), int(d.get("parked", 0)), int(d.get("stale", 0)),
                 int(d.get("offline", 0)), bool(d.get("maint")),
-                list(d.get("offline_roles") or []), int(d.get("todos", 0)))
+                list(d.get("offline_roles") or []), int(d.get("todos", 0)),
+                list(d.get("running_roles") or []))   # 在跑名单(2026-09-18 用户令·端点无此字段时退计数)
     except Exception:
         return None
 
@@ -169,7 +170,7 @@ def _probe_local():
             todos = sum(1 for t in json.load(fh) if isinstance(t, dict) and t.get("status") == "待办")
     except Exception:
         todos = 0
-    return (n, len(running), k, p, stale, offline, maint, offline_roles, todos)
+    return (n, len(running), k, p, stale, offline, maint, offline_roles, todos, sorted(running))
 
 
 def _probe():
@@ -243,9 +244,10 @@ def _update_tray(n, tip, color):
             pass
 
 
-def _fmt_offline_names(roles, cap=3):
-    """列掉线 agent 名·超 cap 个则前 cap 名 + "…+K"(防 Windows tooltip 127 字符硬限被长名单挤爆·
-    别让在岗/在跑等关键计数溢出丢失·用户令 2026-08-21)。返回 ":名1、名2" 或 "" (无掉线)。"""
+def _fmt_names(roles, cap=3):
+    """列 agent 名·超 cap 个则前 cap 名 + "…+K"(防 Windows tooltip 128 wchar 硬限被长名单挤爆·
+    别让在岗/在跑等关键计数溢出丢失·用户令 2026-08-21;2026-09-18 通用化=掉线/在跑名单共用)。
+    返回 ":名1、名2" 或 "" (空列表)。"""
     if not roles:
         return ""
     if len(roles) <= cap:
@@ -253,13 +255,15 @@ def _fmt_offline_names(roles, cap=3):
     return ":" + "、".join(roles[:cap]) + "…+%d" % (len(roles) - cap)
 
 
-def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos=0):
+def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos=0, running_roles=None):
     """算托盘图标数字 + tooltip。图标数字【优先级·最急者赢】(用户令·2026-08-14/08-21):
     掉线数>0 → 显【掉线数】(救agent最急·红);否则 待办>0 → 显【待办数】(要用户拍板·紫);否则 显【在跑数 m】。
     维修模式(Master数分 caveat):stale=预期态 → 图标【回落显在跑数】(不被预期离线惊扰)+ 冠「🔧维修中」+ 掉线标(预期);
-    配色由 _pick_color 定(维修灰蓝/掉线红/待办紫/…)。tooltip 恒列全轴:掉线>0 提「⚠掉线X:名单」(超3截断+…+K
-    防 127 硬限)、待办>0 列「📋待办X」;维修期不列掉线名(预期离线名单吵)。返回 (图标数字, tooltip 串)。"""
-    names = _fmt_offline_names(offline_roles or [])
+    配色由 _pick_color 定(维修灰蓝/掉线红/待办紫/…)。tooltip 恒列全轴:掉线>0 提「⚠掉线X:名单」、
+    在跑>0 列「▶在跑M:名单」(用户令 2026-09-18·和掉线一样列名;掉线名优先=cap3,在跑名 cap 随空间 2)、
+    待办>0 列「📋待办X」;维修期不列掉线名(预期离线名单吵)。末段整体防 128 wchar 溢出截断。返回 (图标数字, tooltip 串)。"""
+    names = _fmt_names(offline_roles or [])
+    run_names = _fmt_names(running_roles or [], cap=(2 if offline_roles else 3))   # 掉线占位时在跑名收敛防溢出
     todo_seg = ("📋待办%d · " % todos) if todos else ""
     if maint:
         num = m                                        # 维修期:回落显在跑数,预期离线不占图标
@@ -270,9 +274,12 @@ def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos
         pre = ""
         off = ("⚠掉线%d%s · " % (offline, names)) if offline else ""
     state = "运转中" if n else "全部离线"
-    tip = "bus %s%s · %s%s在岗%d · 在跑%d · 静默%d · 休眠%d%s · %s" % (
-        pre, state, off, todo_seg, n, m, k, p, (" · 卡claim%d" % stale) if stale else "",
+    run_seg = ("▶在跑%d%s" % (m, run_names)) if m else "在跑0"
+    tip = "bus %s%s · %s%s在岗%d · %s · 静默%d · 休眠%d%s · %s" % (
+        pre, state, off, todo_seg, n, run_seg, k, p, (" · 卡claim%d" % stale) if stale else "",
         time.strftime("%H:%M:%S"))
+    if len(tip) > 126:                                  # NOTIFYICONDATA szTip 128 wchar 硬限·超则截尾
+        tip = tip[:125] + "…"
     return num, tip
 
 
@@ -283,8 +290,8 @@ def _poll_loop():
             tip = "bus 探测失败(agentbus who 无响应)"
             _update_tray("?", tip, "err")
         else:
-            n, m, k, p, stale, offline, maint, offline_roles, todos = r
-            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos)
+            n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles = r
+            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles)
             _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
         time.sleep(POLL_SEC)
 
@@ -327,8 +334,8 @@ def _refresh_once():
     if r is None:
         _update_tray("?", "bus 探测失败", "err")
     else:
-        n, m, k, p, stale, offline, maint, offline_roles, todos = r
-        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos)
+        n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles = r
+        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles)
         _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
 
 
