@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 111,
+  "total": 113,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -145,7 +145,7 @@
     },
     {
      "name": "selfwake 自醒检测",
-     "does": "列全队事件自醒状态",
+     "does": "列全队事件自醒状态;busy 交叉 turn_state(tool/thinking·ts<15min→recent'turn活跃干活中'非stale=干活期不挂wait正常态·防误导协调位拉活·2026-09-17)",
      "carrier": "cmd_selfwake()",
      "status": "在用"
     },
@@ -199,7 +199,7 @@
     },
     {
      "name": "enforce_selfwake.py Stop-hook(C′自醒硬拦)",
-     "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events",
+     "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events;灰度段2=+Master(Master数分APPROVE b01e26·2026-09-17);已知覆盖盲区=fire后harness唤醒丢失型(无turn=hook零机会·守卫7min兜底)",
      "carrier": "hooks/enforce_selfwake.py+settings Stop",
      "status": "灰度①·2026-09-16(用户批案+Master数分L级A签·治82%忘重挂·351次/3月数据驱动)"
     }
@@ -342,6 +342,12 @@
      "does": "人工显式批清纯回执(kind==notice且notice_of=硬签名·带新内容零触碰·--dry)·治每send一回执要人工done的搬运;档B grace自动代谢待坐实",
      "carrier": "bus/core.py cmd_ack_notices",
      "status": "在用·2026-09-16(Master数分判据两档增量绞杀)"
+    },
+    {
+     "name": "ab agent-profile per-agent 数据画像(L1-L3)",
+     "does": "usage.db⋈sid→role账本+events+archive → per-agent 卡(维度2纪律/维度4产出·硬指标·中性非KPI);无归属三分桶 _non_bus(项目域∉bus域集·排主视图)/_adhoc(ephemeral dispatch代号)/_unattributed(模糊留缺);L4消费闭环=画像→异常→深查→迭代候选(首轮2026-09-17跑通=Master数分认证样板)",
+     "carrier": "bus/agent_data.py build_profile()+cmd_agent_profile;WebUI 📇tab",
+     "status": "在用"
     }
    ]
   },
@@ -691,6 +697,12 @@
      "name": "webui-guard 重复WebUI守卫",
      "does": "清没占端口的陈旧server.py实例",
      "carrier": "cmd_webui_guard()",
+     "status": "在用"
+    },
+    {
+     "name": "session_role_map sid→role 归属账本",
+     "does": "append-only 权威归属(hello/心跳落账·2026-08-03Master数分);daemon/dispatch claude -p 子会话由调用方拿 meta.session_id 落账(2026-09-17补·此前结构性漏记);ephemeral 代号标 src=dispatch-adhoc;历史回填带 src=backfill 审计标记",
+     "carrier": "bus/presence.py record_session_role;worker_daemon/dispatch_agent 落账点",
      "status": "在用"
     }
    ]
