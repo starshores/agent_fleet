@@ -392,6 +392,10 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
                                 "host_claude_pid": mine_host, "host_session_id": mine_sid,
                                 "started": _now(), "timeout": timeout, "last_heartbeat": _now(),
                                 "status": "listening", "generation": _gen})
+        # rearm 事件(Master数分 instrument 需求 2026-09-18 回8a590b):重挂留痕 → 掉线可自动三分型
+        # (fire→rearm?→action?):①fire后无rearm=忘重挂(C′治)②误拦③有rearm无turn=唤醒丢失(守卫兜底)。
+        # reg 是覆盖写不留史,events append-only 才可回溯;82% 忘重挂 overcounts 的根治=这条前向数据。
+        _audit("rearm", role=role, wait_pid=os.getpid())
     except Exception:
         pass
     # 掉线尸检 trace(2026-07-28 会话可靠性立项):进场记 start,干净退场补 exit;

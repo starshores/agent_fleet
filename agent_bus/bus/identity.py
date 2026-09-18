@@ -414,7 +414,10 @@ def _wait_autopsy(role):
     """掉线尸检分类(2026-07-28 会话可靠性立项):读 <role>/wait_trace.json(_serve_wait 进场记 start、
     干净退场补 exit)把"掉了"升级为"怎么掉的"——根因分布从此有数据,不再靠猜:
     · exit=None       → wait 进程【异常死亡】(被杀/机器休眠丢/宿主壳回收)= 环境问题,非纪律
-    · exit=idle/task  → wait 正常退出后【没重挂】= 纪律缺口(fire→重挂三步没走完)
+    · exit 正常+退出后有 turn 动作 → ①忘重挂型(有机会没挂=真纪律缺口·C′ 治)
+    · exit 正常+退出后【零 turn 动作】→ ③疑唤醒丢失型(fire 后 harness 未唤醒=无 turn 无机会挂·
+      非纪律·守卫兜底)——三分型 2026-09-18 Master数分 R1 口径(此前两型同文案'未重挂=纪律缺口'致
+      82% 忘重挂 overcounts·冤枉了唤醒丢失的 agent)
     · 无 trace        → 旧版 wait 或从未挂过(观察期)"""
     try:
         t = json.loads((BUS / role / "wait_trace.json").read_text(encoding="utf-8"))
@@ -422,7 +425,39 @@ def _wait_autopsy(role):
         return "无 trace(旧版 wait/从未挂过)"
     if t.get("exit") is None:
         return "wait 进程异常死亡(start=%s 无 exit·被杀/休眠丢/壳回收=环境因)" % (t.get("started") or "?")[:19]
-    return "上次 %s 正常退出(%s)后未重挂=纪律缺口" % (t.get("exit"), (t.get("exited") or "?")[:19])
+    exited = (t.get("exited") or "")[:19]
+    if exited and not _role_turn_action_after(role, exited):
+        return ("上次 %s 正常退出(%s)后【零turn动作】=疑唤醒丢失型(harness未唤醒·无机会重挂·"
+                "非纪律缺口·守卫兜底层)" % (t.get("exit"), exited))
+    return "上次 %s 正常退出(%s)后未重挂=纪律缺口(忘重挂型·退出后有turn活动)" % (t.get("exit"), exited or "?")
+
+
+def _role_turn_action_after(role, since_ts, tail_bytes=524288):
+    """exit 时刻后本 role 有无 turn 代理动作(done/send/rearm=只在 agent 自己 turn 里发生;claim 不算=
+    可能是 wait 进程 _try_claim 所为非 turn)。只读 events.jsonl 尾部 512KB(掉线窗口分钟级·够覆盖)。
+    读失败返 True(fail-conservative:宁按忘重挂催纪律,不假报唤醒丢失)。"""
+    try:
+        p = BUS / "events.jsonl"
+        with open(p, "rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - tail_bytes))
+            tail = fh.read().decode("utf-8", "replace")
+        for ln in tail.split("\n"):
+            if role not in ln:
+                continue
+            try:
+                e = json.loads(ln)
+            except Exception:
+                continue
+            if (e.get("ts") or "") <= since_ts:
+                continue
+            if e.get("event") in ("done", "rearm") and e.get("role") == role:
+                return True
+            if e.get("event") == "send" and (e.get("frm") or e.get("from")) == role:
+                return True
+        return False
+    except Exception:
+        return True
 
 
 def cmd_selfwake_exempt(args):
