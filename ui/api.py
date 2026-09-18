@@ -264,6 +264,7 @@ def bus_tray_counts():
     except Exception:
         todos = 0                        # 待办球只数【待办】态(需用户处理)·排除【进行中】(已有人在做)+【完成】(用户令 2026-08-21)
     return {"ok": True, "loading": loading, "present": n, "running": len(running),
+            "running_roles": sorted(running),   # 在跑 agent 名字列表(托盘 tooltip 列名·用户令 2026-09-18·同 offline_roles 样板·口径=processing非notice+claim新鲜+owner在岗)
             "silent": k, "parked": p, "stale": stale,
             "offline": len(offline_roles), "offline_roles": offline_roles,   # 计数 + 掉线 agent 名字列表(tooltip 列名·用户令 2026-08-21)
             "todos": todos,                                   # 未完成待办数(托盘紫球·用户令 2026-08-21)

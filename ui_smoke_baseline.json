@@ -243,7 +243,7 @@
   {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=477705"
+   "note": "200 bytes=464284"
   },
   {
    "name": "keys /api/state",
@@ -263,7 +263,7 @@
   {
    "name": "GET /api/tray",
    "ok": true,
-   "note": "200 bytes=212"
+   "note": "200 bytes=257"
   },
   {
    "name": "keys /api/tray",
@@ -273,12 +273,12 @@
   {
    "name": "GET /api/reap",
    "ok": true,
-   "note": "200 bytes=508"
+   "note": "200 bytes=175"
   },
   {
    "name": "GET /api/todos",
    "ok": true,
-   "note": "200 bytes=3499"
+   "note": "200 bytes=25"
   },
   {
    "name": "GET /api/live",
@@ -298,7 +298,7 @@
   {
    "name": "GET /api/mechanisms",
    "ok": true,
-   "note": "200 bytes=29043"
+   "note": "200 bytes=30279"
   },
   {
    "name": "GET /api/role-profiles",
@@ -318,7 +318,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=5242"
+   "note": "200 bytes=4956"
   },
   {
    "name": "keys /api/bi",
@@ -328,12 +328,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=43134"
+   "note": "200 bytes=43071"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=45357"
+   "note": "200 bytes=45598"
   },
   {
    "name": "keys /api/usage",
@@ -348,7 +348,7 @@
   {
    "name": "GET /api/sessions",
    "ok": true,
-   "note": "200 bytes=59621"
+   "note": "200 bytes=59667"
   },
   {
    "name": "keys /api/sessions",
@@ -358,7 +358,7 @@
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=4607"
+   "note": "200 bytes=5556"
   },
   {
    "name": "keys /api/ctx",
@@ -368,12 +368,12 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=4841"
+   "note": "200 bytes=5836"
   },
   {
    "name": "GET /api/waitreg",
    "ok": true,
-   "note": "200 bytes=4516"
+   "note": "200 bytes=5359"
   },
   {
    "name": "keys /api/waitreg",
@@ -403,7 +403,7 @@
   {
    "name": "GET /api/guide",
    "ok": true,
-   "note": "200 bytes=23296"
+   "note": "200 bytes=23788"
   },
   {
    "name": "keys /api/guide",
@@ -413,17 +413,17 @@
   {
    "name": "GET /api/user-absence",
    "ok": true,
-   "note": "200 bytes=409"
+   "note": "200 bytes=215"
   },
   {
    "name": "GET /api/agent-profile",
    "ok": true,
-   "note": "200 bytes=8432"
+   "note": "200 bytes=8313"
   },
   {
    "name": "GET /api/storage",
    "ok": true,
-   "note": "200 bytes=2967"
+   "note": "200 bytes=3074"
   },
   {
    "name": "GET /api/lifecycle",
@@ -433,12 +433,12 @@
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=30802"
+   "note": "200 bytes=31406"
   },
   {
    "name": "GET /api/fleet-state",
    "ok": true,
-   "note": "200 bytes=466"
+   "note": "200 bytes=360"
   },
   {
    "name": "keys /api/fleet-state",
