@@ -205,7 +205,7 @@ def bus_tray_counts():
     fl = compute_fleet_cached()
     roles = fl.get("roles", []) or []
     loading = bool(fl.get("loading"))
-    alive_names, n, k, p, offline_roles = set(), 0, 0, 0, []
+    alive_names, n, k, p, offline_roles, silent_roles = set(), 0, 0, 0, [], []
     for r in roles:
         vc = r.get("vclass")
         if r.get("pseudo"):
@@ -230,6 +230,7 @@ def bus_tray_counts():
             alive_names.add(r.get("role"))
             if "静默" in (r.get("verdict") or ""):
                 k += 1
+                silent_roles.append(r.get("role"))   # 名字列表(托盘tooltip列名·MasterAgent令2026-09-21·同offline_roles/running_roles样板·口径=verdict含静默)
     now = time.time()
     running, stale = set(), 0
     for d in glob.glob(str(BUS / "*")):
@@ -265,7 +266,7 @@ def bus_tray_counts():
         todos = 0                        # 待办球只数【待办】态(需用户处理)·排除【进行中】(已有人在做)+【完成】(用户令 2026-08-21)
     return {"ok": True, "loading": loading, "present": n, "running": len(running),
             "running_roles": sorted(running),   # 在跑 agent 名字列表(托盘 tooltip 列名·用户令 2026-09-18·同 offline_roles 样板·口径=processing非notice+claim新鲜+owner在岗)
-            "silent": k, "parked": p, "stale": stale,
+            "silent": k, "silent_roles": silent_roles, "parked": p, "stale": stale,
             "offline": len(offline_roles), "offline_roles": offline_roles,   # 计数 + 掉线 agent 名字列表(tooltip 列名·用户令 2026-08-21)
             "todos": todos,                                   # 未完成待办数(托盘紫球·用户令 2026-08-21)
             "maint": bool(get_maintenance().get("active")),   # 维修模式:托盘据此弱化掉线spike(Master数分 caveat·别让预期停机看着像故障)

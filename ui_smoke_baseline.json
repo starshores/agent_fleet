@@ -243,7 +243,7 @@
   {
    "name": "GET /api/state",
    "ok": true,
-   "note": "200 bytes=464284"
+   "note": "200 bytes=546835"
   },
   {
    "name": "keys /api/state",
@@ -263,7 +263,7 @@
   {
    "name": "GET /api/tray",
    "ok": true,
-   "note": "200 bytes=257"
+   "note": "200 bytes=276"
   },
   {
    "name": "keys /api/tray",
@@ -273,7 +273,7 @@
   {
    "name": "GET /api/reap",
    "ok": true,
-   "note": "200 bytes=175"
+   "note": "200 bytes=216"
   },
   {
    "name": "GET /api/todos",
@@ -318,7 +318,7 @@
   {
    "name": "GET /api/bi",
    "ok": true,
-   "note": "200 bytes=4956"
+   "note": "200 bytes=5121"
   },
   {
    "name": "keys /api/bi",
@@ -328,12 +328,12 @@
   {
    "name": "GET /api/caps",
    "ok": true,
-   "note": "200 bytes=43071"
+   "note": "200 bytes=43131"
   },
   {
    "name": "GET /api/usage",
    "ok": true,
-   "note": "200 bytes=45598"
+   "note": "200 bytes=46264"
   },
   {
    "name": "keys /api/usage",
@@ -348,7 +348,7 @@
   {
    "name": "GET /api/sessions",
    "ok": true,
-   "note": "200 bytes=59667"
+   "note": "200 bytes=58223"
   },
   {
    "name": "keys /api/sessions",
@@ -358,7 +358,7 @@
   {
    "name": "GET /api/ctx",
    "ok": true,
-   "note": "200 bytes=5556"
+   "note": "200 bytes=5221"
   },
   {
    "name": "keys /api/ctx",
@@ -368,12 +368,12 @@
   {
    "name": "GET /api/ctxpanel",
    "ok": true,
-   "note": "200 bytes=5836"
+   "note": "200 bytes=5482"
   },
   {
    "name": "GET /api/waitreg",
    "ok": true,
-   "note": "200 bytes=5359"
+   "note": "200 bytes=4494"
   },
   {
    "name": "keys /api/waitreg",
@@ -383,7 +383,7 @@
   {
    "name": "GET /api/prompts",
    "ok": true,
-   "note": "200 bytes=103619"
+   "note": "200 bytes=105021"
   },
   {
    "name": "GET /api/archive",
@@ -418,27 +418,27 @@
   {
    "name": "GET /api/agent-profile",
    "ok": true,
-   "note": "200 bytes=8313"
+   "note": "200 bytes=8318"
   },
   {
    "name": "GET /api/storage",
    "ok": true,
-   "note": "200 bytes=3074"
+   "note": "200 bytes=2859"
   },
   {
    "name": "GET /api/lifecycle",
    "ok": true,
-   "note": "200 bytes=20275"
+   "note": "200 bytes=20269"
   },
   {
    "name": "GET /api/fleet-log",
    "ok": true,
-   "note": "200 bytes=31406"
+   "note": "200 bytes=31570"
   },
   {
    "name": "GET /api/fleet-state",
    "ok": true,
-   "note": "200 bytes=360"
+   "note": "200 bytes=346"
   },
   {
    "name": "keys /api/fleet-state",
@@ -533,7 +533,7 @@
   {
    "name": "sessions-role-4state",
    "ok": true,
-   "note": "n=148 legal=True no_fake=True honest=True"
+   "note": "n=144 legal=True no_fake=True honest=True"
   },
   {
    "name": "SSE-connect",

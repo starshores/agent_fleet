@@ -102,6 +102,8 @@ def _vclass_of(rec):
     if rec.get("parked"):
         return "parked"
     v = rec.get("verdict") or ""
+    if "干活中" in v:
+        return "live"          # 🔧干活中(turn活跃·长任务心跳晚=正常·MasterAgent令2026-09-21)=忙碌/正常类非异常
     if "损坏" in v:
         return "dead"          # presence 损坏
     if v.startswith("未声明"):
