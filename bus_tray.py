@@ -80,7 +80,8 @@ def _probe_webui():
                 int(d.get("silent", 0)), int(d.get("parked", 0)), int(d.get("stale", 0)),
                 int(d.get("offline", 0)), bool(d.get("maint")),
                 list(d.get("offline_roles") or []), int(d.get("todos", 0)),
-                list(d.get("running_roles") or []))   # 在跑名单(2026-09-18 用户令·端点无此字段时退计数)
+                list(d.get("running_roles") or []),   # 在跑名单(2026-09-18 用户令·端点无此字段时退计数)
+                list(d.get("silent_roles") or []))    # 静默名单(2026-09-21 用户令·同上兼容)
     except Exception:
         return None
 
@@ -107,7 +108,8 @@ def _probe_local():
     present = [r for r in roles if real(r) and r.get("present") and r.get("alive")]
     alive_names = set(r["role"] for r in present)
     n = len(present)
-    k = sum(1 for r in present if "静默" in (r.get("verdict") or ""))
+    silent_roles = sorted(r["role"] for r in present if "静默" in (r.get("verdict") or ""))
+    k = len(silent_roles)   # 名字列表供 tooltip 列名(用户令 2026-09-21·同掉线/在跑),计数=列表长度同口径
     p = sum(1 for r in roles if real(r) and r.get("parked"))
     # 掉线口径(对齐 WebUI bus_tray_counts·Master数分 定稿·用户修正 2026-08-21):【双条件】self_wake=='stale'
     #  AND turn=='idle'(空闲待命 + wait 掉,两条件同时)。旧【单条件·只 stale】误报【正在忙的 agent】——
@@ -170,7 +172,7 @@ def _probe_local():
             todos = sum(1 for t in json.load(fh) if isinstance(t, dict) and t.get("status") == "待办")
     except Exception:
         todos = 0
-    return (n, len(running), k, p, stale, offline, maint, offline_roles, todos, sorted(running))
+    return (n, len(running), k, p, stale, offline, maint, offline_roles, todos, sorted(running), silent_roles)
 
 
 def _probe():
@@ -255,7 +257,8 @@ def _fmt_names(roles, cap=3):
     return ":" + "、".join(roles[:cap]) + "…+%d" % (len(roles) - cap)
 
 
-def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos=0, running_roles=None):
+def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos=0, running_roles=None,
+              silent_roles=None):
     """算托盘图标数字 + tooltip。图标数字【优先级·最急者赢】(用户令·2026-08-14/08-21):
     掉线数>0 → 显【掉线数】(救agent最急·红);否则 待办>0 → 显【待办数】(要用户拍板·紫);否则 显【在跑数 m】。
     维修模式(Master数分 caveat):stale=预期态 → 图标【回落显在跑数】(不被预期离线惊扰)+ 冠「🔧维修中」+ 掉线标(预期);
@@ -275,8 +278,10 @@ def _fmt_tray(n, m, k, p, stale, offline, maint=False, offline_roles=None, todos
         off = ("⚠掉线%d%s · " % (offline, names)) if offline else ""
     state = "运转中" if n else "全部离线"
     run_seg = ("▶在跑%d%s" % (m, run_names)) if m else "在跑0"
-    tip = "bus %s%s · %s%s在岗%d · %s · 静默%d · 休眠%d%s · %s" % (
-        pre, state, off, todo_seg, n, run_seg, k, p, (" · 卡claim%d" % stale) if stale else "",
+    sil_names = _fmt_names(silent_roles or [], cap=2)   # 静默列名(用户令 2026-09-21·通常0-1个·cap2防挤)
+    sil_seg = ("静默%d%s" % (k, sil_names)) if k else "静默0"
+    tip = "bus %s%s · %s%s在岗%d · %s · %s · 休眠%d%s · %s" % (
+        pre, state, off, todo_seg, n, run_seg, sil_seg, p, (" · 卡claim%d" % stale) if stale else "",
         time.strftime("%H:%M:%S"))
     if len(tip) > 126:                                  # NOTIFYICONDATA szTip 128 wchar 硬限·超则截尾
         tip = tip[:125] + "…"
@@ -290,8 +295,8 @@ def _poll_loop():
             tip = "bus 探测失败(agentbus who 无响应)"
             _update_tray("?", tip, "err")
         else:
-            n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles = r
-            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles)
+            n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles, silent_roles = r
+            num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles, silent_roles)
             _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
         time.sleep(POLL_SEC)
 
@@ -334,8 +339,8 @@ def _refresh_once():
     if r is None:
         _update_tray("?", "bus 探测失败", "err")
     else:
-        n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles = r
-        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles)
+        n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles, silent_roles = r
+        num, tip = _fmt_tray(n, m, k, p, stale, offline, maint, offline_roles, todos, running_roles, silent_roles)
         _update_tray(num, tip, _pick_color(n, m, k, stale, offline, maint, todos))
 
 

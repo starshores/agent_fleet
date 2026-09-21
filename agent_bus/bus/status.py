@@ -19,7 +19,7 @@ from bus.proc import _age_seconds, _alive_claude_pids
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
 from bus.edge import _edge_holder
-from bus.selfwake import _self_wake_state, _wait_proc_roles
+from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy
 
 
 def _who_data():
@@ -93,7 +93,14 @@ def _who_data():
         elif mode == "listening" and proc_alive and listen_fresh:
             rec["verdict"] = "✓ worker在听"
         elif mode == "listening" and proc_alive:
-            rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
+            # 交叉 turn_state(2026-09-21 用户令'数字记录有问题'):turn 活跃(tool/thinking·ts<15min)
+            # =在忙非静默(长任务期心跳晚是正常态·同 selfwake busy 修法);误记静默会虚报 tray 静默数
+            # (实证:培训师 turn=thinking 在做任务·被记'worker静默'→球上静默1=假)。
+            busy = _turn_busy(r)
+            if busy:
+                rec["verdict"] = "🔧 干活中(%s·长任务心跳晚=正常)" % busy
+            else:
+                rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
         elif proc_alive:
             rec["verdict"] = "已声明(hello),未起循环"
         else:
