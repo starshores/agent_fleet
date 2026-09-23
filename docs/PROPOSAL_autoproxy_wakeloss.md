@@ -16,6 +16,7 @@
 **动作**:`ab dispatch --name <role> --from bus守卫 --resume-session <presence.session_id> --timeout 3600 --title "[autoproxy] 代领 <role> 待办" --task "你是【<role>】的掉线代理:以 <role> 身份 `ab wait --role <role> --timeout 5` 领一条任务→处理→`ab done --role <role>`;只做一条即退;不重挂 wait;结果开头标 [autoproxy]"`。
 **身份与归属**:`--name <role>`=在册 role → 消耗账本归该 role(非 _adhoc);done 结果带 `[autoproxy]` 标记=派发方可识别"这是代理做的"。events 落 `autoproxy` 事件(role/sid/task_id)=可审计可回溯。
 **一次一条·一次性即退**:不是常驻执行体;做完退出,原会话随时可被人唤醒接管。
+**代理硬边界(Master 派发方要求·09-23)**:①只执行不决策——遇决策点/需 ask-user/有取舍一律原样回报不自拍;②禁 commit/push/写生产/改配置中心(requires_approval 之外再加的硬线);③起手先读该 role inbox 全部 + 最近 Master 纠偏消息再做(resume 拿到的是旧上下文·可能漏 bus 里后发的纠偏);④结果必带 `[autoproxy resume=<sid前8>]`;⑤原会话醒来须能看到代领记录(代理 done 后向该 role 自投一条 fyi「代领了 <task_id>」)。
 
 ## 2. 与 2026-08-27 daemon 回退教训的正面对照(核心价值闸的关键)
 
@@ -59,4 +60,12 @@ bus/identity.py `cmd_selfwake_guard`:③型判定后加 autoproxy 分支 → bus
 
 ## 8. 灰度计划
 
-段1 白名单 {示例组员4, Master数分}(③型最多·4/5 次周)→ 1 周 → Master数分按 §6 验 → 段2 +示例组员2 → 全员。
+段1 白名单 {示例组员4, Master数分, 业务侧}(前两者③型最多·4/5 次周;业务侧=纯只读核查·风险最低·Master 派活最多)→ 1 周 → Master数分按 §6 验 → 段2 +示例组员2 → 全员。**调度 agent 暂不纳入**(Master:其手上是跨集群/部署/门控类生产邻接操作 + PAUSED 待信号语义·代理误判'该开建'风险高)。
+
+## 9. 消费方意见并入(Master · 派发方 · 2026-09-23 ebc43c)
+
+支持方向。四个坑与对策:
+- (a) **双处理竞态**(原会话恰在代理期间醒来):claim 走 O_EXCL 单胜者=同任务不可能双领;代理已 claim 的在 processing·原会话 peek 看不到=天然不重做;补:代理起时写 `<role>/autoproxy.json`(含 task_id),原会话 hello/wait 起手若见此锁且代理活着 → stderr 提示「代理在领 X·勿重做」。
+- (b) **旧上下文漏纠偏**:硬边界③(起手先读 inbox 全部 + 最近 Master 纠偏)。
+- (c) **成本**:idle≥15min + 每 role 每小时 ≤1 + 仅有真任务才起(已在 §1/§5 E2)。
+- (d) **不得削弱可打断**:代理跑在 claude -p·bus 消息可达(dispatch prompt 含 send/request 能力);对方新消息进该 role inbox·代理做完当条即退不再领=自然让位;硬超时 1h。
