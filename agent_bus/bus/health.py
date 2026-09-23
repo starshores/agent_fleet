@@ -18,6 +18,7 @@ from bus.io import _audit, _write_json, json_lock, _fail
 from bus.proc import _age_seconds
 from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents, _policy
 from bus.edge import _edge_holder
+from bus.lock import holders as _lock_holders   # 分离 A4 双发
 from bus.presence import _owner_live
 from bus.selfwake import _is_parked, _self_wake_state, _wait_proc_roles
 
@@ -611,6 +612,7 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     # 6) edge-lock
     eh = _edge_holder()
     h["edge_lock"] = {"who": eh.get("who")} if eh else None
+    h["locks"] = [{"resource": lk.get("resource"), "who": lk.get("who"), "age_s": lk.get("age_s")} for lk in _lock_holders()]   # A4 双发(通用)
     # 7) 待办池停滞(防丢/回收提醒):停"待"态 > 阈值(默认24h)的项,按 状态+归属+停留时长
     st = _stale_todos(todo_stale_min)
     h["stale_todos"] = st

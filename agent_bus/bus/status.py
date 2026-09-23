@@ -19,6 +19,7 @@ from bus.proc import _age_seconds, _alive_claude_pids
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
 from bus.edge import _edge_holder
+from bus.lock import holders as _lock_holders   # 分离 A4 双发:通用 locks[](edge_lock 保留一版·MasterUI 切读方后摘)
 from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy
 
 
@@ -117,6 +118,7 @@ def _who_data():
         "alive_claude": sorted(alive) if psutil is not None else [],
         "claimed_pids": sorted(claimed), "tagged": tagged, "unclaimed_pids": unknown,
         "edge_lock": ({"who": h.get("who"), "age_s": _age_seconds(h.get("acquired_at", ""))} if h else None),
+        "locks": _lock_holders(),                     # A4 双发:[{resource, who, acquired_at, age_s}](含 edge)
     }
 
 
@@ -160,10 +162,9 @@ def cmd_who(args):
             len(d["alive_claude"]), len(d["claimed_pids"]), len(tagged), len(uc), uc if uc else ""))
     else:
         print("(psutil 不可用,无法核对进程;仅凭心跳)")
-    h = d.get("edge_lock")
-    if h:
-        a = h.get("age_s")
-        print("Edge 锁: %s 持有(%ss%s)" % (h.get("who"), a, "·疑似陈旧" if (a and a > 300) else ""))
+    for lk in (d.get("locks") or []):
+        a = lk.get("age_s")
+        print("%s 锁: %s 持有(%ss%s)" % ("Edge" if lk.get("resource") == "edge" else "资源 " + str(lk.get("resource")), lk.get("who"), a, "·疑似陈旧" if (a and a > 300) else ""))
 
 
 def cmd_list(args):
