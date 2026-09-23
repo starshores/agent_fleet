@@ -43,7 +43,7 @@
 - Master superseded 清单 → memory-history 归档(等其业务空闲)
 - 大协作主题(用户愿景·record-only·数据轮已 2 轮)
 - C′ 段3(示例组员2 / 示例组员4 数据最硬)
-- **role_profiles_biz.json 不存在** —— 平台纲领(bus-pluggable-business-platform)的业务角色注册表疑未落地;业务/基建分离度待核
+- ~~role_profiles_biz.json 不存在~~ **勘误(09-23 盘点)**:该表存在于 agent_fleet 根(14 业务角色·gitignore·7-29 分仓已落地),此前查错目录。真实分离缺口见 docs/SEPARATION_AUDIT_20260923.md(Edge/外部IM互斥整类烤进核心·agents/capabilities 业务成分进 bus git·UI/prompt 硬编业务路径)
 
 ## 六、方向建议(排序)
 
