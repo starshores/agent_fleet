@@ -187,6 +187,7 @@ function apRender(){
     +_apRow('claim','领取数',_apN(disc.claim))
     +_apRow('send','发送数',_apN(disc.send))
     +_apRow('掉线催单','guard 催重挂数(随活跃度)',_apN(disc['掉线催单']))
+    +_apRow('↳ ≤60min 自愈','催单后 60min 内有 done/重挂=延迟唤醒·误催',_apN(disc['掉线催单_≤60min自愈']))
     +_apRow('stop_hook_block','stop-hook 拦截数',_apN(disc.stop_hook_block))
     +_apRow('回执时延·中位','notice created→done 秒',_apN(disc['回执时延中位秒']))
     +_apRow('回执时延·P90','notice created→done 秒',_apN(disc['回执时延P90秒']))
