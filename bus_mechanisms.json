@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 113,
+  "total": 115,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -75,6 +75,18 @@
      "does": "用户答ask-user待办→自动路由回提问方+标完成",
      "carrier": "cmd_answer()",
      "status": "在用"
+    },
+    {
+     "name": "send 广播错峰 jitter(防惊群)",
+     "does": "同发送方30s内send≥3→本条随机延迟5-15s投递(实证:15目标同发→13会话同撞API 429→同步退避~28min·守卫全误催);--kind urgent/AGENTBUS_NO_JITTER免;阈值config",
+     "carrier": "bus/core.py _burst_jitter/_burst_count(_deliver前)",
+     "status": "在用"
+    },
+    {
+     "name": "回执代谢档B:fyi免回执 + 纯回执去抖合并领取",
+     "does": "L1 --kind fyi⇒no_receipt(--receipt显式要回执·fyi含索取语软警示);L2 wait最老可领为纯回执→开去抖窗续等·窗内任务零延迟fire·窗满一次领全部纯回执(首条+coalesced ids);notice_debounce_s/by_role(段1 MasterAgent=300);Master数分aef87e三闸全签·验收基线=notice-claim事件",
+     "carrier": "bus/core.py cmd_send/_wait_core/_notice_debounce_s;agent_bus/tests/scenario_noticeB_*.py",
+     "status": "在用(L2 灰度)"
     }
    ]
   },
@@ -151,7 +163,7 @@
     },
     {
      "name": "selfwake-guard 掉自醒报警",
-     "does": "周期扫掉自醒→投重挂提醒+toast(连2次降噪)",
+     "does": "周期扫掉自醒→投重挂提醒+toast(连2次降噪);两级窗(Master数分781e5d·2026-09-23):fire后<30min不催·近5min有turn不催·≥60min无turn加【真掉线】升级标;尸检③a真无turn/③b有turn无bus动作;阈值走config",
      "carrier": "cmd_selfwake_guard()",
      "status": "在用·2026-07-08"
     },
@@ -199,7 +211,7 @@
     },
     {
      "name": "enforce_selfwake.py Stop-hook(C′自醒硬拦)",
-     "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events;灰度段2=+Master(Master数分APPROVE b01e26·2026-09-17);已知覆盖盲区=fire后harness唤醒丢失型(无turn=hook零机会·守卫7min兜底)",
+     "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events;灰度段2=+Master(Master数分APPROVE b01e26·2026-09-17);已知覆盖盲区=fire后harness唤醒丢失型(无turn=hook零机会·守卫7min兜底);AGENTBUS_DISPATCH子会话豁免(f1d0a4e)",
      "carrier": "hooks/enforce_selfwake.py+settings Stop",
      "status": "灰度①·2026-09-16(用户批案+Master数分L级A签·治82%忘重挂·351次/3月数据驱动)"
     }
@@ -541,7 +553,7 @@
     },
     {
      "name": "claude_run run_streaming",
-     "does": "流式跑claude -p,过程写live.log,拿usage元数据",
+     "does": "流式跑claude -p,过程写live.log,拿usage元数据;resume必--fork-session+子进程摘CLAUDE_CODE_SESSION_ID+标AGENTBUS_DISPATCH(防presence劫持·Master数分708a33)",
      "carrier": "claude_run.py",
      "status": "在用·被daemon/dispatch复用"
     },
