@@ -298,7 +298,7 @@ def build_tests():
     T.append(("sepC.empty_biz", ["@py", os.path.join(_TESTS, "scenario_sepC_empty_biz.py")], chk_contains("ALL PASS"), "分离C 清除问:业务注册表空载→caps仅infra/角色页无业务/hook不抛/ab roster·who·caps渲染·恢复有载"))
     T.append(("lock.contention", ["@py", os.path.join(_TESTS, "scenario_lock_contention.py")], chk_contains("ALL PASS"), "分离A 并发gate:N=20争1恰1胜×3轮 + acquire/release 四态JSON键集"))
     T.append(("a2.prompt_lock_hint", ["@py", os.path.join(_TESTS, "scenario_a2_prompt_lock_hint.py")], chk_contains("ALL PASS"), "分离A2:用锁角色有载prompt含edge锁提示(全覆盖)/空载平台段零业务词/daemon·dispatch源码零业务词"))
-    T.append(("a3.external_tools", ["@py", os.path.join(_TESTS, "scenario_a3_external_tools.py")], chk_contains("ALL PASS"), "分离A3:旧路径桩转发/新位edge_lock经ab lock成功/桩不可import/空载业务工具清除桩exit2"))
+    T.append(("a3.external_tools", ["@py", os.path.join(_TESTS, "scenario_a3_external_tools.py")], chk_contains("ALL PASS"), "分离A3:平台目录零external工具(桩已删)/新位edge_lock经ab lock成功/新位四工具--help/业务工具缺失平台lock照常"))
     return T
 
 

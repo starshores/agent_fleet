@@ -1,7 +1,7 @@
 # 三闸提案 · 分离整改 A:Edge/外部 IM 互斥 → 通用共享资源互斥(+ 外部 IM 工具族外迁)
 
 > 提案方:MasterAgent · 2026-09-23 · 依 SELF_REDESIGN_CHARTER + SEPARATION_AUDIT_20260923 项 1(最重:业务专用协调机制烤进核心)。
-> 签字方:Master数分(三闸)· 消费方知会:**外部 IM**(external_*.py 调用方)/ MasterUI(health/status `edge_lock` 读方)/ 培训师(onboarding 文案 edge-acquire)/ Master(派活 prompt)。状态:**Master数分 b3282f 三闸签(A1/A2/A4 签·A3 条件签 K1/K2)→ 全部落地 2026-09-23**(A1 3d2f5d8 · A4 ddfc358 · A2 6067eae · A3 见 git log);桩待业务侧记忆改完(grep 旧路径=0)后删。
+> 签字方:Master数分(三闸)· 消费方知会:**外部 IM**(external_*.py 调用方)/ MasterUI(health/status `edge_lock` 读方)/ 培训师(onboarding 文案 edge-acquire)/ Master(派活 prompt)。状态:**Master数分 b3282f 三闸签(A1/A2/A4 签·A3 条件签 K1/K2)→ 全部落地 2026-09-23**(A1 3d2f5d8 · A4 ddfc358 · A2 6067eae · A3 见 git log);桩已同日删除(外部 IM 1b0542 改完 4 条记忆·MasterAgent grep 业务库=0·agent_fleet 非归档引用=0)。
 
 ## 0. 盘点补遗(审计漏项)
 审计项 1 只列了 `bus/edge.py` + 2 CLI + health/status + daemon/dispatch prompt 外部 IM 段。**漏了 `agent_bus/external_{common,canvas,msg,read,sheet_read}.py` 5 个外部 IM CDP 工具本体**(业务工具住在基建目录·随 agent_fleet git 演进)。归属问✗(外部 IM CDP 操作=业务对外能力·非协调机制);清除问✗(卸业务后 5 文件仍在核心);换域问✗(换域这 5 文件是死代码)。纳入本闸 A3。
@@ -44,3 +44,4 @@ a `ab lock` 并发 N=20 争 1 恰 1 胜(3 轮);b edge-* 别名 JSON byte-identic
 - A2 roster.shared_resources_prompt 按角色页注入;外部 IM/示例成员2(近 30 天 events 真用锁的全部角色)页已补 shared_resources(biz git);daemon desc 改读 agents_view(B1 前置);smoke a2 三段验收(有载全覆盖/空载平台段零业务词/源码零业务词)。
 - A3 external_{common,canvas,msg,read,sheet_read}.py → agent_fleet_data/biz_tools/external(自带 git);旧位 __main__ 转发桩(不可 import·空载 exit2 报未安装);external_common.edge_lock 改调 canonical agentbus `lock acquire --resource edge`(K2 与迁移同一原子步);K1 业务记忆 4 条旧路径清单已交外部 IM(620771);smoke a3。path_registry biz-tools 登记。
 - 审计漏项 A3 补遗已纳入;机制注册表类 7 改名「共享资源互斥(通用原语)」。
+- 桩删除(同日):外部 IM 改完业务记忆 4 条→MasterAgent grep 业务库旧路径=0·agent_fleet 内非归档引用=0(sync_code.ps1 遗留文件名列表=junction 守卫 no-op·不算引用)→ `git rm` 5 桩;smoke a3 改为『平台目录零 external 工具 + 新位 K2 + 清除问』。验收 f 满足。

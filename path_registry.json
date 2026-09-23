@@ -282,7 +282,7 @@
      "name": "业务工具族(自带 git)",
      "path": "C:\\apphome\\agent_fleet_data\\biz_tools",
      "kind": "dir",
-     "desc": "分离 A3(2026-09-23):external_{common,canvas,msg,read,sheet_read}.py 物理家;agent_bus/ 同名文件为 __main__ 转发桩(业务侧旧路径引用清零后删)。清除=删本目录·桩报『业务工具未安装』exit2·平台照跑。",
+     "desc": "分离 A3(2026-09-23):external_{common,canvas,msg,read,sheet_read}.py 物理家;agent_bus/ 旧位桩已于同日删除(业务侧记忆 4 条改完·grep 旧路径=0·外部 IM 1b0542 确认)。清除=删本目录·平台照跑(平台不引用)。",
      "owner": "外部 IM(工具)/Master(口径)"
     }
    ]
