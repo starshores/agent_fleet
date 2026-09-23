@@ -290,6 +290,8 @@ def build_tests():
     _TESTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_bus", "tests")
     T.append(("noticeB.scenario1", ["@py", os.path.join(_TESTS, "scenario_noticeB_1.py")], chk_contains("ALL PASS"), "档B①:fyi免回执/--receipt/索取语警示/缺省兼容/debounce=0/去抖合并3条"))
     T.append(("noticeB.scenario2", ["@py", os.path.join(_TESTS, "scenario_noticeB_2.py")], chk_contains("ALL PASS"), "档B②:窗内任务零延迟/回执留inbox/armed窗内守卫不误判"))
+    # 分离 C(Master数分 fdbd6d 建议固化):空载清除测试隔离版·AGENTBUS_BIZ_REGISTRY 指空临时目录=业务表全清等价态·不动 live 文件
+    T.append(("sepC.empty_biz", ["@py", os.path.join(_TESTS, "scenario_sepC_empty_biz.py")], chk_contains("ALL PASS"), "分离C 清除问:业务注册表空载→caps仅infra/角色页无业务/hook不抛/ab roster·who·caps渲染·恢复有载"))
     return T
 
 
