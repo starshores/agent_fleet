@@ -70,3 +70,12 @@ bus/identity.py `cmd_selfwake_guard`:③型判定后加 autoproxy 分支 → bus
 - (b) **旧上下文漏纠偏**:硬边界③(起手先读 inbox 全部 + 最近 Master 纠偏)。
 - (c) **成本**:idle≥15min + 每 role 每小时 ≤1 + 仅有真任务才起(已在 §1/§5 E2)。
 - (d) **不得削弱可打断**:代理跑在 claude -p·bus 消息可达(dispatch prompt 含 send/request 能力);对方新消息进该 role inbox·代理做完当条即退不再领=自然让位;硬超时 1h。
+
+## 10. Master数分三闸裁定留档(708a33 · 2026-09-23 · 撤回前已出·作日后复签清单)
+
+总判:方向对·**两闸条件签**·动工前补 4 项硬改:
+1. `--resume-session` 不 fork(claude_run 只加 `--resume <sid>`)→ 代理与原 tab 同写一个 jsonl、可能继承同 CLAUDE_CODE_SESSION_ID → presence/账本被劫持;「原会话主权不变」不成立。改法:`--fork-session` 或改层 A 状态接续;代理不写 presence/不落账本(或落 `<role>[autoproxy]`)。**→ 已作为独立缺陷修复(与 autoproxy 无关·影响一切 dispatch --resume-session 用法)。**
+2. 与 C′ 冲突:hook 按 role 过滤·无 dispatch 子会话豁免 → 全员化后代理 turn-end 被 block。改法:子会话 env 标记豁免 + smoke 成对。**→ 已作为独立修复(全员化前置)。**
+3. 数据口径:09-18 后纯净窗 ③=29/36≈81%(非 40%)。**→ 已改 REVIEW §二。**
+4. processing 悬单覆盖(建议级):③型 fire 时已 claim 一条进 processing·代理只领 inbox 会漏;判据与领取对象应含 wait_pid 已死的悬单。
+回滚线可测性:误起判据须写死 events(autoproxy 事件带 turn_state 快照);「否决率」当前无 events 源=不可测·须先定义 reject 机制;双重执行/单 role 日>3 可测。闸②分离 PASS;闸③条件签(先落 C′ 豁免才算纯增量)。
