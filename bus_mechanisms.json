@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 117,
+  "total": 118,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -511,9 +511,15 @@
   },
   {
    "id": 7,
-   "name": "Edge互斥与云文档协调",
+   "name": "共享资源互斥(通用原语)",
    "related_cap": "(基建层)",
    "mechanisms": [
+    {
+     "name": "通用共享资源互斥 ab lock",
+     "does": "任何域的独占资源同一原语:ab lock acquire/release/status --resource <name>;锁文件 BUS/locks/<name>.lock;O_EXCL 恰1胜(并发gate 20争1×3轮)·stale 回收(持锁进程死/超ttl rename 原子夺取)·watchdog 等释放;edge-acquire/release=--resource edge 别名(byte-identical);status/health 双发 locks[];派活 prompt 按角色页 shared_resources 注入抢锁提示(无字段不注入);云文档 CDP 工具族外迁 biz_tools(桩过渡)",
+     "carrier": "bus/lock.py · bus/edge.py(别名) · roster.shared_resources_prompt · worker_daemon/dispatch_agent build_prompt · tests/scenario_lock_contention/a2/a3",
+     "status": "在用·2026-09-23(分离 A1/A2/A4 Master数分签·A3 条件签 K1 桩+K2 原子已落)"
+    },
     {
      "name": "edge-acquire 抢Edge锁",
      "does": "O_EXCL原子抢焦点互斥锁(watchdog等释放·stale回收)",
@@ -544,7 +550,8 @@
      "carrier": "_role_proc_alive()",
      "status": "在用"
     }
-   ]
+   ],
+   "_note": "分离 A(2026-09-23):原「Edge互斥与云文档协调」。Edge/云文档专属条目=业务侧机制·文案保留作为 resource=edge 的实例说明;平台层只提供 ab lock 通用原语。"
   },
   {
    "id": 8,

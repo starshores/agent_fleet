@@ -276,6 +276,14 @@
      "kind": "note",
      "desc": "2026-09-23 前 agents.json/capabilities.json 含业务文本已入 git 历史;共享 master 不重写历史(Master数分 6f6d66)。清除问只验 HEAD 与未来。",
      "owner": "MasterAgent"
+    },
+    {
+     "id": "biz-tools",
+     "name": "业务工具族(自带 git)",
+     "path": "C:\\apphome\\agent_fleet_data\\biz_tools",
+     "kind": "dir",
+     "desc": "分离 A3(2026-09-23):external_{common,canvas,msg,read,sheet_read}.py 物理家;agent_bus/ 同名文件为 __main__ 转发桩(业务侧旧路径引用清零后删)。清除=删本目录·桩报『业务工具未安装』exit2·平台照跑。",
+     "owner": "外部 IM(工具)/Master(口径)"
     }
    ]
   },
