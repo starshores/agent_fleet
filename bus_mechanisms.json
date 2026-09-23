@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 115,
+  "total": 117,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -439,6 +439,18 @@
      "does": "首次 hello 注册的新角色标 trained=false + 自动投带训单给培训师;send 派活给未结业目标带⚠待训警示(仍投递·防培训师离线死锁);培训师 train-done 结业解除",
      "carrier": "bus/identity.py _auto_train_request()/cmd_train_done() + bus/core.py cmd_send 警示",
      "status": "在用"
+    },
+    {
+     "name": "注册表业务成分外迁·biz_registry两表合并视图",
+     "does": "业务角色页 role_profiles_biz.json + 业务 caps caps_biz.json 物理外迁 agent_fleet_data/biz_registry(自带 git);读方走 bus.roster.biz_registry_dir()/load_caps_pool()/load_role_profiles() 合并视图(infra 优先·业务表缺失=合法空载);hook reinject 经同一解析器;AGENTBUS_BIZ_REGISTRY 可重定向=隔离空载测(smoke sepC.empty_biz)",
+     "carrier": "bus/roster.py biz_registry_dir/load_caps_pool · hooks/reinject_post_compact._biz_profiles_path · agent_bus/tests/scenario_sepC_empty_biz.py",
+     "status": "在用·2026-09-23(分离 C·Master数分 fdbd6d 签收·培训师终裁 confidentiality=biz)"
+    },
+    {
+     "name": "花名册只读视图 agents_view(desc 回退角色页)",
+     "does": "agents.json 深拷贝 ⊕ 角色页 desc/one_liner(有页=单一源·标 desc_src=role_profile;无页沿用 agents.json desc);只读读方(roster/route/probe/WebUI 花名册)走它·写方(register/hello/retire/update_agents)仍读原件=视图 desc 永不经 RMW 回写基建 git",
+     "carrier": "bus/roster.py agents_view · agentbus re-export · roles.py/probe.py 读方",
+     "status": "新上·2026-09-23(分离 B1·剥 agents.json 业务 desc 待 MasterUI 切读方后执行)"
     }
    ]
   },
