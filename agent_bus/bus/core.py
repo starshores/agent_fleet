@@ -139,6 +139,15 @@ def cmd_send(args):
     mk = (getattr(args, "kind", None) or "").strip().lower()
     if mk in ("request", "fyi", "urgent"):
         task["kind"] = mk
+    if mk == "fyi" and cfg("fyi_no_receipt", True) and not getattr(args, "receipt", False):
+        task["no_receipt"] = True   # 档B L1(Master数分签字 2026-09-23):fyi=知悉即可·完成不回执(events 仍审计·ab replies 可拉查谁 done)
+    if getattr(args, "receipt", False):
+        task["receipt"] = True      # C1:--receipt 显式要回执(覆盖 fyi 默认·广播类"谁读了"信号从推改拉仍可推)
+    if mk == "fyi":                 # C2:fyi 误标软警示(不拦):文本含索取语=多半该用 request
+        _txt = (args.task or "") + " " + (args.title or "")
+        if any(k in _txt for k in ("请回", "请复", "请签", "请确认", "请裁", "请答", "请审", "是否", "?", "?")):
+            sys.stderr.write("⚠ --kind fyi 但文本含索取语(请回/请确认/?…):fyi=不回执、对方结果不会推回你;"
+                             "若需回复请改 --kind request,或加 --receipt 保留回执。(仍投递)\n")
     cf = _build_continue_from(args)        # 接续上下文(2026-08-27):状态文件/--resume 会话
     if cf:
         task["continue_from"] = cf
@@ -149,6 +158,17 @@ def cmd_send(args):
 # ---------------- 任务原子领取原语(已抽到 bus/mailbox.py · 见文件头 import)----------------
 
 
+def _notice_debounce_s(role):
+    """档B L2 去抖窗秒数:config notice_debounce_by_role[role] > notice_debounce_s(默认 0=关·旧路径 byte-identical)。
+    灰度段1=MasterAgent 300;段2 协调位 90;全员默认 90(Master数分 L级B 验收后)。"""
+    try:
+        by = cfg("notice_debounce_by_role", None) or {}
+        v = by.get(role, cfg("notice_debounce_s", 0))
+        return max(0.0, float(v or 0))
+    except Exception:
+        return 0.0
+
+
 def _wait_core(role, timeout, include_approval=False):
     """阻塞到 inbox 有【可领取】任务(watchdog 事件),claim 并返回 task dict;空闲超时返回 None。
     不触 presence、不打印——给 cmd_wait / cmd_serve / daemon 复用。
@@ -157,10 +177,73 @@ def _wait_core(role, timeout, include_approval=False):
     inbox = _role_dir(role) / "inbox"
     groups = _role_groups(role)                       # 所属工作组(运行时·可空);无组 → 下面组循环空转 = 行为与旧完全一致
     group_inboxes = [_group_dir(g) / "inbox" for g in groups]
+    # 档B L2·纯回执去抖合并领取(Master数分签字 2026-09-23):dz=0 → 下面 _try_claim 走旧路径 byte-identical。
+    # dz>0:非回执任务永远零延迟优先;最老可领若是纯回执(kind==notice 且 notice_of)→ 开 dz 秒窗续等,
+    # 窗内非回执到达即刻领;窗满一次领入全部纯回执(首条返回·其余 id 挂 coalesced)→ 一次唤醒收一批。
+    dz = _notice_debounce_s(role)
+    dstate = {"until": None}
+
+    def _is_pure_notice(p):
+        try:
+            o = json.loads(p.read_text(encoding="utf-8"))
+            return o.get("kind") == "notice" and bool(o.get("notice_of"))
+        except Exception:
+            return False
+
+    def _oldest_non_notice():
+        for p in sorted(inbox.glob("*.json")):
+            try:
+                o = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                return p
+            if o.get("requires_approval") and not include_approval:
+                continue
+            if o.get("kind") == "notice" and o.get("notice_of"):
+                continue
+            return p
+        return None
 
     def _try_claim():
         """先自己 inbox(点名/会话粘连活),再各组共享 inbox(池活·O_EXCL 并发安全)。
         返回 claim 到的 task dict,或 None(无可领 / 竞态没抢到 → 调用方续等,gate②)。"""
+        if dz > 0:
+            t = _oldest_non_notice()                  # ① 非回执零延迟(去抖窗内亦即刻)
+            if t:
+                obj = _claim(role, t)
+                if obj:
+                    dstate["until"] = None
+                    return obj
+            for g in groups:
+                obj = _claim_group_task(role, g, include_approval)
+                if obj:
+                    dstate["until"] = None
+                    return obj
+            t = _oldest_claimable(inbox, include_approval)
+            if t and _is_pure_notice(t):             # ② 纯回执:去抖
+                now = time.monotonic()
+                if dstate["until"] is None:
+                    dstate["until"] = now + dz
+                    return None                       # 开窗·续等(ev.wait 上限取窗余量)
+                if now < dstate["until"]:
+                    return None
+                first, ids = None, []                 # ③ 窗满:合并领取全部纯回执
+                for p in sorted(inbox.glob("*.json")):
+                    if not _is_pure_notice(p):
+                        continue
+                    o = _claim(role, p)
+                    if o:
+                        if first is None:
+                            first = o
+                        else:
+                            ids.append(o.get("id"))
+                dstate["until"] = None
+                if first is not None and ids:
+                    first["coalesced"] = ids
+                    first["coalesced_hint"] = ("去抖合并:另 %d 条纯回执已一并领入 processing·读各 done/ 后 "
+                                               "`ab ack-notices --role %s` 一键清" % (len(ids), role))
+                return first
+            dstate["until"] = None
+            return None
         t = _oldest_claimable(inbox, include_approval)
         if t:
             obj = _claim(role, t)
@@ -195,11 +278,18 @@ def _wait_core(role, timeout, include_approval=False):
                     if remaining <= 0:
                         break                         # 真超时,无任务 → idle
                 if obs_ok:
-                    woke = ev.wait(timeout=(None if infinite else remaining))
+                    wt = None if infinite else remaining
+                    if dstate["until"] is not None:   # 去抖窗内:最多等到窗满就重评估(档B L2)
+                        dw = max(0.05, dstate["until"] - time.monotonic())
+                        wt = dw if wt is None else min(wt, dw)
+                    woke = ev.wait(timeout=wt)
+                    debouncing = dstate["until"] is not None
                     obj = _try_claim()
                     if obj:
                         break                         # 领到(自己 inbox 或组池)
                     if not woke:                      # ev.wait 超时返回(非事件)
+                        if debouncing:
+                            ev.clear(); continue      # 去抖到期(非真超时)→ 已重评估·续等
                         if infinite:
                             ev.clear(); continue      # 无限:理论只在 set 时返回,防御性续等(绝不空返)
                         break                         # 有限超时 → idle
