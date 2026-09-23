@@ -142,10 +142,8 @@ def _role_profile(role):
 
 
 def _load_caps_pool():
-    try:
-        return json.loads((BUS / "capabilities.json").read_text(encoding="utf-8")).get("capabilities", {})
-    except Exception:
-        return {}
+    from bus.roster import load_caps_pool          # 分离 C:两表合并视图
+    return load_caps_pool()
 
 
 def _print_role_feed(role):

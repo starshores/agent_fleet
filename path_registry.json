@@ -224,9 +224,9 @@
     {
      "id": "biz-role-profiles",
      "name": "业务角色注册表",
-     "path": "C:\\apphome\\agent_fleet\\role_profiles_biz.json",
+     "path": "C:\\apphome\\agent_fleet_data\\biz_registry\\role_profiles_biz.json",
      "kind": "file",
-     "desc": "具体业务角色的角色页(2026-07-29 分仓·gitignore);基建表只留『业务角色』抽象条目。清除本文件=业务角色页全清。",
+     "desc": "具体业务角色的角色页(2026-07-29 分仓·gitignore);基建表只留『业务角色』抽象条目。清除本文件=业务角色页全清。 ｜ 2026-09-23 分离 C:迁入 biz_registry(自带 git)。",
      "owner": "培训师(建档)/Master(口径)"
     },
     {
@@ -252,6 +252,30 @@
      "kind": "dir",
      "desc": "会话考古从离线业务 agent 会话抢救的记忆/报告【中转站】——终态=各归其库(业务→业务库·基建→基建库),Master 跟进迁移(2026-07-29 批准);迁毕本目录业务残件应为零。数据清理时此处业务残件一并清。",
      "owner": "Master(迁移)/会话考古(manifest)"
+    },
+    {
+     "id": "biz-registry-dir",
+     "name": "业务注册表目录(自带 git)",
+     "path": "C:\\apphome\\agent_fleet_data\\biz_registry",
+     "kind": "dir",
+     "desc": "role_profiles_biz.json + caps_biz.json 物理家;agent_fleet 根 biz_registry 为 junction。清除=删本目录+删 junction;平台空载照跑。回滚源=同级 biz_registry_backup_<ts>。",
+     "owner": "培训师(caps/建档)/Master(口径)"
+    },
+    {
+     "id": "biz-caps",
+     "name": "业务能力池",
+     "path": "C:\\apphome\\agent_fleet_data\\biz_registry\\caps_biz.json",
+     "kind": "file",
+     "desc": "只服务业务域的 caps;infra caps 留 agent_bus/capabilities.json;读方 load_caps_pool 合并视图。",
+     "owner": "培训师"
+    },
+    {
+     "id": "biz-git-legacy",
+     "name": "已知遗留:bus git 历史中的业务 desc/caps",
+     "path": "C:\\apphome\\agent_fleet\\.git",
+     "kind": "note",
+     "desc": "2026-09-23 前 agents.json/capabilities.json 含业务文本已入 git 历史;共享 master 不重写历史(Master数分 6f6d66)。清除问只验 HEAD 与未来。",
+     "owner": "MasterAgent"
     }
    ]
   },

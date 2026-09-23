@@ -164,6 +164,11 @@ def cmd_route(args):
 
 
 def _load_caps_pool():
+    from bus.roster import load_caps_pool          # 分离 C:两表合并视图(infra ⊕ biz)·旧名保留=外部 ab.* 引用不破
+    return load_caps_pool()
+
+
+def _load_caps_pool_legacy_unused():
     f = BUS / "capabilities.json"
     if f.exists():
         try:

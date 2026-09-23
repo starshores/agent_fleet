@@ -22,6 +22,27 @@ BUS = Path(os.environ.get("AGENTBUS_DIR") or (Path.home() / ".claude" / "agent_b
 # 副本·避免二次飘);正常态注册表唯一源,坏才吐降级串并明示降级。hook 恒 exit 0。
 _PROFILES = Path(__file__).resolve().parent.parent / "role_profiles.json"
 
+
+def _biz_profiles_path():
+    """业务表路径【单一解析】(分离 C·Master数分 T1):优先 bus.roster.biz_registry_dir()(与 roster/hello/boot-check
+    同一函数=同一规则);import 失败才用同规则内联(cfg biz_registry > <agent_fleet根>/biz_registry);新位置缺文件
+    → 回退 agent_fleet 根旧位(过渡期)。任何异常返旧位·hook 恒不抛。"""
+    root = _PROFILES.parent
+    try:
+        import sys as _s
+        ab = str(root / "agent_bus")
+        if ab not in _s.path:
+            _s.path.insert(0, ab)
+        from bus.roster import biz_registry_dir
+        p = Path(biz_registry_dir()) / "role_profiles_biz.json"
+    except Exception:
+        try:
+            cfgv = json.loads((root / "agent_bus" / "config.json").read_text(encoding="utf-8")).get("biz_registry")
+        except Exception:
+            cfgv = None
+        p = Path(cfgv) / "role_profiles_biz.json" if cfgv else root / "biz_registry" / "role_profiles_biz.json"
+    return p if p.exists() else (root / "role_profiles_biz.json")
+
 def _load_profiles():
     """读 role_profiles.json(+role_profiles_biz.json 业务表合并·2026-07-29 分仓)→ dict;
     缺失/坏返 {}(业务表缺失=合法)。绝不抛。"""
@@ -30,7 +51,7 @@ def _load_profiles():
     except Exception:
         return {}
     try:
-        b = json.loads((_PROFILES.parent / "role_profiles_biz.json").read_text(encoding="utf-8"))
+        b = json.loads(_biz_profiles_path().read_text(encoding="utf-8"))   # 分离 C:单一解析(T1)
         seen = {r.get("role") for r in d.get("roles", [])}
         d["roles"] = list(d.get("roles", [])) + [r for r in b.get("roles", []) if r.get("role") not in seen]
     except Exception:

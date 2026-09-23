@@ -9,6 +9,32 @@ from bus.config import BUS, cfg
 from bus.io import _write_json, json_lock
 
 
+def biz_registry_dir():
+    """业务注册表目录(分离 C·Master数分 6f6d66:业务成分外迁且业务侧自带版本控制):
+    cfg biz_registry > <agent_fleet_home>/biz_registry(junction → C:\\apphome\\agent_fleet_data\\biz_registry·自带 .git)。
+    收:role_profiles_biz.json / caps_biz.json。缺失=合法空载(平台三问·清除问)。"""
+    home = cfg("agent_fleet_home") or str(Path(__file__).resolve().parents[2])
+    return Path(cfg("biz_registry") or Path(home, "biz_registry"))
+
+
+def load_caps_pool():
+    """能力池【两表合并视图】(分离 C·培训师 14 项分类确认 da0e31):capabilities.json(infra·bus git)
+    ⊕ biz_registry/caps_biz.json(业务 caps·业务侧 git)。同名 infra 优先(业务表禁收 infra cap)。
+    读方(ab caps/hello/boot-check/WebUI 能力池)一律走本函数;业务表缺失/坏=合法(视为无业务 caps)。绝不抛。"""
+    pool = {}
+    try:
+        pool.update(json.loads((BUS / "capabilities.json").read_text(encoding="utf-8")).get("capabilities", {}))
+    except Exception:
+        pass
+    try:
+        b = json.loads((biz_registry_dir() / "caps_biz.json").read_text(encoding="utf-8")).get("capabilities", {})
+        for k, v in b.items():
+            pool.setdefault(k, v)
+    except Exception:
+        pass
+    return pool
+
+
 def load_role_profiles():
     """角色注册表【两表合并视图】(用户令 2026-07-29 分仓):基建 role_profiles.json(git·管理/基建
     角色+『业务角色』抽象条目)+ 业务 role_profiles_biz.json(gitignore·业务数据·数据清理整体清除)。
@@ -23,7 +49,10 @@ def load_role_profiles():
     except Exception:
         pass
     try:
-        b = json.loads(Path(home, "role_profiles_biz.json").read_text(encoding="utf-8"))
+        bp = biz_registry_dir() / "role_profiles_biz.json"          # 分离 C:业务表落 biz_registry(自带 git)
+        if not bp.exists():
+            bp = Path(home, "role_profiles_biz.json")               # 过渡回退:未迁移时仍读 agent_fleet 根
+        b = json.loads(bp.read_text(encoding="utf-8"))
         seen = {r.get("role") for r in out["roles"]}
         out["roles"] += [r for r in (b.get("roles") or []) if r.get("role") not in seen]
     except Exception:

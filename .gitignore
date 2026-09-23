@@ -22,3 +22,5 @@ role_profiles_biz.json
 # 全部 agent 会话/记忆运行态,易变且含隐私,随文件夹拷贝迁移、不进 git;
 # 其中业务会话库再外置到业务侧缓存区、此处只是 junction。
 projects/
+# 分离 C:业务注册表 junction(物理家 agent_fleet_data/biz_registry·自带 git)
+biz_registry/

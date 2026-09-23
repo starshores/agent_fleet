@@ -49,8 +49,8 @@ def _required_reads(role):
     # 能力→必读聚合(2.3 P1):capabilities.json 各 cap 可挂 reads(掌握该能力该读什么),
     # 角色必读=boot_reads+记忆索引+其所持 caps 的 reads 并集——清单随能力走,不用逐角色手维护。
     try:
-        from bus.roster import _load_agents
-        pool = json.loads((BUS / "capabilities.json").read_text(encoding="utf-8")).get("capabilities", {})
+        from bus.roster import _load_agents, load_caps_pool
+        pool = load_caps_pool()                     # 分离 C:两表合并视图
         have = {s for _, s in req}
         for c in ((_load_agents().get(role) or {}).get("caps") or []):
             for f in ((pool.get(c) or {}).get("reads") or []):
@@ -220,11 +220,10 @@ def cmd_memory_audit(args):
 def cmd_caps_audit(args):
     """caps 池联检:①角色持有但池里没有的 cap ②池里存在但无人持有的 cap(dormant·非错)
     ③池 cap 缺 desc ④池 cap 挂了 reads 的(供 boot-check 聚合)。登记归培训师·机制归 MasterAgent。"""
-    from bus.roster import _load_agents, _retired_roles, _is_test_role
-    try:
-        pool = json.loads((BUS / "capabilities.json").read_text(encoding="utf-8")).get("capabilities", {})
-    except Exception as e:
-        print("capabilities.json 不可读:%s" % e); sys.exit(1)
+    from bus.roster import _load_agents, _retired_roles, _is_test_role, load_caps_pool
+    pool = load_caps_pool()                         # 分离 C:两表合并视图(缺失=空载·不 exit)
+    if not pool:
+        print("能力池为空(capabilities.json 不可读且无 caps_biz)"); sys.exit(1)
     agents = _load_agents(); retired = _retired_roles()
     held = {}
     for role, v in agents.items():
