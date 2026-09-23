@@ -145,9 +145,34 @@ def _events_by_role(since_epoch):
     return out
 
 
+def _role_action_times():
+    """per-role 的 done/rearm 事件时刻(epoch 升序)·供"催单后≤60min 自愈"回填标签(Master数分 781e5d·报告期分类·不改原判)。"""
+    out = defaultdict(list)
+    ev = BUS / "events.jsonl"
+    if not ev.exists():
+        return out
+    for ln in ev.read_text(encoding="utf-8", errors="replace").split("\n"):
+        if '"done"' not in ln and '"rearm"' not in ln:
+            continue
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        if e.get("event") in ("done", "rearm") and e.get("role"):
+            ts = _t(e.get("ts"))
+            if ts:
+                out[e["role"]].append(ts)
+    for r in out:
+        out[r].sort()
+    return out
+
+
 def _archive_metrics(since_epoch):
-    """L1+L2 维度2:全库 archive 扫 → per-role {掉线催单数, 回执时延列表}(路径=掉线分析实证·Master数分复核 SOUND)。"""
-    drops = Counter()
+    """L1+L2 维度2:全库 archive 扫 → per-role {掉线催单数, 催单后≤60min自愈数, 回执时延列表}
+    (路径=掉线分析实证·Master数分复核 SOUND;自愈标签=Master数分 781e5d 回填口径:催单后 60min 内该 role 有 done 或 rearm
+    → 记"延迟唤醒·误催"·原催单计数保留=可溯源)。"""
+    drops = Counter(); heal = Counter()
+    acts = _role_action_times()
     lat = defaultdict(list)
     for rd in os.listdir(BUS):
         base = BUS / rd
@@ -167,11 +192,13 @@ def _archive_metrics(since_epoch):
                     continue
                 if o.get("from") == "bus守卫" and "重挂" in (o.get("title") or ""):
                     drops[rd] += 1          # 掉线催单(per-role 归属=所在 role 目录·Master数分复核过等价 .to)
+                    if cts and any(cts < a <= cts + 3600 for a in acts.get(rd, ())):
+                        heal[rd] += 1       # 催单后 ≤60min 有 done/rearm=延迟唤醒·误催(报告期标签)
                 if o.get("kind") == "notice" and o.get("finished") and cts:
                     fts = _t(o.get("finished"))
                     if fts and fts >= cts:
                         lat[rd].append(fts - cts)   # 回执时延=created→done
-    return drops, lat
+    return drops, lat, heal
 
 
 def _pct(sorted_list, p):
@@ -216,7 +243,7 @@ def _build(args):
     m = _sid_role_map()
     usage = _usage_by_role(since_date, m)
     evs = _events_by_role(since_epoch)
-    drops, lat = _archive_metrics(since_epoch)
+    drops, lat, heal = _archive_metrics(since_epoch)
 
     roles = set(usage) | set(evs) | set(drops) | set(lat)
     # _ 前缀桶(_unattributed/_non_bus/_adhoc/_error)与 __ 测试角色都不入 per-agent 卡:
@@ -239,7 +266,8 @@ def _build(args):
             } if u else "无数据(usage 无归属会话)",
             "维度2_纪律": {
                 "done": e.get("done") or 0, "claim": e.get("claim") or 0, "send": e.get("send") or 0,
-                "掉线催单": drops.get(r, 0), "stop_hook_block": e.get("stop_hook_block") or 0,
+                "掉线催单": drops.get(r, 0), "掉线催单_≤60min自愈": heal.get(r, 0),   # Master数分781e5d:延迟唤醒·误催标签
+                "stop_hook_block": e.get("stop_hook_block") or 0,
                 "回执时延中位秒": _pct(ls, .5), "回执时延P90秒": _pct(ls, .9), "回执样本数": len(ls),
             },
         }

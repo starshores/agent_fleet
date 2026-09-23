@@ -330,6 +330,34 @@ def _save_guard_prev(roles):
         pass
 
 
+def _guard_delay_verdict(role):
+    """守卫两级窗(Master数分 781e5d·2026-09-23 惊群根因后定):返回 (skip, level, note)。
+    实证:29 例"唤醒丢失"0 例永久丢失·延迟中位 24~29min(fan-out 同时唤醒撞 API 退避)·旧 ~7min 即催=全误报。
+    level ∈ busy(近 recent_min 有 turn 活动=在处理·不催)/ in-grace(fire 后 <grace_min·不催)/
+            remind(≥grace_min·催)/ true-offline(≥true_offline_min 且 fire 后无 turn 活动·催单加【真掉线】升级标=派发方改派判据)。
+    阈值走 config(guard_fire_grace_min=30 / guard_true_offline_min=60 / guard_recent_turn_min=5)·灰度两周按误催率再调。"""
+    grace = float(cfg("guard_fire_grace_min", 30)); true_off = float(cfg("guard_true_offline_min", 60))
+    recent = float(cfg("guard_recent_turn_min", 5)); now = time.time()
+
+    def _ts(p, key):
+        try:
+            v = json.loads((BUS / role / p).read_text(encoding="utf-8")).get(key)
+            return time.mktime(time.strptime(str(v)[:19], "%Y-%m-%dT%H:%M:%S")) if v else None
+        except Exception:
+            return None
+    exited = _ts("wait_trace.json", "exited"); turn_ts = _ts("turn_state.json", "ts")
+    if turn_ts and (now - turn_ts) < recent * 60:
+        return True, "busy", "近%d分钟有turn活动=在处理·不催" % recent
+    if exited is None:
+        return False, "remind", "无trace退出时刻·按旧规催"
+    age = (now - exited) / 60
+    if age < grace:
+        return True, "in-grace", "fire后%.0fmin<%.0fmin延迟窗·不催(延迟唤醒中位~29min·多自愈)" % (age, grace)
+    if age >= true_off and not (turn_ts and turn_ts > exited):
+        return False, "true-offline", "fire后%.0fmin≥%.0fmin且无turn活动=真掉线升级" % (age, true_off)
+    return False, "remind", "fire后%.0fmin≥%.0fmin延迟窗·催" % (age, grace)
+
+
 def cmd_selfwake_guard(args):
     """【B·自醒巡检报警·2026-07-08 Master拍板】周期扫自醒,发现掉自醒(claude活/无wait/心跳超期)的
     agent → ①往其 inbox 投一条【重挂提醒】(dedup:已有未领的提醒就不重投)②WinRT toast 报警(汇总)。
@@ -365,11 +393,15 @@ def cmd_selfwake_guard(args):
         print("自醒巡检:%d 疑掉线,均【首次/未连续确认】→本轮不报(待下轮确认,消瞬时假阳性):%s"
               % (len(stale), "、".join(sorted(cur))))
         return
-    reminded, skipped = [], []
+    reminded, skipped, delayed = [], [], []
     marker = "[自醒守卫·请重挂]"
     stale_confirmed = [(r, d) for r, d in stale if r in confirmed]
     for role, detail in stale_confirmed:
         inbox = BUS / role / "inbox"
+        # 两级窗(Master数分 781e5d):延迟窗内/在处理 → 不催;≥60min 无 turn → 催单加【真掉线】升级标
+        skip, level, note = _guard_delay_verdict(role)
+        if skip:
+            delayed.append("%s(%s)" % (role, note)); continue
         # dedup:该 role inbox 已有未领的守卫提醒 → 跳过不重投
         dup = False
         try:
@@ -388,7 +420,7 @@ def cmd_selfwake_guard(args):
         tid = _gen_id(role)
         task = {
             "id": tid, "from": "bus守卫", "to": role,   # 2.3 P1:系统名义,不再伪造 MasterAgent(回执归 bus守卫 桶·卫生代谢清)
-            "title": marker + " 你掉了自醒",
+            "title": marker + ((" 【真掉线·≥%dmin无turn】" % int(float(cfg("guard_true_offline_min", 60)))) if level == "true-offline" else "") + " 你掉了自醒",
             "task": ("自醒巡检【连续2次】发现你掉了自醒(%s;尸检:%s)。看到即请【后台 run_in_background】跑 "
                      "`ab wait --role %s --timeout 0`(0=block 真无限·有消息才醒),再 `ab selfwake` 验在岗(别用 shell &)。"
                      "★禁轮询(用户令2026-07-28:轮询=错误·全员事件 wait;定时只允许闹钟式到点一次醒)。"
@@ -398,7 +430,7 @@ def cmd_selfwake_guard(args):
         }
         _write_json(inbox / (tid + ".json"), task)
         reminded.append(role)
-    _audit("selfwake_guard", stale=len(stale), confirmed=len(confirmed), reminded=len(reminded))
+    _audit("selfwake_guard", stale=len(stale), confirmed=len(confirmed), reminded=len(reminded), delayed=len(delayed))
     if not args.dry_run and reminded:
         _fire_toast("⚠ %d 个 agent 掉自醒(连续2次确认)" % len(confirmed),
                     "已提醒重挂:" + "、".join(reminded) + ("(另%d已提醒过)" % len(skipped) if skipped else ""))
@@ -406,6 +438,8 @@ def cmd_selfwake_guard(args):
         len(stale), len(confirmed), len(unconfirmed), ("[dry-run] " if args.dry_run else ""), len(reminded),
         (" · %d 已提醒过跳过" % len(skipped)) if skipped else "",
         "" if args.dry_run else " + toast报警"))
+    if delayed:
+        print("   ⏳ 延迟窗内/在处理·本轮不催(两级窗·Master数分781e5d):" + "、".join(delayed))
     for role, detail in stale:
         print("   - %s%s:%s | 尸检:%s" % (role, "" if role in confirmed else "(待确认)", detail, _wait_autopsy(role)))
 
@@ -427,8 +461,18 @@ def _wait_autopsy(role):
         return "wait 进程异常死亡(start=%s 无 exit·被杀/休眠丢/壳回收=环境因)" % (t.get("started") or "?")[:19]
     exited = (t.get("exited") or "")[:19]
     if exited and not _role_turn_action_after(role, exited):
-        return ("上次 %s 正常退出(%s)后【零turn动作】=疑唤醒丢失型(harness未唤醒·无机会重挂·"
-                "非纪律缺口·守卫兜底层)" % (t.get("exit"), exited))
+        # ③a/③b 两维(Master数分 781e5d):turn_state ts 晚于 exit=有 turn 无 bus 动作(在忙长任务/纪律);否则真无 turn。
+        # 实证 2026-09-23:③ 29 例 0 永久丢失·多为延迟唤醒(fan-out 同时唤醒撞 API 退避)·措辞去"丢失"。
+        tt = None
+        try:
+            tt = (json.loads((BUS / role / "turn_state.json").read_text(encoding="utf-8")).get("ts") or "")[:19]
+        except Exception:
+            pass
+        if tt and tt > exited:
+            return ("上次 %s 正常退出(%s)后【有turn无bus动作】=③b(在忙长任务或纪律·turn_ts %s)"
+                    % (t.get("exit"), exited, tt[11:]))
+        return ("上次 %s 正常退出(%s)后【零turn动作】=③a疑延迟唤醒(harness未起turn·非纪律·多在30min内自愈·"
+                "守卫兜底层)" % (t.get("exit"), exited))
     return "上次 %s 正常退出(%s)后未重挂=纪律缺口(忘重挂型·退出后有turn活动)" % (t.get("exit"), exited or "?")
 
 

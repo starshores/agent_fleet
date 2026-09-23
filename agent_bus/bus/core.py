@@ -48,6 +48,52 @@ def _warn_unreachable(role):
 
 
 
+def _burst_count(frm, window_s):
+    """近 window_s 秒内 frm 的 send 事件数(只读 events.jsonl 尾 64KB)。"""
+    try:
+        with open(str(BUS / "events.jsonl"), "rb") as fh:
+            fh.seek(0, 2); fh.seek(max(0, fh.tell() - 65536)); tail = fh.read().decode("utf-8", "replace")
+        now = time.time(); n = 0
+        for ln in tail.split("\n"):
+            if '"send"' not in ln or frm not in ln:
+                continue
+            try:
+                e = json.loads(ln)
+            except Exception:
+                continue
+            if e.get("event") != "send" or e.get("frm") != frm:
+                continue
+            try:
+                ts = time.mktime(time.strptime(str(e.get("ts", ""))[:19], "%Y-%m-%dT%H:%M:%S"))
+            except Exception:
+                continue
+            if now - ts <= window_s:
+                n += 1
+        return n
+    except Exception:
+        return 0
+
+
+def _burst_jitter(frm, task, dry=False):
+    """广播惊群错峰(Master数分闸① PASS 781e5d·2026-09-23):同一发送方短窗内连发 ≥ 阈值(fan-out / 循环广播)→
+    本条投递前随机延迟 jitter 秒,错开目标同时 fire。实证:15 目标同发 → 13 wait 同时 fire → 13 会话同撞
+    API 429 → 同步退避 ~28min → 守卫全误催。kind=urgent(用户令类紧急广播)/ 环境 AGENTBUS_NO_JITTER=1 免。
+    dry=True 只返计算不睡。阈值走 config:send_burst_threshold=3 / send_burst_window_s=30 / send_jitter_range_s=[5,15]。"""
+    if os.environ.get("AGENTBUS_NO_JITTER") or (task or {}).get("kind") == "urgent":
+        return 0.0
+    th = int(cfg("send_burst_threshold", 3)); win = int(cfg("send_burst_window_s", 30))
+    if _burst_count(frm, win) < th:
+        return 0.0
+    import random
+    rng = cfg("send_jitter_range_s", None)
+    lo, hi = (float(rng[0]), float(rng[1])) if isinstance(rng, (list, tuple)) and len(rng) == 2 else (5.0, 15.0)
+    d = random.uniform(lo, hi)
+    if not dry:
+        sys.stderr.write("⏳ 广播错峰:%s 近%ds内连发≥%d·本条延迟 %.1fs 投递(防惊群撞API·--kind urgent 免)\n" % (frm, win, th, d))
+        time.sleep(d)
+    return d
+
+
 def _deliver(to, frm, task, audit_event="send"):
     """统一投递契约(P1·2026-07-28):目录保障 + from=unknown 警示 + 可达告警 + 培训闸软警示
     + 写 inbox + 审计。send/request 共用——request 原来径写 inbox 绕过全部四层
@@ -58,6 +104,7 @@ def _deliver(to, frm, task, audit_event="send"):
             "⚠ from=unknown(没带 --from 且无 AGENTBUS_ROLE):worker 完成后的回执会落进 "
             "unknown/、原请求方永远收不到=静默丢失。请带 --from <你的role> 重发。\n")
     _warn_unreachable(to)   # 校验目标在岗(治静默漏接:派了≠接了)
+    _burst_jitter(frm, task)   # 广播惊群错峰(Master数分闸① PASS 781e5d)
     if (_load_agents().get(to) or {}).get("trained") is False:   # 培训闸·软警示(新角色未结业)
         sys.stderr.write("⚠ 目标 %s 处于🎓待训期(新注册·培训师未 train-done):简单明确活可派;"
                          "运维/写库/改基建类复杂活请等结业,或在任务里写明验证清单。(仍投递)\n" % to)
@@ -90,7 +137,7 @@ def cmd_send(args):
     # 维度1问答比字段(Master数分口径 2026-09-17):--kind task|request|fyi·缺省 task 不落字段(向后兼容;
     # 绝不与系统回执 kind=notice 撞语义——ack-notices 判据=kind==notice 且带 notice_of 双条件·此处永不满足)。
     mk = (getattr(args, "kind", None) or "").strip().lower()
-    if mk in ("request", "fyi"):
+    if mk in ("request", "fyi", "urgent"):
         task["kind"] = mk
     cf = _build_continue_from(args)        # 接续上下文(2026-08-27):状态文件/--resume 会话
     if cf:
