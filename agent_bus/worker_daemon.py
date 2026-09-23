@@ -41,30 +41,37 @@ def touch(role, mode, timeout):
     ab._touch_presence(role, mode, {"daemon_pid": os.getpid(), "wait_timeout": timeout})
 
 
-def run_task(role, cwd, task):
-    """临时拉起 claude -p 执行任务,返回 (status, result_text, meta)。"""
-    instr = task.get("task", "")
-    title = task.get("title", "")
-    # 注入角色身份 + 专责(从 agents.json 的 desc 读),让 daemon 真正"扮演"该角色而非通用 worker
+def build_prompt(role, title, instr):
+    """daemon 派活 prompt(分离 A2·2026-09-23 抽成可测函数):身份 + 专责(desc 走 agents_view=角色页单一源·B1 前置)
+    + 通用【共享资源互斥】段(按角色页 shared_resources 注入·无字段不注入=平台零业务词)+ 任务体。"""
     try:
-        desc = (ab._load_agents().get(role, {}) or {}).get("desc", "") or ""
+        desc = (ab.agents_view().get(role, {}) or {}).get("desc", "") or ""
     except Exception:
         desc = ""
     abpy = str(ab.BUS / "agentbus.py")
     ident = "你是 agent bus 上的【%s】角色执行体。\n" % role
     if desc:
         ident += "你的专责领域:%s\n" % desc
-    prompt = (
+    try:
+        lock_hint = ab.shared_resources_prompt(role, abpy)
+    except Exception:
+        lock_hint = ""
+    return (
         ident +
         "下面是已经分配给你的一项具体任务,请【以该角色的专责视角,直接执行这项任务本身】并完成它。\n"
         "重要:任务内容已在下面给全;**不要**去 agent bus 取任务、**不要**起 loop/serve/wait、"
         "**不要**把自己当成轮询 worker。只做下面这件事。\n"
-        "【若本任务要操作 Edge/云文档(复制/点击/粘贴/编辑)】:先抢 Edge 互斥锁再操作、用完释放——\n"
-        "  python \"%s\" edge-acquire --who %s  →  (connect_over_cdp 编辑)  →  python \"%s\" edge-release --who %s\n"
-        "  抢不到(timeout)就稍候重试或回报忙;不碰 Edge/云文档的任务忽略此条。\n"
+        + lock_hint +
         "完成后用一段简洁中文回复结果/产物路径(你的最终回复会被原样作为回填内容)。\n\n"
-        "【任务标题】%s\n【任务内容】\n%s" % (abpy, role, abpy, role, title, instr)
+        "【任务标题】%s\n【任务内容】\n%s" % (title, instr)
     )
+
+
+def run_task(role, cwd, task):
+    """临时拉起 claude -p 执行任务,返回 (status, result_text, meta)。"""
+    instr = task.get("task", "")
+    title = task.get("title", "")
+    prompt = build_prompt(role, title, instr)
     # 流式跑 claude -p:过程实时写 <role>/live.log(tail -f 可看),并拿最终结果。
     # (prompt 经 stdin 传,避免 claude.cmd 批处理 shim 在首换行截断多行 argv。)
     import claude_run

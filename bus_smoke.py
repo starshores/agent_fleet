@@ -297,6 +297,7 @@ def build_tests():
     # 分离 C(Master数分 fdbd6d 建议固化):空载清除测试隔离版·AGENTBUS_BIZ_REGISTRY 指空临时目录=业务表全清等价态·不动 live 文件
     T.append(("sepC.empty_biz", ["@py", os.path.join(_TESTS, "scenario_sepC_empty_biz.py")], chk_contains("ALL PASS"), "分离C 清除问:业务注册表空载→caps仅infra/角色页无业务/hook不抛/ab roster·who·caps渲染·恢复有载"))
     T.append(("lock.contention", ["@py", os.path.join(_TESTS, "scenario_lock_contention.py")], chk_contains("ALL PASS"), "分离A 并发gate:N=20争1恰1胜×3轮 + acquire/release 四态JSON键集"))
+    T.append(("a2.prompt_lock_hint", ["@py", os.path.join(_TESTS, "scenario_a2_prompt_lock_hint.py")], chk_contains("ALL PASS"), "分离A2:用锁角色有载prompt含edge锁提示(全覆盖)/空载平台段零业务词/daemon·dispatch源码零业务词"))
     return T
 
 

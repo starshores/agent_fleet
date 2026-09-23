@@ -87,6 +87,25 @@ def agents_view():
     return a
 
 
+def shared_resources_prompt(role, abpy):
+    """派活 prompt 的【共享资源互斥提示】段(分离 A2·2026-09-23):按角色页 shared_resources:[{"resource","hint"}] 生成;
+    无页 / 无字段 → ""(不注入=空载零业务词)。具体域文案(如"操作某外部协作工具前先抢 edge 锁")住业务角色页,平台只给原语。
+    有载验收(Master数分 g):近 30 天用过锁的每个角色·其角色页必有本字段·否则有载静默丢锁提示。"""
+    try:
+        page = next((r for r in (load_role_profiles().get("roles") or []) if r.get("role") == role), None)
+        srs = [s for s in ((page or {}).get("shared_resources") or []) if isinstance(s, dict) and s.get("resource")]
+    except Exception:
+        srs = []
+    if not srs:
+        return ""
+    lines = ["【共享资源互斥】本角色可能独占以下共享资源;操作前先抢锁、用完释放(抢不到=timeout 就稍候重试或回报忙):"]
+    for s in srs:
+        r = s["resource"]; hint = (s.get("hint") or "").strip()
+        lines.append("  - %s%s:python \"%s\" lock acquire --resource %s --who %s  →  (操作)  →  python \"%s\" lock release --resource %s --who %s"
+                     % (r, ("(%s)" % hint) if hint else "", abpy, r, role, abpy, r, role))
+    return "\n".join(lines) + "\n"
+
+
 def _policy():
     """角色策略注册表(P1·2026-07-28 出代码):role_profiles.json meta.policy——
     human_attended / mgmt_owner / biz_default_owner 原散在多处硬编码,角色增减要改代码且守卫可被伪造名绕过。

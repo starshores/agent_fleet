@@ -25,6 +25,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentbus as ab
 
 
+def build_prompt(name, frm, title, task):
+    """ad-hoc 派活 prompt(分离 A2·2026-09-23 抽成可测函数):总线沟通能力 + 通用共享资源互斥原语(ad-hoc 无角色页·只给原语·
+    若代号恰有角色页则按页注入具体资源提示)。平台层零业务词。"""
+    agentbus_py = str(ab.BUS / "agentbus.py")
+    try:
+        lock_hint = ab.shared_resources_prompt(name, agentbus_py)
+    except Exception:
+        lock_hint = ""
+    if not lock_hint:
+        lock_hint = ("  - 若要独占某共享资源(如浏览器焦点/某设备)→ 先 python \"%s\" lock acquire --resource <资源名> --who %s 抢锁,"
+                     "操作完 lock release --resource <资源名> --who %s(抢不到稍候重试,防串台)。\n" % (agentbus_py, name, name))
+    head = (
+        "你是【一次性 ad-hoc agent】(代号:%s)。只完成下面这一件临时任务即结束——"
+        "**不监听任何队列、不取别的任务、不起 loop/serve/wait、不把自己当持久 worker**。\n"
+        "你有【总线沟通能力】:\n"
+        "  - 需要别的 agent 协助 → 运行:python \"%s\" request --to <角色> --from %s --task \"...\"(发子任务并阻塞等应答)\n"
+        "  - 要报进度/留言 → python \"%s\" send --to <角色> --from %s --title \"...\" --task \"...\"\n"
+        % (name, agentbus_py, name, agentbus_py, name))
+    tail = (
+        "完成后用一段简洁中文回复最终结果/产物路径(你的最终回复会被原样回填给派发方 %s)。\n\n"
+        "【临时任务标题】%s\n【内容】\n%s" % (frm, title, task))
+    return head + lock_hint + tail
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--id", required=True)
@@ -43,19 +66,7 @@ def main():
     cwd = rec.get("cwd") or ab.cfg("default_worker_cwd", os.getcwd())
     timeout = rec.get("timeout", 3600)
     claude = os.environ.get("CLAUDE_BIN") or ab.cfg("claude_bin", str(Path.home() / "AppData" / "Roaming" / "npm" / "claude.cmd"))
-    agentbus_py = str(ab.BUS / "agentbus.py")
-
-    prompt = (
-        "你是【一次性 ad-hoc agent】(代号:%s)。只完成下面这一件临时任务即结束——"
-        "**不监听任何队列、不取别的任务、不起 loop/serve/wait、不把自己当持久 worker**。\n"
-        "你有【总线沟通能力】:\n"
-        "  - 需要别的 agent 协助 → 运行:python \"%s\" request --to <角色> --from %s --task \"...\"(发子任务并阻塞等应答)\n"
-        "  - 要报进度/留言 → python \"%s\" send --to <角色> --from %s --title \"...\" --task \"...\"\n"
-        "  - 若要操作 Edge/云文档 → 先 python \"%s\" edge-acquire --who %s 抢锁,操作完 edge-release --who %s(抢不到稍候重试,防串台)。\n"
-        "完成后用一段简洁中文回复最终结果/产物路径(你的最终回复会被原样回填给派发方 %s)。\n\n"
-        "【临时任务标题】%s\n【内容】\n%s" % (
-            name, agentbus_py, name, agentbus_py, name, agentbus_py, name, name, frm, title, task)
-    )
+    prompt = build_prompt(name, frm, title, task)
 
     # 流式跑 claude -p,过程实时写 live.log(tail -f 可看),并拿最终结果
     import claude_run
