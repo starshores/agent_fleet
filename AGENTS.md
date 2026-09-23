@@ -61,6 +61,8 @@ ab prune [--dry-run]                             # 清空的遗留 role 目录(�
 ab dispatch --task "..." [--from X --name N --cwd D --timeout 3600]  # 派【一次性 ad-hoc agent】:有总线沟通(request/send)、不监听队列、干完即逝、可重派;结果回填 <from>/done(replies 收)
 ab edge-acquire --who X [--timeout 120 --ttl 300]  # 抢 Edge/云文档操作互斥锁;抢到 {acquired:true},被占且持有者活着→watchdog 等释放(不轮询)、超时 {acquired:false,timeout:true,holder}
 ab edge-release --who X [--force]                   # 释放(默认只释放自己持的;--force 强释)
+ab lock acquire --resource <名> --who X [--timeout --ttl]   # ★通用共享资源互斥(分离 A1·2026-09-23):任何域的独占资源同一原语;edge-acquire/release = --resource edge 别名
+ab lock release --resource <名> --who X [--force]  /  ab lock status [--resource <名>]   # 锁文件 BUS/locks/<名>.lock(edge 过渡仍 edge.lock)
 ab caps [--role X]                                  # 能力池:无参看全池+谁持有;--role 看某角色被分配的能力(最小授权)
 ab roster                                           # 花名册:每个 agent 的 在岗/能力(caps)/专长(desc)/注册时间(agents.json 是真相源)
 ab route <关键词...>                                 # 对口路由助手:按专长/能力找【最对口+在岗】角色推荐派给谁(命中多优先、在岗优先、退役/测试排除)。派活前先 route,别自接跨领域/别乱广播

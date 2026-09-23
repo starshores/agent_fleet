@@ -262,6 +262,10 @@ def build_tests():
     # ---- 有态:edge 锁(测试 who + 短超时)----
     T.append(("edge-acquire", ["edge-acquire", "--who", SMOKE_ROLE, "--timeout", "2"], chk_no_tb, "抢 Edge 锁(被占则 timeout 也算跑通)"))
     T.append(("edge-release", ["edge-release", "--who", SMOKE_ROLE, "--force"], chk_no_tb, "释放 Edge 锁"))
+    # 分离 A1(Master数分 b3282f 签):通用资源互斥(独立 resource 名·不碰 live edge.lock)+ 并发 gate
+    T.append(("lock.acquire", ["lock", "acquire", "--resource", "__smoke_res__", "--who", SMOKE_ROLE, "--timeout", "2"], chk_json("acquired"), "通用锁 acquire"))
+    T.append(("lock.status", ["lock", "status", "--resource", "__smoke_res__"], chk_json("locks"), "通用锁 status"))
+    T.append(("lock.release", ["lock", "release", "--resource", "__smoke_res__", "--who", SMOKE_ROLE, "--force"], chk_json("released"), "通用锁 release"))
     # ---- 有态:retire → revive 测试角色(自清路径)----
     T.append(("retire", ["retire", "--role", SMOKE_ROLE, "--reason", "smoke test"], chk_no_tb, "退役归档"))
     T.append(("revive", ["revive", "--role", SMOKE_ROLE], chk_no_tb, "复用回路"))
@@ -292,6 +296,7 @@ def build_tests():
     T.append(("noticeB.scenario2", ["@py", os.path.join(_TESTS, "scenario_noticeB_2.py")], chk_contains("ALL PASS"), "档B②:窗内任务零延迟/回执留inbox/armed窗内守卫不误判"))
     # 分离 C(Master数分 fdbd6d 建议固化):空载清除测试隔离版·AGENTBUS_BIZ_REGISTRY 指空临时目录=业务表全清等价态·不动 live 文件
     T.append(("sepC.empty_biz", ["@py", os.path.join(_TESTS, "scenario_sepC_empty_biz.py")], chk_contains("ALL PASS"), "分离C 清除问:业务注册表空载→caps仅infra/角色页无业务/hook不抛/ab roster·who·caps渲染·恢复有载"))
+    T.append(("lock.contention", ["@py", os.path.join(_TESTS, "scenario_lock_contention.py")], chk_contains("ALL PASS"), "分离A 并发gate:N=20争1恰1胜×3轮 + acquire/release 四态JSON键集"))
     return T
 
 
