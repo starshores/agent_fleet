@@ -27,3 +27,6 @@
 !_probes/blindspot_map.json
 # _probes/README.md 被上面全局 !README.md 意外放行 → 显式压回忽略(它=探针spec/pilot文档·同PROBE_FRAMEWORK不落git)
 _probes/README.md
+# 档B 场景测试(bus_smoke @py 调用·2026-09-23)
+!tests/
+!tests/*.py

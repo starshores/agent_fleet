@@ -41,9 +41,13 @@ def run(args, timeout=30, stdin_text=None):
     env = dict(os.environ)
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    # "@py <script> [args]" = 跑外部场景脚本(档B 多步时序场景装不进单命令 case·2026-09-23);嵌套标记让脚本不动 SMOKE_ROLE 注册
+    cmd = [PY] + args[1:] if (args and args[0] == "@py") else [PY, AB] + args
+    if args and args[0] == "@py":
+        env["AGENTBUS_SMOKE_NESTED"] = "1"
     try:
         p = subprocess.run(
-            [PY, AB] + args,
+            cmd,
             capture_output=True, timeout=timeout, env=env,
             input=(stdin_text.encode("utf-8") if stdin_text else None),
         )
@@ -282,6 +286,10 @@ def build_tests():
     T.append(("memory-history.list", ["memory-history", "list"], chk_no_tb, "记忆分层·历史空间清单(只读)"))
     T.append(("user-absence.dry", ["user-absence-check"], chk_no_tb, "用户缺席检测 dry(无 --apply=只报)"))
     T.append(("ack-notices.dry", ["ack-notices", "--role", SMOKE_ROLE, "--dry"], chk_no_tb, "notice 代谢档A dry(只列不动)"))
+    # 档B(Master数分 aef87e 三闸全签):多步时序场景走外部脚本(@py)·期待末行 ALL PASS。放最后=脚本 clean() 只清 SMOKE_ROLE 队列。
+    _TESTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_bus", "tests")
+    T.append(("noticeB.scenario1", ["@py", os.path.join(_TESTS, "scenario_noticeB_1.py")], chk_contains("ALL PASS"), "档B①:fyi免回执/--receipt/索取语警示/缺省兼容/debounce=0/去抖合并3条"))
+    T.append(("noticeB.scenario2", ["@py", os.path.join(_TESTS, "scenario_noticeB_2.py")], chk_contains("ALL PASS"), "档B②:窗内任务零延迟/回执留inbox/armed窗内守卫不误判"))
     return T
 
 
@@ -301,7 +309,7 @@ def main():
         HEAVY = {"reap", "health-sweep", "supervise", "health", "who", "selfwake",
                  "selfwake-guard", "webui-guard", "prune", "sessions"}
         for name, argv, checker, note in tests:
-            to = 90 if argv[0] in HEAVY else 30
+            to = 120 if argv[0] == "@py" else (90 if argv[0] in HEAVY else 30)   # @py 场景脚本含真 wait 时序·给足
             r = run(argv, timeout=to)
             ok = bool(checker(r))
             results.append({"name": name, "cmd": argv[0], "ok": ok, "exit": r["exit"], "tb": r["tb"], "note": note})
