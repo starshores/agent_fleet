@@ -45,7 +45,7 @@
 
 ## 六、方向建议(排序)
 
-1. **治③唤醒丢失型(最高价值)**:守卫检测"fire 后无 turn"→ 自动起 `dispatch --continue-from resume_session=<该会话>` 一次性代理接活(claude_run 层 C 现成),不改 harness 把 40% 掉线转为"自动代理续跑"。→ **已启动三闸提案** docs/PROPOSAL_autoproxy_wakeloss.md
+1. **治③唤醒丢失型(最高价值)**:守卫检测"fire 后无 turn"→ 自动起 `dispatch --continue-from resume_session=<该会话>` 一次性代理接活(claude_run 层 C 现成),不改 harness 把 40% 掉线转为"自动代理续跑"。→ 三闸提案 docs/PROPOSAL_autoproxy_wakeloss.md **已搁置**(用户 09-23:现在只考虑使用在线 agent);③型解法回到「让 agent 在线」侧
 2. C′ 周验收 → 段3
 3. 档B notice 自动代谢(协调位省 40-70% turn)
 4. 业务/基建分离度盘点(两铁律之一;先核 biz 注册表缺口)
