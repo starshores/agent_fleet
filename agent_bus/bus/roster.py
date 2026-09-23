@@ -60,6 +60,33 @@ def load_role_profiles():
     return out
 
 
+def agents_view():
+    """花名册【只读合并视图】(分离 B1·2026-09-23):agents.json(机制态:registered/caps/…)⊕ 角色页 desc。
+    规则:角色在 role_profiles(基建表或 biz_registry 业务表)有页 → desc 取角色页 `desc`(无则 one_liner)=单一源;
+    无角色页 → 沿用 agents.json 自带 desc(兜底·新注册未建档)。返回深拷贝·改它不回写。
+    ★ 写方(register/hello/train-done/retire…)仍走 _load_agents/update_agents 读原始文件——本视图注入的 desc
+    绝不能经 RMW 写回 agents.json(会把业务 desc 灌回基建 git·分离 B 复发)。只读读方(roster/find/route/
+    probe/WebUI 花名册/agent 详情)一律走本函数。"""
+    import copy
+    a = copy.deepcopy(_load_agents())
+    try:
+        prof = {r.get("role"): r for r in (load_role_profiles().get("roles") or []) if r.get("role")}
+    except Exception:
+        prof = {}
+    for role, rec in a.items():
+        if not isinstance(rec, dict):
+            continue
+        p = prof.get(role)
+        if p:
+            d = (p.get("desc") or p.get("one_liner") or "").strip()
+            if d:
+                rec["desc"] = d
+                rec["desc_src"] = "role_profile"
+        elif "desc" in rec:
+            rec["desc_src"] = "agents.json"
+    return a
+
+
 def _policy():
     """角色策略注册表(P1·2026-07-28 出代码):role_profiles.json meta.policy——
     human_attended / mgmt_owner / biz_default_owner 原散在多处硬编码,角色增减要改代码且守卫可被伪造名绕过。

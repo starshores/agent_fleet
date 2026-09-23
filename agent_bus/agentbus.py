@@ -45,6 +45,7 @@ from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_me
 from bus.roster import (  # noqa: E402
     _agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
     _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, _case_collision,
+    load_caps_pool, biz_registry_dir, agents_view,   # 分离 C/B1:两表合并视图 / 业务注册表目录 / 花名册只读视图(消费方 ui.api 用)
 )
 from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds  # noqa: E402
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live  # noqa: E402
@@ -105,6 +106,7 @@ __all__ = [
     "_write_json", "_gen_id", "_audit", "record_metric", "read_metrics",
     # 花名册/角色目录
     "_load_agents", "_list_roles", "_role_dir", "_is_test_role", "_load_caps_pool", "_load_retired_roster",
+    "load_caps_pool", "biz_registry_dir", "agents_view",   # 分离 C/B1(2026-09-23)
     # 进程/存在感/自醒
     "psutil", "_age_seconds", "_alive_claude_pids", "_touch_presence", "_load_pidtags",
     "_self_wake_state", "_wait_proc_roles", "_daemon_alive",

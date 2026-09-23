@@ -45,9 +45,13 @@ _DISCIPLINE_SUBTYPES = ("lane", "轮询", "外发", "自醒", "execution-complet
 def _load_agents():
     """读 agents.json(canonical)→ {role: {caps:[...], desc:".."}}。roster=其 keys。"""
     try:
-        d = json.loads((BUS / "agents.json").read_text(encoding="utf-8"))
+        from bus.roster import agents_view          # 分离 B1:只读视图(业务 desc 回退角色页)
+        d = agents_view()
     except Exception:
-        d = {}
+        try:
+            d = json.loads((BUS / "agents.json").read_text(encoding="utf-8"))
+        except Exception:
+            d = {}
     cont = d.get("agents") if isinstance(d.get("agents"), dict) else d
     out = {}
     for k, v in cont.items():

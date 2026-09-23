@@ -11,7 +11,7 @@ import json, os
 
 from bus.config import BUS, _now
 from bus.io import _write_json, _audit, _fail
-from bus.roster import _load_agents, _save_agents, update_agents, _retired_roles, _is_test_role
+from bus.roster import agents_view, _load_agents, _save_agents, update_agents, _retired_roles, _is_test_role
 from bus.selfwake import _self_wake_state, _wait_proc_roles
 
 
@@ -130,7 +130,7 @@ def route_scores(terms, limit=5):
     terms = [t.lower() for t in (terms or []) if t and t.strip()]
     if not terms:
         return []
-    agents = _load_agents()
+    agents = agents_view()                # 分离 B1:只读视图(desc 回退角色页)
     retired = _retired_roles()
     wait_roles = _wait_proc_roles()
     scored = []
@@ -181,7 +181,7 @@ def _load_caps_pool_legacy_unused():
 def cmd_roster(args):
     """花名册:列每个 agent 的 在岗状态 / 能力(caps) / 专长(desc) / 注册时间。
     agents.json 是花名册真相源;在岗按自醒检测(armed=在岗 / stale=掉线 / off=未醒)。"""
-    agents = _load_agents()
+    agents = agents_view()                # 分离 B1:只读视图(desc 回退角色页)
     kw = (getattr(args, "grep", None) or "").strip().lower()
     if kw:  # 路由助手:按关键词在 role/专长(desc)/caps 里筛"谁管这事"→ 直接派给它,不广播
         agents = {r: v for r, v in agents.items()
@@ -214,7 +214,7 @@ def cmd_roster(args):
 def cmd_caps(args):
     """能力池查询:`caps` 看全池+谁持有;`caps --role X` 看某角色被分配的能力。"""
     pool = _load_caps_pool()
-    agents = _load_agents()
+    agents = agents_view()                # 分离 B1:只读视图(desc 回退角色页)
     if args.role:
         caps = (agents.get(args.role) or {}).get("caps") or []
         print("【%s】的能力(caps,最小授权):" % args.role)
