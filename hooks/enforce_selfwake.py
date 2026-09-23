@@ -135,6 +135,8 @@ def main():
         return
     if data.get("agent_type"):
         return  # subagent 不自醒
+    if os.environ.get("AGENTBUS_DISPATCH"):
+        return  # dispatch/daemon 一次性 claude -p 子会话(claude_run 标 env)·不自醒·不拦(Master数分 708a33 闸①(2))
     role = _resolve_role(data.get("session_id"))
     if not role or role in ("用户", "unknown"):
         return  # 个人会话/伪角色

@@ -95,7 +95,9 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
     if effort:
         cmd += ["--effort", str(effort)]
     if resume_session:
-        cmd += ["--resume", str(resume_session)]
+        # --fork-session(2026-09-23 Master数分 708a33 闸①(1)):不 fork 会与原交互 tab 同写一个 jsonl·
+        # 子会话可能继承同 session_id → presence/session_role_map 被劫持·原 tab 看不到子会话轮次。
+        cmd += ["--resume", str(resume_session), "--fork-session"]
     elif session_id:
         cmd += ["--session-id", str(session_id)]
     try:
@@ -113,9 +115,12 @@ def run_streaming(claude_bin, cwd, prompt, live_log, timeout=3600, effort=None, 
     w("[%s] ▶ 启动 claude -p (cwd=%s)" % (_now(), cwd))
     final, is_err, got_result = None, False, False
     try:
+        # 子进程 env:摘掉宿主 CLAUDE_CODE_SESSION_ID(防 hello/心跳/账本把子会话绑到宿主 role=presence 劫持)
+        # + 标 AGENTBUS_DISPATCH=1(C′ Stop-hook 据此豁免一次性子会话·Master数分 708a33 闸①(2))
+        env = dict(os.environ); env.pop("CLAUDE_CODE_SESSION_ID", None); env["AGENTBUS_DISPATCH"] = "1"
         p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                             creationflags=_NO_WINDOW)
+                             creationflags=_NO_WINDOW, env=env)
         killed = {"v": False}
 
         def killer():
