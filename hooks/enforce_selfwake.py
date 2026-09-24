@@ -50,7 +50,23 @@ def _resolve_role(sid):
 # 灰度(L级B 前置·Master数分条件1):白名单增量灰度 ①MasterAgent(安全先行)→②+Master(Master数分 APPROVE
 # 2026-09-17 b01e26:40/42掉线=忘重挂型·user-facing=代表性case;误拦率>5%或连环block→摘回)
 # →③+Master数分(42次/3月最高·rapid churn)→④全员(白名单置 None)。一次只加一个 busy role=可归因。
-GRAY_ROLES = {"MasterAgent", "Master"}  # 灰度②·L级B 验收(误拦率<5%/掉线趋0/无连环block)MasterAgent+Master两段合验
+def _gray_roles():
+    """灰度白名单 ← agent_bus/config.json stop_hook_gray_roles(list;null=全员)·读不到回退段②硬编。
+    段③(2026-09-24 实证扩):+MasterUI +Master数分——两者昨 18:05/18:38 wait fire 后未重挂(①忘重挂型)·
+    守卫催单投 inbox 无人读·今晨 turn 活跃 inbox 积压 15h=忙而聋;Stop-hook 在其回合末强制重挂=唯一能到达它们的机制。"""
+    try:
+        cfgv = json.loads((Path(__file__).resolve().parent.parent / "agent_bus" / "config.json").read_text(encoding="utf-8"))
+        v = cfgv.get("stop_hook_gray_roles", "__absent__")
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return set(v)
+    except Exception:
+        pass
+    return {"MasterAgent", "Master"}
+
+
+GRAY_ROLES = _gray_roles()
 FIRE_GRACE = 15                    # 秒:wait 刚 fire 退出的唤醒窗口·放行防竞态误拦
 
 

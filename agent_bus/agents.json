@@ -1,7 +1,7 @@
 {
  "SQLAGent": {
   "registered": "2026-06-22T10:39:35",
-  "desc": "维护 sql_agent 代理(server.py)那个 cli 本身,不是通用查库 worker;别给它派查询活。",
+  "desc": "",
   "caps": ["bus-comms", "self-wake", "confidentiality", "sql-proxy-maint"]
  },
  "Master": {
@@ -44,7 +44,7 @@
    "self-wake",
    "confidentiality"
   ],
-  "desc": "外部/不受信 skill 安全分诊(隔离审查):runner 二进制绝不执行、全程隔离scratchpad静态分析;Go/PE壳逆向(strings/nm/objdump取符号与VMA→文件偏移)、加密payload解密(AES-GCM·hex key·前置nonce)、解压真身扫危险面(网络/exec/生IP/base64)、只跑审计过的良性内核做同构复现;产物一律显式UTF-8、下载即改名QUARANTINE、未审清不入~/.claude/skills。判据:stub无害≠skill安全,decryptKey+payloadEnc+生IP verifyURL三件套=供应链投毒;分层定性(恶性可只在壳、内核良性)。外部下发件先审后用。"
+  "desc": ""
  },
  "示例组员2": {
   "registered": "2026-07-08T10:03:07",
@@ -55,7 +55,7 @@
    "sql-fetch",
    "high-risk"
   ],
-  "desc": "示例组数据分析/数仓诊断:候选层/ETL/拉链表、跨库一致性核查、输出差异根因;写操作只设计+核验、走审批不绕过。路由'数据对不对/跨库对账/输出差异'找它 【示例组池·与示例组员同职互换成员】",
+  "desc": "",
   "effort": "high"
  },
  "示例组员3": {
@@ -67,7 +67,7 @@
    "sql-fetch",
    "high-risk"
   ],
-  "desc": "示例组数据分析/数仓诊断(示例组可互换复制体·与示例组员同能力池):候选层/ETL/拉链表、跨库一致性核查(键绑定指纹/段对账)、源库对账、字段迁移核对/落库复核;写操作只设计+核验走审批不绕过。可互换承接示例组池活。",
+  "desc": "",
   "effort": "high"
  },
  "__wgm1__": {

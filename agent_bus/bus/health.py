@@ -3,7 +3,7 @@
 · 消息丢失巡检自愈(health-sweep)· 只读健康总检(health)· 停滞待办(stale)· daemon 舰队自愈(supervise)。
 
 依赖：config(BUS/cfg/_now)· io(_audit/_write_json)· proc(_age_seconds)· roster(_list_roles/_retired_roles/
-_is_test_role/_load_agents)· edge(_edge_holder)· presence(_owner_live)· selfwake(_is_parked/_self_wake_state/_wait_proc_roles)
+_is_test_role)· lock(holders)· presence(_owner_live)· selfwake(_is_parked/_self_wake_state/_wait_proc_roles)
 · psutil/subprocess/shutil。无反向依赖=无环。
 """
 import json, os, shutil, subprocess, time
@@ -17,8 +17,7 @@ from bus.config import BUS, cfg, _now
 from bus.io import _audit, _write_json, json_lock, _fail
 from bus.proc import _age_seconds
 from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents, _policy
-from bus.edge import _edge_holder
-from bus.lock import holders as _lock_holders   # 分离 A4 双发
+from bus.lock import holders as _lock_holders   # 分离 A4:通用 locks[](edge_lock 已摘)
 from bus.presence import _owner_live
 from bus.selfwake import _is_parked, _self_wake_state, _wait_proc_roles
 
@@ -610,9 +609,7 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     if not owner: h["warns"].append("WebUI 未在岗")
     if stale_webui: h["warns"].append("陈旧 WebUI %d" % len(stale_webui))
     # 6) edge-lock
-    eh = _edge_holder()
-    h["edge_lock"] = {"who": eh.get("who")} if eh else None
-    h["locks"] = [{"resource": lk.get("resource"), "who": lk.get("who"), "age_s": lk.get("age_s")} for lk in _lock_holders()]   # A4 双发(通用)
+    h["locks"] = [{"resource": lk.get("resource"), "who": lk.get("who"), "age_s": lk.get("age_s")} for lk in _lock_holders()]   # A4:通用资源互斥(edge_lock 旧字段已摘)
     # 7) 待办池停滞(防丢/回收提醒):停"待"态 > 阈值(默认24h)的项,按 状态+归属+停留时长
     st = _stale_todos(todo_stale_min)
     h["stale_todos"] = st
@@ -622,7 +619,7 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
 
 
 def cmd_health(args):
-    """【只读】bus 健康总检:自醒 / 队列 / 消息丢失(孤儿·卡死·久滞)/ daemon 舰队 / WebUI / edge锁,
+    """【只读】bus 健康总检:自醒 / 队列 / 消息丢失(孤儿·卡死·久滞)/ daemon 舰队 / WebUI / 资源锁,
     一屏看全 + ⚠/✓ + 总判定。不改任何状态(要处置走 supervise / health-sweep --apply)。--json 出结构化。"""
     h = _collect_health(stale_min=getattr(args, "stale_min", 30) or 30,
                         stuck_min=getattr(args, "stuck_min", 90) or 90,
@@ -653,7 +650,7 @@ def cmd_health(args):
     if f["orphans"]: L.append("  ⚠ 孤儿 daemon: " + ", ".join(f["orphans"]))
     w = h["webui"]
     L.append("\n[WebUI]  8799 %s / 陈旧重复 %d" % (("在岗 pid=%s" % w["owner_pid"]) if w["owner_pid"] else "⚠ 没人占", w["stale_dupes"]))
-    L.append("\n[edge锁] " + ("持有者=%s" % h["edge_lock"]["who"] if h["edge_lock"] else "空闲"))
+    L.append("\n[资源锁] " + ("; ".join("%s=%s" % (lk.get("resource"), lk.get("who")) for lk in (h.get("locks") or [])) or "全部空闲"))   # A4:通用 locks[]
     stt = h.get("stale_todos") or []
     L.append("\n[待办池停滞] %s 停「待」态 >%dh: %d" % ("⚠" if stt else "✓", (getattr(args, "todo_stale_min", 1440) or 1440) // 60, len(stt)))
     for s in stt[:10]:

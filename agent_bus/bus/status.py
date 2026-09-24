@@ -5,7 +5,7 @@ _who_data = 权威状态源(核对 presence 心跳 vs 实际 claude 进程 + 自
 cmd_who 表格化、WebUI 健康模块另吃(role-verdict 散点收敛的候选单一源）。
 
 依赖：config(BUS/_now)· proc(_age_seconds/_alive_claude_pids)· roster(_list_roles/_retired_roles/
-_pseudo_role_label/_load_agents)· presence(_load_pidtags)· edge(_edge_holder)· selfwake(_is_parked/_park_expired)· psutil。无反向依赖=无环。
+_pseudo_role_label/_load_agents)· presence(_load_pidtags)· lock(holders)· selfwake(_is_parked/_park_expired)· psutil。无反向依赖=无环。
 """
 import json
 
@@ -18,14 +18,13 @@ from bus.config import BUS, _now
 from bus.proc import _age_seconds, _alive_claude_pids
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
-from bus.edge import _edge_holder
-from bus.lock import holders as _lock_holders   # 分离 A4 双发:通用 locks[](edge_lock 保留一版·MasterUI 切读方后摘)
-from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy
+from bus.lock import holders as _lock_holders   # 分离 A4:通用 locks[](edge_lock 旧字段已摘·MasterUI 1ffac70 切 d.locks)
+from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy, _inbox_backlog
 
 
 def _who_data():
     """结构化版 who:权威核对 presence 心跳 与 实际 claude 进程,给 WebUI 健康模块吃。
-    返回 {as_of, psutil, roles:[...], alive_claude, claimed_pids, tagged, unclaimed_pids, edge_lock}。
+    返回 {as_of, psutil, roles:[...], alive_claude, claimed_pids, tagged, unclaimed_pids, locks}。
     每个 role 记 registered/caps(花名册真相)+ present/mode/claude_pid/daemon_pid/alive/age_s/verdict/cwd/current_*。
     注:presence 只存 claude_pid+cwd,不存 session-jsonl id —— 会话↔角色的对齐由 WebUI 侧按 cwd 关联(同 cwd 多 agent 时标注歧义,不猜)。"""
     alive = _alive_claude_pids()
@@ -99,7 +98,8 @@ def _who_data():
             # (实证:培训师 turn=thinking 在做任务·被记'worker静默'→球上静默1=假)。
             busy = _turn_busy(r)
             if busy:
-                rec["verdict"] = "🔧 干活中(%s·长任务心跳晚=正常)" % busy
+                dn, dh = _inbox_backlog(r)      # 忙而聋(2026-09-24):turn 活跃但 inbox 积压=协作断线·球/面板要看得见
+                rec["verdict"] = ("🔧 干活中·⚠聋(inbox积压%d·最老%sh·无wait)" % (dn, dh)) if dn else ("🔧 干活中(%s·长任务心跳晚=正常)" % busy)
             else:
                 rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
         elif proc_alive:
@@ -112,13 +112,11 @@ def _who_data():
     tagged = [{"pid": pid, "label": tags[str(pid)].get("label"), "private": bool(tags[str(pid)].get("private"))}
               for pid in rest if str(pid) in tags]
     unknown = [pid for pid in rest if str(pid) not in tags]
-    h = _edge_holder()
     return {
         "as_of": _now(), "psutil": psutil is not None, "roles": out_roles,
         "alive_claude": sorted(alive) if psutil is not None else [],
         "claimed_pids": sorted(claimed), "tagged": tagged, "unclaimed_pids": unknown,
-        "edge_lock": ({"who": h.get("who"), "age_s": _age_seconds(h.get("acquired_at", ""))} if h else None),
-        "locks": _lock_holders(),                     # A4 双发:[{resource, who, acquired_at, age_s}](含 edge)
+        "locks": _lock_holders(),                     # A4:[{resource, who, acquired_at, age_s}](含 edge·通用资源互斥)
     }
 
 

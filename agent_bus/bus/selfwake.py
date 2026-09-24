@@ -4,7 +4,7 @@
 依赖:config(BUS)· proc(_proc_scan/_age_seconds)· psutil。不依赖任何 cmd_* / 上层。
 自醒三态化(2026-07-08):armed 在岗 / recent 刚fire待重挂(瞬时) / stale 掉线 / off 未醒 / parked 休眠。
 """
-import json, os
+import json, os, time
 
 try:
     import psutil
@@ -121,6 +121,35 @@ def _self_wake_state(role, alive_pids=None, wait_roles=None):
     return _verdict_body(role, pf, wait_roles)
 
 
+def _inbox_backlog(role, min_age_s=None):
+    """role inbox 里【未领且已放置 ≥min_age_s】的消息 → (条数, 最老小时)。用于「忙而聋」判定(2026-09-24 实证:
+    turn 活跃 15h 却 inbox 积压 7 条=有 turn 无 bus 动作=收不到协作消息;守卫催单投 inbox 同样无人读)。
+    min_age_s 默认 config deaf_inbox_min(30 分钟)。读失败 (0, 0)。"""
+    try:
+        from bus.config import cfg
+        if min_age_s is None:
+            min_age_s = float(cfg("deaf_inbox_min", 30)) * 60
+        now = time.time(); n = 0; oldest = 0.0
+        for p in (BUS / role / "inbox").glob("*.json"):
+            try:
+                o = json.loads(p.read_text(encoding="utf-8"))
+                ts = time.mktime(time.strptime(str(o.get("created", ""))[:19], "%Y-%m-%dT%H:%M:%S"))
+            except Exception:
+                continue
+            age = now - ts
+            if age >= min_age_s:
+                n += 1; oldest = max(oldest, age)
+        return n, round(oldest / 3600, 1)
+    except Exception:
+        return 0, 0.0
+
+
+def _deaf_tag(role):
+    """turn 活跃但 inbox 积压 → '⚠忙而聋:inbox积压N条(最老Xh)·无wait=收不到消息' ;无积压 → ''。"""
+    n, h = _inbox_backlog(role)
+    return ("⚠忙而聋:inbox积压%d条(最老%sh)·无wait=收不到协作消息·任务间隙请 ab peek 排空+重挂" % (n, h)) if n else ""
+
+
 def _turn_busy(role, max_age=900):
     """role 的 turn 是否活跃干活中(turn_state.json 由 hook 盖:PreToolUse/thinking 等)。
     state∈{tool,thinking} 且 ts 距今 <max_age(默认 15min·长工具期间 ts 不刷新故放宽)→
@@ -171,6 +200,9 @@ def _verdict_body(role, pf, wait_roles):
             # 示例组员2 turn=tool·cpu 6% 活跃中误发拉活)。真卡死判据=turn ts 长期不动或进程退。
             ts_state = _turn_busy(role)
             if ts_state:
+                deaf = _deaf_tag(role)          # 2026-09-24:干活期正常态 ≠ 忙而聋(inbox 积压=协作断线·如实标出)
+                if deaf:
+                    return ("recent", "turn 活跃但 %s(%s)" % (deaf, ts_state))
                 return ("recent", "turn 活跃干活中(%s·无 wait=干活期正常态·非掉线)" % ts_state)
             return ("stale", "会话在但无 wait 进程、心跳超期 %ss——自醒掉线(没重挂?)" % age)
         return ("stale", "进程已退,自醒掉线")

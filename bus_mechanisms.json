@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 118,
+  "total": 119,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -214,6 +214,12 @@
      "does": "回合结束无armed wait→block令重挂;判据=wait.reg+wait_trace双文件(present+listening+pid活·fire grace 15s·no-armed宽限2s二查防启动窗口误拦);灰度仅MasterAgent·block留痕events;灰度段2=+Master(Master数分APPROVE b01e26·2026-09-17);已知覆盖盲区=fire后harness唤醒丢失型(无turn=hook零机会·守卫7min兜底);AGENTBUS_DISPATCH子会话豁免(f1d0a4e)",
      "carrier": "hooks/enforce_selfwake.py+settings Stop",
      "status": "灰度①·2026-09-16(用户批案+Master数分L级A签·治82%忘重挂·351次/3月数据驱动)"
+    },
+    {
+     "name": "忙而聋可见化(turn活跃但inbox积压)",
+     "does": "selfwake/status 对 turn 活跃(tool/thinking·ts<15min)且无 wait 的角色,再查 inbox 有无 ≥deaf_inbox_min(30min)未领消息:有→标 ⚠忙而聋/⚠聋(条数·最老小时)=有 turn 无 bus 动作的协作断线,与掉线/干活期正常态区分;守卫催单投 inbox 对聋者无效→靠球/面板可见 + C′ Stop-hook 回合末强制重挂(灰度白名单 config stop_hook_gray_roles 段③ +MasterUI +Master数分)",
+     "carrier": "bus/selfwake.py _inbox_backlog/_deaf_tag · bus/status.py 干活中 verdict · hooks/enforce_selfwake._gray_roles · config deaf_inbox_min/stop_hook_gray_roles · tests/scenario_deaf_busy.py",
+     "status": "新上·2026-09-24(实证:MasterUI/Master数分 fire 后未重挂·inbox 积压 15h 被判干活期正常态)"
     }
    ]
   },

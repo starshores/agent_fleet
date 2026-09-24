@@ -37,5 +37,13 @@
  "notice_debounce_s": 0,
  "notice_debounce_by_role": {
   "MasterAgent": 300
- }
+ },
+ "_deaf_comment": "忙而聋(2026-09-24):turn 活跃但 inbox 有 ≥deaf_inbox_min 分钟未领消息 → selfwake/status 标 ⚠聋;stop_hook_gray_roles=C′ Stop-hook 强制重挂白名单(null=全员)·段③ +MasterUI +Master数分",
+ "deaf_inbox_min": 30,
+ "stop_hook_gray_roles": [
+  "MasterAgent",
+  "Master",
+  "MasterUI",
+  "Master数分"
+ ]
 }
