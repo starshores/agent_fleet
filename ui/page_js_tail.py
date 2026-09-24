@@ -19,7 +19,7 @@ function renderHealth(){
   else{ b.className='hbadge warn'; b.textContent='🩺 ⚠ '+warns.length+' 项'; b.title=warns.join(' / '); }
   // 展开明细(六块)
   const sw=d.selfwake||{}, q=d.queues||{}, ls=d.loss||{}, fl=d.fleet||{}, w=d.webui||{};
-  const el=d.edge_lock;
+  const lks=Array.isArray(d.locks)?d.locks:(d.edge_lock?[Object.assign({resource:'edge'},d.edge_lock)]:[]);
   let h='<h4>🩺 bus 健康 · '+esc(d.as_of||'')+'</h4>';
   h+= warns.length? warns.map(x=>'<div class="hwarn">⚠ '+esc(x)+'</div>').join('')
                   : '<div class="hblk hgood"><b>✓ 全绿,无警告</b></div>';
@@ -35,7 +35,7 @@ function renderHealth(){
   h+=hRow('daemon 期望/在跑', (fl.alive||0)+' / '+(fl.expected||0), (fl.dead&&fl.dead.length)>0 || (fl.orphans&&fl.orphans.length)>0);
   if(fl.dead&&fl.dead.length) h+='<div class="hk hbad" style="padding-left:8px">已死:'+esc(fl.dead.join('、'))+'</div>';
   h+=hRow('WebUI owner pid / 陈旧实例', (w.owner_pid||'?')+' / '+(w.stale_dupes||0), (w.stale_dupes||0)>0);
-  h+=hRow('Edge 调试锁', el?('被占:'+esc(el.who||'?')):'空闲', !!el);
+  h+=hRow('资源锁', lks.length? lks.map(l=>esc(l.resource||'?')+' 被占:'+esc(l.who||'?')).join(' / '):'空闲', lks.length>0);
   pn.innerHTML=h;
 }
 async function loadHealth(){

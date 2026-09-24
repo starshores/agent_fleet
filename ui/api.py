@@ -871,8 +871,8 @@ def build_caps():
     """能力池/caps 数据:① 能力池清单(desc/default_for/风险/持有者)② agent×cap 矩阵
     ③ 能力分布(每 cap 几人持有)④ 缺口(空caps在岗 agent / 无持有者能力 / 过滤的测试角色)
     ⑤ 最小授权视角(高风险能力持有者)。文件实时读,只读不改。"""
-    pool = ab._load_caps_pool()        # capabilities.json 的 capabilities 段
-    agents = ab._load_agents()         # agents.json 花名册(含 retired 标记)
+    pool = ab.load_caps_pool()         # capabilities.json 的 capabilities 段
+    agents = ab.agents_view()          # agents.json 花名册(含 retired 标记)
     try:
         roster = ab._load_retired_roster()    # retired_roster.json(已摘番号的存档)
     except Exception:
@@ -1439,26 +1439,13 @@ STATUS_ORDER = {"待办": 0, "进行中": 1, "搁置": 2, "完成": 3}
 _VALID_PRIORITY = set(PRIORITY_ORDER)
 _VALID_STATUS = set(STATUS_ORDER)
 
-# 种子(空)—— 仅首次创建 todos.json 时写入
-_SEED_TODOS = [
-]
-
-
 def _todo_id():
     return "t-%d-%s" % (time.time_ns() // 1_000_000, os.urandom(2).hex())
 
 
 def _load_todos():
-    if not TODOS.exists():
-        # 首次:写入种子
-        seeded = []
-        for s in _SEED_TODOS:
-            o = dict(s)
-            o.update({"id": _todo_id(), "created": ab._now(), "updated": ab._now(),
-                      "task_id": None, "dispatched_to": None})
-            seeded.append(o)
-        _save_todos(seeded)
-        return seeded
+    if not TODOS.exists():          # 平台空载:无种子(旧业务种子已删·分离A4顺手)
+        return []
     try:
         data = json.loads(TODOS.read_text(encoding="utf-8"))
         return data if isinstance(data, list) else []
@@ -2136,7 +2123,7 @@ def build_fleet_log():
 
 def build_lifecycle():
     """汇总角色全生命周期:agents.json(在册) + retired_roster.json(退役档案) + fleet_log.jsonl(retire/revive)。"""
-    agents_data = ab._load_agents()
+    agents_data = ab.agents_view()
     try:
         roster = ab._load_retired_roster() or []
     except Exception:
@@ -2806,7 +2793,7 @@ def build_mechanisms():
 #  静态读·只读文件·无实时 telemetry·无 refresher 线程·数据不出本机。
 # =============================================================
 _ROLE_PROFILES = Path(r"C:\apphome\agent_fleet\role_profiles.json")
-_ROLE_PROFILES_BIZ = Path(r"C:\apphome\agent_fleet\role_profiles_biz.json")
+_ROLE_PROFILES_BIZ = Path(ab.biz_registry_dir()) / "role_profiles_biz.json"   # 分离C: 业务注册表外迁 biz_registry
 _HOOKS_DIR = Path(r"C:\apphome\agent_fleet\hooks")
 
 
