@@ -7,7 +7,7 @@ session_tags.json = 运行态磁盘文件（gitignore·不进 bus 核心 git）�
 
 依赖：config(BUS/_now)· io(_audit)· roles(_load_retired_roster)· mailbox(_resolve_self_role)· psutil。无反向依赖=无环。
 """
-import json, os
+import json, sys, os
 from pathlib import Path
 
 try:
@@ -170,7 +170,11 @@ def cmd_resume(args):
             continue
         try:
             d = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:
+            # Master数分 4057c1(2026-09-24):此前静默 continue → 角色从面板消失(实例:MasterAgent presence 含 317 个 NUL·昨 ab resume 不显 MasterAgent)。
+            # 改为显式一行『⚠presence损坏』·可修可见;其它字段留空不猜。
+            rows.append({"role": role, "state": "⚠presence损坏", "last_seen": "", "session_id": "", "cwd": "", "mode": "",
+                         "resume": "", "note": "presence.json 解析失败(%s)——ab hello --role %s 重写即自愈" % (type(e).__name__, role), "size_kb": 0})
             continue
         sid = d.get("session_id")
         cwd = d.get("cwd") or ""
@@ -198,10 +202,19 @@ def cmd_resume(args):
         rows.append({"role": role, "state": state, "last_seen": last, "session_id": sid or "",
                      "cwd": cwd, "mode": mode, "resume": resume_cmd, "note": note,
                      "size_kb": round(f.stat().st_size / 1024, 1) if f else 0})
-    order = {"⏻需恢复": 0, "⚠会话缺失": 1, "⚠无会话锚": 1, "⏻daemon停": 2, "✓在岗": 3, "🅿️休眠": 4}
+    order = {"⚠presence损坏": 0, "⏻需恢复": 0, "⚠会话缺失": 1, "⚠无会话锚": 1, "⏻daemon停": 2, "✓在岗": 3, "🅿️休眠": 4}
     rows.sort(key=lambda r: (order.get(r["state"], 9), r["role"]))
+    # 同一 session_id 被 ≥2 个 role 登记 = 冒用/错登记(实例:会话考古 presence 曾登记 MasterAgent 的 sid·resume 面板两行同 id)。纯告警不改行。
+    _by_sid = {}
+    for r in rows:
+        if r.get("session_id"):
+            _by_sid.setdefault(r["session_id"], []).append(r["role"])
+    dup_warns = ["⚠ 同一会话id被多个 role 登记(冒用/错登记·请核 presence.json):%s → %s" % (s, "、".join(rs))
+                 for s, rs in _by_sid.items() if len(rs) >= 2]
     if getattr(args, "json", False):
         print(json.dumps(rows, ensure_ascii=False))
+        for w in dup_warns:
+            sys.stderr.write(w + "\n")         # --json 保持 rows 结构不变·告警走 stderr
         return
     n_need = sum(1 for r in rows if r["state"] == "⏻需恢复")
     print("停机快速恢复(角色→最后绑定会话·presence 锚;共 %d 角色 · 需恢复 %d):" % (len(rows), n_need))
@@ -216,7 +229,9 @@ def cmd_resume(args):
         for r in rows:
             if r["resume"]:
                 print("  [%s]\t%s" % (r["role"], r["resume"]))
-    print("\n口径:✓在岗=绑定进程活着不用动;⏻需恢复=进程没了且会话 jsonl 在(可 resume);休眠/伪角色/退役不需恢复。")
+    for w in dup_warns:
+        print(w)
+    print("\n口径:✓在岗=绑定进程活着不用动;⏻需恢复=进程没了且会话 jsonl 在(可 resume);休眠/伪角色/退役不需恢复;⚠presence损坏=文件坏了先 hello 重写。")
 
 
 def cmd_sessions(args):
