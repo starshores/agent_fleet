@@ -1,7 +1,8 @@
 {
   "env": {
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65",
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000",
+    "CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP": "1"
   },
   "model": "sonnet",
   "hooks": {
@@ -116,5 +117,6 @@
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "_env_note_reap": "2026-09-24 用户确认:禁 Claude Code 低内存回收后台任务(④型掉线根因·近3天20次);同时已 setx 用户级环境变量·此处并记=换机回填不丢(settings env 对新会话同样生效)"
 }
