@@ -19,7 +19,7 @@ function renderHealth(){
   else{ b.className='hbadge warn'; b.textContent='🩺 ⚠ '+warns.length+' 项'; b.title=warns.join(' / '); }
   // 展开明细(六块)
   const sw=d.selfwake||{}, q=d.queues||{}, ls=d.loss||{}, fl=d.fleet||{}, w=d.webui||{};
-  const lks=Array.isArray(d.locks)?d.locks:(d.edge_lock?[Object.assign({resource:'edge'},d.edge_lock)]:[]);
+  const lks=Array.isArray(d.locks)?d.locks:[];
   let h='<h4>🩺 bus 健康 · '+esc(d.as_of||'')+'</h4>';
   h+= warns.length? warns.map(x=>'<div class="hwarn">⚠ '+esc(x)+'</div>').join('')
                   : '<div class="hblk hgood"><b>✓ 全绿,无警告</b></div>';
