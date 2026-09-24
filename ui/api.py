@@ -1939,7 +1939,7 @@ def read_sessions():
 #  上下文窗口占用 —— 1M 撞墙预警(SESSION_RELIABILITY 可视化落地)
 #  数据源:每个活跃 session 的 jsonl 尾部最后一条 assistant.usage:
 #    ctx = input_tokens + cache_read_input_tokens + cache_creation_input_tokens
-#    占用% = ctx / 窗口(按模型真实值,opus-4*/sonnet-4=1M、haiku=200K、未知=200K 标注)
+#    占用% = ctx / 窗口(按模型真实值,Claude5/opus-4*/sonnet-4-6=1M、haiku=200K、未知=默认1M 标注)
 #  性能:bounded tail/head 读(不整文件加载),且只在后台刷新线程跑 → 请求路径只读缓存,绝不现读。
 #  显示:所有活跃会话如实显 proj(自看控制台无外部方,默认不脱敏);is_agent 仅用于 role 绑定判定,不再据此掩码个人会话。
 # =============================================================
@@ -1957,15 +1957,12 @@ def _ctx_win_of(model):
     """模型→上下文窗口(真实值)。返回 (window, known):known=False 表示窗口为假定值,UI 需标注。
     切勿按名硬编 200K——opus-4-7/opus-4-8 都是 1M(踩过把 opus-4-7 当 200K 算出假 164%)。"""
     m = (model or "").lower()
-    if "fable" in m or "mythos" in m:            # Claude 5 家族:fable-5/mythos-5=1M(claude-api 权威·2026-07-27 修 fable 落 200K 假红警)
+    if "haiku" in m:                              # haiku=200K(唯一已知小窗口)
+        return 200000, True
+    if ("fable" in m or "mythos" in m or "opus-5" in m or "sonnet-5" in m
+            or "opus-4" in m or "sonnet-4-6" in m):  # Claude 5 家族 + opus-4* + sonnet-4-6 = 1M(确认)
         return 1000000, True
-    if "opus-4" in m or "haiku" in m:           # 任务确认:opus-4*=1M、haiku=200K
-        return (1000000 if "opus-4" in m else 200000), True
-    if "sonnet-4-6" in m:                         # 官方确认 1M(claude-api 权威·2026-07-28)
-        return 1000000, True
-    if "sonnet-4" in m:                           # 其余 sonnet-4*(4-0/4-5 默认 200K·1M须beta头)·假定
-        return 1000000, False
-    return 200000, False                         # 未知:默认 200K 且标注
+    return 1000000, False                        # 未知:默认 1M 且标注(用户令 2026-09-24·修 opus-5-5 落 200K 假 5 倍占用)
 
 
 def _ctx_tail_text(path, nbytes):

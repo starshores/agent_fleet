@@ -125,7 +125,7 @@ function renderCtx(){
       +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
       +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
   }).join(''));
-  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role✓=session_id 精确绑定(who 暴露 presence.session_id ⨝ 会话 jsonl id,MasterAgent 全解;不再 regex 猜);未绑定=daemon(无此 env)/尚未 re-hello/非注册会话,不猜。占用逐会话精确。窗口:opus-4*/sonnet-4=1M、haiku/未知=200K(假定标注)。所有会话如实显 proj(自看控制台默认不脱敏,能看清哪个个人会话在吃上下文/逼近压线);liveness/注册看 🛰 运维面板。';
+  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role✓=session_id 精确绑定(who 暴露 presence.session_id ⨝ 会话 jsonl id,MasterAgent 全解;不再 regex 猜);未绑定=daemon(无此 env)/尚未 re-hello/非注册会话,不猜。占用逐会话精确。窗口:Claude5/opus-4*/sonnet-4-6=1M、haiku=200K、未知=默认1M(假定标注)。所有会话如实显 proj(自看控制台默认不脱敏,能看清哪个个人会话在吃上下文/逼近压线);liveness/注册看 🛰 运维面板。';
 }
 async function loadCtx(){
   try{ const r=await fetch('/api/ctxpanel'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
