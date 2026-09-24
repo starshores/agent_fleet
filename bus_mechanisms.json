@@ -223,7 +223,7 @@
     },
     {
      "name": "④型悬单真修(harness回收→孤儿claim)",
-     "does": "harness 低内存回收杀 wait 的 bash 包装壳→python wait 孤儿仍 claim→消息烂 processing(实锤 MasterUI/Master数分 各1例·15h)。修:_claim 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);每次 wait 起手 _requeue_orphans 把 claim 者已亡的悬单退回 inbox(新 wait 立刻领到);reap 判 claim 者已亡立即退回;selfwake/who 标 ⚠悬单N;守卫聋态不投 inbox 催单只 toast;尸检四型口径",
+     "does": "harness 低内存回收杀 wait 的 bash 包装壳→python wait 孤儿仍 claim→消息烂 processing(实锤 MasterUI/Master数分 各1例·15h)。修:_claim 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);每次 wait 起手 _requeue_orphans 把悬单退回 inbox(新 wait 立刻领到);reap 同判据。悬单判据(Master数分 d21617 热修)=listening 角色 processing 消息 claimed 后该会话无 turn 活动 ≥orphan_no_turn_min(30)·不用 claim_pid 存活(wait 自身 pid 恒亡·反了会双处理);selfwake/who 标 ⚠悬单N;守卫聋态不投 inbox 催单只 toast;尸检四型口径",
      "carrier": "bus/mailbox._claim · bus/core._start_wait_heartbeat/_wait_core · bus/selfwake._orphan_claims/_requeue_orphans · bus/health.cmd_reap · identity.cmd_selfwake_guard/_wait_autopsy · tests/scenario_deaf_orphan.py",
      "status": "新上·2026-09-24(Master数分 15b5e5 a/b 要求)"
     }

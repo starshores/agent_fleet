@@ -100,7 +100,7 @@ def _who_data():
             if busy:
                 dn, dh = _inbox_backlog(r)      # 忙而聋(2026-09-24):turn 活跃但 inbox 积压=协作断线·球/面板要看得见
                 do = len(_orphan_claims(r))     # ④悬单:processing 里 claim 者已亡
-                tag = ("·⚠聋(inbox积压%d·最老%sh·无wait)" % (dn, dh) if dn else "") + ("·⚠悬单%d(claim者已亡)" % do if do else "")
+                tag = ("·⚠聋(inbox积压%d·最老%sh·无wait)" % (dn, dh) if dn else "") + ("·⚠悬单%d(claimed后无turn)" % do if do else "")
                 rec["verdict"] = ("🔧 干活中" + tag) if tag else ("🔧 干活中(%s·长任务心跳晚=正常)" % busy)
             else:
                 rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")

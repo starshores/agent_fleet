@@ -144,28 +144,53 @@ def _inbox_backlog(role, min_age_s=None):
         return 0, 0.0
 
 
+def _is_orphan_claim(role, obj, now=None, min_s=None, turn_ts=None):
+    """单条 processing 消息是否悬单(④型·Master数分 d21617 判据·2026-09-24):
+    claimed 之后该 role【无任何 turn 活动】(turn_state.ts <= claimed 或无 turn_state)且距 claimed ≥ orphan_no_turn_min(默认 30)分钟
+    = wait 领了但输出没送到会话(harness 回收/不再通知)。★不能用 claim_pid 存活判(claim_pid=wait 自身·正常 claim 后即退=恒亡·判据反了会把在办消息退回=双处理)。
+    turn_ts 可由调用方预读传入(批量时省 IO)。"""
+    try:
+        from bus.config import cfg
+        if min_s is None:
+            min_s = float(cfg("orphan_no_turn_min", 30)) * 60
+        now = now or time.time()
+        cl = str(obj.get("claimed") or "")[:19]
+        if not cl:
+            return False
+        cl_ts = time.mktime(time.strptime(cl, "%Y-%m-%dT%H:%M:%S"))
+        if now - cl_ts < min_s:
+            return False
+        if turn_ts is None:
+            try:
+                turn_ts = (json.loads((BUS / role / "turn_state.json").read_text(encoding="utf-8")).get("ts") or "")[:19]
+            except Exception:
+                turn_ts = ""
+        return not (turn_ts and turn_ts > cl)
+    except Exception:
+        return False
+
+
 def _orphan_claims(role):
-    """processing 里 claim 者已亡的悬单(④型·harness 内存回收杀掉 wait 包装壳·python 孤儿 claim 后无 turn 处理):
-    判据=claim_pid 已记且进程不存在(pid 复用成非 python 也算亡)。返回 [path,...]。无 claim_pid 的旧消息不判(留 reap ttl 兜)。"""
+    """processing 里的悬单列表(见 _is_orphan_claim)。只判 mode=listening 的会话角色;daemon(worker 跑 claude -p·turn_state 不由 hook 盖)不判·交 reap ttl 兜。"""
     out = []
     try:
-        import psutil as _ps
+        pr = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+        if pr.get("mode") != "listening":
+            return out
     except Exception:
         return out
+    try:
+        turn_ts = (json.loads((BUS / role / "turn_state.json").read_text(encoding="utf-8")).get("ts") or "")[:19]
+    except Exception:
+        turn_ts = ""
+    now = time.time()
     try:
         for p in (BUS / role / "processing").glob("*.json"):
             try:
                 o = json.loads(p.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            cp = o.get("claim_pid")
-            if not cp:
-                continue
-            try:
-                alive = _ps.pid_exists(int(cp)) and "python" in (_ps.Process(int(cp)).name() or "").lower()
-            except Exception:
-                alive = False
-            if not alive:
+            if _is_orphan_claim(role, o, now=now, turn_ts=turn_ts):
                 out.append(p)
     except Exception:
         pass
@@ -180,7 +205,7 @@ def _requeue_orphans(role):
         try:
             o = json.loads(p.read_text(encoding="utf-8"))
             o["status"] = "pending"; o["requeue_count"] = int(o.get("requeue_count", 0)) + 1
-            o["requeued_at"] = time.strftime("%Y-%m-%dT%H:%M:%S"); o["requeue_why"] = "claim者已亡(④harness回收孤儿claim)"
+            o["requeued_at"] = time.strftime("%Y-%m-%dT%H:%M:%S"); o["requeue_why"] = "claimed后无turn活动≥阈值(④型悬单·输出未送达会话)"
             o.pop("claimed", None); o.pop("claim_pid", None); o.pop("claim_ppid", None)
             p.write_text(json.dumps(o, ensure_ascii=False, indent=1), encoding="utf-8")
             os.replace(str(p), str(BUS / role / "inbox" / p.name)); n += 1
@@ -195,7 +220,7 @@ def _deaf_tag(role):
     tag = ("⚠忙而聋:inbox积压%d条(最老%sh)·无wait=收不到协作消息·任务间隙请 ab peek 排空+重挂" % (n, h)) if n else ""
     o = len(_orphan_claims(role))
     if o:
-        tag = (tag + "·" if tag else "") + "⚠悬单%d(claim者已亡=④harness回收孤儿·重挂wait即自动退回inbox)" % o
+        tag = (tag + "·" if tag else "") + "⚠悬单%d(claimed后无turn≥阈值=④型·重挂wait即自动退回inbox)" % o
     return tag
 
 

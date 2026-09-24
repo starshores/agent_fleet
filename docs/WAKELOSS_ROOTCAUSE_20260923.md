@@ -32,4 +32,4 @@
 - 实锤 2 例(Master数分 15b5e5 独立核·会话 jsonl task-notification 原文):MasterUI 17:58 / Master数分 18:32 后台 wait 的 bash 包装壳被 Claude Code 低内存回收;python wait 成孤儿仍在 18:05 / 18:38 claim 消息(events 有 claim 无 turn)→ 消息烂 processing 15h。harness 通知明令勿自重启,agent 未重挂=当时正确行为·不计纪律·不计 C′。
 - 我(MasterAgent)首判①忘重挂并扩 C′ 段③到协调位=误判(自述根因不可信的反向实例:环境因被归纪律);Master数分驳回·config 已回退段②。
 - 四型口径:①忘重挂(C′ 治)/ ②C′误拦 / ③延迟唤醒 a·b(守卫两级窗)/ ④harness 回收·孤儿 claim(本补遗·真修如下);环境死并入④。
-- 真修(同日落地):`_claim` 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);`_requeue_orphans` 在每次 wait 起手把 claim 者已亡的悬单退回 inbox(新 wait 立刻领到);reap 判 claim 者已亡立即退回;selfwake/who 标 ⚠悬单N;守卫对忙而聋态不投 inbox 催单(白投)只 toast。smoke deaf.busy / deaf.orphan。
+- 真修(同日落地):`_claim` 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);`_requeue_orphans` 在每次 wait 起手把悬单退回 inbox(新 wait 立刻领到);reap 同判据退回。★悬单判据(Master数分 d21617 热修):listening 角色 processing 消息【claimed 后该会话无 turn 活动 ≥ orphan_no_turn_min(30)】=输出未送达;**不能**用 claim_pid 存活判(claim_pid=wait 自身 pid·正常 claim 后即退=恒亡·反了会把在办消息退回=双处理·smoke 曾漏测『正常 claim 后 wait 退出』态);selfwake/who 标 ⚠悬单N;守卫对忙而聋态不投 inbox 催单(白投)只 toast。smoke deaf.busy / deaf.orphan。

@@ -31,12 +31,16 @@ def cmd_reap(args):
     挪到 <role>/failed/ 不再 requeue(避免坏任务无限重派打爆舰队)。
     grace 默认 120s(避开刚领取时 presence 短暂空窗的误判);ttl 默认 4000s(> daemon claude -p 的 3600s 超时,正常长任务不误伤)。"""
     roles = [args.role] if args.role else _list_roles()
-    actions = []
+    actions = []; role_mode = {}
     for role in roles:
         proc = BUS / role / "processing"
         if not proc.exists():
             continue
         live = _owner_live(role)
+        try:
+            role_mode[role] = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("mode")
+        except Exception:
+            role_mode[role] = None
         for p in sorted(proc.glob("*.json")):
             try:
                 obj = json.loads(p.read_text(encoding="utf-8"))
@@ -45,14 +49,10 @@ def cmd_reap(args):
             age = _age_seconds(obj.get("claimed") or obj.get("created") or "")
             if age is None:
                 continue
-            # ④型(2026-09-24 Master数分 15b5e5):claim 者 pid 已亡=悬单·不等 grace 立即退回(harness 内存回收杀包装壳·python 孤儿 claim 后无人处理)
-            claim_dead = False
-            cp = obj.get("claim_pid")
-            if cp and psutil is not None:
-                try:
-                    claim_dead = not (psutil.pid_exists(int(cp)) and "python" in (psutil.Process(int(cp)).name() or "").lower())
-                except Exception:
-                    claim_dead = True
+            # ④型悬单(Master数分 d21617 判据·2026-09-24):claimed 后该会话无 turn 活动 ≥ orphan_no_turn_min → 退回。
+            # ★曾用 claim_pid 存活判=反了(claim_pid 是 wait 自身·正常 claim 后即退=恒亡·会把在办消息退回双处理)·热修改 turn 判据。
+            from bus.selfwake import _is_orphan_claim
+            claim_dead = _is_orphan_claim(role, obj) if (role_mode.get(role) == "listening") else False
             stuck = claim_dead or (not live and age > args.grace) or (age > args.ttl)
             if not stuck:
                 continue
@@ -90,7 +90,7 @@ def cmd_reap(args):
                     os.replace(str(p), str(BUS / role / "inbox" / p.name))
                 except Exception:
                     pass
-            why = "claim者已亡(④harness回收孤儿claim)" if claim_dead else ("owner存活但超ttl卡死" if live else "owner进程已退")
+            why = "claimed后无turn≥阈值(④型悬单)" if claim_dead else ("owner存活但超ttl卡死" if live else "owner进程已退")
             actions.append(("退回inbox(第%d次,%s,age%ds)" % (rq, why, age), role, tid))
     if not actions:
         print("reap: 无孤儿任务(processing 干净,或 owner 都在听且未超 ttl)"); return
