@@ -27,3 +27,9 @@
 
 ## 对 Master 的用法含义
 "⚠掉线" 在 fire 后 30 min 内多为延迟唤醒·会自愈;别在 7 min 时拉活。真掉线判据=fire 后 >60 min 且 turn_state idle 且无任何动作。
+
+## 补遗(2026-09-24)· 第④型:harness 内存回收 → 孤儿 wait 仍 claim → 悬单
+- 实锤 2 例(Master数分 15b5e5 独立核·会话 jsonl task-notification 原文):MasterUI 17:58 / Master数分 18:32 后台 wait 的 bash 包装壳被 Claude Code 低内存回收;python wait 成孤儿仍在 18:05 / 18:38 claim 消息(events 有 claim 无 turn)→ 消息烂 processing 15h。harness 通知明令勿自重启,agent 未重挂=当时正确行为·不计纪律·不计 C′。
+- 我(MasterAgent)首判①忘重挂并扩 C′ 段③到协调位=误判(自述根因不可信的反向实例:环境因被归纪律);Master数分驳回·config 已回退段②。
+- 四型口径:①忘重挂(C′ 治)/ ②C′误拦 / ③延迟唤醒 a·b(守卫两级窗)/ ④harness 回收·孤儿 claim(本补遗·真修如下);环境死并入④。
+- 真修(同日落地):`_claim` 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);`_requeue_orphans` 在每次 wait 起手把 claim 者已亡的悬单退回 inbox(新 wait 立刻领到);reap 判 claim 者已亡立即退回;selfwake/who 标 ⚠悬单N;守卫对忙而聋态不投 inbox 催单(白投)只 toast。smoke deaf.busy / deaf.orphan。

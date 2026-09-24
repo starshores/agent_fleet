@@ -73,6 +73,11 @@ def _claim(role, taskpath, locked=False):
         return {"error": "bad task file: %s" % e}
     obj["status"] = "processing"
     obj["claimed"] = _now()
+    obj["claim_pid"] = os.getpid()                    # ④型排障/孤儿判定(2026-09-24 Master数分 15b5e5):claim 者 pid·死了=悬单
+    try:
+        obj["claim_ppid"] = os.getppid()              # 父壳(bash 包装)pid·harness 内存回收杀的就是它
+    except Exception:
+        pass
     try:
         _write_json(proc, obj)   # 更新 status/claimed 供 who/WebUI 看
     except Exception as e:

@@ -70,22 +70,6 @@
   "desc": "",
   "effort": "high"
  },
- "__wgm1__": {
-  "registered": "2026-07-10T15:44:58",
-  "desc": "wgtest"
- },
- "__wgm2__": {
-  "registered": "2026-07-10T15:44:58",
-  "desc": "wgtest"
- },
- "__wgm3__": {
-  "registered": "2026-07-10T15:44:58",
-  "desc": "wgtest"
- },
- "__wgmB__": {
-  "registered": "2026-07-10T15:53:52",
-  "desc": "x"
- },
  "Master数分": {
   "registered": "2026-07-14T16:05:19",
   "desc": "数据分析口(数分线回归基名·数分→数分2累积后缀收回):bus/用量/成本资源数据分析与口径把关(评估用token不用$·真实可溯源):Claude全会话用量token增量ETL入usage.db(持久方舟·message_id幂等)、用量成本SQLite分析、BI用量JSON API、token_stats.py口径维护。管理层,cwd=agent_fleet。",

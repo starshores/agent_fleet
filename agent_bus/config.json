@@ -1,49 +1,47 @@
 {
- "_comment": "agent bus 机器相关路径集中配置。迁移/换机/换用户名只改这一处。每项可被环境变量 AGENTBUS_<KEY大写> 覆盖(如 AGENTBUS_CLAUDE_BIN)。路径用正斜杠,Windows 也接受;支持 ~(用户目录)。",
- "claude_bin": "~/AppData/Roaming/npm/claude.cmd",
- "python_bin": "C:/path/to/python.exe",
- "default_worker_cwd": "C:/BaseSpace/XXX",
- "repo": "C:/BaseSpace/XXX",
- "memory_index": "~/.claude/projects/XXX/memory/MEMORY.md",
- "agent_fleet_home": "C:/apphome/agent_fleet",
- "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
- "usage_db": "~/.claude/agent_bus/usage.db",
- "idle_timeout_policy": {
-  "_comment": "ab wait --timeout 0 哨兵的空返超时。真任务事件即时接活不受此影响。sentinel_mode=block(用户令 2026-08-10:自醒改'有消息才被叫醒',消灭 idle 冷唤醒白烧~周$361)→返回 block_timeout_s(默认7天=实践上阻塞到消息;大有限值留极限自愈,防 harness 清理后永久掉聋)。改回 daynight 则按日/夜(day/night_timeout_s)。切换/调时长改此处一处。",
-  "sentinel_mode": "block",
-  "block_timeout_s": 604800,
-  "day_start_hour": 7,
-  "night_start_hour": 23,
-  "day_timeout_s": 7200,
-  "night_timeout_s": 21600
- },
- "env": {
-  "PYTHONUTF8": "1"
- },
- "_env_comment": "bus 启动环境(2026-07-10 UTF-8 根治):PYTHONUTF8=1 让 bus 起的 python 一律 UTF-8 I/O,从源头免 GBK 乱码。各 python 入口已 os.environ.setdefault 兜住子进程;launcher(start_worker.ps1 等)可读此块 export 到 shell 覆盖 ad-hoc。",
- "_guard_comment": "守卫两级窗(Master数分781e5d·2026-09-23):fire后<grace不催·≥true_offline且无turn=真掉线升级·近recent有turn=在处理不催",
- "guard_fire_grace_min": 30,
- "guard_true_offline_min": 60,
- "guard_recent_turn_min": 5,
- "_jitter_comment": "广播错峰(Master数分闸①PASS):同发送方burst_window内send≥threshold→随机延迟jitter_range秒;--kind urgent/AGENTBUS_NO_JITTER免",
- "send_burst_threshold": 3,
- "send_burst_window_s": 30,
- "send_jitter_range_s": [
-  5,
-  15
- ],
- "_noticeB_comment": "档B(Master数分签字2026-09-23):fyi_no_receipt=fyi免回执;notice_debounce_s=纯回执去抖窗秒(0=关);by_role 覆盖(段1=MasterAgent 300)",
- "fyi_no_receipt": true,
- "notice_debounce_s": 0,
- "notice_debounce_by_role": {
-  "MasterAgent": 300
- },
- "_deaf_comment": "忙而聋(2026-09-24):turn 活跃但 inbox 有 ≥deaf_inbox_min 分钟未领消息 → selfwake/status 标 ⚠聋;stop_hook_gray_roles=C′ Stop-hook 强制重挂白名单(null=全员)·段③ +MasterUI +Master数分",
- "deaf_inbox_min": 30,
- "stop_hook_gray_roles": [
-  "MasterAgent",
-  "Master",
-  "MasterUI",
-  "Master数分"
- ]
+  "_comment": "agent bus 机器相关路径集中配置。迁移/换机/换用户名只改这一处。每项可被环境变量 AGENTBUS_<KEY大写> 覆盖(如 AGENTBUS_CLAUDE_BIN)。路径用正斜杠,Windows 也接受;支持 ~(用户目录)。",
+  "claude_bin": "~/AppData/Roaming/npm/claude.cmd",
+  "python_bin": "C:/path/to/python.exe",
+  "default_worker_cwd": "C:/BaseSpace/XXX",
+  "repo": "C:/BaseSpace/XXX",
+  "memory_index": "~/.claude/projects/XXX/memory/MEMORY.md",
+  "agent_fleet_home": "C:/apphome/agent_fleet",
+  "sync_memory_script": "C:/apphome/agent_fleet/sync_memory.ps1",
+  "usage_db": "~/.claude/agent_bus/usage.db",
+  "idle_timeout_policy": {
+   "_comment": "ab wait --timeout 0 哨兵的空返超时。真任务事件即时接活不受此影响。sentinel_mode=block(用户令 2026-08-10:自醒改'有消息才被叫醒',消灭 idle 冷唤醒白烧~周$361)→返回 block_timeout_s(默认7天=实践上阻塞到消息;大有限值留极限自愈,防 harness 清理后永久掉聋)。改回 daynight 则按日/夜(day/night_timeout_s)。切换/调时长改此处一处。",
+   "sentinel_mode": "block",
+   "block_timeout_s": 604800,
+   "day_start_hour": 7,
+   "night_start_hour": 23,
+   "day_timeout_s": 7200,
+   "night_timeout_s": 21600
+  },
+  "env": {
+   "PYTHONUTF8": "1"
+  },
+  "_env_comment": "bus 启动环境(2026-07-10 UTF-8 根治):PYTHONUTF8=1 让 bus 起的 python 一律 UTF-8 I/O,从源头免 GBK 乱码。各 python 入口已 os.environ.setdefault 兜住子进程;launcher(start_worker.ps1 等)可读此块 export 到 shell 覆盖 ad-hoc。",
+  "_guard_comment": "守卫两级窗(Master数分781e5d·2026-09-23):fire后<grace不催·≥true_offline且无turn=真掉线升级·近recent有turn=在处理不催",
+  "guard_fire_grace_min": 30,
+  "guard_true_offline_min": 60,
+  "guard_recent_turn_min": 5,
+  "_jitter_comment": "广播错峰(Master数分闸①PASS):同发送方burst_window内send≥threshold→随机延迟jitter_range秒;--kind urgent/AGENTBUS_NO_JITTER免",
+  "send_burst_threshold": 3,
+  "send_burst_window_s": 30,
+  "send_jitter_range_s": [
+   5,
+   15
+  ],
+  "_noticeB_comment": "档B(Master数分签字2026-09-23):fyi_no_receipt=fyi免回执;notice_debounce_s=纯回执去抖窗秒(0=关);by_role 覆盖(段1=MasterAgent 300)",
+  "fyi_no_receipt": true,
+  "notice_debounce_s": 0,
+  "notice_debounce_by_role": {
+   "MasterAgent": 300
+  },
+  "_deaf_comment": "忙而聋(2026-09-24):turn 活跃但 inbox 有 ≥deaf_inbox_min 分钟未领消息 → selfwake/status 标 ⚠聋;stop_hook_gray_roles=C′ Stop-hook 强制重挂白名单(null=全员)·段③扩协调位被Master数分驳回(15b5e5:昨晚MasterUI/Master数分掉线=④harness内存回收型非①忘重挂·C′不对症且与harness勿自重启指令冲突)·按原候选 示例成员/示例组员4 走",
+  "deaf_inbox_min": 30,
+  "stop_hook_gray_roles": [
+   "MasterAgent",
+   "Master"
+  ]
 }

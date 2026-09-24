@@ -300,6 +300,7 @@ def build_tests():
     T.append(("a2.prompt_lock_hint", ["@py", os.path.join(_TESTS, "scenario_a2_prompt_lock_hint.py")], chk_contains("ALL PASS"), "分离A2:用锁角色有载prompt含edge锁提示(全覆盖)/空载平台段零业务词/daemon·dispatch源码零业务词"))
     T.append(("a3.external_tools", ["@py", os.path.join(_TESTS, "scenario_a3_external_tools.py")], chk_contains("ALL PASS"), "分离A3:平台目录零external工具(桩已删)/新位edge_lock经ab lock成功/新位四工具--help/业务工具缺失平台lock照常"))
     T.append(("deaf.busy", ["@py", os.path.join(_TESTS, "scenario_deaf_busy.py")], chk_contains("ALL PASS"), "忙而聋:turn活跃+inbox积压→selfwake/who标⚠聋·清空不误标·hook灰度读config"))
+    T.append(("deaf.orphan", ["@py", os.path.join(_TESTS, "scenario_deaf_orphan.py")], chk_contains("ALL PASS"), "④型悬单:claim_pid已死→识别/selfwake标/reap判/退回inbox/活claim不判/真wait起手自动退回并领到"))
     return T
 
 

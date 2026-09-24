@@ -144,10 +144,59 @@ def _inbox_backlog(role, min_age_s=None):
         return 0, 0.0
 
 
+def _orphan_claims(role):
+    """processing 里 claim 者已亡的悬单(④型·harness 内存回收杀掉 wait 包装壳·python 孤儿 claim 后无 turn 处理):
+    判据=claim_pid 已记且进程不存在(pid 复用成非 python 也算亡)。返回 [path,...]。无 claim_pid 的旧消息不判(留 reap ttl 兜)。"""
+    out = []
+    try:
+        import psutil as _ps
+    except Exception:
+        return out
+    try:
+        for p in (BUS / role / "processing").glob("*.json"):
+            try:
+                o = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            cp = o.get("claim_pid")
+            if not cp:
+                continue
+            try:
+                alive = _ps.pid_exists(int(cp)) and "python" in (_ps.Process(int(cp)).name() or "").lower()
+            except Exception:
+                alive = False
+            if not alive:
+                out.append(p)
+    except Exception:
+        pass
+    return out
+
+
+def _requeue_orphans(role):
+    """悬单退回 inbox(④型真修·Master数分 15b5e5 a):新 wait 起手调用→自己立刻能领到;reap 周期也调用。
+    先原地改写再 os.replace 原子搬回(任一时刻文件只在一处)。返回退回条数。"""
+    n = 0
+    for p in _orphan_claims(role):
+        try:
+            o = json.loads(p.read_text(encoding="utf-8"))
+            o["status"] = "pending"; o["requeue_count"] = int(o.get("requeue_count", 0)) + 1
+            o["requeued_at"] = time.strftime("%Y-%m-%dT%H:%M:%S"); o["requeue_why"] = "claim者已亡(④harness回收孤儿claim)"
+            o.pop("claimed", None); o.pop("claim_pid", None); o.pop("claim_ppid", None)
+            p.write_text(json.dumps(o, ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(str(p), str(BUS / role / "inbox" / p.name)); n += 1
+        except Exception:
+            pass
+    return n
+
+
 def _deaf_tag(role):
     """turn 活跃但 inbox 积压 → '⚠忙而聋:inbox积压N条(最老Xh)·无wait=收不到消息' ;无积压 → ''。"""
     n, h = _inbox_backlog(role)
-    return ("⚠忙而聋:inbox积压%d条(最老%sh)·无wait=收不到协作消息·任务间隙请 ab peek 排空+重挂" % (n, h)) if n else ""
+    tag = ("⚠忙而聋:inbox积压%d条(最老%sh)·无wait=收不到协作消息·任务间隙请 ab peek 排空+重挂" % (n, h)) if n else ""
+    o = len(_orphan_claims(role))
+    if o:
+        tag = (tag + "·" if tag else "") + "⚠悬单%d(claim者已亡=④harness回收孤儿·重挂wait即自动退回inbox)" % o
+    return tag
 
 
 def _turn_busy(role, max_age=900):
@@ -193,6 +242,9 @@ def _verdict_body(role, pf, wait_roles):
         pid = pr.get("claude_pid")
         alive = bool(psutil is not None and pid and psutil.pid_exists(pid))
         if alive and fresh:
+            deaf = _deaf_tag(role)          # 2026-09-24:刚 fire 待重挂态也要露出 悬单/聋(④型悬单恰在此态出现)
+            if deaf:
+                return ("recent", "有心跳无 wait 进程但 %s(心跳 %ss)" % (deaf, age))
             return ("recent", "有心跳无 wait 进程(刚 fire 待重挂/交互中·非 event-armed·心跳 %ss)" % age)
         if alive:
             # 交叉 turn_state(2026-09-17):活跃干活中(turn=tool/thinking·ts 较新)不算掉线——

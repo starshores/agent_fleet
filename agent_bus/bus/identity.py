@@ -391,7 +391,7 @@ def cmd_selfwake_guard(args):
         print("自醒巡检:%d 疑掉线,均【首次/未连续确认】→本轮不报(待下轮确认,消瞬时假阳性):%s"
               % (len(stale), "、".join(sorted(cur))))
         return
-    reminded, skipped, delayed = [], [], []
+    reminded, skipped, delayed, deaf = [], [], [], []
     marker = "[自醒守卫·请重挂]"
     stale_confirmed = [(r, d) for r, d in stale if r in confirmed]
     for role, detail in stale_confirmed:
@@ -400,6 +400,11 @@ def cmd_selfwake_guard(args):
         skip, level, note = _guard_delay_verdict(role)
         if skip:
             delayed.append("%s(%s)" % (role, note)); continue
+        # 聋态(2026-09-24 Master数分 15b5e5):turn 活跃/心跳新鲜但 inbox 已积压 → inbox 催单=白投(它不读 inbox)→ 只 toast 给人·不投
+        from bus.selfwake import _inbox_backlog as _ib
+        _dn, _dh = _ib(role)
+        if _dn:
+            deaf.append("%s(inbox积压%d·最老%sh)" % (role, _dn, _dh)); continue
         # dedup:该 role inbox 已有未领的守卫提醒 → 跳过不重投
         dup = False
         try:
@@ -428,7 +433,9 @@ def cmd_selfwake_guard(args):
         }
         _write_json(inbox / (tid + ".json"), task)
         reminded.append(role)
-    _audit("selfwake_guard", stale=len(stale), confirmed=len(confirmed), reminded=len(reminded), delayed=len(delayed))
+    _audit("selfwake_guard", stale=len(stale), confirmed=len(confirmed), reminded=len(reminded), delayed=len(delayed), deaf=len(deaf))
+    if not args.dry_run and deaf:
+        _fire_toast("⚠ %d 个 agent 忙而聋(inbox 积压·催单不投)" % len(deaf), "请在其 tab 里让它 ab peek 排空+重挂:" + "、".join(deaf))
     if not args.dry_run and reminded:
         _fire_toast("⚠ %d 个 agent 掉自醒(连续2次确认)" % len(confirmed),
                     "已提醒重挂:" + "、".join(reminded) + ("(另%d已提醒过)" % len(skipped) if skipped else ""))
@@ -438,6 +445,8 @@ def cmd_selfwake_guard(args):
         "" if args.dry_run else " + toast报警"))
     if delayed:
         print("   ⏳ 延迟窗内/在处理·本轮不催(两级窗·Master数分781e5d):" + "、".join(delayed))
+    if deaf:
+        print("   🔇 忙而聋·inbox 催单白投→只 toast(Master数分15b5e5):" + "、".join(deaf))
     for role, detail in stale:
         print("   - %s%s:%s | 尸检:%s" % (role, "" if role in confirmed else "(待确认)", detail, _wait_autopsy(role)))
 
@@ -456,7 +465,9 @@ def _wait_autopsy(role):
     except Exception:
         return "无 trace(旧版 wait/从未挂过)"
     if t.get("exit") is None:
-        return "wait 进程异常死亡(start=%s 无 exit·被杀/休眠丢/壳回收=环境因)" % (t.get("started") or "?")[:19]
+        # ④型(2026-09-24 Master数分 15b5e5·实锤 MasterUI/Master数分 各1例):harness 低内存回收杀 bash 包装壳→python wait 孤儿仍 claim→悬单+无 turn。
+        # 不计 C′ 失败·不计纪律。真修=父壳自检自退 + 悬单退回 inbox(_requeue_orphans)。
+        return "wait 进程异常死亡(start=%s 无 exit·被杀/休眠丢/④harness内存回收壳=环境因·非纪律)" % (t.get("started") or "?")[:19]
     exited = (t.get("exited") or "")[:19]
     if exited and not _role_turn_action_after(role, exited):
         # ③a/③b 两维(Master数分 781e5d):turn_state ts 晚于 exit=有 turn 无 bus 动作(在忙长任务/纪律);否则真无 turn。

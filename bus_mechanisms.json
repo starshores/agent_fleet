@@ -1,6 +1,6 @@
 {
  "meta": {
-  "total": 119,
+  "total": 120,
   "generated": "2026-07-10",
   "generated_by": "Master数分 (Explore 子agent 全量扫 agentbus.py/worker_daemon/dispatch_agent/claude_run + CLAUDE/AGENTS/SESSION_RELIABILITY/NEWINFRA_PLAN)",
   "purpose": "bus 基础设施机制单一注册表——取代散落各提示词文件/代码/记忆的机制描述。供 🔧机制 WebUI tab 展示。",
@@ -217,9 +217,15 @@
     },
     {
      "name": "忙而聋可见化(turn活跃但inbox积压)",
-     "does": "selfwake/status 对 turn 活跃(tool/thinking·ts<15min)且无 wait 的角色,再查 inbox 有无 ≥deaf_inbox_min(30min)未领消息:有→标 ⚠忙而聋/⚠聋(条数·最老小时)=有 turn 无 bus 动作的协作断线,与掉线/干活期正常态区分;守卫催单投 inbox 对聋者无效→靠球/面板可见 + C′ Stop-hook 回合末强制重挂(灰度白名单 config stop_hook_gray_roles 段③ +MasterUI +Master数分)",
+     "does": "selfwake/status 对 turn 活跃(tool/thinking·ts<15min)且无 wait 的角色,再查 inbox 有无 ≥deaf_inbox_min(30min)未领消息:有→标 ⚠忙而聋/⚠聋(条数·最老小时)=有 turn 无 bus 动作的协作断线,与掉线/干活期正常态区分;守卫催单投 inbox 对聋者无效→靠球/面板可见 (C′ 段③扩协调位被Master数分驳回·15b5e5:实为④型)",
      "carrier": "bus/selfwake.py _inbox_backlog/_deaf_tag · bus/status.py 干活中 verdict · hooks/enforce_selfwake._gray_roles · config deaf_inbox_min/stop_hook_gray_roles · tests/scenario_deaf_busy.py",
-     "status": "新上·2026-09-24(实证:MasterUI/Master数分 fire 后未重挂·inbox 积压 15h 被判干活期正常态)"
+     "status": "在用·2026-09-24(Master数分15b5e5签·阈值30min)"
+    },
+    {
+     "name": "④型悬单真修(harness回收→孤儿claim)",
+     "does": "harness 低内存回收杀 wait 的 bash 包装壳→python wait 孤儿仍 claim→消息烂 processing(实锤 MasterUI/Master数分 各1例·15h)。修:_claim 记 claim_pid/ppid;wait 心跳线程父壳 create_time 自检→父亡自退不再 claim(治本);每次 wait 起手 _requeue_orphans 把 claim 者已亡的悬单退回 inbox(新 wait 立刻领到);reap 判 claim 者已亡立即退回;selfwake/who 标 ⚠悬单N;守卫聋态不投 inbox 催单只 toast;尸检四型口径",
+     "carrier": "bus/mailbox._claim · bus/core._start_wait_heartbeat/_wait_core · bus/selfwake._orphan_claims/_requeue_orphans · bus/health.cmd_reap · identity.cmd_selfwake_guard/_wait_autopsy · tests/scenario_deaf_orphan.py",
+     "status": "新上·2026-09-24(Master数分 15b5e5 a/b 要求)"
     }
    ]
   },

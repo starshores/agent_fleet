@@ -42,7 +42,8 @@ try:
     st, detail = _self_wake_state(R, wait_roles=set())
     chk(st == "recent" and "忙而聋" not in detail and "干活期正常态" in detail, "③ inbox 空→干活期正常态不误标")
     hk = importlib.import_module("enforce_selfwake")
-    g = hk._gray_roles(); chk(g is None or {"MasterUI", "Master数分", "MasterAgent"} <= set(g), "④ hook 灰度读 config: %s" % (sorted(g) if g else g))
+    # 段③扩协调位被Master数分驳回(15b5e5:昨晚掉线=④harness回收型·C′不对症)→ 只验 config 驱动生效(含段②两角色)
+    g = hk._gray_roles(); chk(g is None or {"MasterAgent", "Master"} <= set(g), "④ hook 灰度读 config(段②): %s" % (sorted(g) if g else g))
 finally:
     try: msg.unlink()
     except Exception: pass

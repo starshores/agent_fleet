@@ -19,7 +19,7 @@ from bus.proc import _age_seconds, _alive_claude_pids
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
 from bus.lock import holders as _lock_holders   # 分离 A4:通用 locks[](edge_lock 旧字段已摘·MasterUI 1ffac70 切 d.locks)
-from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy, _inbox_backlog
+from bus.selfwake import _self_wake_state, _wait_proc_roles, _turn_busy, _inbox_backlog, _orphan_claims
 
 
 def _who_data():
@@ -99,7 +99,9 @@ def _who_data():
             busy = _turn_busy(r)
             if busy:
                 dn, dh = _inbox_backlog(r)      # 忙而聋(2026-09-24):turn 活跃但 inbox 积压=协作断线·球/面板要看得见
-                rec["verdict"] = ("🔧 干活中·⚠聋(inbox积压%d·最老%sh·无wait)" % (dn, dh)) if dn else ("🔧 干活中(%s·长任务心跳晚=正常)" % busy)
+                do = len(_orphan_claims(r))     # ④悬单:processing 里 claim 者已亡
+                tag = ("·⚠聋(inbox积压%d·最老%sh·无wait)" % (dn, dh) if dn else "") + ("·⚠悬单%d(claim者已亡)" % do if do else "")
+                rec["verdict"] = ("🔧 干活中" + tag) if tag else ("🔧 干活中(%s·长任务心跳晚=正常)" % busy)
             else:
                 rec["verdict"] = "⚠ worker静默(超心跳%ss)" % (age if age is not None else "?")
         elif proc_alive:

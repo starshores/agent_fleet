@@ -45,7 +45,15 @@ def cmd_reap(args):
             age = _age_seconds(obj.get("claimed") or obj.get("created") or "")
             if age is None:
                 continue
-            stuck = (not live and age > args.grace) or (age > args.ttl)
+            # ④型(2026-09-24 Master数分 15b5e5):claim 者 pid 已亡=悬单·不等 grace 立即退回(harness 内存回收杀包装壳·python 孤儿 claim 后无人处理)
+            claim_dead = False
+            cp = obj.get("claim_pid")
+            if cp and psutil is not None:
+                try:
+                    claim_dead = not (psutil.pid_exists(int(cp)) and "python" in (psutil.Process(int(cp)).name() or "").lower())
+                except Exception:
+                    claim_dead = True
+            stuck = claim_dead or (not live and age > args.grace) or (age > args.ttl)
             if not stuck:
                 continue
             rq = int(obj.get("requeue_count", 0)) + 1
@@ -82,7 +90,7 @@ def cmd_reap(args):
                     os.replace(str(p), str(BUS / role / "inbox" / p.name))
                 except Exception:
                     pass
-            why = "owner存活但超ttl卡死" if live else "owner进程已退"
+            why = "claim者已亡(④harness回收孤儿claim)" if claim_dead else ("owner存活但超ttl卡死" if live else "owner进程已退")
             actions.append(("退回inbox(第%d次,%s,age%ds)" % (rq, why, age), role, tid))
     if not actions:
         print("reap: 无孤儿任务(processing 干净,或 owner 都在听且未超 ttl)"); return

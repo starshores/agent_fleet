@@ -175,6 +175,13 @@ def _wait_core(role, timeout, include_approval=False):
     include_approval=False(默认,所有自动监听者)时,requires_approval 高风险任务不会被领取,
     统一实现 requires_approval 闸(tab 与 daemon 一致),高风险任务留 inbox 等人工批准领取。"""
     inbox = _role_dir(role) / "inbox"
+    try:                                              # ④型真修(Master数分 15b5e5 a·2026-09-24):起手先把本 role 的悬单(claim 者已亡)退回 inbox → 本 wait 立刻领到
+        from bus.selfwake import _requeue_orphans
+        _rq = _requeue_orphans(role)
+        if _rq:
+            _audit("requeue_orphans", role=role, n=_rq)
+    except Exception:
+        pass
     groups = _role_groups(role)                       # 所属工作组(运行时·可空);无组 → 下面组循环空转 = 行为与旧完全一致
     group_inboxes = [_group_dir(g) / "inbox" for g in groups]
     # 档B L2·纯回执去抖合并领取(Master数分签字 2026-09-23):dz=0 → 下面 _try_claim 走旧路径 byte-identical。
@@ -416,9 +423,24 @@ def _start_wait_heartbeat(role, mode, extra, host_pid=None, reg_path=None, my_pi
       ② reg 已被别的 wait 覆盖(wait_pid != 我)→ 被接管 → 退出,让位单一执行体。
     host_pid=None(父链断追不到宿主)→ 跳过宿主自检(安全降级:不误杀,靠 P0 yield/reap 兜)。"""
     stop = threading.Event()
+    # ③ 父壳自检(④型·2026-09-24 Master数分 15b5e5 b):harness 低内存回收杀的是 bash 包装壳·python wait 成孤儿仍 claim →
+    #    悬单。记父 pid+create_time(防 pid 复用);父亡 → 本 wait 自退不再 claim(治本=孤儿不 claim)。取不到父=跳过(不误杀)。
+    _ppid = None; _pct = None
+    try:
+        if psutil is not None:
+            _pp = psutil.Process(os.getppid()); _ppid = _pp.pid; _pct = _pp.create_time()
+    except Exception:
+        _ppid = None
 
     def _beat():
         while not stop.wait(interval or _WAIT_HB_INTERVAL):
+            if _ppid is not None:
+                try:
+                    _pdead = psutil.Process(_ppid).create_time() != _pct
+                except Exception:
+                    _pdead = True
+                if _pdead:
+                    _wait_self_exit(reg_path, my_pid, "父壳(ppid=%s)已亡→孤儿 wait 自退不再 claim(④型·harness 回收)" % _ppid)
             try:
                 _touch_presence(role, mode, extra)
             except Exception:
