@@ -1,5 +1,22 @@
 # AGENTS — agent 管理与任务分派(agent bus)
 
+## MasterAgent 3.0 当前开发约定（2026-10-13）
+
+用户已指定当前升级为3.0，MasterAgent负责基座演进。业务可替换是硬验收：同构建空载→业务A→业务B→恢复A；业务包经公开契约接入，不给具体业务或角色名增加基座分支。
+
+- 新实现位于 `masteragent/`，独立入口 `python -B -m masteragent`；当前 `3.0.0`、状态schema 4。说明与阶段状态见 `docs/MASTERAGENT_3_FOUNDATION.md`、`docs/MASTERAGENT_3_COORDINATION.md`、`docs/MASTERAGENT_3_RUNTIME.md`、`docs/MASTERAGENT_3_APP_SERVER.md`、`docs/MASTERAGENT_3_MEMBERS.md`、`docs/MASTERAGENT_3_PROGRESS.md`。
+- 运行 `python -B -m unittest discover -s tests_v3 -v`，仅用合成包和临时根。新路径不得默认访问旧总线、`.claude`、个人会话或真实业务；不运行旧 `bus_smoke.py`、`ui_smoke.py` 或旧场景脚本作为3.0测试。
+- 新入口有Codex单次文本执行器和每次Attempt独占的App Server文本执行器，后者支持持久化运行中补充信息。替身和进程测试通过不代表真实模型已验证，逻辑作用域检查不代表OS沙箱。独立纯文本部署已通过真实模型持续接单及停止恢复验收；原生恢复、业务工具与生产迁移仍待验证。证据和范围见 docs/MASTERAGENT_3_RELEASE.md。
+- 逐角色工作区与访问上限在安装时通过部署映射显式绑定，不写入可移植业务包；工作区、临时执行目录、原生登录/历史目录分别管理。路径登记和访问上限不等于工具授权，本阶段业务文件工具仍关闭。
+- 外部执行必须选择部署JSON，固定native可执行文件/版本/模型，运行历史绑定安装+角色+代次；业务包仅声明通用能力。子进程在独立空目录运行，上下文仅经stdin传入；不继承个人配置、身份令牌或旧bus环境。不能复制/读取个人认证文件来绕过专用登录。
+- `run/run_as`仅用于短时纯文本函数；真实执行器须使用独立提交的`claim`→事务外执行→`complete`。租约过期进入待核对，不能自动重跑；业务恢复须明确接续并重新审批。schema 1/2/3状态只通过显式`migrate`升级到schema 4并保存备份，schema 2/3有运行中执行时拒绝迁移，不自动读取/迁移旧bus。
+- `serve`提供Windows事件驱动的前台常驻调度，显式Actor与部署配置，不自动登记角色或恢复native历史。同角色单成员，领取与Attempt归属同事务提交；停止或失联阻止旧执行发布，任务不自动重做。状态online仅租约口径，执行归属不代表OS进程已停，模型连通仍需真实验收。
+- 运行中补充信息须绑定安装、角色、代次及Attempt，只有精确thread/turn投递回执才能标记accepted；未确认投递保留为held并阻止成功发布，不自动重放。文本纠偏不是工具或决策批准；原生工具/审批请求当前只拒绝。App Server不支持exec的`--ignore-user-config`，专用目录出现自定义配置、hooks或技能时拒绝运行。
+- 用户已授权3.0本机正式发行；这不代表授权自动切换旧服务、绑定旧角色、读取业务历史或迁移/清理生产数据。保留用户已有修改；3.0变更只在明确的源码/文档文件内推进。
+- **Codex MasterAgent 压缩恢复**：仅当前 Codex session 与 `agent_bus/MasterAgent/presence.json` 中的 `host_session_id` 精确匹配时，才认定为 MasterAgent。项目 `.codex/config.toml` 的 `SessionStart(source=compact)` 钩子重注入 `.codex/MASTERAGENT_ROLE_CONTEXT.md` 和登记能力；不匹配时不得按 cwd 推断角色。旧版 Claude 启动步骤仅作历史参考，不自动视为 Codex 流程。
+- **Codex fleet 启动与身份**：`whoami` 对 Codex 只接受 `host_session_id` 精确匹配，不得用共享 `codex_pid` 回退。用户级 `~/.codex/hooks.json` 在 startup/resume/clear/compact 按精确 session 绑定或显式 role-next 票据加载对应角色卡与项目记忆；startup/resume 还会自动启动全局 Codex bridge，收件角色不需要在会话里手动运行 `wait`。物理原件为 `host_config/CODEX.hooks.json`。MasterAgent 与业务项目的项目级 `.codex/config.toml` 保留角色上下文、MasterAgent 压缩恢复卡与 bridge 备用入口；全局/项目入口以精确 session 锁去重。新 thread 必须先用 `codex-role-next --role X --cwd <项目目录>` 显式指定一次角色，不能按共享 cwd/PID 选角色。Codex bridge 先批量 claim 当前可自动领取的 inbox，再确认 wait 已登记，通过本机 App Server 向同一精确 session 启动模型回合；任务执行时独立 wait pump 持续领新消息并排队，按批次串行交付。
+- 下方是旧版本操作参考；其中Claude自恢复、hello/wait和固定团队流程不能自动套用到3.0开发会话。
+
 多个 Claude Code tab(各跑一个 role)互相派活的文件总线。让 worker 在各自 tab 里**活的、可旁观**地执行(子代理做不到)。无服务端,纯文件 + watchdog 事件(不 sleep polling)。
 
 - 代码:`C:\apphome\agent_fleet\agent_bus\`(`agent_fleet`=物理家;`~/.claude/agent_bus` 是指向它的 junction)。`agentbus.py` + `ab`/`ab.cmd` + 自带 README(运行时规范路径 `~/.claude/agent_bus`)。

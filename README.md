@@ -1,5 +1,20 @@
 # agent_fleet — Agent Bus 基础设施
 
+## MasterAgent 3.0 正式发行入口
+
+`masteragent/` 是业务可替换的独立协调基座，当前本机正式发行版为 `3.0.0`，状态 schema 4。已完成隔离状态根中的真实 Codex 双角色持续接单、纠偏、停止、断线后显式恢复与 A→B→A 验收。现有 `agent_bus/` 舰队仍独立运行，尚未迁移或由 3.0 接管；正式版范围与未交付能力见 [发行说明](docs/MASTERAGENT_3_RELEASE.md)。
+
+- 使用和边界：[3.0 基础切片](docs/MASTERAGENT_3_FOUNDATION.md)
+- 协作与状态升级：[3.0 公共协作核心](docs/MASTERAGENT_3_COORDINATION.md)
+- Codex 单次文本执行：[3.0 运行时接入](docs/MASTERAGENT_3_RUNTIME.md)
+- 常驻成员：[3.0 成员手册](docs/MASTERAGENT_3_MEMBERS.md)
+- 进度与验证：[3.0 进度](docs/MASTERAGENT_3_PROGRESS.md)
+- 隔离测试：`python -B -m unittest discover -s tests_v3 -v`
+- 命令入口：`python -B -m masteragent --help`
+- 正式包入口：`python -B <本机交付目录>/masteragent-3.0.0.pyz --version`
+
+下面保留旧版本说明，供迁移参考。新入口不导入旧 `agent_bus`，旧入口和运行数据仍保持原状。
+
 多个 Claude Code CLI 会话(各是一个 *role*)互相分派任务的**文件总线 + 协调基础设施**。
 无服务端、纯文件 + watchdog 事件(不轮询);一个 role 一个 tab,事件自醒、可旁观。
 

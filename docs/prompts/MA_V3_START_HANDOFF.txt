@@ -1,0 +1,107 @@
+MasterAgent 3.0 启动交接通知
+日期：2026-10-08
+接收人：用户新开的 MA / MasterAgent 会话
+
+一、用户指令与分工
+
+用户原话：
+“我会新起会话去注册MA拉起服务，你也是MA但你不注册，先用当前的V3版交给他跑起服务，若有问题小修复交给他，这周额度不多了，优化放下周，写通知我来知会他去取。”
+
+你是接手启动工作的 MA，负责自己的身份注册、当前 V3 启动与验证，以及阻断启动的小修复。写此交接的开发 MA 不注册、不启动服务、不与新会话争用身份。通知由用户转达，未通过旧总线或其他会话工具发送。
+
+本周范围：复用当前版本和已有证据，优先把最小可运行链路启动并验证；只修启动、认证衔接、协议兼容等直接阻断。优化、全面重构、完整角色迁移、持续会话增强留到下周，不创建定时任务。不要重新展开全面审查、组织多路研究或重复已有全部测试。代码变更后做与修改相关的必要验证。
+
+二、当前交付的准确状态
+
+主项目：C:\apphome\agent_fleet
+版本：3.0.0-dev.3；状态 schema 2。
+实现：masteragent\；独立入口 python -B -m masteragent。
+开发修改已同步主项目，尚未提交、打 tag 或发布。不要 reset、clean 或覆盖已有修改。
+
+已实现：通用业务包、安装/激活/停用/恢复、作用域身份、任务与租约、持久决定/子任务/通知、Codex 单次文本执行、事件记录、取消/超时与进程树清理。
+已有验证：196 项隔离测试，195 通过，1 项因 Windows 符号链接权限跳过；独立开发包完成 A→B→A 切换等验证。未调用真实模型。原生 Codex 版本与接口检查通过，专用目录上次登录检查未就绪。
+
+重要边界：当前 CLI 没有 serve/daemon 常驻服务命令，也没有已部署的 V3 WebUI 或后台团队。现成的 execute-task 是单次执行器。成功运行一个演示任务只能汇报“单次真实执行通过”，不能据此汇报“常驻服务/团队已上线”。
+
+启动目标应以实际能力为准：先完成真实单次闭环，再检查最小值守运行是否能在小修复范围内落地。若缺少的常驻入口必须新增较大功能，明确报告这个阻断和已完成的链路，将大功能留到下周；不要为满足“拉起服务”名义启动旧版服务或声称已有未实现能力。
+
+三、先读这些文件，不重做审查
+
+C:\apphome\agent_fleet\AGENTS.md（先看文首 V3 约定；后半段含旧 Claude 版本参考）
+C:\apphome\agent_fleet\docs\MASTERAGENT_3_PROGRESS.md
+C:\apphome\agent_fleet\docs\MASTERAGENT_3_RUNTIME.md
+
+全部交付文件所在目录：
+C:\Users\<用户>\Documents\Codex\2026-10-08\c-apphome-agent-fleet-docs-prompts\outputs
+
+其中：
+- masteragent-3.0-dev.3.pyz：当前独立开发包。
+- MASTERAGENT_3_CODEX_RUNTIME.json：已经填好本机路径的演示部署配置。
+- LOGIN_MASTERAGENT_3.ps1：为该专用目录发起原生 Codex 登录。
+- RUN_MASTERAGENT_3_DEMO.ps1：固定请求 ID 的一次合成任务演示。
+- MASTERAGENT_3_ROLE_WORKSPACES.json：22 个现有角色的声明工作目录清单。
+- MASTERAGENT_3_DEV3_TEST_SUMMARY.json、MASTERAGENT_3_DEV3_BUILD_VERIFICATION.json：已有测试和构建证据。
+
+开发包 SHA256：
+ff8cab7a69595dbafc818be73a87b6296388c8a20ae562167aab571d165f5d51
+
+Python：C:\path\to\python.exe
+已核验原生 Codex：C:\Users\<用户>\AppData\Local\OpenAI\Codex\bin\9691020b546a15b2\codex.exe
+固定版本：codex-cli 0.162.0-alpha.2
+演示模型：gpt-6-astra；账户是否可用尚未验证。不要把配置中的模型名当成已观测模型，也不要擅自以更贵的模型替换。
+
+四、建议的最短启动路径
+
+1. 从主项目接手，核对当前版本与在飞任务。按项目实际支持的注册流程登记自己的 MA 身份；用户所说 MA 指 MasterAgent。不能借用本交接会话身份，也不能伪造 Claude 进程信息让旧 hello 看似成功。
+
+   维护者 MA 的身份与演示业务 actor 是两层：已有演示安装是 a、角色 reviewer、代次 1。V3 register 只能注册当前业务包声明的角色；不要把 reviewer 改名为 MasterAgent，不要硬加固定 MA 角色到通用基座。重复 register 会撤销旧 actor，在飞任务期间不得靠重注册接管。
+
+2. 优先复用已准备的独立演示，不重新安装/激活它，不随意改代次。其根目录：
+   C:\Users\<用户>\Documents\Codex\2026-10-08\c-apphome-agent-fleet-docs-prompts\work\v3-codex-demo
+   子目录 state 为状态，business-a-workspace 为合成工作目录，runtime-a-reviewer-generation-1 为独立原生运行目录。配置应使用 outputs 内的 MASTERAGENT_3_CODEX_RUNTIME.json，脚本从绑定标记读取状态根。
+
+3. 先做不调用模型的 runtime-check。现成登录脚本会先完成这一检查。若程序升级导致版本不符，核实新程序/接口后只做必要兼容修复，不能删除版本检查直接放行。
+
+4. 通过 LOGIN_MASTERAGENT_3.ps1 完成该目录的原生登录；登录界面需要用户操作时如实交给用户处理，不要求在聊天里贴认证内容，不读取/复制个人 auth.json。工作目录记录不是登录凭据。确认已有登录时不必重复登录。
+
+5. 登录完成后执行 RUN_MASTERAGENT_3_DEMO.ps1。它只提交一个虚构 SAMPLE-001 文本任务，登记 reviewer 并调用 execute-task，actor 凭据保存在独立状态目录。已有 completed 返回原结果；running 或待核对任务会阻止自动重跑。
+
+PowerShell 快捷入口（接手 MA 执行；交接会话没有执行）：
+
+$Ma3Outputs = 'C:\Users\<用户>\Documents\Codex\2026-10-08\c-apphome-agent-fleet-docs-prompts\outputs'
+& (Join-Path $Ma3Outputs 'LOGIN_MASTERAGENT_3.ps1')
+# 仅在登录完成后继续；不需要改 ExecutionPolicy 来绕过系统策略。
+& (Join-Path $Ma3Outputs 'RUN_MASTERAGENT_3_DEMO.ps1')
+
+6. 检查真实退出码、任务 completed、结果和 attempt 记录，确认进程结束。登录、注册、runtime-check 成功都不能代替这一步。超时、取消或 needs_reconcile 必须先核对；不能为了“跑通”自动无限重试。先用这一条最小任务节省本周额度，非修复必要不反复调用模型。
+
+7. 在此基础上处理服务启动。若小范围增加最小值守入口，应遵守单实例、同一角色不重复执行、可停止、状态可查询、日志不带凭据、领取事务外执行与未知结果不自动重跑等现有约束。不得把旧 bus 当作新 V3 服务上线，不扩到 UI、全团队和新编排架构。需要交互登录的终端由用户可见，其余后台助手默认隐藏窗口。
+
+五、现有角色工作路径与暂缓项
+
+路径声明源：
+C:\apphome\agent_fleet\role_profiles.json
+C:\apphome\agent_fleet\biz_registry\role_profiles_biz.json
+后者经 junction 指向 C:\apphome\agent_fleet_data\biz_registry\role_profiles_biz.json。
+
+22 个在册角色已全部核对：7 个登记在 C:\apphome\agent_fleet，15 个登记在 C:\BaseSpace\XXX。静态 cwd 不是在线状态；旧 presence.cwd 可能是历史继承值，不可覆盖声明。抽象“业务角色”条目不是实际角色，路径还有控制字符，已从清单排除。
+
+dev.3 尚未实现逐角色工作区/资源绑定，目前仅有每业务安装一个目录；业务文件工具也未接通。不要把这些真实目录直接塞给文本执行器，或默认所有角色共用一个 cwd。工作目录、临时执行目录、Codex 登录与历史目录分别管理。完整绑定与真实团队迁移放后续；绝对路径保留在部署层，不写进可移植业务包或通用基座。
+
+六、小修复与交付纪律
+
+- 小修复直接由接手 MA 完成，限启动阻断，保留现有用户修改，尤其 BUS_ONBOARDING.md。没有授权为启动而清理真实业务或会话历史。
+- 若改源码，明确从源码运行还是重建开发包；当前演示脚本调用的是 outputs 的 pyz，不能改了源码却仍用旧包验证。保留旧包，按现有 scripts\build_v3.py 构建新包并标明版本/摘要，更新脚本所用路径或在源码入口验证。
+- 只运行 tests_v3 中相关隔离测试；不要运行旧 bus_smoke.py、ui_smoke.py、recover.py 或旧维护脚本作为 V3 验收。
+- 不删除未知执行的状态/日志，不按历史 PID 猜测并杀进程；停止使用当前拥有者的取消链路。下周优化不在本次顺手展开。
+- C:\Users\<用户>\AppData\Local\Temp\v3-review-v9j3fg4j 是此前合成测试留下的目录，清理已被自动审批拒绝，不是启动阻断，不重试或绕过。
+
+七、回报给用户
+
+完成后用简短说明给出：
+1. MA 注册的实际方式与身份，或尚缺的支持。
+2. 实际启动的是单次执行器、最小值守进程还是别的服务；给出真实启动命令、状态/日志位置及停止方式。
+3. 一条真实 Codex 任务是否完成；失败给出直接原因，不伪造成功。
+4. 本次必要小修复、验证结果和下周留项。
+
+把启动结果追加到主项目 docs\MASTERAGENT_3_PROGRESS.md，便于后续会话接续。无需跨会话回传给交接 MA；由用户查看和决定后续。本通知写成时没有任何 V3 模型任务或常驻服务被本交接会话启动。

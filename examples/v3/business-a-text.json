@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "platform_api": 1,
+  "package_id": "business-a-text",
+  "version": "1.0.0",
+  "roles": [
+    {
+      "role_id": "reviewer",
+      "display_name": "Catalogue reviewer",
+      "instructions": "Review synthetic catalogue entries. Business A canary: ALPHA_CATALOGUE_ONLY.",
+      "tools": [
+        "review-text"
+      ]
+    },
+    {
+      "role_id": "editor",
+      "display_name": "Catalogue editor",
+      "instructions": "Prepare synthetic catalogue descriptions under the ALPHA_CATALOGUE_ONLY policy.",
+      "tools": []
+    }
+  ],
+  "knowledge": {
+    "catalogue-policy": "ALPHA_CATALOGUE_ONLY: catalogue entries must include an item label. This is synthetic test data."
+  },
+  "tools": {
+    "review-text": {
+      "adapter": "agent-text",
+      "description": "Produce a catalogue review from the supplied text context."
+    }
+  },
+  "workflows": {
+    "catalogue-review": {
+      "roles": [
+        "editor",
+        "reviewer"
+      ],
+      "description": "Draft and review a synthetic catalogue entry."
+    }
+  }
+}

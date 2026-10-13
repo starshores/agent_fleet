@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "platform_api": 1,
+  "package_id": "business-b-text",
+  "version": "2.1.0",
+  "roles": [
+    {
+      "role_id": "reviewer",
+      "display_name": "Workshop reviewer",
+      "instructions": "Review synthetic workshop material. Business B canary: BETA_WORKSHOP_ONLY.",
+      "tools": [
+        "plan-text"
+      ]
+    },
+    {
+      "role_id": "facilitator",
+      "display_name": "Workshop facilitator",
+      "instructions": "Prepare synthetic workshop exercises under the BETA_WORKSHOP_ONLY policy.",
+      "tools": [
+        "plan-text"
+      ]
+    }
+  ],
+  "knowledge": {
+    "workshop-policy": "BETA_WORKSHOP_ONLY: workshop exercises must include a learning objective. This is synthetic test data."
+  },
+  "tools": {
+    "plan-text": {
+      "adapter": "agent-text",
+      "description": "Produce a workshop plan from the supplied text context."
+    }
+  },
+  "workflows": {
+    "workshop-review": {
+      "roles": [
+        "facilitator",
+        "reviewer"
+      ],
+      "description": "Prepare and review a synthetic workshop exercise."
+    }
+  }
+}
