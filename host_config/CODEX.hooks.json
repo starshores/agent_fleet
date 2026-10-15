@@ -1,0 +1,31 @@
+{
+  "description": "MasterAgent Codex global role-memory context hook",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|clear|compact)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\path\\to\\python.exe -B C:\\apphome\\agent_fleet\\.codex\\hooks\\agentbus_codex_global_context.py",
+            "timeout": 10,
+            "statusMessage": "Loading explicit Codex role memory",
+            "additionalContextLimit": 12000
+          }
+        ]
+      },
+      {
+        "matcher": "^(startup|resume)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\path\\to\\python.exe -B C:\\apphome\\agent_fleet\\.codex\\hooks\\agentbus_codex_session_start.py",
+            "timeout": 86400,
+            "async": true,
+            "statusMessage": "Connecting this Codex session to agent-bus"
+          }
+        ]
+      }
+    ]
+  }
+}

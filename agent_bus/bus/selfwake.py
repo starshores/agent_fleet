@@ -13,6 +13,8 @@ except Exception:
 
 from bus.config import BUS
 from bus.proc import _proc_scan, _age_seconds
+from bus.proc import _host_pid_alive
+from bus.codex_recovery import requeue_blocked, fence_tasks
 
 
 def _wait_proc_roles():
@@ -23,7 +25,8 @@ def _wait_proc_roles():
 
 def _reg_wait_state(role):
     """P2b(2026-08-10 用户令):读 <role>/wait.reg.json 判 role 有无【健康在册 wait】(reg 单一源·
-    附宿主孤儿识别)。返回 (True, detail)=有活 wait;(None, None)=reg 不可用/持有者已退→调用方【回退
+    附宿主孤儿识别)。返回 (True, detail)=有活 wait;(False, detail)=已确认宿主退出的孤儿 wait,
+    不可由进程扫描恢复为 armed;(None, None)=reg 不可用/持有者已退→调用方【回退
     psutil wait_roles】(兼容无 reg 的 wait·过渡期 P1 前遗留)。
     ★验 reg.wait_pid 确是 agentbus wait 进程(cmdline·只查这一个 pid=便宜)防 pid 复用误判在岗;
      宿主 claude 死=孤儿(P1 宿主自检将自杀·如实标注,不假报健康在岗)。"""
@@ -42,15 +45,70 @@ def _reg_wait_state(role):
             return (None, None)          # pid 复用成非 wait / 持有者已退 → reg 陈旧,回退 psutil
     except Exception:
         return (None, None)              # 进程没了 → reg 陈旧,回退
-    hp = reg.get("host_claude_pid")      # 宿主孤儿识别
+    hp = reg.get("host_pid") or reg.get("host_claude_pid")  # generic host; legacy Claude field supported
+    hk = reg.get("host_kind") or ("claude" if reg.get("host_claude_pid") else None)
     if hp:
-        try:
-            host_alive = "claude" in (psutil.Process(hp).name() or "").lower()
-        except Exception:
-            host_alive = False
+        host_alive = _host_pid_alive(hp, hk)
         if not host_alive:
-            return (True, "reg 在册 wait 但宿主 claude(%s)已退=孤儿(P1 自检将自杀)" % hp)
+            return (False, "reg 在册 wait 但宿主 %s(%s)已退=孤儿(P1 自检将自杀)" % (hk or "agent", hp))
     return (True, "会话自醒(reg 在册·wait %s 在跑)" % wp)
+
+
+def _codex_messenger_evidence(role, session_id):
+    """Read evidence with stable reasons; missing evidence never grants recovery."""
+    if not isinstance(session_id, str) or not session_id or session_id != session_id.strip():
+        return None, "messenger_session_invalid"
+    path = BUS / role / "messenger.state.json"
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, "messenger_state_missing"
+    except (ValueError, UnicodeError):
+        return None, "messenger_state_invalid"
+    except OSError:
+        return None, "messenger_state_unreadable"
+    if not isinstance(state, dict):
+        return None, "messenger_state_invalid"
+    if state.get("session_id") != session_id:
+        return None, "messenger_session_mismatch"
+    return state, None
+
+
+def _codex_messenger_diagnostic(role):
+    """Read-only evidence diagnosis for a role already declared as Codex."""
+    try:
+        presence = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError):
+        return None
+    if not isinstance(presence, dict) or presence.get("host_kind") != "codex":
+        return None
+    _, reason = _codex_messenger_evidence(role, presence.get("host_session_id"))
+    return reason
+
+
+def _codex_messenger_state(role, session_id):
+    """A live bus wait alone cannot establish Codex model delivery."""
+    state, reason = _codex_messenger_evidence(role, session_id)
+    if reason == "messenger_session_mismatch":
+        return ("stale", "Codex 信使报活属于其他会话 [%s]" % reason)
+    if reason:
+        return ("recent", "Codex 信使投递状态不可用，尚未确认就绪 [%s]" % reason)
+    age = _age_seconds(state.get("heartbeat", ""))
+    if age is None or age < 0 or age > 35:
+        return ("stale", "Codex 信使报活超期")
+    pid = state.get("pid")
+    try:
+        cl = psutil.Process(int(pid)).cmdline() if psutil is not None else []
+        if not ("--session-id" in cl and session_id in cl
+                and any(os.path.basename(str(x)).lower() == "codex_messenger.py" for x in cl)):
+            return ("stale", "Codex 信使进程已退或 PID 被复用")
+    except Exception:
+        return ("stale", "Codex 信使进程已退")
+    if state.get("status") != "armed":
+        return ("recent", "Codex 信使在报活但投递链未就绪(%s)" % state.get("status"))
+    if not (state.get("wait_alive") and state.get("app_ready") and state.get("pump_alive")):
+        return ("recent", "Codex 信使在报活但投递链不完整")
+    return ("armed", "Codex 信使在岗(pid %s·报活 %ss·wait/App Server 就绪)" % (pid, int(age)))
 
 
 def _parked_path(role):
@@ -149,6 +207,8 @@ def _is_orphan_claim(role, obj, now=None, min_s=None, turn_ts=None):
     claimed 之后该 role【无任何 turn 活动】(turn_state.ts <= claimed 或无 turn_state)且距 claimed ≥ orphan_no_turn_min(默认 30)分钟
     = wait 领了但输出没送到会话(harness 回收/不再通知)。★不能用 claim_pid 存活判(claim_pid=wait 自身·正常 claim 后即退=恒亡·判据反了会把在办消息退回=双处理)。
     turn_ts 可由调用方预读传入(批量时省 IO)。"""
+    if requeue_blocked(role, obj):
+        return False
     try:
         from bus.config import cfg
         if min_s is None:
@@ -204,6 +264,9 @@ def _requeue_orphans(role):
     for p in _orphan_claims(role):
         try:
             o = json.loads(p.read_text(encoding="utf-8"))
+            if requeue_blocked(role, o):
+                fence_tasks(role, [o], "orphan_requires_reconcile")
+                continue
             o["status"] = "pending"; o["requeue_count"] = int(o.get("requeue_count", 0)) + 1
             o["requeued_at"] = time.strftime("%Y-%m-%dT%H:%M:%S"); o["requeue_why"] = "claimed后无turn活动≥阈值(④型悬单·输出未送达会话)"
             o.pop("claimed", None); o.pop("claim_pid", None); o.pop("claim_ppid", None)
@@ -254,18 +317,28 @@ def _verdict_body(role, pf, wait_roles):
         if psutil is not None and dp and psutil.pid_exists(dp):
             return ("armed", "daemon 自醒(watchdog 阻塞)")
         return ("stale", "daemon 已退,自醒掉线")
+    messenger = None
+    if pr.get("host_kind") == "codex":
+        messenger = _codex_messenger_state(role, pr.get("host_session_id"))
     # 非 daemon:协调位/会话自醒 = 独立 wait 进程(不刷心跳)→ 优先按进程判活
     # P2b(2026-08-10 用户令):判据优先读 reg(单一源·附宿主孤儿识别)→ 回退 psutil wait_roles(兼容无 reg)
     reg_armed, reg_detail = _reg_wait_state(role)
+    if reg_armed is False:
+        # A live wait PID does not restore its dead host. Only unavailable
+        # registration (None) may use the legacy process-scan fallback.
+        return ("stale", reg_detail)
+    if messenger is not None and messenger[0] != "armed":
+        return messenger
     if reg_armed:
-        return ("armed", reg_detail)
+        return messenger if messenger is not None else ("armed", reg_detail)
     if wait_roles is None:
         wait_roles = _wait_proc_roles()
     if role in wait_roles:
-        return ("armed", "会话自醒(后台 wait 进程在跑·无 reg)")
+        return messenger if messenger is not None else ("armed", "会话自醒(后台 wait 进程在跑·无 reg)")
     if mode == "listening":
-        pid = pr.get("claude_pid")
-        alive = bool(psutil is not None and pid and psutil.pid_exists(pid))
+        kind = pr.get("host_kind") or ("claude" if pr.get("claude_pid") else None)
+        pid = pr.get("host_pid") or pr.get("claude_pid") or pr.get("codex_pid")
+        alive = _host_pid_alive(pid, kind)
         if alive and fresh:
             deaf = _deaf_tag(role)          # 2026-09-24:刚 fire 待重挂态也要露出 悬单/聋(④型悬单恰在此态出现)
             if deaf:

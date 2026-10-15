@@ -162,9 +162,8 @@ def _role_dir(role):
     return d
 
 
-# 已知非 role 目录(不靠前缀排除的漏网者):bus=总线自身 Python 源码包(与 mailbox 同住 BUS 根;
-# Master数分 2026-07-28 报:被枚举成 role 后 selfwake/who 误报"bus 掉线")。__pycache__ 双保险。
-_NON_ROLE_DIRS = {"bus", "__pycache__"}
+# 总线源码、资源锁和测试脚本与 mailbox 同住 BUS 根，不是角色。
+_NON_ROLE_DIRS = {"bus", "locks", "tests", "__pycache__"}
 
 
 def _list_roles():

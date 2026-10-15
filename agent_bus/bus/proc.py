@@ -67,6 +67,90 @@ def _claude_ancestor():
     return claude_pid, cwd, chain
 
 
+def _host_kind(name):
+    """Return the supported interactive host kind for an exact executable name."""
+    base = os.path.basename(name or "").lower()
+    if base.endswith(".exe"):
+        base = base[:-4]
+    return base if base in ("claude", "codex") else None
+
+
+def _host_session_id(kind=None, env=None):
+    """Return this session's opaque host id without crossing Claude/Codex namespaces."""
+    env = env or os.environ
+    if kind == "claude":
+        return env.get("CLAUDE_CODE_SESSION_ID")
+    if kind == "codex":
+        return env.get("CODEX_SESSION_ID") or env.get("CODEX_THREAD_ID")
+    return (env.get("CLAUDE_CODE_SESSION_ID") or env.get("CODEX_SESSION_ID")
+            or env.get("CODEX_THREAD_ID"))
+
+
+def _host_ancestor():
+    """Find the current Claude or Codex host on this process's own parent chain.
+
+    Returns (kind, pid, cwd, chain). This deliberately does not scan other
+    Codex processes: callers can only bind to the host that launched them.
+    """
+    if psutil is None:
+        return None, None, None, []
+    chain = []
+    try:
+        p = psutil.Process(os.getpid())
+        for _ in range(20):
+            p = p.parent()
+            if p is None:
+                break
+            try:
+                name = p.name() or ""
+            except Exception:
+                name = ""
+            chain.append({"pid": p.pid, "name": name.lower()})
+            kind = _host_kind(name)
+            if kind:
+                try:
+                    cwd = p.cwd()
+                except Exception:
+                    cwd = None
+                return kind, p.pid, cwd, chain
+    except Exception:
+        pass
+    return None, None, None, chain
+
+
+def _proc_host_ancestor(pid):
+    """Find a supported host process above one known process, without global scanning."""
+    if psutil is None:
+        return None, None
+    try:
+        p = psutil.Process(pid)
+        for _ in range(20):
+            p = p.parent()
+            if p is None:
+                break
+            try:
+                kind = _host_kind(p.name() or "")
+            except Exception:
+                kind = None
+            if kind:
+                return kind, p.pid
+    except Exception:
+        pass
+    return None, None
+
+
+def _host_pid_alive(pid, kind=None):
+    """Validate one known host PID by its executable name (guards PID reuse)."""
+    if psutil is None or not pid:
+        return False
+    try:
+        proc = psutil.Process(int(pid))
+        actual = _host_kind(proc.name() or "")
+        return bool(actual and (kind is None or actual == kind))
+    except Exception:
+        return False
+
+
 def _proc_claude_ancestor(pid):
     """从【给定 pid】向上 walk 父链找 claude.exe 祖先 pid(判"某 wait 进程属哪个活会话实例"用)。
     与 _claude_ancestor 的区别:那个走当前进程,这个走任意 pid。追不到(父链断/进程没了)返 None。
@@ -91,7 +175,7 @@ def _proc_claude_ancestor(pid):
 
 
 def _proc_session_id(pid):
-    """读某进程环境变量 CLAUDE_CODE_SESSION_ID(判 wait 进程属哪个 CC 会话)。
+    """Read the inherited Claude/Codex session id for a known process.
     ★比父链祖先 pid 更稳:env 在进程创建时固定,【不受 harness 背景 shell 父链偶发断裂影响】
     (reboot-hello 记的坑:背景进程 parent-walk 偶发够不到 claude.exe → _proc_claude_ancestor 误返
     None → 曾把同会话 wait 误判跨会话杀掉)。Windows 上 p.environ() 对同用户进程通常可读;
@@ -99,7 +183,9 @@ def _proc_session_id(pid):
     if psutil is None:
         return None
     try:
-        return (psutil.Process(pid).environ() or {}).get("CLAUDE_CODE_SESSION_ID")
+        env = psutil.Process(pid).environ() or {}
+        kind, _host_pid = _proc_host_ancestor(pid)
+        return _host_session_id(kind, env)
     except Exception:
         return None
 

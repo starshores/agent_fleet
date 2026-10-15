@@ -4,13 +4,13 @@
 BODY = r"""<header>
   <h1>🛰 Agent Bus 控制台</h1>
   <span class="pill"><span id="connDot" class="dot"></span><span id="connTxt">连接中…</span></span>
-  <span class="pill" title="在跑 claude=机器上所有活着的 claude 进程;在岗=已认领到某 role(有 presence)的 claude 进程。两者都【不是】fleet.json 里的 daemon 数 —— daemon 看 🩺 健康徽标/舰队页。">在跑 claude <b id="aliveN" style="color:var(--txt)">–</b> · 在岗 <b id="fleetN" style="color:var(--txt)">–</b></span>
+  <span class="pill" title="Claude 进程是旧宿主进程数；自醒在岗按各角色完整投递链判定，Codex 需信使、wait 与 App Server 就绪。">Claude 进程 <b id="aliveN" style="color:var(--txt)">–</b> · 自醒在岗 <b id="fleetN" style="color:var(--txt)">–</b></span>
   <span id="gConfirm" class="gconfirm" style="display:none" title="点击跳到待办池查看待确认">🙋 <b>0</b> 项待确认</span>
   <span id="healthWrap" class="hwrap">
     <span id="healthBadge" class="hbadge loading" title="bus 健康(点击展开)">🩺 …</span>
     <div id="healthPanel" class="hpanel" style="display:none"></div>
   </span>
-  <span id="ctxBadge" class="hbadge loading" title="上下文预算(点击看看板)·≥65%红=将被 auto-compact,建议先主动落档重置">🧠 …</span>
+  <span id="ctxBadge" class="hbadge loading" title="上下文预算；Claude 65% 预警，Codex 压缩阈值未确认">🧠 …</span>
   <span class="spacer"></span>
   <span class="ctrl">兜底轮询
     <select id="pollSel">
@@ -69,43 +69,46 @@ BODY = r"""<header>
 
 <main>
   <section data-tab="fleet">
-    <div class="sec-h">A · 舰队总览 <span class="sub">role 身份 / 心跳 / 队列(同 <span class="mono">who</span>+<span class="mono">list</span>)— 点行展开任务</span></div>
+    <div class="sec-h">A · 舰队总览 <span class="sub">role 身份 / 心跳 / 队列(同 <span class="mono">who</span>+<span class="mono">list</span>)— 点行展开任务；角色默认模型与思考强度仅影响后续 Claude 派工/daemon</span></div>
     <div class="ua-panel" id="uaPanel" style="display:none"></div>
     <div id="maintBanner" style="display:none;background:rgba(255,165,0,.12);border-bottom:1px solid rgba(255,165,0,.3);padding:7px 16px;font-size:13px">🔧 <b>维修模式启动中</b> <span id="maintDetail" class="muted"></span></div>
     <div class="sec-b">
       <table>
         <thead><tr>
           <th style="width:1%;white-space:nowrap">Role</th>
-          <th style="width:120px;max-width:120px">模型</th>
+          <th style="width:145px;max-width:145px">运行模型</th>
+          <th style="width:190px;max-width:190px">角色默认模型</th>
+          <th style="width:155px;max-width:155px">默认思考强度</th>
           <th style="width:200px;max-width:200px">判定</th>
           <th style="width:1%;white-space:nowrap">turn 状态</th>
-          <th style="width:1%;white-space:nowrap">pid<span class="sub" style="font-weight:400"> (d:=daemon)</span></th>
+          <th style="width:1%;white-space:nowrap">宿主 PID<span class="sub" style="font-weight:400"> (Codex 可共享)</span></th>
           <th style="width:1%;white-space:nowrap">心跳</th>
           <th style="width:1%;white-space:nowrap">inbox</th>
           <th style="width:1%;white-space:nowrap">proc</th>
           <th style="width:1%;white-space:nowrap">done</th>
           <th style="width:1%;white-space:nowrap">held</th>
           <th style="width:1%;white-space:nowrap">failed</th>
-          <th>cwd</th>
+          <th>角色工作区</th>
         </tr></thead>
-        <tbody id="fleetBody"></tbody>
+        <tbody id="fleetBody"><tr><td colspan="14" class="muted">正在读取舰队状态…</td></tr></tbody>
       </table>
     </div>
     <div class="foot" id="procFoot"></div>
   </section>
 
   <section data-tab="bi" style="scroll-margin-top:64px">
-    <div class="sec-h">📊 运营 / 资源 <span class="sub">今日消耗 = <span class="mono">usage.db</span>(全量·含前台 cli·Shanghai 日,统一运营口径)· 在跑任务 + 系统资源 <span class="mono">psutil</span> 实时</span>
+    <div class="sec-h">📊 运营 / 资源 <span class="sub">Claude 用量来自 <span class="mono">usage.db</span> · Codex 用量来自本机 rollout token 记录(无美元估值) · 活跃会话按精确 session 读取 · 系统资源 <span class="mono">psutil</span></span>
       <span class="spacer" style="flex:1"></span>
       <span class="pill muted" id="biUpd">–</span>
     </div>
     <div class="sec-b">
       <div class="bi-kpis" id="biKpis"></div>
+      <div id="biActive" style="padding:0 16px 8px"></div>
       <div id="biRunning" style="padding:0 16px 8px"></div>
       <div id="biModels" style="padding:2px 16px 10px"></div>
-      <div class="sub" style="padding:12px 16px 0">在岗资源占用(当前进程 · <span class="mono">psutil</span> 实时 · 进程此刻的 CPU/内存 · 按内存降序)</div>
+      <div class="sub" style="padding:12px 16px 0">在岗资源占用（Codex 共享宿主只计一次，不能按角色拆分；<span class="mono">psutil</span> 实时 · 按内存降序）</div>
       <table class="bi-tbl">
-        <thead><tr><th>角色</th><th>CPU%</th><th>内存MB</th></tr></thead>
+        <thead><tr><th>角色</th><th>CPU%</th><th>内存MB</th><th>Codex 累计 token</th></tr></thead>
         <tbody id="biSysBody"></tbody>
       </table>
     </div>
@@ -193,12 +196,12 @@ BODY = r"""<header>
         <option value="never">never(不弹)</option>
       </select>
       <label class="chk"><input type="checkbox" id="sendApproval">
-        高风险 requires_approval(留 inbox 不被自动领取,需人工 <span class="mono">wait --include-approval</span>)</label>
+        高风险 requires_approval（留在 inbox 待人工审核；Codex 角色不手动挂 wait）</label>
       <button class="btn" id="sendBtn">发送任务</button>
     </section>
 
     <section>
-      <div class="sec-h">D · 回填结果 <span class="sub">读 <span class="mono">&lt;role&gt;/done</span></span>
+      <div class="sec-h">D · 任务回报 <span class="sub">汇总全角色最近 200 条回报；先显示 30 条，点开看正文，可按角色筛选</span>
         <span class="spacer" style="flex:1"></span>
         <select id="replyRole" style="width:auto;margin:0;padding:3px 8px"></select>
         <button class="btn danger" id="clearAllBtn" style="margin:0;padding:5px 12px">清空</button>
@@ -208,7 +211,7 @@ BODY = r"""<header>
   </div>
 
   <section data-tab="live">
-    <div class="sec-h">I · 实时视图 <span class="mono">live.log</span> <span class="sub">看 headless daemon/dispatch 实时执行流(🔧工具 / 💬回复 / ■完成)— 选 role 后每 1.5s 轮询</span>
+    <div class="sec-h">I · 旧执行体日志 <span class="mono">live.log</span> <span class="sub">仅 Claude headless daemon/dispatch 的历史或实时执行流；Codex 交互会话不写此日志。选 role 后每 1.5s 刷新。</span>
       <span class="spacer" style="flex:1"></span>
       <span class="filt">role
         <select id="liveRole"></select>
@@ -221,7 +224,7 @@ BODY = r"""<header>
 
   <!-- 📖 操作说明 —— 渲染 repo 根 BUS_GUIDE.md(单一源·内容 MasterAgent 维护·MasterUI 只渲染)。左目录右正文·锚点跳转 -->
   <section data-tab="guide">
-    <div class="sec-h">📖 操作说明 <span class="sub">bus 怎么正确用 · 数据源 <span class="mono">BUS_GUIDE.md</span>(单一源 · 内容 MasterAgent 维护 · 本页只渲染)· 本机可查不外发</span>
+    <div class="sec-h">📖 操作说明 <span class="sub">数据源 <span class="mono">BUS_GUIDE.md</span>。Codex 当前流程见顶部专节；旧 Claude 手动挂 wait 步骤仅供历史查阅。本机可查，不外发。</span>
       <span class="spacer" style="flex:1"></span>
       <span id="guideMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="guideRefresh">刷新</button>
@@ -234,7 +237,7 @@ BODY = r"""<header>
 
   <!-- 📇 per-agent 数据画像(L3·中性自我发现工具·非KPI/非排名·Master数分红线)。单agent drill-in·无并排横比grid -->
   <section data-tab="agentprofile">
-    <div class="sec-h">📇 数据画像 <span class="sub"><b>🔍 自我发现工具 · 非考核/排名</b> · per-agent 硬指标只读旁路 · 数据源 <span class="mono">agent-profile</span></span>
+    <div class="sec-h">📇 数据画像 <span class="sub"><b>🔍 自我发现工具 · 非考核/排名</b> · 用量指标目前只含 Claude usage.db；Codex 用量见历史用量页 · 数据源 <span class="mono">agent-profile</span></span>
       <span class="spacer" style="flex:1"></span>
       <span class="filt">窗口 <select id="apDays"><option value="7">近7天</option><option value="30" selected>近30天</option><option value="90">近90天</option></select></span>
       <span id="apMeta" class="muted" style="font-size:11.5px"></span>
@@ -242,19 +245,23 @@ BODY = r"""<header>
     </div>
     <div class="ap-framing" id="apFraming"></div>
     <div class="ap-wrap">
-      <aside class="ap-list" id="apList"><div class="muted">加载…</div></aside>
+      <aside class="ap-list" id="apList"><div class="muted">正在汇总历史记录，首次打开可能需要约 20 秒…</div></aside>
       <article class="ap-card" id="apCard"><div class="muted" style="padding:22px">← 选一个角色看它的画像(单卡自省 · 非横向对比)</div></article>
     </div>
   </section>
 
-  <!-- 历史用量 BI (P0) —— 独立 tab(账单级全量,与运营/资源口径分开) -->
+  <!-- 历史用量 BI (P0) —— Claude与Codex分别呈现，避免计量口径混算 -->
   <section data-tab="usage">
-    <div class="sec-h">📈 历史用量 <span class="sub">全量 Claude Code 用量 · <span class="mono">token_stats.py</span> · 已去重 · <b>token 消耗为主</b>($ 仅 API 等价参考)· Shanghai 日</span>
+    <div class="sec-h">📈 历史用量 <span class="sub">Claude: <span class="mono">token_stats.py</span> · Codex: 本机 rollout token 事件 · 两者分开展示 · Shanghai 日</span>
       <span class="spacer" style="flex:1"></span>
       <span id="usageMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="usageRefresh">刷新</button>
     </div>
     <div class="kpis" id="usageKpis"></div>
+    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:8px;padding-top:12px">Codex 终端用量 <span class="muted">(本机 rollout 请求用量 · input 含 cached input · 不重复加 cache · 不估美元成本)</span></div>
+    <div class="kpis" id="codexUsageKpis"></div>
+    <div class="uchart-cap">每日 Codex token 趋势 · 总 <span class="muted">(input+output · cached input 为 input 子集)</span><span class="muted" id="uCodexPeak"></span></div>
+    <div class="uchart-wrap"><canvas id="uCodexTrend" height="150"></canvas><div class="uchart-tip" id="uCodexTip"></div></div>
     <div class="grid2">
       <div>
         <div class="uchart-cap">每日 token 趋势 · io <span class="muted">(input+output · 新增有效工作量)</span>
@@ -275,7 +282,7 @@ BODY = r"""<header>
         <div class="bars" id="uProj"></div>
       </div>
     </div>
-    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">模型迁移进度 <span class="muted">(按月堆叠 · 标 4.8 占比)</span></div>
+    <div class="uchart-cap" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px">Claude 模型迁移进度 <span class="muted">(按月堆叠 · 标 4.8 占比)</span></div>
     <canvas id="uModels" height="200"></canvas>
     <div class="legend" id="uModelLegend"></div>
   </section>
@@ -288,8 +295,8 @@ BODY = r"""<header>
       <span id="capsMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="capsRefresh">刷新</button>
     </div>
-    <div class="sub" style="padding:8px 16px 0">⓪ Agent 详情 · <b>各 agent 会哪些内容</b> <span style="font-weight:400">— 名 / <b>职责 desc(会什么)</b> / caps / 状态(<span style="color:var(--live)">前台cli</span>·<span style="color:var(--idle)">daemon</span>·<span style="color:var(--none)">离线</span>·<span style="color:var(--dead)">退役→接替者</span>)· 数据源 <span class="mono">agents.json.desc</span> + <span class="mono">retired_roster.json</span> 实时只读</span></div>
-    <div class="ag-grid" id="agDetail"></div>
+    <div class="sub" style="padding:8px 16px 0">⓪ Agent 详情 · <b>各 agent 会哪些内容</b> <span style="font-weight:400">— 名 / <b>职责 desc(会什么)</b> / caps / 状态(<span style="color:var(--live)">Codex 信使、Claude 前台 cli</span>·<span style="color:var(--idle)">daemon</span>·<span style="color:var(--none)">离线</span>·<span style="color:var(--dead)">退役→接替者</span>)· 数据源 <span class="mono">agents.json.desc</span> + <span class="mono">retired_roster.json</span> 实时只读</span></div>
+    <div class="ag-grid" id="agDetail"><div class="muted">正在读取角色能力…</div></div>
   </section>
 
   <section data-tab="caps">
@@ -323,8 +330,8 @@ BODY = r"""<header>
 
   <!-- 上下文模块 · 1M 预算/auto-compact 预警 -->
   <section data-tab="ctx">
-    <div class="sec-h">🧠 上下文 · 1M 预算预警
-      <span class="sub">每个活跃会话(窗口)的上下文预算:<span class="mono">ctx=input+cache_read+cache_creation</span> / 模型窗口 — <b>≥65% 将被 auto-compact</b>(实测真阈·有损摘要→降智)、≥50%黄。role 仅标"谁的窗口"(who 校验)。<b>谁活着/在岗</b>看 🛰 运维面板</span>
+    <div class="sec-h">🧠 上下文 · 会话预算
+      <span class="sub">Claude 的占用与 65% 自动压缩预警、Codex 的本机上报占用分开展示；Codex 自动压缩阈值未确认。角色仅按精确会话绑定。<b>谁在岗</b>看 🛰 运维面板</span>
       <span class="spacer" style="flex:1"></span>
       <span id="ctxMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="ctxRefresh">刷新</button>
@@ -332,7 +339,7 @@ BODY = r"""<header>
     <div class="sec-b">
       <div class="ctx-kpis" id="ctxKpis"></div>
       <table>
-        <thead><tr><th>占用%</th><th>距自动压(65%)余量</th><th>ctx / 窗口</th><th>role(谁的窗口)</th><th>model</th><th>最后活动 UTC</th></tr></thead>
+        <thead><tr><th>占用%</th><th>Claude 距自动压余量</th><th>ctx / 窗口</th><th>角色</th><th>model</th><th>最后活动 UTC</th></tr></thead>
         <tbody id="ctxBody"></tbody>
       </table>
       <div class="foot muted" id="ctxFoot"></div>
@@ -342,15 +349,15 @@ BODY = r"""<header>
   <!-- ⏱ wait 注册表观测(P3·2026-08-10):每个 role 的后台 wait 生命周期 -->
   <section data-tab="waitreg">
     <div class="sec-h">⏱ wait 注册表观测
-      <span class="sub">每个 role 在册的后台 wait 进程生命周期:<span class="mono">wait_pid / 宿主 claude / 代数 / 在册时长 / 心跳 / 状态</span>。宿主 claude 死而 wait 仍活=<b>孤儿</b>(P1 宿主自检 10s 内自杀)。数据源 <span class="mono">&lt;role&gt;/wait.reg.json</span></span>
+      <span class="sub">每个角色在册 wait 的生命周期。Codex wait 由信使管理；wait 在册不等于可投递，需到舰队页核对信使与 App Server。数据源 <span class="mono">&lt;role&gt;/wait.reg.json</span></span>
       <span class="spacer" style="flex:1"></span>
       <span id="wrMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="wrRefresh">刷新</button>
     </div>
     <div class="sec-b">
       <table>
-        <thead><tr><th>role</th><th>wait_pid</th><th>宿主 claude</th><th>代数</th><th>在册时长</th><th>心跳 age</th><th>状态</th></tr></thead>
-        <tbody id="wrBody"></tbody>
+        <thead><tr><th>role</th><th>wait_pid</th><th>宿主</th><th>代数</th><th>在册时长</th><th>心跳 age</th><th>状态</th></tr></thead>
+        <tbody id="wrBody"><tr><td colspan="7" class="muted">正在读取 wait 注册表…</td></tr></tbody>
       </table>
       <div class="foot muted" id="wrFoot"></div>
     </div>
@@ -359,7 +366,7 @@ BODY = r"""<header>
   <!-- 提示词审核(只读·手动刷新)-->
   <section data-tab="prompts">
     <div class="sec-h">📝 提示词审核
-      <span class="sub">当前喂给 agent 的提示词<b>原文</b>(只读·供审核措辞)— hello onboarding / 全局+项目 CLAUDE.md / 基座层文档。手动刷新才重读,每节标源路径+mtime</span>
+      <span class="sub">提示词来源与实际注入预览（只读）— Claude 旧原文、Codex 全局和项目入口、角色记忆及 hooks 配置分别列出。Codex 根项目按精简入口加载，旧 CLAUDE.md 供按需查阅；手动刷新才重读。</span>
       <span class="spacer" style="flex:1"></span>
       <span id="promptsMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="promptsRefresh">刷新</button>
@@ -427,7 +434,7 @@ BODY = r"""<header>
 
   <section data-tab="roles">
     <div class="sec-h">👤 角色注册表
-      <span class="sub">管理/基建角色的<b>单一真相源</b> · 数据 <span class="mono">role_profiles.json</span> · 每角色:层级/一句话/cwd·mode·caps + 启动流程 + <b>明式输入</b>(用户/Master 显式派)/ <b>隐式输入</b>(自举时读的锚点) + 边界</span>
+      <span class="sub">管理/基建角色档案。启动流程原文含旧 Claude 步骤；Codex 由 SessionStart 按精确会话绑定并启动信使，无需手动挂 wait。数据 <span class="mono">role_profiles.json</span></span>
       <span class="spacer" style="flex:1"></span>
       <span id="rolesMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="rolesRefresh">刷新</button>
@@ -442,7 +449,7 @@ BODY = r"""<header>
 
   <section data-tab="bizroles">
     <div class="sec-h">🏢 业务角色
-      <span class="sub">业务执行层角色档案 · 数据 <span class="mono">role_profiles_biz.json</span>(业务数据·不进 git)</span>
+      <span class="sub">业务执行层角色档案；启动流程原文含旧 Claude 步骤，Codex 由 SessionStart 自动启动信使。数据 <span class="mono">role_profiles_biz.json</span>(业务数据·不进 git)</span>
       <span class="spacer" style="flex:1"></span>
       <span id="bizRolesMeta" class="muted" style="font-size:11.5px"></span>
       <button class="btn ghost mini" id="bizRolesRefresh">刷新</button>

@@ -47,7 +47,8 @@ from bus.roster import (  # noqa: E402
     _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, _case_collision,
     load_caps_pool, biz_registry_dir, agents_view, shared_resources_prompt,   # 分离 C/B1:两表合并视图 / 业务注册表目录 / 花名册只读视图(消费方 ui.api 用)
 )
-from bus.proc import _claude_ancestor, _proc_scan, _alive_claude_pids, _age_seconds  # noqa: E402
+from bus.proc import (_claude_ancestor, _host_ancestor, _host_session_id, _host_pid_alive,
+                      _proc_scan, _alive_claude_pids, _age_seconds)  # noqa: E402
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live  # noqa: E402
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids  # noqa: E402
 from bus.roster import HUMAN_ATTENDED  # noqa: E402
@@ -95,6 +96,7 @@ from bus.identity import (  # noqa: E402
     cmd_register, cmd_tag, cmd_hello, cmd_whoami, cmd_selfwake, cmd_selfwake_guard, cmd_selfwake_exempt,
     cmd_train_done,
 )
+from bus.codex_startup import cmd_codex_role_next  # noqa: E402
 
 # ---- 稳定公共面契约(P1·2026-07-28):外部消费方(dispatch_agent / worker_daemon /
 # pool_dispatcher / longrange_net / ui.api)经 `import agentbus as ab` 只应使用下列名字——
@@ -109,7 +111,8 @@ __all__ = [
     "_load_agents", "_list_roles", "_role_dir", "_is_test_role", "_load_caps_pool", "_load_retired_roster",
     "load_caps_pool", "biz_registry_dir", "agents_view", "shared_resources_prompt",   # 分离 C/B1(2026-09-23)
     # 进程/存在感/自醒
-    "psutil", "_age_seconds", "_alive_claude_pids", "_touch_presence", "_load_pidtags",
+    "psutil", "_age_seconds", "_alive_claude_pids", "_host_ancestor", "_host_session_id",
+    "_host_pid_alive", "_touch_presence", "_load_pidtags",
     "_self_wake_state", "_wait_proc_roles", "_daemon_alive",
     # 消息流/通知
     "_wait_core", "_emit_completion_notice", "_fire_toast",
@@ -198,6 +201,9 @@ def main():
     p = sub.add_parser("selfwake-guard"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_selfwake_guard)
     p = sub.add_parser("selfwake-exempt"); p.add_argument("--role", default=None); p.add_argument("--off", action="store_true"); p.add_argument("--mode", default=None); p.add_argument("--reason", default=None); p.add_argument("--note", default=None); p.set_defaults(fn=cmd_selfwake_exempt)
     p = sub.add_parser("whoami"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_whoami)
+    p = sub.add_parser("codex-role-next", help="为指定项目下的下一个新 Codex thread 显式指定角色；SessionStart 自动 hello+挂 wait")
+    p.add_argument("--role", required=True); p.add_argument("--cwd", default=os.getcwd(), help="目标项目工作目录，必须与 Codex SessionStart cwd 一致（默认当前目录）")
+    p.set_defaults(fn=cmd_codex_role_next)
     p = sub.add_parser("caps"); p.add_argument("--role", default=None); p.set_defaults(fn=cmd_caps)
     p = sub.add_parser("roster"); p.add_argument("--grep", default=None); p.set_defaults(fn=cmd_roster)
     p = sub.add_parser("ask-user"); p.add_argument("--from", dest="frm", default=None); p.add_argument("--title", required=True); p.add_argument("--detail", default=""); p.add_argument("--priority", default="中"); p.add_argument("--urgency", default=None, help="确认点紧急度(high/normal/low·缺席检测阈值与自动过期口径按此;缺则由priority派生高=high/中=normal/低=low)"); p.add_argument("--kind", default=None, help="确认点类型(decision=待决策需拍板 / fyi=待知悉结论只需轻ack;缺则标题标记派生·默认decision安全默认)"); p.add_argument("--deadline", default=""); p.add_argument("--ref", default=None); p.set_defaults(fn=cmd_ask_user)

@@ -15,7 +15,7 @@ except Exception:
     psutil = None
 
 from bus.config import BUS, _now
-from bus.proc import _age_seconds, _alive_claude_pids
+from bus.proc import _age_seconds, _alive_claude_pids, _host_pid_alive
 from bus.roster import _list_roles, _retired_roles, _pseudo_role_label, _load_agents
 from bus.presence import _load_pidtags
 from bus.lock import holders as _lock_holders   # 分离 A4:通用 locks[](edge_lock 旧字段已摘·MasterUI 1ffac70 切 d.locks)
@@ -44,9 +44,10 @@ def _who_data():
             "registered": ent.get("registered") if isinstance(ent, dict) else None,
             "caps": (ent.get("caps") if isinstance(ent, dict) else None) or [],
             "retired": r in retired_set, "present": False, "mode": None,
-            "claude_pid": None, "daemon_pid": None, "alive": None, "age_s": None,
+            "claude_pid": None, "codex_pid": None, "host_pid": None, "host_kind": None,
+            "daemon_pid": None, "alive": None, "age_s": None,
             "verdict": None, "cwd": None, "current_task": None, "current_title": None,
-            "session_id": None,
+            "session_id": None, "host_session_id": None,
         }
         plabel = _pseudo_role_label(r)
         if plabel:                    # 伪角色/系统桶:非执行体,不判在线/掉线,单列标注
@@ -67,11 +68,17 @@ def _who_data():
         except Exception:
             rec["verdict"] = "presence 损坏"; out_roles.append(rec); continue
         rec["present"] = True
-        pid = pr.get("claude_pid"); rec["claude_pid"] = pid
+        pid = pr.get("host_pid") or pr.get("claude_pid") or pr.get("codex_pid")
+        host_kind = pr.get("host_kind") or ("claude" if pr.get("claude_pid") else ("codex" if pr.get("codex_pid") else None))
+        rec["claude_pid"] = pr.get("claude_pid")
+        rec["codex_pid"] = pr.get("codex_pid")
+        rec["host_pid"] = pid
+        rec["host_kind"] = host_kind
         age = _age_seconds(pr.get("last_seen", "")); rec["age_s"] = age
         mode = pr.get("mode", "?"); rec["mode"] = mode
         rec["cwd"] = pr.get("cwd")
         rec["session_id"] = pr.get("session_id")   # 权威 session→role(取代 regex 猜)
+        rec["host_session_id"] = pr.get("host_session_id") if host_kind == "codex" else None
         rec["current_task"] = pr.get("current_task")
         rec["current_title"] = pr.get("current_title")
         wt = pr.get("wait_timeout") or 110
@@ -82,9 +89,9 @@ def _who_data():
             rec["alive"] = d_alive
             rec["verdict"] = ("✓ daemon在听" if d_alive else ("✗ daemon已退" if dpid else "daemon?"))
             out_roles.append(rec); continue
-        proc_alive = (pid in alive) if (pid and psutil is not None) else None
+        proc_alive = _host_pid_alive(pid, host_kind) if (pid and psutil is not None) else None
         rec["alive"] = proc_alive
-        if pid:
+        if pid and host_kind == "claude":
             claimed.add(pid)
         if psutil is None:
             rec["verdict"] = "心跳%ss前(mode=%s)" % (age if age is not None else "?", mode)
@@ -138,7 +145,7 @@ def cmd_who(args):
     # 自醒列【前置到 verdict 前】(Master数分 P2b 验收揪出:verdict 非固定宽,伪角色/parked 的长描述会撑破
     # 列宽把自醒符号挤到行尾错位)。自醒符号短固定 → 放 verdict 前永不被撑歪;verdict 放最后可变长
     # 列(present 行后接 pid/age/cwd 用 %-22s 对齐;短行 verdict 用 %s 收尾长文本不挤任何列)。
-    print("%-14s %-4s %-22s %-9s %8s  %s" % ("role", "自醒", "verdict(健康)", "claude_pid", "心跳age", "cwd"))
+    print("%-14s %-4s %-22s %-14s %8s  %s" % ("role", "自醒", "verdict(健康)", "host(kind:pid)", "心跳age", "cwd"))
     print("-" * 90)
     for rec in d["roles"]:
         r = rec["role"]; verdict = rec.get("verdict") or "?"
@@ -147,10 +154,11 @@ def cmd_who(args):
         cur = rec.get("current_task")
         if not rec.get("present"):          # 伪角色/退役/休眠/未声明/损坏:无进程·短行(verdict 收尾·长文本不挤列)
             print("%-14s %-4s %s" % (r, sw, verdict)); continue
-        piddisp = ("d:%s" % (rec.get("daemon_pid") or "?")) if rec.get("mode") == "daemon" else str(rec.get("claude_pid") or "-")
+        piddisp = ("d:%s" % (rec.get("daemon_pid") or "?")) if rec.get("mode") == "daemon" else (
+            "%s:%s" % (rec.get("host_kind"), rec.get("host_pid")) if rec.get("host_pid") else "-")
         last = (rec.get("cwd") or "-") + (("  ▶ 在做:%s" % (rec.get("current_title") or cur)) if cur else "")
-        print("%-14s %-4s %-22s %-9s %7ss  %s" % (r, sw, verdict, piddisp, age_s, last))
-    print("-" * 88)
+        print("%-14s %-4s %-22s %-14s %7ss  %s" % (r, sw, verdict, piddisp, age_s, last))
+    print("-" * 96)
     if d["psutil"]:
         tagged = d.get("tagged", [])
         if tagged:

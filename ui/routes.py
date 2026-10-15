@@ -65,7 +65,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, INDEX_HTML, "text/html; charset=utf-8")
         elif path == "/api/state":
             q = parse_qs(u.query)
-            role = (q.get("reply_role", ["Master"])[0]) or "Master"
+            role = (q.get("reply_role", ["__all__"])[0]) or "__all__"
             fresh = (q.get("fresh", ["0"])[0]) in ("1", "true")
             self._send(200, build_state(role, fresh=fresh))
         elif path == "/api/events":
@@ -205,6 +205,8 @@ class Handler(BaseHTTPRequestHandler):
             # 手动触发 daemon 自愈:复用 agentbus supervise(可 dry-run)
             b = self._body_json()
             self._send(200, run_supervise(dry_run=bool(b.get("dry_run"))))
+        elif path == "/api/role-model-prefs":
+            self._send(200, update_role_model_prefs(self._body_json()))
         elif path == "/api/clear_replies":
             b = self._body_json()
             role = (b.get("role") or "Master").strip()

@@ -45,7 +45,7 @@ def lock_holder(resource):
 
 
 def _role_proc_alive(role):
-    """持锁 role 是否还有活进程(daemon_pid 或 claude_pid 存在)——死了则锁可被回收。"""
+    """持锁 role 是否还有活进程(daemon 或绑定的 Claude/Codex host)——死了则锁可被回收。"""
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return False
@@ -55,10 +55,14 @@ def _role_proc_alive(role):
         return False
     if psutil is None:
         return True  # 没 psutil 不敢判死
-    for k in ("daemon_pid", "claude_pid"):
-        pid = pr.get(k)
-        if pid and psutil.pid_exists(pid):
-            return True
+    daemon_pid = pr.get("daemon_pid")
+    if daemon_pid and psutil.pid_exists(daemon_pid):
+        return True
+    from bus.proc import _host_pid_alive
+    host_pid = pr.get("host_pid") or pr.get("claude_pid") or pr.get("codex_pid")
+    host_kind = pr.get("host_kind") or ("claude" if pr.get("claude_pid") else ("codex" if pr.get("codex_pid") else None))
+    if host_pid and _host_pid_alive(host_pid, host_kind):
+        return True
     return False
 
 

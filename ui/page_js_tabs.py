@@ -4,10 +4,14 @@
 TABS = r"""// ===== tab 分页 =====
 const TAB_NAMES={fleet:'🛰 舰队/运维',guide:'📖 操作说明',bi:'📊 运营/资源','usage':'📈 历史用量',caps:'🧬 能力池',ctx:'🧠 上下文',waitreg:'⏱ wait 注册表',prompts:'📝 提示词审核',tasklines:'🎯 任务线看板',groups:'🧩 工作组',mechanisms:'🔧 机制',roles:'👤 角色',bizroles:'🏢 业务角色',longrange:'🗂️ 长程任务',agentprofile:'📇 数据画像',tasks:'📋 任务/协作',live:'🔴 实时',paths:'📁 路径',fleetlog:'📋 舰队日志',asr:'🎙 语音转写'};
 let curTab='fleet'; try{ curTab=localStorage.getItem('busTab')||'fleet'; }catch(e){}
-if(!TAB_NAMES[curTab]) curTab='fleet';
+// Explicit legacy deep links from the workbench only select known pages.
+const linkedTab=location.hash.slice(1);
+if(Object.hasOwn(TAB_NAMES,linkedTab)) curTab=linkedTab;
+if(!Object.hasOwn(TAB_NAMES,curTab)) curTab='fleet';
 function showTab(t){
-  if(!TAB_NAMES[t]) t='fleet';
+  if(!Object.hasOwn(TAB_NAMES,t)) t='fleet';
   curTab=t; try{ localStorage.setItem('busTab',t); }catch(e){}
+  if(location.hash!=='#'+t) history.replaceState(null,'','#'+t);
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
   document.querySelectorAll('main > [data-tab]').forEach(el=>el.classList.toggle('tabhide',el.getAttribute('data-tab')!==t));
   window.scrollTo({top:0});
@@ -31,6 +35,10 @@ function showTab(t){
   else if(t==='fleetlog') loadFleetLog();
   else if(t==='asr') loadASR();
 }
+window.addEventListener('hashchange',()=>{
+  const tab=location.hash.slice(1);
+  if(Object.hasOwn(TAB_NAMES,tab)&&tab!==curTab) showTab(tab);
+});
 // 🙋 用户确认点/缺席面板(用户侧自醒对偶·MasterAgent 后端 ab user-absence-check·commit 36bd525)——谁在等用户拍板+用户离席多久
 function _uaAge(m){ m=Math.round(m||0); if(m<60) return m+'min'; const h=Math.floor(m/60); if(h<24) return h+'h'; return Math.floor(h/24)+'d'; }
 let _uaLast=0;
@@ -139,6 +147,7 @@ function _apRow(label,def,val){ return '<div class="ap-row"><span class="ap-rk">
 async function loadAgentProfile(force){
   const list=document.getElementById('apList'); if(!list) return;
   const days=(document.getElementById('apDays')||{}).value||'30';
+  if(!_apData) list.innerHTML='<div class="muted">正在汇总历史记录，首次打开可能需要约 20 秒…</div>';
   try{
     const d=await (await fetch('/api/agent-profile?days='+days)).json();
     if(!d||!d.ok){ list.innerHTML='<div class="muted">加载失败:'+esc((d&&d.error)||'?')+'</div>'; return; }

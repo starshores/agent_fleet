@@ -13,20 +13,33 @@ function renderBI(bi){
   document.getElementById('biUpd').textContent=bi.now+(bi.psutil?'':' · 无psutil(系统资源不可用)');
   const tu=bi.today_usage||{};
   const st=bi.sys_total;
+  const cu=tu.codex||{};
   const fmtMem=mb=>mb>=1024?(mb/1024).toFixed(2)+' GB':Math.round(mb)+' MB';
   const kpi=[
-    ['bus 总内存', st?fmtMem(st.rss_mb):'—', st?(st.roles+' 角色 · '+st.nproc+' 进程 · '+st.cpu+'% CPU'):'无psutil', false],
+    ['bus 宿主进程组内存', st?fmtMem(st.rss_mb):'—', st?((st.groups==null?st.roles:st.groups)+' 进程组 · '+st.nproc+' 进程 · '+st.cpu+'% CPU'):'无psutil', false],
     ['今日 token(总)', fmtN(tu.tokens_total||0), (tu.date?(tu.is_today?tu.date:('库存至 '+tu.date)):'usage.db'), false],
+    ['Codex 今日 token', fmtN(cu.tokens_total||0), '仅当前登记会话 · 无美元估值', false],
     ['今日 io(in+out)', fmtN(tu.tokens_io||0), 'in '+fmtN(tu.input||0)+' / out '+fmtN(tu.output||0), false],
     ['今日成本($参考)', usd(tu.cost_usd||0), '', false],
     ['今日 calls', fmtN(tu.calls||0), '', false],
-    ['在跑任务', bi.running.length, '', false]
+    ['工作中会话', bi.active_sessions_known?(bi.active_sessions||[]).length:'—',
+      'Codex 精确会话状态'+(bi.active_sessions_known?' · 已读取 '+bi.active_sessions_known+' 个':' · 暂不可用'), false],
+    ['Bus 在跑任务', bi.running.length, '已登记的任务', false]
   ];
   morphInto(document.getElementById('biKpis'), kpi.map(k=>
     `<div class="bi-kpi${k[3]?' warn':''}" data-key="k-${esc(k[0])}"><div class="k">${esc(k[0])}</div><div class="v">${k[1]}${k[2]?'<small>'+esc(k[2])+'</small>':''}</div></div>`).join(''));
-  morphInto(document.getElementById('biRunning'), bi.running.length? bi.running.map(r=>
+  morphInto(document.getElementById('biActive'),
+    '<span class="muted" style="font-size:12px">会话正在工作：</span>'+
+    (bi.active_sessions_known
+      ? ((bi.active_sessions||[]).length?(bi.active_sessions||[]).map(role=>
+        `<span class="bi-run" data-key="active-${esc(role)}"><span class="live-dot on"></span><b>${esc(role)}</b></span>`).join('')
+        : '<span class="muted" style="font-size:12px">当前无活跃 Codex 回合</span>')
+      : '<span class="muted" style="font-size:12px">状态暂不可用</span>'));
+  morphInto(document.getElementById('biRunning'),
+    '<span class="muted" style="font-size:12px">Bus 在跑任务：</span>'+
+    (bi.running.length? bi.running.map(r=>
     `<span class="bi-run" data-key="run-${esc(r.role)}"><span class="live-dot on"></span><b>${esc(r.role)}</b> ${esc(r.title||r.task)}</span>`).join('')
-    : '<span class="muted" style="font-size:12px">当前无在跑任务</span>');
+    : '<span class="muted" style="font-size:12px">当前无在跑 Bus 任务</span>'));
   // 模型用量统计:各模型→会话数+角色列表
   const mc=bi.model_counts||[];
   if(mc.length){
@@ -43,14 +56,15 @@ function renderBI(bi){
   } else {
     morphInto(document.getElementById('biModels'),'');
   }
-  // 在岗资源占用:仅列有活进程(sys)的 role,按内存降序(metrics 任务消耗口径已随 daemon 移除退役,成本看「历史用量」)
-  const live=(bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
+  // Codex 共享 App Server 进程树只显示一次；不可按角色分摊。
+  const live=(bi.resource_rows||bi.per_role||[]).filter(r=>r.sys).sort((a,b)=>(b.sys.rss_mb||0)-(a.sys.rss_mb||0));
   morphInto(document.getElementById('biSysBody'), !live.length
-    ? '<tr><td colspan="3" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'
+    ? '<tr><td colspan="4" class="muted" style="padding:10px 16px">无在岗进程资源数据（psutil 不可用或无活进程）</td></tr>'
     : live.map(r=>`<tr data-key="bs-${esc(r.role)}">
-      <td><b>${esc(r.role)}</b></td>
+      <td title="${esc((r.shared_roles||[]).join('、'))}"><b>${esc(r.role)}</b></td>
       <td class="num">${r.sys.cpu}</td>
-      <td class="num">${r.sys.rss_mb}</td></tr>`).join(''));
+      <td class="num">${r.sys.rss_mb}</td>
+      <td class="num">${r.codex_tokens_total?fmtN(r.codex_tokens_total):'—'}</td></tr>`).join(''));
 }
 async function loadBI(){ try{ const r=await fetch('/api/bi'); renderBI(await r.json()); }catch(e){} }
 
@@ -86,28 +100,47 @@ function sliceDaily(daily,r){
   const cut=y+'-'+m+'-'+dd;
   return daily.filter(x=>x.date>=cut);
 }
+function _claudeUsageAvailable(d){ return !!d && d.claude_available!==false && !d.claude_error && !d.error; }
 function renderUsage(d){
-  const kp=document.getElementById('usageKpis');
-  if(!d || d.error){ kp.innerHTML='<div class="muted" style="padding:6px 12px">用量数据读取失败:'+esc(d&&d.error||'?')+'</div>'; return; }
+  d=d||{error:'未收到统计数据'};
   _usageData=d;
+  const claudeOk=_claudeUsageAvailable(d);
   const mt=d.meta||{};
   const cfg=mt.config_active||{alias_count:mt.alias_count,merge_groups:mt.merge_groups,ignore_projects:mt.ignore_projects};
-  document.getElementById('usageMeta').textContent='刷新于 '+esc(d.as_of||'')
+  document.getElementById('usageMeta').textContent=claudeOk?('刷新于 '+esc(d.as_of||'')
     +' · 跟踪 '+(mt.tracked_jsonl_files!=null?mt.tracked_jsonl_files:'?')+' jsonl'
-    +(cfg?(' · alias '+(cfg.alias_count||0)+'/merge '+(cfg.merge_groups||0)+'/ignore '+(cfg.ignore_projects||0)):'');
+    +(cfg?(' · alias '+(cfg.alias_count||0)+'/merge '+(cfg.merge_groups||0)+'/ignore '+(cfg.ignore_projects||0)):'')
+    ):'Claude 用量不可用：'+(d.claude_error||d.error||'统计未就绪');
   // 范围相关 KPI + 趋势:交给 applyRange;范围按钮绑定一次
   const rg=document.getElementById('uRange');
   if(rg && !rg._bound){ rg._bound=1; rg.querySelectorAll('button').forEach(b=>b.onclick=()=>applyRange(+b.dataset.r)); }
   _bindTrendHover('uTrend','uTrendTip'); _bindTrendHover('uTrendTotal','uTrendTotalTip');
+  _bindTrendHover('uCodexTrend','uCodexTip');
+  const cu=d.codex_usage||{}, cd=cu.daily||[], ct=cu.totals||{};
+  const codexOk=cu.ok===true && !cu.error;
+  const today=cd.length?cd[cd.length-1]:{};
+  morphInto(document.getElementById('codexUsageKpis'), codexOk?[
+    ['Codex 总 token（当前登记会话）',fmtN(ct.tokens_total||0),'acc','仅当前登记角色精确绑定的会话；cached input 已包含在 input 中，不重复累加'],
+    ['Codex input',fmtN(ct.input||0),'','input 包含 cached input'],
+    ['Codex cached input',fmtN(ct.cached_input||0),'','input 的子集，仅作缓存观察'],
+    ['Codex output',fmtN(ct.output||0),'','输出 token'],
+    ['最近日 token',fmtN(today.tokens_total||0),'',today.date||'暂无记录'],
+    ['登记会话（有记录）',fmtN(cu.sessions||0),'','当前登记角色精确绑定且有本机 rollout 的会话数']
+  ].map(k=>`<div class="kpi" data-key="cuk-${esc(k[0])}" title="${esc(k[3])}"><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('')
+    :'<div class="muted" data-key="codex-unavailable" style="padding:6px 12px">Codex 用量不可用：'+esc(cu.error||'统计未就绪')+'</div>');
   applyRange(_uRange);
   renderUProj();
   // 模型迁移
-  drawModels(d.by_month_model||[]);
+  drawModels(claudeOk?(d.by_month_model||[]):[],!claudeOk);
 }
 // 项目 Top N —— token 为主(用量统计侧已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径。
 // U1 响应式:钻取展开=openProjRaws 状态驱动、raw 内容随主渲染一并出 html → morphInto 增量 patch,刷新中展开态/内容天然保留。
 function renderUProj(){
   const d=_usageData; if(!d) return;
+  if(!_claudeUsageAvailable(d)){
+    const unit=document.getElementById('uProjUnit'); if(unit) unit.textContent='(Claude 统计不可用)';
+    morphInto(document.getElementById('uProj'),'<div class="muted">Claude 用量不可用</div>'); return;
+  }
   let projs=(d.by_project||[]).slice();
   const tokOf=p=>p.tokens_total!=null?p.tokens_total:(p.input!=null?((p.input||0)+(p.output||0)+(p.cache_read||0)+(p.cache_write_5m||0)+(p.cache_write_1h||0)):null);
   const ioOf=p=>p.tokens_io!=null?p.tokens_io:(p.input!=null?((p.input||0)+(p.output||0)):null);
@@ -147,7 +180,8 @@ function applyRange(r){
   const rg=document.getElementById('uRange');
   if(rg) rg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));
   const d=_usageData; if(!d) return;
-  const daily=sliceDaily(d.daily||[],r);
+  const claudeOk=_claudeUsageAvailable(d), cu=d.codex_usage||{}, codexOk=cu.ok===true && !cu.error;
+  const daily=claudeOk?sliceDaily(d.daily||[],r):[];
   const t=d.totals||{};
   const rangeCost=daily.reduce((s,x)=>s+(x.cost_usd||0),0);
   const rl=r?(r+'d'):'全历史';
@@ -160,7 +194,7 @@ function applyRange(r){
   const cacheHit=rDenom?(Math.floor(rCr/rDenom*1000)/10).toFixed(1)+'%':'–';
   // 用户定 BI 口径:token 消耗提主位;总 token + io(有效工作量)并列对照 + cache_read 单列标注;$ 标(参考)
   const tk=_tokTotals(t);
-  morphInto(document.getElementById('usageKpis'), [
+  morphInto(document.getElementById('usageKpis'), claudeOk?[
     ['总 token(全历史)', fmtN(tk.total),'acc','input+output+cache_read+cache_write,固定物理量(不随 plan/定价浮动)'],
     ['io 有效工作量', fmtN(tk.io),'','input+output —— 真正的新 work / 有效工作量(不含 cache 重复读)'],
     ['输入 input('+rl+')', fmtN(rIn),'','每次调用的新输入 token(不含 cache 读写)· 仅逐条 ETL 段(05-11 起)有拆分,backfill 段不计'],
@@ -170,9 +204,12 @@ function applyRange(r){
     ['API calls(去重)', fmtN(t.calls),''],
     ['API 等价成本(参考)', usd(t.cost_usd),'warn','$ 随 plan/定价浮动、plan 下还会下沉,仅作 API 等价参考;token 才是固定量'],
     ['范围成本('+rl+'·参考)', usd(rangeCost),'','范围内 $ 合计(参考)'],
-  ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${esc(k[3])}"`:''}><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join(''));
-  drawTrend(daily,{cv:'uTrend',mode:'io',peak:'trendPeak',tip:'uTrendTip',legend:'trendLegend'});
-  drawTrend(daily,{cv:'uTrendTotal',mode:'total',peak:'trendPeakTotal',tip:'uTrendTotalTip'});
+  ].map(k=>`<div class="kpi" data-key="uk-${esc(k[0])}"${k[3]?` title="${esc(k[3])}"`:''}><div class="k">${esc(k[0])}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('')
+    :'<div class="muted" data-key="claude-unavailable" style="padding:6px 12px">Claude 用量不可用：'+esc(d.claude_error||d.error||'统计未就绪')+'</div>');
+  drawTrend(daily,{cv:'uTrend',mode:'io',peak:'trendPeak',tip:'uTrendTip',legend:'trendLegend',unavailable:!claudeOk});
+  drawTrend(daily,{cv:'uTrendTotal',mode:'total',peak:'trendPeakTotal',tip:'uTrendTotalTip',unavailable:!claudeOk});
+  const codexDaily=codexOk?sliceDaily(cu.daily||[],r):[];
+  drawTrend(codexDaily,{cv:'uCodexTrend',mode:'total',peak:'uCodexPeak',tip:'uCodexTip',unavailable:!codexOk});
 }
 // 每日 token 趋势:前后一致的【单一连续序列】(别3段)。真实性靠脚注披露口径,不靠视觉分段。
 //  · backfill 段(03-27~04-28)= stats-cache 日聚合,其 total 量级≈io(未含 cache);io 图两段真可比、连续。
@@ -195,7 +232,7 @@ function drawTrend(daily, opt){
   const all=daily||[];
   const vals=all.map(x=>_trendVal(x,opt.mode));
   const has=vals.filter(v=>v!=null);
-  if(!has.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',padL,padT+20); if(peakEl)peakEl.textContent=''; if(lg)lg.innerHTML=''; cv._pts=[]; return; }
+  if(opt.unavailable||!has.length){ ctx.fillStyle=UC.dim;ctx.fillText(opt.unavailable?'统计不可用':'无数据',padL,padT+20); if(peakEl)peakEl.textContent=''; if(lg)lg.innerHTML=''; cv._pts=[]; return; }
   const maxV=Math.max.apply(null,has)*1.12||1;
   const n=all.length;
   const X=i=>padL+gw*(n<2?0.5:i/(n-1)), Y=v=>padT+gh*(1-v/maxV);
@@ -273,12 +310,12 @@ function bindProjDrill(){
     renderUProj();
   });
 }
-function drawModels(bmm){
+function drawModels(bmm,unavailable=false){
   const cv=document.getElementById('uModels'); const f=_fit(cv,200); const ctx=f.ctx,w=f.w,h=f.h;
   const rows=bmm.filter(r=>r.model.indexOf('synthetic')<0);
   const months=[...new Set(rows.map(r=>r.month))].sort();
   const models=[...new Set(rows.map(r=>r.model))];
-  if(!months.length){ ctx.fillStyle=UC.dim;ctx.fillText('无数据',20,30); return; }
+  if(unavailable||!months.length){ ctx.fillStyle=UC.dim;ctx.fillText(unavailable?'统计不可用':'无数据',20,30); morphInto(document.getElementById('uModelLegend'),''); return; }
   const padL=18,padR=14,padT=14,padB=26, gw=w-padL-padR, gh=h-padT-padB;
   const byMM={}; rows.forEach(r=>{byMM[r.month+'|'+r.model]=r.calls;});
   const tot=months.map(m=>models.reduce((s,md)=>s+(byMM[m+'|'+md]||0),0));
@@ -299,7 +336,7 @@ function drawModels(bmm){
 async function loadUsage(force){
   const kp=document.getElementById('usageKpis'); if(!kp.innerHTML) kp.innerHTML='<div class="muted" style="padding:6px 12px">加载中…</div>';
   try{ const r=await fetch('/api/usage'+(force?'?fresh=1':'')); renderUsage(await r.json()); }
-  catch(e){ kp.innerHTML='<div class="muted" style="padding:6px 12px">加载失败:'+esc(e)+'</div>'; }
+  catch(e){ renderUsage({error:'加载失败：'+String(e),codex_usage:{ok:false,error:'加载失败'}}); }
 }
 
 // ===== 派工/协作效率(metrics.jsonl · 仅自动化派工口径,非总账)=====

@@ -105,16 +105,16 @@ function renderCtx(){
   const body=document.getElementById('ctxBody'); const foot=document.getElementById('ctxFoot');
   if(!body) return;
   if(d.loading){ meta.textContent='后台扫描中…'; morphInto(body,'<tr><td colspan="6" class="muted">加载中（后台 jsonl 尾读）…</td></tr>'); return; }
-  meta.textContent='活跃 '+d.n+' · 精确绑定 '+(d.n_bound||0)+'/'+d.n+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
-  morphInto(kp,'<div class="k"><div class="v ctxpct '+(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green')+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
-    +'<div class="k"><div class="v ctxpct '+(d.n_red>0?'red':'green')+'">'+d.n_red+'</div><div class="l">≥65% 将被自动压</div></div>'
-    +'<div class="k"><div class="v ctxpct '+(d.n_yellow>0?'yellow':'green')+'">'+d.n_yellow+'</div><div class="l">≥50% 注意</div></div>'
+  meta.textContent='活跃 '+d.n+' · 精确绑定 '+(d.n_bound||0)+'/'+d.n+' · Codex '+(d.n_codex||0)+' · 最近 '+d.active_min+'min · '+esc(d.as_of||'');
+  morphInto(kp,'<div class="k"><div class="v ctxpct '+(d.max_source==='codex'?'info':(d.max_pct>=d.red?'red':d.max_pct>=d.yellow?'yellow':'green'))+'">'+d.max_pct+'%</div><div class="l">峰值占用</div></div>'
+    +'<div class="k"><div class="v ctxpct '+(d.n_red>0?'red':'green')+'">'+d.n_red+'</div><div class="l">Claude ≥65% 自动压</div></div>'
+    +'<div class="k"><div class="v ctxpct '+(d.n_yellow>0?'yellow':'green')+'">'+d.n_yellow+'</div><div class="l">Claude ≥50% 注意</div></div>'
     +'<div class="k"><div class="v">'+d.n+'</div><div class="l">活跃会话</div></div>');
   if(!d.rows||!d.rows.length){ morphInto(body,'<tr><td colspan="6" class="muted">（最近 '+d.active_min+' 分钟无活跃会话）</td></tr>'); foot.textContent=''; return; }
   morphInto(body, d.rows.map(r=>{
     const barW=Math.max(2,Math.min(100,r.pct))*0.6;
     let who;
-    if(r.role) who='<b>'+esc(r.role)+'</b> <span style="color:var(--live)" title="session_id 精确绑定(who 暴露的 presence.session_id ⨝ 会话 jsonl id)">✓</span>';
+    if(r.role) who='<b>'+esc(r.role)+'</b> <span style="color:var(--live)" title="'+(r.source==='codex'?'Codex host_session_id 精确绑定':'session_id 精确绑定')+'">✓</span>';
     else if(!r.is_agent) who='<span class="muted" title="'+esc(r.proj||'')+'">'+esc(r.proj?projShort(r.proj):'个人会话')+'</span>';
     else who='<span class="winassumed" title="who 无匹配 session_id:daemon(无此 env)/ 尚未 re-hello / 非注册会话 — 不猜">未绑定</span>';
     return '<tr class="'+(r.level==='red'?'ctx-red':'')+'" data-key="cx-'+esc(r.sid)+'">'
@@ -125,7 +125,7 @@ function renderCtx(){
       +'<td class="mono" title="'+esc(r.model)+'">'+esc((r.model||'?').replace('claude-',''))+'</td>'
       +'<td class="muted mono">'+esc(r.ts||'')+'</td></tr>';
   }).join(''));
-  foot.textContent='占用% =(input+cache_read+cache_creation)/模型窗口;自动压阈=窗口×65%(实测 auto-compact 真阈),余量=阈−ctx(<0=已过线将被压)。role✓=session_id 精确绑定(who 暴露 presence.session_id ⨝ 会话 jsonl id,MasterAgent 全解;不再 regex 猜);未绑定=daemon(无此 env)/尚未 re-hello/非注册会话,不猜。占用逐会话精确。窗口:Claude5/opus-4*/sonnet-4-6=1M、haiku=200K、未知=默认1M(假定标注)。所有会话如实显 proj(自看控制台默认不脱敏,能看清哪个个人会话在吃上下文/逼近压线);liveness/注册看 🛰 运维面板。';
+  foot.textContent='Claude 占用=(input+cache_read+cache_creation)/模型窗口；该来源实测自动压阈为窗口×65%。Codex 占用来自本机 rollout token_count，显示其上报窗口与当前 token；Codex 自动压缩阈值未从终端数据确认，因此不套用 65% 告警或余量。角色只按 Claude session_id / Codex host_session_id 精确绑定，不按路径猜。';
 }
 async function loadCtx(){
   try{ const r=await fetch('/api/ctxpanel'); _ctx=await r.json(); }catch(e){ /* 保留上次 */ }
@@ -134,9 +134,9 @@ async function loadCtx(){
 function renderCtxBadge(){
   const b=document.getElementById('ctxBadge'); if(!b) return; const d=_ctx;
   if(!d || d.loading){ b.className='hbadge loading'; b.textContent='🧠 …'; return; }
-  if(d.n_red>0){ b.className='hbadge danger'; b.textContent='🧠 ⚠ '+d.n_red+' 将压 '+d.max_pct+'%'; b.title=d.n_red+' 个会话 ≥65%(峰值 '+d.max_pct+'%)— 将被 auto-compact,建议先主动落档重置'; }
-  else if(d.n_yellow>0){ b.className='hbadge warn'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'%(有 ≥50% 会话)'; }
-  else{ b.className='hbadge ok'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'% — 全部安全'; }
+  if(d.n_red>0){ b.className='hbadge danger'; b.textContent='🧠 ⚠ Claude '+d.n_red+' 将压'; b.title=d.n_red+' 个 Claude 会话 ≥65%；Codex 压缩阈值未确认'; }
+  else if(d.n_yellow>0){ b.className='hbadge warn'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值占用 '+d.max_pct+'%（有 Claude 会话 ≥50%）；Codex 压缩阈值未确认'; }
+  else{ b.className='hbadge ok'; b.textContent='🧠 '+d.max_pct+'%'; b.title='峰值当前上下文占用 '+d.max_pct+'%; Codex 的自动压缩阈值未确认'; }
 }
 document.getElementById('ctxRefresh').onclick=()=>loadCtx();
 document.getElementById('ctxBadge').onclick=()=>showTab('ctx');

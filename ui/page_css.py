@@ -107,6 +107,10 @@ textarea{min-height:120px;resize:vertical;font-family:var(--mono)}
 .btn.danger{background:transparent;color:var(--dead);border:1px solid rgba(var(--dead-rgb),.4)}
 .btn:disabled{opacity:.5;cursor:default}
 .reply{margin:8px 16px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.reply summary{cursor:pointer;list-style:none}
+.reply summary::-webkit-details-marker{display:none}
+.reply summary::before{content:'▸';color:var(--muted);margin-right:2px}
+.reply[open] summary::before{content:'▾'}
 .reply .r-h{display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:5px;flex-wrap:wrap}
 .reply pre{margin:5px 0 0;white-space:pre-wrap;word-break:break-word;font-size:12px;color:#cdd4e0;
   background:var(--bg);padding:8px 10px;border-radius:6px;max-height:200px;overflow:auto}
@@ -162,8 +166,9 @@ textarea{min-height:120px;resize:vertical;font-family:var(--mono)}
 .ctx-kpis .k .v{font-size:18px;font-weight:700}
 .ctx-kpis .k .l{font-size:11px;color:var(--dim)}
 .ctxpct{font-weight:700;font-variant-numeric:tabular-nums}
-.ctxpct.green{color:var(--live)} .ctxpct.yellow{color:var(--warn)} .ctxpct.red{color:var(--dead)}
+.ctxpct.green{color:var(--live)} .ctxpct.yellow{color:var(--warn)} .ctxpct.red{color:var(--dead)} .ctxpct.info{color:var(--acc)}
 .ctxbar{display:inline-block;height:7px;border-radius:4px;vertical-align:middle;margin-left:7px;min-width:2px;background:currentColor;opacity:.55}
+.ctxbar.info{color:var(--acc)}
 tr.ctx-red td{background:rgba(var(--dead-rgb),.08)}
 .winassumed{color:var(--dim);font-size:10.5px}
 .hpanel{position:absolute;top:30px;left:0;z-index:30;width:360px;max-height:70vh;overflow:auto;
@@ -396,6 +401,14 @@ table.capmx td.cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 #fleetBody .badge.vbadge.live{background:rgba(var(--live-rgb),.10)}  /* verdict 主徽标保留极淡底=可扫读 */
 #fleetBody .qcount.dn{background:transparent;color:var(--dim)}       /* done 计数=历史信息,安静 */
 #fleetBody .qcount.ib{font-weight:700}                                /* inbox 待领=要人处理,加重 */
+.model-pref-line{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.model-pref-value{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-prefs{position:relative;flex:0 0 auto}
+.model-prefs summary{cursor:pointer;color:var(--acc);white-space:nowrap;margin-top:0}
+.model-prefs-form{display:grid;grid-template-columns:1fr;gap:4px;align-items:center;margin-top:4px}
+.model-prefs[open] .model-prefs-form{position:absolute;top:100%;right:0;z-index:30;width:180px;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.model-prefs-form input,.model-prefs-form select{min-width:0;width:100%;padding:4px 6px;font-size:11px}
+.model-prefs-form button{justify-self:start}
 
 /* U5b 全站原语(块认知三原则):钳行(点击展开)/折叠卡(标题即锚点·正文默认收)/chip 降噪 */
 .clampable{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:s-resize}

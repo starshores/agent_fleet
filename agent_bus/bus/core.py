@@ -13,7 +13,9 @@ from bus.config import BUS, METRICS, cfg, _now, _idle_timeout_policy
 from bus.io import _gen_id, _write_json, _oldest, _audit, record_metric, read_metrics, _fail
 from bus.roster import (_agents_file, _load_agents, _save_agents, _role_dir, _list_roles,
                         _retired_roles, _is_test_role, _PSEUDO_ROLE_LABELS, _pseudo_role_label, HUMAN_ATTENDED)
-from bus.proc import _claude_ancestor, _proc_claude_ancestor, _proc_session_id, _claude_by_session, _proc_scan, _alive_claude_pids, _age_seconds
+from bus.proc import (_claude_ancestor, _proc_claude_ancestor, _proc_session_id, _claude_by_session,
+                      _host_ancestor, _host_session_id, _host_pid_alive, _proc_scan,
+                      _alive_claude_pids, _age_seconds)
 from bus.presence import _touch_presence, _set_current_task, _pidtags_file, _load_pidtags, _owner_live
 from bus.selfwake import _wait_proc_roles, _parked_path, _is_parked, _park_expired, _self_wake_state, _ancestor_pids
 from bus.notify import _toast_throttled, _fire_toast, _maybe_toast, _emit_completion_notice
@@ -415,10 +417,10 @@ def _wait_self_exit(reg_path, my_pid, why):
     os._exit(0)
 
 
-def _start_wait_heartbeat(role, mode, extra, host_pid=None, reg_path=None, my_pid=None, interval=None):
+def _start_wait_heartbeat(role, mode, extra, host_pid=None, host_kind=None, reg_path=None, my_pid=None, interval=None):
     """后台心跳线程:wait 阻塞期间每 interval 秒(默认 10s)刷 presence + reg 心跳(daemon 线程·best-effort)。
     P1 宿主自检(用户令 2026-08-10·根治孤儿):
-      ① 启动宿主 claude 已退(pid 没了 / pid 复用成非 claude)→ 本 wait 是孤儿(claim 走任务也没人处理)
+      ① 启动宿主已退(pid 没了 / pid 复用成其它程序)→ 本 wait 是孤儿(claim 走任务也没人处理)
          → 自杀,不再抢 inbox。这比"新 wait 去杀孤儿"或"reap 兜底"都干净——孤儿自己消失。
       ② reg 已被别的 wait 覆盖(wait_pid != 我)→ 被接管 → 退出,让位单一执行体。
     host_pid=None(父链断追不到宿主)→ 跳过宿主自检(安全降级:不误杀,靠 P0 yield/reap 兜)。"""
@@ -445,14 +447,11 @@ def _start_wait_heartbeat(role, mode, extra, host_pid=None, reg_path=None, my_pi
                 _touch_presence(role, mode, extra)
             except Exception:
                 pass                      # 心跳绝不影响 wait 主流程(bus 路径瞬失等,下一拍再试)
-            # ① 宿主自检:宿主 claude 死 → 孤儿自杀(psutil 缺失则跳过,不误杀)
+            # ① 宿主自检:Claude/Codex host 死 → 孤儿自杀(psutil 缺失则跳过,不误杀)
             if host_pid is not None and psutil is not None:
-                try:
-                    alive = "claude" in (psutil.Process(host_pid).name() or "").lower()
-                except Exception:
-                    alive = False         # pid 没了 / 读不到 → 判宿主已退
+                alive = _host_pid_alive(host_pid, host_kind)
                 if not alive:
-                    _wait_self_exit(reg_path, my_pid, "宿主 claude(pid=%s)已退→孤儿 wait 自杀(P1)" % host_pid)
+                    _wait_self_exit(reg_path, my_pid, "宿主 %s(pid=%s)已退→孤儿 wait 自杀(P1)" % (host_kind or "agent", host_pid))
             # ② 被接管自检 + 刷 reg 心跳
             if reg_path is not None and my_pid is not None:
                 try:
@@ -489,20 +488,37 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
     #   _owner_live 是 role 级、本会话 wait 仍在岗 → 要拖到 age>ttl 4000s 才退回)。故跨会话/追不到宿主
     #   的旧 wait 一律【takeover 杀掉接管】(符合"一 role 一执行体"铁律)。宿主 pid 判据比 session_id 准
     #   (--resume 复用 sid,但每个活 claude.exe 是独立 pid);见 proc._proc_claude_ancestor。
-    mine_sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    # 本 wait 的启动宿主 claude 会话 pid(P1 reg + 宿主自检用)。多源回退(P1.1·2026-08-10):
-    # 本 harness 下后台 shell 父链【普遍】够不到 claude.exe(reboot-hello 记的坑)→ _claude_ancestor 常返
-    # None → 宿主自检形同虚设。故回退:① 父链;② session_id 反查活 claude(--resume 会话命令行带 sid);
-    # ③ presence 里 hello 绑定的 claude_pid(死 pid 已治本不永续=要么活 pid 要么 None,用它安全)。
-    # 全 None(极端)才降级跳过自检(不误杀)。
-    mine_host = _claude_ancestor()[0]
-    if mine_host is None and mine_sid:
-        mine_host = _claude_by_session(mine_sid)[0]
-    if mine_host is None:
+    mine_host_kind, mine_host, _mine_cwd, _mine_chain = _host_ancestor()
+    mine_sid = _host_session_id(mine_host_kind)
+    if os.environ.get("AGENTBUS_CODEX_BRIDGE_WAIT") == "1":
+        mine_sid = _host_session_id("codex")
+        # This wait is owned by a detached messenger. Bind its registry and
+        # host-liveness check only through the exact session's current
+        # presence; the wait must never guess a host from a shared PID.
         try:
-            mine_host = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8")).get("claude_pid")
+            bound = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+            bound_pid = bound.get("host_pid")
+            if (not mine_sid or bound.get("host_kind") != "codex"
+                    or bound.get("host_session_id") != mine_sid
+                    or not _host_pid_alive(bound_pid, "codex")):
+                raise RuntimeError("Codex bridge wait has no live exact host binding")
+            mine_host_kind, mine_host = "codex", bound_pid
+        except (OSError, ValueError, TypeError) as exc:
+            raise RuntimeError("Codex bridge wait cannot read its exact host binding") from exc
+    # Claude resume can fall back to its command line; Codex is never found by scanning
+    # other Codex processes. If parent walking failed, only accept a matching role binding.
+    if mine_host is None and mine_host_kind == "claude" and mine_sid:
+        mine_host = _claude_by_session(mine_sid)[0]
+    if mine_host is None and mine_sid:
+        try:
+            _bound = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+            _bound_kind = _bound.get("host_kind") or ("claude" if _bound.get("claude_pid") else None)
+            _bound_sid = _bound.get("host_session_id") or _bound.get("session_id")
+            _bound_pid = _bound.get("host_pid") or _bound.get("claude_pid")
+            if _bound_kind == mine_host_kind and _bound_sid == mine_sid and _host_pid_alive(_bound_pid, mine_host_kind):
+                mine_host = _bound_pid
         except Exception:
-            mine_host = None
+            pass
     # ── 竞争裁决走 reg(P2·2026-08-10 用户令):判据从 psutil 扫+environ 归到 wait.reg.json 单一源 ──
     # reg 记录本 role 当前在册 wait(wait_pid/host_session_id)。裁决:
     #   · 让位(非 takeover + reg 有【同会话】活持有者)→ 治 kill-churn(P0/P1 一脉),判据读 reg 一个文件
@@ -548,7 +564,9 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
         _gen = 1
     try:
         _write_json(_reg_path, {"role": role, "wait_pid": os.getpid(),
-                                "host_claude_pid": mine_host, "host_session_id": mine_sid,
+                                "host_kind": mine_host_kind, "host_pid": mine_host,
+                                "host_claude_pid": mine_host if mine_host_kind == "claude" else None,
+                                "host_session_id": mine_sid,
                                 "started": _now(), "timeout": timeout, "last_heartbeat": _now(),
                                 "status": "listening", "generation": _gen})
         # rearm 事件(Master数分 instrument 需求 2026-09-18 回8a590b):重挂留痕 → 掉线可自动三分型
@@ -564,7 +582,8 @@ def _serve_wait(role, timeout, presence_mode="listening", presence_extra=None, i
     _trace = {"pid": os.getpid(), "started": _now(), "timeout": timeout, "exit": None}
     _write_json(_tracef, _trace)
     _hb_stop = _start_wait_heartbeat(role, presence_mode, extra,      # 阻塞期周期心跳 + P1 宿主自检
-                                     host_pid=mine_host, reg_path=_reg_path, my_pid=os.getpid())
+                                     host_pid=mine_host, host_kind=mine_host_kind,
+                                     reg_path=_reg_path, my_pid=os.getpid())
     try:
         _touch_presence(role, presence_mode, extra)       # 声明身份 + 心跳
         obj = _wait_core(role, timeout, include_approval)

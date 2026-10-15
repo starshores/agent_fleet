@@ -6,13 +6,14 @@
 _retired_roles/_pseudo_role_label/_role_dir/_case_collision)· presence(_touch_presence/_load_pidtags/_pidtags_file)
 · selfwake(_ancestor_pids/_is_parked/_parked_path/_self_wake_state/_wait_proc_roles)· notify(_fire_toast)。无反向依赖=无环。
 """
-import json, os, re, sys, time
+import json, os, re, subprocess, sys, time
 from pathlib import Path
 
 from bus.config import BUS, _now, cfg
 from bus.io import _audit, _gen_id, _write_json
 from bus.roster import _load_agents, _save_agents, update_agents, _list_roles, _retired_roles, _pseudo_role_label, _role_dir, _case_collision
 from bus.presence import _touch_presence, _load_pidtags, _pidtags_file
+from bus.proc import _host_ancestor, _host_session_id
 from bus.selfwake import _ancestor_pids, _is_parked, _parked_path, _self_wake_state, _wait_proc_roles, _is_guard_exempt, _guard_exempt_path
 from bus.notify import _fire_toast
 
@@ -57,6 +58,14 @@ def cmd_hello(args):
     role = args.role
     if not role:
         sys.stderr.write("hello 需要 --role(仅预览可省:hello --preview)\n"); return
+    kind = _host_ancestor()[0]
+    codex_sid = _host_session_id("codex") if kind == "codex" else None
+    if codex_sid:
+        from bus.codex_startup import registered_codex_role
+        previous_role = registered_codex_role(codex_sid)
+        if previous_role and previous_role != role:
+            sys.stderr.write("拒绝 hello:当前 Codex session 已持久登记到另一角色。\n")
+            sys.exit(2)
     dup = _case_collision(role)
     if dup:
         sys.stderr.write("⚠ 拒绝 hello:角色名 %r 与既有 %r 仅大小写不同——Windows 文件系统不区分大小写、会共用同一 mailbox(致幽灵重复+绑定错乱)。你多半想声明 %r,请用它的准确大小写重跑。\n" % (role, dup, dup))
@@ -81,17 +90,51 @@ def cmd_hello(args):
         # 显式指定本 tab 的 claude pid(parent-walk + session 反查都失败时的人工兜底·2026-07-29 模型侧案)
         extra = {"claude_pid": int(args.pid)}
     _touch_presence(role, "idle", extra)
+    bridge_error = None
+    if codex_sid and not os.environ.get("AGENTBUS_CODEX_HOOK_HELLO"):
+        # SessionStart may have run before a new Codex thread was assigned its
+        # role. An explicit late hello is also a valid bootstrap point.
+        try:
+            _start_codex_messenger_after_hello(role, codex_sid)
+        except Exception as exc:
+            bridge_error = str(exc)
     pf = BUS / role / "presence.json"
     print(pf.read_text(encoding="utf-8"))
-    _print_onboarding(role)
-    _print_role_feed(role)
+    _print_onboarding(role, codex=bool(codex_sid))
+    _print_role_feed(role, codex=bool(codex_sid))
     if is_new:
         _auto_train_request(role, _load_agents().get(role) or {})   # P0 重构后 a 已不在作用域(锁内 mutator);重读取
+    if bridge_error:
+        sys.stderr.write("Codex 身份已登记，但信使启动失败：%s；请用 ab selfwake 核对并交基础设施恢复。\n" % bridge_error)
+        sys.exit(1)
 
 
-def _print_onboarding(role):
+def _start_codex_messenger_after_hello(role, session_id):
+    """Late Codex hello starts the bridge only after exact-session presence exists."""
+    import importlib.util
+
+    # BUS is the data directory (~/.claude/agent_bus), not this codebase's
+    # root. Resolve the launcher beside the source tree instead.
+    hook_path = Path(__file__).resolve().parents[2] / ".codex" / "hooks" / "agentbus_codex_session_start.py"
+    spec = importlib.util.spec_from_file_location("agentbus_codex_session_start", hook_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Codex messenger launcher is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    profile = _role_profile(role) or {}
+    module._start_messenger(role, session_id, profile.get("cwd") or os.getcwd())
+
+
+def _print_onboarding(role, codex=False):
     """打印【基本能力 onboarding】文本(事件自醒 / 待办 ask-user / 专一性 / 卡住别硬扛)。
     正常 hello 与 hello --preview 共用;纯打印、无副作用。role 可为占位符(preview 时)。"""
+    if codex:
+        print("\n【Codex 信使】本会话已按精确 session 登记；信使由 SessionStart 或本次 hello 启动。")
+        print("开始任务前用 ab selfwake 核对本角色的信使、内部 wait 和 App Server 均就绪。")
+        print("角色不要手动运行或重挂 ab wait；执行期间信使继续收件并排队投递。")
+        print('收到 kind="notice" 时只读 notice_of 指向的结果并 done；普通任务和 fyi 处理后也须 done。')
+        print("跨领域任务按角色边界找对口 agent；需要用户决定的事项走 ab ask-user。")
+        return
     abpy = os.path.abspath(__file__)
     py = sys.executable or "python"   # 绝对解释器路径,PATH-proof:后台 shell 偶发 PATH 缺 python 会让裸 `python` 启动 127→自醒掉线(Master数分/我都撞过)
     fb = '(若新 shell 提示 `ab: command not found`=PATH 未刷新,用全路径 "C:/apphome/agent_fleet/agent_bus/ab" <命令>,或兜底 "%s" "%s" <命令>)' % (py, abpy)
@@ -146,7 +189,7 @@ def _load_caps_pool():
     return load_caps_pool()
 
 
-def _print_role_feed(role):
+def _print_role_feed(role, codex=False):
     """hello 即喂【角色页 + 能力池】(2026-07-28 用户令:机制上防"老角色的新会话空脑上岗"——
     实证:MasterUI 新会话首单把 WebUI 重启到 5678 且假阳性验证,根因=角色操作知识只在 compact 注入、上岗时没人喂)。
     数据同源 role_profiles.json + capabilities.json(与 WebUI 角色页/compact hook 同一份);纯打印无副作用。"""
@@ -159,7 +202,9 @@ def _print_role_feed(role):
         if prof.get("boundary"):
             print("【边界】" + prof["boundary"])
         flow = prof.get("startup_flow") or []
-        if flow:
+        if codex:
+            print("【Codex 启动】身份由精确 session 绑定，信使负责收件；用 ab selfwake 核对投递链。")
+        elif flow:
             print("【启动流程·逐条走完才算上岗】")
             for s in flow:
                 print("  " + s)
@@ -176,8 +221,19 @@ def _print_role_feed(role):
     # 角色记忆索引指针(记忆随角色走·2026-07-28 用户令:CC 记忆按 cwd 定位=同 cwd 多角色共锅,
     # 索引按角色分锅 <role>.MEMORY.md,根 MEMORY.md=路由器+公共段)
     try:
-        slug = re.sub(r"[:\\/_. ]", "-", os.getcwd())
-        pot = Path.home() / ".claude" / "projects" / slug / "memory"
+        from bus.proc import _host_ancestor
+        if _host_ancestor()[0] == "codex":
+            # A Codex host can contain threads for several projects. Resolve
+            # memory from the explicit role profile, never the shared host cwd.
+            prof = _role_profile(role) or {}
+            role_cwd = prof.get("memory_cwd") or prof.get("cwd") or os.getcwd()
+            slug = re.sub(r"[:\\/_. ]", "-", role_cwd)
+            pot = Path.home() / ".claude" / "projects" / slug / "memory"
+            if not pot.exists() and Path(role_cwd, "memory").exists():
+                pot = Path(role_cwd, "memory")
+        else:
+            slug = re.sub(r"[:\\/_. ]", "-", os.getcwd())
+            pot = Path.home() / ".claude" / "projects" / slug / "memory"
         ri = pot / (role + ".MEMORY.md")
         if ri.exists():
             print("【角色记忆索引】读 %s(上岗/压后必读;你的新记忆也写这份,全角色公共纪律在同目录根 MEMORY.md)" % ri)
@@ -240,11 +296,16 @@ def cmd_train_done(args):
 
 def cmd_whoami(args):
     """反查【本会话/进程】绑定的 role(同 cwd 多 role 时不靠 cwd 猜):
-    ① 按 env CLAUDE_CODE_SESSION_ID 匹配各 role presence.session_id(权威);
-    ② fallback 按 claude_pid(本进程的 claude 祖先 pid)匹配;
+    ① 按当前宿主 session_id 精确匹配各 role presence(权威);
+    ② 仅 Claude 兼容路径允许按 claude_pid 祖先回退；Codex PID 可被多个 thread 共享，禁止回退;
     查到→打印 role(exit 0);查不到→空 + exit 2(=真新未绑定 tab,恢复入口据此才默认 MasterAgent)。
     用途:新 CLI 恢复入口/PostCompact hook 先 whoami 认清真身份。"""
-    sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    sid = _host_session_id()
+    host_kind = _host_ancestor()[0]
+    # Environment can be absent in some Codex hook subprocesses. The current
+    # parent chain is still enough to establish that PID matching is unsafe.
+    is_codex = host_kind == "codex" or bool(
+        os.environ.get("CODEX_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"))
     roles = _list_roles()
     def _pres(r):
         pf = BUS / r / "presence.json"
@@ -256,14 +317,21 @@ def cmd_whoami(args):
     if sid:
         for r in roles:
             pr = _pres(r)
-            if pr and pr.get("session_id") == sid:
+            if not pr:
+                continue
+            if is_codex:
+                matches = (pr.get("host_kind") == "codex"
+                           and sid == pr.get("host_session_id"))
+            else:
+                matches = sid in (pr.get("host_session_id"), pr.get("session_id"))
+            if matches:
                 hit = r; how = "session_id"; break
-    if not hit:
+    if not hit and not is_codex:
         anc = _ancestor_pids()
         for r in roles:
             pr = _pres(r)
-            if pr and pr.get("claude_pid") in anc:
-                hit = r; how = "claude_pid(祖先)"; break
+            if pr and (pr.get("host_pid") in anc or pr.get("claude_pid") in anc):
+                hit = r; how = "%s_pid(祖先)" % (pr.get("host_kind") or "claude"); break
     if getattr(args, "json", False):
         print(json.dumps({"role": hit, "matched_by": how, "session_id": sid}, ensure_ascii=False))
     else:
@@ -301,7 +369,7 @@ def cmd_selfwake(args):
     if recent:
         print("◐待确认=有心跳无wait进程(刚fire待重挂/交互中·瞬时非告警);持续则下轮转掉线。")
     if stale:
-        print("⚠ 掉线需重挂:daemon→`supervise`/`start_worker`;协调位会话→重新挂后台 `wait --role <自己>`。")
+        print("⚠ 掉线处置:Codex→核对并恢复精确 session 的信使/App Server 投递链；Claude 协调位→重挂后台 wait；daemon→`supervise`/`start_worker`。")
 
 
 def _guard_prev_path():
@@ -357,22 +425,43 @@ def _guard_delay_verdict(role):
 
 
 def cmd_selfwake_guard(args):
-    """【B·自醒巡检报警·2026-07-08 Master拍板】周期扫自醒,发现掉自醒(claude活/无wait/心跳超期)的
-    agent → ①往其 inbox 投一条【重挂提醒】(dedup:已有未领的提醒就不重投)②WinRT toast 报警(汇总)。
-    只报警+提醒,不代挂(外部无法替前台CLI重挂,见方案评估)。--dry-run 只报不动。
-    周期驱动:可由 WebUI 常驻线程 / cron 每几分钟跑一次,把"18h没人发现"变"几分钟内报警"。"""
+    """巡检自醒。Codex 走精确会话信使恢复并失败上报；旧 Claude 走重挂提醒。"""
     from bus.fleetlog import maint_active, maint_info
     if maint_active():   # 🔧 维修模式(用户 2026-07-28):守卫休眠——停机 agent 大片"掉线"=预期,不报警不投提醒不 toast
         i = maint_info()
         print("🔧 维修模式进行中(since %s·%s)→ 自醒守卫休眠,本轮不巡检。`ab maint --off` 结束后恢复。"
               % (i.get("since", "?"), i.get("note") or "-"))
         return
+    if not args.dry_run:
+        # 同一恢复器也由 WebUI 每 45 秒运行；此入口确保手动巡检会尝试恢复。
+        # 它仅凭精确 session + 安全条件重启 Codex 信使，并向 MasterAgent 去重上报失败。
+        guard = Path(__file__).resolve().parents[2] / ".codex" / "codex_messenger_guard.py"
+        try:
+            result = subprocess.run([sys.executable, "-B", str(guard)],
+                                    capture_output=True, text=True, encoding="utf-8",
+                                    errors="replace", timeout=50,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if result.returncode:
+                print("⚠ Codex 信使守卫执行失败: " + (result.stderr or result.stdout)[-300:])
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print("⚠ Codex 信使守卫未完成: " + str(exc))
+    from bus.codex_startup import resume_role_for_session
     wait_roles = _wait_proc_roles()
     retired_set = _retired_roles()
     stale = []
+    codex_roles = []
     for role in _list_roles():
         if _pseudo_role_label(role) or role in retired_set or _is_parked(role) or _is_guard_exempt(role):
             continue                          # parked=故意暂离 / guard_exempt=轮询模式在岗 → 不巡检报警
+        try:
+            presence = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            presence = {}
+        sid = presence.get("host_session_id")
+        if (presence.get("host_kind") == "codex"
+                or (isinstance(sid, str) and resume_role_for_session(sid) == role)):
+            codex_roles.append(role)
+            continue  # Codex 不向失联角色投手动 ab wait 提醒。
         st, detail = _self_wake_state(role, wait_roles=wait_roles)
         if st == "stale":
             stale.append((role, detail))
@@ -386,7 +475,7 @@ def cmd_selfwake_guard(args):
     _save_guard_prev(cur)
     unconfirmed = cur - confirmed
     if not stale:
-        print("✓ 自醒巡检:全员在岗,无掉自醒"); return
+        print("✓ 自醒巡检:旧式自醒无掉线；Codex 信使由恢复守卫核查 %d 个角色" % len(codex_roles)); return
     if not confirmed:
         print("自醒巡检:%d 疑掉线,均【首次/未连续确认】→本轮不报(待下轮确认,消瞬时假阳性):%s"
               % (len(stale), "、".join(sorted(cur))))

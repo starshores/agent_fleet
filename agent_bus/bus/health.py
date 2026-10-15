@@ -19,7 +19,9 @@ from bus.proc import _age_seconds
 from bus.roster import _list_roles, _retired_roles, _is_test_role, _load_agents, _policy
 from bus.lock import holders as _lock_holders   # 分离 A4:通用 locks[](edge_lock 已摘)
 from bus.presence import _owner_live
-from bus.selfwake import _is_parked, _self_wake_state, _wait_proc_roles
+from bus.selfwake import (_is_parked, _self_wake_state, _wait_proc_roles,
+                          _codex_messenger_diagnostic)
+from bus.codex_recovery import requeue_blocked, fence_tasks
 
 
 def cmd_reap(args):
@@ -62,14 +64,25 @@ def cmd_reap(args):
             # 回执已在请求方 done/ = 任务其实做完了,归档补齐即可,绝不能 requeue 重跑。
             sender = obj.get("from")
             if sender and (BUS / sender / "done" / (tid + ".json")).exists():
+                archived = BUS / role / "archive" / p.name
+                if archived.exists():
+                    # A completed archive can coexist with a processing file
+                    # when done's final unlink failed. Never replace the
+                    # completed result with the older processing payload.
+                    actions.append(("归档与processing并存→保留待核对", role, tid)); continue
                 if not args.dry_run:
                     obj["reap_note"] = "receipt-exists→archived(done崩在归档前的残骸补齐)"
                     try:
                         _write_json(p, obj)
-                        os.replace(str(p), str(BUS / role / "archive" / p.name))
+                        os.replace(str(p), str(archived))
                     except Exception:
                         pass
                 actions.append(("回执已在→归档免重跑", role, tid)); continue
+            if requeue_blocked(role, obj):
+                if not args.dry_run:
+                    fence_tasks(role, [obj], "reap_requires_reconcile")
+                actions.append(("Codex执行待核对→保留processing、不自动重投", role, tid))
+                continue
             if rq > args.max_requeue:
                 if not args.dry_run:
                     failed = BUS / role / "failed"; failed.mkdir(parents=True, exist_ok=True)
@@ -546,14 +559,14 @@ def _stale_todos(threshold_min=1440):
 def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
     """只读汇总 bus 健康各项指标(不改任何状态)。返回 dict,供 cmd_health 渲染 / WebUI 复用。"""
     now = time.time()
-    role_dirs = [d for d in sorted(BUS.iterdir())
-                 if d.is_dir() and not d.name.startswith((".", "_")) and d.name != "unknown"
-                 and not _is_test_role(d.name)]
+    role_dirs = [BUS / role for role in _list_roles()
+                 if role != "unknown" and not _is_test_role(role)]
     h = {"as_of": _now(), "warns": []}
     # 1) 自醒(退役 role 跳过——不计掉线,否则误报)
     wr = _wait_proc_roles()
     retired_set = _retired_roles()
     armed = recent = stale = off = retired_n = parked_n = 0; stale_roles = []
+    messenger_evidence_gaps = []
     for d in role_dirs:
         if d.name in retired_set:
             retired_n += 1; continue
@@ -565,8 +578,16 @@ def _collect_health(stale_min=30, stuck_min=90, todo_stale_min=1440):
         elif stt == "recent": recent += 1            # 有心跳无wait·瞬时态·不计告警
         elif stt == "stale": stale += 1; stale_roles.append(d.name)
         else: off += 1
-    h["selfwake"] = {"armed": armed, "recent": recent, "stale": stale, "off": off, "parked": parked_n, "retired": retired_n, "stale_roles": stale_roles}
+        if stt == "recent":
+            reason = _codex_messenger_diagnostic(d.name)
+            if reason:
+                messenger_evidence_gaps.append({"role": d.name, "reason": reason})
+    h["selfwake"] = {"armed": armed, "recent": recent, "stale": stale, "off": off, "parked": parked_n, "retired": retired_n, "stale_roles": stale_roles,
+                     "messenger_evidence_gaps": messenger_evidence_gaps}
     if stale_roles: h["warns"].append("自醒掉线 %d(%s)" % (stale, ",".join(stale_roles)))
+    if messenger_evidence_gaps:
+        h["warns"].append("Codex 信使投递证据待核对 %d(%s)" % (
+            len(messenger_evidence_gaps), ",".join(item["role"] for item in messenger_evidence_gaps)))
     # 2) 队列
     q = {"inbox": 0, "processing": 0, "held": 0, "failed": 0}
     held_l, failed_l = [], []
@@ -638,6 +659,8 @@ def cmd_health(args):
     sw = h["selfwake"]
     L.append("\n[自醒]   在岗 %d / 待确认 %d / 掉线 %d / 未醒 %d / 退役 %d" % (sw["armed"], sw.get("recent", 0), sw["stale"], sw["off"], sw.get("retired", 0)))
     if sw["stale_roles"]: L.append("  ⚠ 掉线需重挂: " + ", ".join(sw["stale_roles"]))
+    for gap in sw.get("messenger_evidence_gaps", []):
+        L.append("  ⚠ 信使证据待核对: %s [%s]；未确认投递就绪，不推断进程已退" % (gap["role"], gap["reason"]))
     q = h["queues"]
     L.append("\n[队列]   inbox 待领 %d / processing 处理中 %d / held 待批 %d / failed 失败 %d"
              % (q["inbox"], q["processing"], q["held"], q["failed"]))

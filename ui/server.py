@@ -68,8 +68,8 @@ def start_supervisor(interval=90):
 
 
 def start_selfwake_guard(interval=180):
-    """常驻自醒探测网(Master 令·B):每 ~interval 秒后台跑 `ab selfwake-guard` ——
-    它扫掉自醒(stale)的 agent → dedup 投「重挂」提醒到其 inbox + WinRT toast 报警。
+    """每 ~interval 秒跑 `ab selfwake-guard`：Codex 尝试信使恢复并失败上报，
+    旧 Claude 才向掉自醒角色投重挂提醒与 WinRT toast。
     由 WebUI 8799 always-on 驱动,不依赖任何 agent 醒着(把「18h 没人发现掉自醒」变「3 分钟内报警」)。
     探测逻辑全在 agentbus(cmd_selfwake_guard),此处只周期调它。
     · daemon=True 随 server 退出;· 首轮先 sleep(避开重启后 agent 尚未重挂的假警);
@@ -82,6 +82,21 @@ def start_selfwake_guard(interval=180):
                                capture_output=True, timeout=60, creationflags=_NO_WINDOW)
             except Exception:
                 pass
+    threading.Thread(target=loop, daemon=True).start()
+
+
+def start_codex_messenger_guard(interval=45):
+    """Repair safe exact-session Codex losses; report unresolved failures to MasterAgent."""
+    stop = threading.Event()
+
+    def loop():
+        while not stop.wait(interval):
+            try:
+                subprocess.run([_PYEXE, "-B", str(ABDIR.parent / ".codex" / "codex_messenger_guard.py")],
+                               capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+            except Exception:
+                pass
+
     threading.Thread(target=loop, daemon=True).start()
 
 
@@ -161,6 +176,7 @@ def main():
     if not args.no_supervise:
         start_supervisor()
     start_selfwake_guard(180)         # 常驻自醒探测网(Master令·B):180s 跑 ab selfwake-guard,掉自醒→inbox提醒+toast(8799 always-on 驱动,不依赖 agent 醒着)
+    start_codex_messenger_guard(45)   # 近期空闲 Codex 信使安全自愈；维修模式或未完成任务时跳过
     start_user_absence_check(300)     # 用户侧自醒对偶(2026-08-28):5min 跑 ab user-absence-check --apply,pending确认点离席+超阈→toast升级/低紧急超期auto-expire留痕(对偶selfwake-guard探用户缺席)
     start_maint(1800)                 # B2+B3(2026-07-21):30min 维护心跳=reap(退卡死/孤儿)+ todos-archive(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态·安全无人值守
     start_route_reap(300)             # 工作组路由超时自愈(MasterAgent令·2026-07-23):5min 独立 tick 跑 ab route-reap(超15min未done路由任务re-route)·不搭30min start_maint(任务池太粗)·幂等no-op

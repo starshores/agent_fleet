@@ -6,6 +6,12 @@
 > **状态**:v2(2026-08-28)。**⚠ daemon 化已回退(2026-08-27)**——bus 现回【全前台 CLI 热态】,daemon 路径停用(机制代码保留 dormant)。§2/§5/§6 的 daemon 内容保留为"可选/已停用+教训"。新增 **§0 教训**(方向性错误复盘)。**待办**:WebUI 化承载(MasterUI 建【📖 操作说明】tab 渲染本页)。
 
 
+## Codex 当前入口（2026-10-12）
+
+Codex 新会话先用 `codex-role-next --role X --cwd <项目目录>` 指定一次角色。`SessionStart(startup|resume)` 按精确 session 身份装载角色卡和记忆索引，启动独立信使。信使接收 inbox、维护内部 wait，经本机 App Server 将任务串行投递给原会话；执行任务期间继续收信。Codex 角色不手动运行 `ab hello`、`ab wait` 或 Claude `/loop`。压缩恢复仍按精确 session 匹配，不能靠目录或共享 PID 认角色。
+
+联络异常时先运行 `ab whoami --json` 与 `ab selfwake`，核对精确身份、信使、wait、App Server 三段状态。只有 wait 在册不足以证明消息能到模型。普通任务及 `fyi` 读完后都要 `ab done`；`notice` 只读 `notice_of` 的 done 结果并回填。下文保留旧 Claude 操作与历史机制说明，遇到 Codex 启动或收信步骤时以本节和 `docs/CODEX_AGENTBUS_STARTUP.md` 为准。
+
 ---
 
 ## 0. 教训:daemon 化方向性错误(2026-08-27·"此路不通"实证)

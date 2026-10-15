@@ -16,13 +16,14 @@
 ## Tabs(TAB_NAMES 顺序)
 | key | 标题 | 用途 | 主 API |
 |-----|------|------|--------|
-| `fleet` | 🛰 舰队/运维 | 每角色 verdict(在岗/静默/掉线/**🅿️休眠**/进程已退)+ 自醒 + turn 状态 + 队列计数;未认领 claude 进程(tagged/unknown) | `/api/state` |
-| `bi` | 📊 运营/资源 | 运营/资源 BI(token 消耗为主口径,非费用) | `/api/bi` |
-| `usage` | 📈 历史用量 | usage.db 历史用量(ETL·token_stats) | `/api/usage` |
+| `fleet` | 🛰 舰队/运维 | 精确会话身份、Codex 信使投递态与当前会话工作态；运行模型、角色默认模型、默认思考强度分列显示，后两列可编辑；队列计数；Codex 共享宿主 PID 与角色工作区分开显示 | `/api/state`；POST `/api/role-model-prefs` |
+| `bi` | 📊 运营/资源 | Claude usage.db 与 Codex rollout token 分源；“工作中会话”按精确 Codex session 的本机 App Server 状态，“Bus 在跑任务”按托盘新鲜 claim 口径；Codex 共享 App Server 进程树只计一次，资源不能按角色拆分 | `/api/bi` |
+| `usage` | 📈 历史用量 | Claude usage.db 与 Codex rollout 分开展示，不估 Codex 美元成本 | `/api/usage` |
 | `caps` | 🧬 能力池 | 能力池(谁被授权哪些 cap·登记归培训师) | `/api/caps` |
-| `ctx` | 🧠 上下文 | 各会话上下文占用(proj 如实显·不掩码) | `/api/ctx` `/api/ctxpanel` |
-| `prompts` | 📝 提示词审核 | 提示词审核(每节**行号 gutter**·左侧等宽行号列/每逻辑行一行·内容 wrap 不打乱行号;真实文件节带 **📂开文件** 按钮→默认程序打开) | `/api/prompts` + POST `/api/open-file` |
+| `ctx` | 🧠 上下文 | Claude 的 65% 自动压缩预警与 Codex 的上报窗口占用分开；Codex 阈值未知不套用 Claude 告警 | `/api/ctx` `/api/ctxpanel` |
+| `prompts` | 📝 提示词审核 | 提示词审核(hello/Claude 提示词 + Codex 全局源与宿主入口、项目指令、MasterAgent 角色记忆、hooks 配置；按精确 presence 展示 startup/resume、compact 角色卡、compact 项目 CLAUDE.md/记忆三类实际注入预览;每节**行号 gutter**;真实文件节带 **📂开文件** 按钮→默认程序打开) | `/api/prompts` + POST `/api/open-file` |
 | `tasklines` | 🎯 任务线看板 | 长期任务线卡片 + 待决策徽标 | `/api/tasklines` |
+| `tasks` | 📋 任务/协作 | 默认汇总活跃角色最近 200 条完成回报，前端先显示 30 条并折叠正文，可按收件角色筛选或逐批展开 | `/api/state?reply_role=__all__` |
 | `groups` | 🧩 工作组 | 工作组池化 + 组内并行度指标 | `/api/groups` |
 | `mechanisms` | 🔧 机制 | bus 机制注册表(13 类·`bus_mechanisms.json`)·related_cap 交叉链 | `/api/mechanisms` |
 | `roles` | 👤 角色 | 角色注册表(`role_profiles.json`·MasterAgent owns):每角色启动流程/明式·隐式输入/边界 + **compact hook 注入两层**(🌐全局层=`meta.common_rules` verbatim 展示一次;每卡🧩角色层 render_role + 「完整 compact 注入」折叠=`build_context(role)` **WYSIWYG 逐字**)。★单一源硬口径:调 `hooks/reinject_post_compact.py` 导出函数产出、**绝不手抄副本**(防第三处飘);hook 不可读→降级横幅不塌页 | `/api/role-profiles` |
@@ -46,14 +47,17 @@
   - **卡死claim** = `processing/` 里超 RUN_TTL 的僵尸 claim(rot·单列告警·不计在跑)。
   - ⚠ **不用 `who.current_task` 当在跑源**——该字段滞留在已卡死旧 claim 上 → 虚报在跑。
 
+Codex 会话的直接交互回合不一定形成 Bus claim。舰队页与运营页的“会话工作中”由本机 App Server `thread/read(includeTurns=false)` 读取精确 `presence.host_session_id` 的 `active/idle` 状态；只取状态，不读取 turn 或对话正文。观察失败时状态为未知，不把信使在岗当作正在工作。舰队缓存约 20 秒刷新一次；“Bus 在跑任务”与托盘保持同一口径。
+
 ## 后端 API 一览
 - **GET**:`/api/state` `/api/events`(SSE) `/api/health` `/api/tray` `/api/reap`(dry-run) `/api/todos` `/api/live` `/api/tasklines` `/api/groups` `/api/mechanisms` `/api/longrange` `/api/bi` `/api/caps` `/api/usage` `/api/dispatch_metrics` `/api/sessions` `/api/ctx` `/api/ctxpanel` `/api/prompts`
-- **POST**:`/api/send` `/api/supervise` `/api/clear_replies` `/api/todos/{add,update,delete,dispatch,answer}` `/api/lr-decide`(决策合批写回) `/api/open-file`(📂开文件·**白名单硬约束**:只允许 `build_prompts()` 当前 openable 的真实文件 path·`os.startfile` 本机默认程序打开·127.0.0.1 only·拒任意路径=防 WebUI 变任意文件打开器攻击面)
+- **POST**:`/api/send` `/api/supervise` `/api/clear_replies` `/api/role-model-prefs`(仅写角色后续 Claude 派工/daemon 的 `agents.json` 默认 model/effort；空值继承全局，不切换当前交互会话) `/api/todos/{add,update,delete,dispatch,answer}` `/api/lr-decide`(决策合批写回) `/api/open-file`(📂开文件·**白名单硬约束**:只允许 `build_prompts()` 当前 openable 的真实文件 path·`os.startfile` 本机默认程序打开·127.0.0.1 only·拒任意路径=防 WebUI 变任意文件打开器攻击面)
 
 ## 后台常驻线程(8799 always-on 驱动·不依赖任何 agent 醒着·main() 启动)
 - `start_fleet_refresher(20)` / `start_health_refresher(25)` / `start_ctx_refresher(12)` / `start_who_refresher(20)`:唯一刷新者·子进程扫描填缓存(请求路径零扫描)。
 - `start_status_pusher(15)`:刷 `fleet_status.json`(daemon→agent 定时通信·复用缓存)。
-- `start_selfwake_guard(180)`:3min 跑 `ab selfwake-guard`·扫掉自醒(stale)→inbox 提醒+WinRT toast(把「18h 没人发现掉线」变「3min 内报警」)。
+- `start_selfwake_guard(180)`:3min 跑 `ab selfwake-guard`；Codex 调用精确会话信使恢复器，旧 Claude 掉自醒才投手动重挂提醒和 WinRT toast。
+- `start_codex_messenger_guard(45)`:检查精确绑定的 Codex 信使；近期空闲、进程已退且无 processing 时重启同一 session 的信使。启动失败经 30 秒合批窗、无法安全恢复持续 90 秒后，单次扫描只向 MasterAgent 发送一条全队汇总；每角色诊断保留在本机。维修模式、旧会话、活跃任务和待核对任务不自动重启；记录在 `agent_bus/codex_messenger_guard.jsonl`，不重放任务。
 - `start_maint(1800)`:30min 维护心跳=`reap`(退卡死/孤儿 processing→inbox)+ `todos-archive --older-min 1440 --apply`(归档完成>24h·防池膨胀)·仅动真卡死/旧完成态。
 - `start_route_reap(300)`:**5min 独立 tick** 跑 `ab route-reap`(工作组路由超时自愈·超15min未done路由任务re-route)·**不搭 30min start_maint**(任务池太粗)·幂等 no-op(MasterAgent令·2026-07-23)。
 - 全部同模子:首轮先 sleep·各自 try/except 静默不掀翻 8799·子进程 CREATE_NO_WINDOW 免弹窗。

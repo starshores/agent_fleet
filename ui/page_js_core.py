@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """ui.page_js_core —— page_js 拆分子模块 CORE(自我迭代波·案①·纯搬运字节一致·2026-09-16)。"""
-CORE = r"""let state=null, pollTimer=null, lastTasksOpen=new Set();
+CORE = r"""let state=null, pollTimer=null, lastTasksOpen=new Set(), replyVisible=30;
 
 // 增量更新统一入口:把容器 el 的【孩子】patch 成 innerHtml(childrenOnly→容器自身的 class/style 不动)。
 //  · getNodeKey 用 id 或 data-key(列表项给稳定业务 key)→ 原地更新、不重建 → 不闪、滚动不跳。
 //  · onBeforeElUpdated 跳过【正在输入/选择】的表单控件 → 光标/未提交输入/下拉态不被刷新冲掉。
 function _keyOf(n){ if(n.nodeType!==1) return null; return n.id || n.getAttribute('data-key') || null; }
 function _onBeforeUpd(f,t){ if(f===document.activeElement && (f.tagName==='INPUT'||f.tagName==='TEXTAREA'||f.tagName==='SELECT')) return false;
+  if(f.tagName==='DETAILS'&&f.open) t.open=true;
   // fold/clampable 展开态活在 DOM class(渲染串不带 open)→ morph 前把 open 抄到目标,数据刷新不收起(Master数分 U5b finding 修死)
   if(t&&f.classList&&f.classList.contains('open')&&t.classList&&(t.classList.contains('fold')||t.classList.contains('clampable'))) t.classList.add('open');
   return true; }
@@ -41,11 +42,11 @@ async function manualDone(taskId,role,btn){
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtAge(a){ if(a==null) return '?'; if(a<60) return a+'s'; if(a<3600) return Math.floor(a/60)+'m'+(a%60)+'s'; return Math.floor(a/3600)+'h'+Math.floor((a%3600)/60)+'m';}
 function qc(n,cls){return `<span class="qcount ${n?cls:'z'}">${n}</span>`;}
-function swBadge(s,detail){
+function swBadge(s,detail,hostKind){
   const t=esc(detail||'');
-  if(s==='armed') return ` <span class="badge live" title="自醒在岗 ${t}">🔔自醒</span>`;
-  if(s==='recent') return ` <span class="badge idle" title="有心跳无wait进程·瞬时态(刚fire待重挂/交互中)·非告警 ${t}">◐待确认</span>`;
-  if(s==='stale') return ` <span class="badge dead" title="自醒掉线!需重挂 ${t}">⚠自醒掉线</span>`;
+  if(s==='armed') return ` <span class="badge live" title="${hostKind==='codex'?'Codex 信使、wait、App Server 就绪':'自醒在岗'} ${t}">🔔自醒</span>`;
+  if(s==='recent') return ` <span class="badge idle" title="${hostKind==='codex'?'Codex 投递链待确认':'有心跳无 wait 进程·瞬时态'} ${t}">◐待确认</span>`;
+  if(s==='stale') return ` <span class="badge dead" title="${hostKind==='codex'?'信使投递链掉线，需核对并恢复精确会话':'自醒掉线，需按 Claude 流程恢复'} ${t}">⚠自醒掉线</span>`;
   return ` <span class="badge none" title="未自醒 ${t}">—</span>`;
 }
 // turn 状态(turn_state.py hook 实时盖):thinking=turn内思考 / tool=正跑工具 / idle=空闲。
@@ -58,8 +59,13 @@ function swBadge(s,detail){
 //  ③ 非 armed 且 thinking/tool 超 STALE 秒无新事件 → 判「停顿?」。数据只来自 hook 事件 + wait 进程,非推断。
 // 分状态陈旧阈:思考态推理很少 >30s;工具态本可跑很久(长 bash/Agent 编排等),放宽到 300s 才疑。
 const TURN_STALE={thinking:30, tool:300};
-function turnBadge(tn, sw){
+function turnBadge(tn, sw, runtime){
   const st=tn&&tn.state, age=tn?tn.age:null, ag=(age==null?'':' '+fmtAge(age));
+  if(st==='needs_reconcile') return `<span class="badge warn" title="上次投递留下待核对诊断；查看 processing 与完成归档，不能据此重放任务 ${esc(tn.event||'')}">⚠ 上次投递待核对${ag}</span>`;
+  if(runtime&&runtime.type==='active') return runtime.waiting_approval
+    ? '<span class="badge warn" title="Codex 当前会话正在等待批准；按精确 session 从本机 App Server 读取">⏳ 等待批准</span>'
+    : '<span class="badge live" title="Codex 当前会话有活跃回合；按精确 session 从本机 App Server 读取，含直接交互任务">🟢 会话工作中</span>';
+  if(runtime&&runtime.type==='idle'&&st==='thinking') return '<span class="badge idle" title="Codex 当前会话无活跃回合；旧 turn 事件已结束">⚪ 空闲</span>';
   const stale=st?(TURN_STALE[st]||60):0;
   const freshActive=st&&st!=='idle'&&age!=null&&age<=stale;
   if(freshActive){
@@ -87,7 +93,7 @@ function render(){
   if(!state) return;
   const f=state.fleet;
   document.getElementById('aliveN').textContent=f.alive_count;
-  document.getElementById('fleetN').textContent=f.fleet_count;
+  document.getElementById('fleetN').textContent=f.armed_count==null?'–':f.armed_count;
   document.getElementById('updT').textContent='更新 '+state.now;
 
   // fleet table —— 增量 morph(展开态由 lastTasksOpen 声明式驱动 + 委托 onclick,刷新中展开/滚动不丢)
@@ -102,16 +108,44 @@ function render(){
   sortedRoles.forEach(r=>{
     const hasTasks=(r.inbox+r.processing+(r.held||0)+(r.failed||0))>0;
     const open=lastTasksOpen.has(r.role);
+    const modelSourceLabel=r.model_source==='observed'?'':
+      ({'role-default':'角色默认', 'assumed-default':'默认估算', unreported:'未上报', none:'无运行模型'}[r.model_source]||'模型');
+    const modelSourceTitle=r.model_source==='observed'?'':('模型来源：'+(r.model_source||'none'));
     fleetHtml+=`<tr data-key="fr-${esc(r.role)}" class="role-row${hasTasks?' clickable':''}"${hasTasks?` data-role="${esc(r.role)}" onclick="toggleTasks(this)"`:''}>
       <td><b>${esc(r.role)}</b></td>
-      <td class="mono" style="font-size:11px;width:120px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.model||'')}">${esc((r.model||'').replace('claude-','')||'–')}</td>
-      <td style="width:200px;max-width:200px;overflow:hidden"><div style="display:flex;gap:4px;align-items:center;max-width:200px;overflow:hidden"><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail)}</div></td>
-      <td>${turnBadge(r.turn, r.self_wake)}</td>
+      <td class="mono" style="font-size:11px;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(modelSourceTitle)}">${modelSourceLabel?esc(modelSourceLabel)+': ':''}${esc((r.model||'').replace('claude-','')||'–')}</td>
+      <td style="max-width:190px;font-size:11px">
+        <div class="model-pref-line">
+          <div class="model-pref-value mono" title="角色默认模型">${esc(r.configured_model||'继承全局')}</div>
+        <details class="model-prefs" onclick="event.stopPropagation()" ${r.model_editable?'':'style="display:none"'}><summary>修改模型</summary>
+          <div class="model-prefs-form">
+            <input type="text" class="role-model-input" value="${esc(r.configured_model||'')}" maxlength="160" placeholder="模型 ID；留空继承全局" aria-label="${esc(r.role)} 默认模型">
+            <button class="btn ghost mini" onclick="event.stopPropagation();saveRoleModelPrefs('${esc(r.role)}',this)">保存模型</button>
+          </div>
+        </details>
+        </div>
+      </td>
+      <td style="max-width:155px;font-size:11px">
+        <div class="model-pref-line">
+          <div class="model-pref-value">${esc(r.configured_effort||'继承全局')}</div>
+        <details class="model-prefs" onclick="event.stopPropagation()" ${r.model_editable?'':'style="display:none"'}><summary>修改强度</summary>
+          <div class="model-prefs-form">
+            <select class="role-effort-select" aria-label="${esc(r.role)} 默认思考强度">
+              <option value="" ${!r.configured_effort?'selected':''}>继承全局</option>
+              ${['low','medium','high','xhigh','max'].map(v=>`<option value="${v}" ${r.configured_effort===v?'selected':''}>${v}</option>`).join('')}
+            </select>
+            <button class="btn ghost mini" onclick="event.stopPropagation();saveRoleModelPrefs('${esc(r.role)}',this)">保存强度</button>
+          </div>
+        </details>
+        </div>
+      </td>
+      <td style="width:200px;max-width:200px;overflow:hidden"><div style="display:flex;gap:4px;align-items:center;max-width:200px;overflow:hidden"><span class="badge vbadge ${r.vclass}" title="${esc(r.verdict)}">${esc(r.host_kind==='codex'&&r.self_wake==='armed'?'✓ 信使在岗':r.verdict)}</span>${swBadge(r.self_wake,r.self_wake_detail,r.host_kind)}</div></td>
+      <td>${turnBadge(r.turn, r.self_wake, r.runtime_status)}</td>
       <td class="mono">${esc(r.pid_display||'–')}</td>
       <td class="mono">${fmtAge(r.age)}</td>
       <td>${qc(r.inbox,'ib')}</td><td>${qc(r.processing,'pr')}</td><td>${qc(r.done,'dn')}</td>
       <td>${qc(r.held||0,'held')}</td><td>${qc(r.failed||0,'failed')}</td>
-      <td class="cwd" title="${esc(r.cwd||'')}">${esc(r.cwd||'–')}</td></tr>`;
+      <td class="cwd" title="${esc(r.host_kind==='codex'?'角色配置工作区；共享宿主 CWD: '+(r.cwd||'未知'):(r.cwd||''))}">${esc(r.workspace_cwd||'–')}</td></tr>`;
     if(hasTasks){
       let inner='<div class="task-wrap">';
       (r.tasks||[]).forEach(t=>{
@@ -127,11 +161,11 @@ function render(){
           <span class="spacer" style="flex:1"></span>
           ${canDone?`<button class="btn ghost mini" style="font-size:11px;padding:2px 8px;color:var(--ok)" onclick="manualDone('${esc(t.id)}','${esc(r.role)}',this)">done ✓</button>`:''}
           </div>
-          ${appr?'<div class="hint">高风险任务:自动监听者(serve/daemon/wait)不会领取 → 有人值守的 tab 用 <code>wait --include-approval</code> 显式领取执行</div>':''}
+          ${appr?'<div class="hint">高风险任务留在 inbox，不会被自动领取；请走人工审批流程。Codex 角色不要手动挂 wait。</div>':''}
           <pre>${esc(t.task)}</pre></div>`;
       });
       inner+='</div>';
-      fleetHtml+=`<tr data-key="fd-${esc(r.role)}" class="tasks" data-role="${esc(r.role)}" style="display:${open?'':'none'}"><td colspan="12">${inner}</td></tr>`;
+      fleetHtml+=`<tr data-key="fd-${esc(r.role)}" class="tasks" data-role="${esc(r.role)}" style="display:${open?'':'none'}"><td colspan="14">${inner}</td></tr>`;
     }
   });
   morphInto(document.getElementById('fleetBody'), fleetHtml);
@@ -145,7 +179,7 @@ function render(){
   // process footer
   let foot=[];
   if(f.tagged.length) foot.push('已标注(非fleet):'+f.tagged.map(t=>`<span class="tag ${t.private?'lock':''}">${esc(t.label)} pid ${t.pid}${t.private?' 🔒':(t.cwd?' · '+esc(t.cwd):'')}</span>`).join(''));
-  foot.push(`<span class="muted">在跑 claude ${f.alive_count} · 在岗(已认领)${f.fleet_count} · 已标注 ${f.tagged.length} · 未声明 ${f.unknown.length}</span>`);
+  foot.push(`<span class="muted">Claude 进程 ${f.alive_count} · 自醒在岗 ${f.armed_count==null?'–':f.armed_count} · Claude 已标注 ${f.tagged.length} · Claude 未声明 ${f.unknown.length}</span>`);
   if(f.unknown.length) foot.push('未声明(非fleet·未标记):'+f.unknown.map(u=>`<span class="tag">pid ${u.pid}${u.cwd?' · '+esc(u.cwd):''}</span>`).join(''));
   morphInto(document.getElementById('procFoot'), foot.join('<br>'));
 
@@ -179,18 +213,22 @@ function render(){
 
   // reply role dropdown
   const rr=document.getElementById('replyRole'); const rc=rr.value||state.reply_role;
-  morphInto(rr, state.all_roles.map(r=>`<option data-key="o-${esc(r)}" ${r==rc?'selected':''}>${esc(r)}</option>`).join(''));
+  morphInto(rr, `<option value="__all__" data-key="o-all" ${rc==='__all__'?'selected':''}>全部角色</option>`+
+    state.all_roles.map(r=>`<option data-key="o-${esc(r)}" ${r==rc?'selected':''}>${esc(r)}</option>`).join(''));
 
   // replies
   const rb=document.getElementById('replyBox');
   if(!state.replies.length){ morphInto(rb,'<div class="muted" style="padding:6px 16px">（无回填）</div>'); }
-  else{ morphInto(rb, state.replies.map(r=>`<div class="reply" data-key="rp-${esc(r.file||r.id)}">
-      <div class="r-h"><span class="badge ${r.status==='ok'?'live':'dead'}">${esc(r.status||'?')}</span>
-        <span class="mono">${esc(r.id)}</span> · from <b>${esc(r.from)}</b>
+  else{ morphInto(rb, state.replies.slice(0,replyVisible).map(r=>`<details class="reply" data-key="rp-${esc(r.owner||'')}-${esc(r.file||r.id)}">
+      <summary class="r-h"><span class="badge ${r.status==='ok'?'live':'dead'}">${esc(r.status||'?')}</span>
+        <span class="mono">${esc(r.id)}</span> · ${state.replies_all?'收件角色 <b>'+esc(r.owner)+'</b> · ':''}from <b>${esc(r.from)}</b>
         <span>${esc(r.title)}</span> <span class="muted">${esc(r.finished)}</span>
         <span class="spacer" style="flex:1"></span>
-        <button class="btn ghost" style="margin:0;padding:2px 9px" onclick="clearOne('${esc(r.file)}')">清除</button></div>
-      <pre>${esc(r.result)}</pre></div>`).join('')); }
+        <button class="btn ghost" style="margin:0;padding:2px 9px" onclick="event.preventDefault();event.stopPropagation();clearOne('${esc(r.owner||rr.value)}','${esc(r.file)}')">清除</button></summary>
+      <pre>${esc(r.result)}</pre></details>`).join('')+
+      (state.replies.length>replyVisible?`<button class="btn ghost" style="margin:8px 16px" onclick="replyVisible+=30;render()">显示更多（当前 ${replyVisible}/${state.replies.length}）</button>`:'')); }
+  document.getElementById('clearAllBtn').disabled=rr.value==='__all__';
+  document.getElementById('clearAllBtn').title=rr.value==='__all__'?'选择单个角色后才能清空其回报':'清空当前角色回报';
 
   renderTodos();
   fillLiveRoles();
@@ -412,7 +450,7 @@ function tEdit(id){
 
 let _loadFails=0;
 async function load(role, fresh){
-  const rr=role||document.getElementById('replyRole').value||'Master';
+  const rr=role||document.getElementById('replyRole').value||'__all__';
   const ctrl=new AbortController(); const tid=setTimeout(()=>ctrl.abort(),15000);  // 15s 超时,防卡死
   try{
     const res=await fetch('/api/state?reply_role='+encodeURIComponent(rr)+(fresh?'&fresh=1':''),{signal:ctrl.signal});
@@ -451,8 +489,7 @@ function connectSSE(){
   }catch(e){ setConn(false); }
 }
 
-async function clearOne(file){
-  const role=document.getElementById('replyRole').value;
+async function clearOne(role,file){
   await fetch('/api/clear_replies',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({role,file})});
   toast('已清除 '+file); load();
@@ -460,7 +497,7 @@ async function clearOne(file){
 
 document.getElementById('refreshBtn').onclick=()=>load(null,true);
 document.getElementById('pollSel').onchange=setPoll;
-document.getElementById('replyRole').onchange=()=>load(document.getElementById('replyRole').value);
+document.getElementById('replyRole').onchange=()=>{ replyVisible=30; load(document.getElementById('replyRole').value); };
 document.getElementById('clearAllBtn').onclick=async()=>{
   const role=document.getElementById('replyRole').value;
   if(!confirm('清空 '+role+'/done 全部回填?')) return;
@@ -536,6 +573,22 @@ document.getElementById('superviseBtn').onclick=async()=>{
   }catch(e){toast('supervise 失败:'+e,true);}
   btn.disabled=false;
 };
+
+async function saveRoleModelPrefs(role,btn){
+  const row=btn.closest('tr');
+  const model=(row.querySelector('.role-model-input').value||'').trim();
+  const effort=row.querySelector('.role-effort-select').value;
+  btn.disabled=true;
+  try{
+    const res=await fetch('/api/role-model-prefs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({role,model,effort})});
+    const data=await res.json();
+    if(!data.ok){toast('保存失败: '+(data.error||'?'),true);return;}
+    toast('已保存 '+role+' 的角色默认模型与思考强度');
+    await load();
+  }catch(e){toast('保存失败: '+e,true);}
+  finally{btn.disabled=false;}
+}
 
 // 待办池:新增 + 筛选
 document.getElementById('tAddBtn').onclick=async()=>{

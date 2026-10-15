@@ -88,6 +88,16 @@ def _turn_state(role):
         d = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return None
+    # Codex bridge state belongs to one exact thread. Ignore it after the role
+    # has been rebound to another session so the fleet UI cannot show old work.
+    if d.get("host_kind") == "codex":
+        try:
+            presence = json.loads((BUS / role / "presence.json").read_text(encoding="utf-8"))
+            current_sid = presence.get("host_session_id") or presence.get("codex_session_id")
+            if presence.get("host_kind") != "codex" or d.get("session_id") != current_sid:
+                return None
+        except Exception:
+            return None
     return {"state": d.get("state"), "label": d.get("label"),
             "tool": d.get("tool"), "event": d.get("event"),
             "age": ab._age_seconds(d.get("ts", ""))}

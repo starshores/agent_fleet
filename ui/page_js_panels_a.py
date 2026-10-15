@@ -11,9 +11,10 @@ function renderWaitreg(){
   if(!rows.length){ morphInto(body,'<tr><td colspan="7" class="muted" style="padding:8px">暂无在册 wait(reg 为空)</td></tr>'); if(foot)foot.textContent=''; return; }
   let orphans=0;
   const html=rows.map(r=>{
-    const host = r.host_claude_pid!=null
-      ? esc(r.host_claude_pid)+(r.host_alive===false?' <span class="badge dead">✗死</span>':(r.host_alive?' <span class="badge live">✓</span>':''))
-      : '<span class="muted">–</span>';
+    const hostPid = r.host_pid!=null?r.host_pid:r.host_claude_pid;
+    const host = hostPid!=null
+      ? esc((r.host_kind?r.host_kind+':':'')+hostPid)+(r.host_alive===false?' <span class="badge dead">✗死</span>':(r.host_alive?' <span class="badge live">✓</span>':''))
+      : (r.host_session_id?'<span class="mono" title="精确宿主会话；注册表未记录宿主 PID">session:'+esc(r.host_session_id)+'</span>':'<span class="muted">–</span>');
     let stat;
     if(r.orphan){ orphans++; stat='<span class="badge dead">⚠ 孤儿(宿主死·P1将杀)</span>'; }
     else if(!r.wait_alive){ stat='<span class="badge warn">wait 进程已退(陈旧 reg)</span>'; }
@@ -60,7 +61,8 @@ function renderPrompts(d){
       body='<div class="pmt-b muted" id="pmt-'+i+'" style="display:'+(open?'block':'none')+'">⚠ '+esc(s.error)+'</div>';
     }else{
       // 行号 gutter:每逻辑行一 flex 行(行号顶对齐·内容 wrap 不打乱行号)
-      const lines=(s.content||'').split('\n');
+      const lines=(s.content||'').split(/\r?\n/);
+      if(lines.length>1 && lines[lines.length-1]==='') lines.pop();
       const rows=lines.map((ln,n)=>'<div class="pln"><span class="lno">'+(n+1)+'</span><span class="lco">'+esc(ln)+'</span></div>').join('');
       body='<div class="pmt-code" id="pmt-'+i+'" style="display:'+(open?'block':'none')+'">'+rows+'</div>';
     }

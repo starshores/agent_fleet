@@ -22,6 +22,8 @@ from common import ABDIR, ab, BUS  # noqa: F401
 from common import _roles, _count, _read_tasks, _safe_cwd, _turn_state, _vclass_of  # noqa: F401
 from bus.io import json_lock  # noqa: F401
 from bus.storage import storage_audit as _storage_audit  # noqa: F401
+from bus.roster import load_role_profiles, update_agents
+from codex_usage import active_context as _codex_active_context, historical_usage as _codex_historical_usage
 
 
 def compute_fleet():
@@ -36,6 +38,11 @@ def compute_fleet():
     alive = set(wd.get("alive_claude") or [])                 # 复用 _who_data 已扫的 alive(不重扫)
     claimed = set(wd.get("claimed_pids") or [])
     sw_roles = ab._wait_proc_roles() if psutil_ok else set()  # 供 _scan(fleet_status 推送复用)+ 自醒 detail
+    try:
+        workspace_cwds = {p.get("role"): p.get("cwd") for p in load_role_profiles().get("roles", [])
+                          if p.get("role") and p.get("cwd")}
+    except Exception:
+        workspace_cwds = {}
     rows = []
     for rec in wd.get("roles", []):
         r = rec["role"]
@@ -47,8 +54,8 @@ def compute_fleet():
         # pid_display 派生
         if rec.get("mode") == "daemon":
             pid_display = "d:%s" % (rec.get("daemon_pid") or "?")
-        elif rec.get("claude_pid"):
-            pid_display = str(rec.get("claude_pid"))
+        elif rec.get("host_pid"):
+            pid_display = "%s:%s" % (rec.get("host_kind") or "host", rec.get("host_pid"))
         else:
             pid_display = None
         row = {
@@ -58,8 +65,9 @@ def compute_fleet():
             "done": _count(r, "done"),
             "held": _count(r, "held"),      # 高风险待批(requires_approval 留 inbox;held 为显式批前暂存)
             "failed": _count(r, "failed"),  # 毒任务(reap 超 max-requeue)
-            "pid": rec.get("claude_pid"), "pid_display": pid_display,
+            "pid": rec.get("host_pid") or rec.get("claude_pid"), "host_kind": rec.get("host_kind"), "pid_display": pid_display,
             "age": rec.get("age_s"), "mode": rec.get("mode"), "cwd": rec.get("cwd"),
+            "workspace_cwd": (workspace_cwds.get(r) or rec.get("cwd")) if rec.get("host_kind") == "codex" else rec.get("cwd"),
             "started": None, "host": None,
             "verdict": rec.get("verdict") or "未声明(无 presence)",   # ← 权威源(灭本地自算)
             "vclass": _vclass_of(rec),                                  # 派生显示类
@@ -70,8 +78,11 @@ def compute_fleet():
             row["parked"] = True
         if rec.get("pseudo"):
             row["pseudo"] = True
-        row["session_id"] = rec.get("session_id") or ""
+        row["session_id"] = (rec.get("host_session_id") if rec.get("host_kind") == "codex"
+                             else rec.get("session_id")) or ""
         rows.append(row)
+
+    _attach_codex_runtime_status(rows)
 
     # 在跑但未认领的 claude 进程:_who_data 已分好(tagged/unclaimed_pids),此处仅补 cwd(display 层)
     tags = ab._load_pidtags()
@@ -94,9 +105,71 @@ def compute_fleet():
         "unknown": unknown,
         "alive_count": len(alive),
         "fleet_count": len(claimed),
+        "armed_count": sum(1 for row in rows if row.get("self_wake") == "armed"),
         # 原始扫描结果随缓存带出:让 fleet_status 推送复用,避免它在主进程内再扫一次(GIL)。
         "_scan": {"alive": sorted(alive), "wait_roles": sorted(sw_roles)},
     }
+
+
+def _attach_codex_runtime_status(rows):
+    """Read exact Codex thread activity without loading turns or their content.
+
+    The bridge's turn_state records its own dispatched turns; direct user turns
+    do not update it. This read-only App Server status fills that visibility gap.
+    A failed probe leaves the existing turn_state untouched and reports unknown.
+    """
+    candidates = []
+    for row in rows:
+        if row.get("host_kind") != "codex" or row.get("pseudo") or row.get("parked"):
+            continue
+        sid = row.get("session_id")
+        if not sid:
+            continue
+        try:
+            presence = json.loads((BUS / row["role"] / "presence.json").read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if presence.get("host_kind") == "codex" and presence.get("host_session_id") == sid:
+            candidates.append((row, sid))
+    if not candidates:
+        return
+
+    app = None
+    try:
+        bridge_dir = str(Path(__file__).resolve().parents[1] / ".codex")
+        if bridge_dir not in sys.path:
+            sys.path.insert(0, bridge_dir)
+        from codex_wait_bridge import AppServer
+
+        # Observe only. In particular, do not resume, subscribe to events, or
+        # inspect another role's turns or transcript.
+        app = AppServer("", "_ui", subscribe=False)
+        deadline = time.monotonic() + 8
+        for row, sid in candidates:
+            remaining = deadline - time.monotonic()
+            if remaining < 0.25:
+                break
+            try:
+                thread = app.rpc("thread/read", {"threadId": sid, "includeTurns": False},
+                                 timeout=min(1.5, remaining)).get("thread") or {}
+                status = thread.get("status") or {}
+                if thread.get("id") != sid or status.get("type") not in (
+                        "active", "idle", "notLoaded", "systemError"):
+                    continue
+                row["runtime_status"] = {"type": status["type"]}
+                if status["type"] == "active":
+                    row["runtime_status"]["waiting_approval"] = (
+                        "waitingOnApproval" in (status.get("activeFlags") or []))
+            except Exception:
+                continue
+    except Exception:
+        pass
+    finally:
+        if app is not None:
+            try:
+                app.close()
+            except Exception:
+                pass
 
 
 # compute_fleet 每次跑 ab._alive_claude_pids()(全进程扫描),本机进程多 ~4s。
@@ -174,7 +247,7 @@ def compute_fleet_cached():
     if data is None:
         # 冷启:刷新线程还没填上 → 立即回 loading 占位(前端保留上次/显示加载中),不阻塞
         return {"psutil": ab.psutil is not None, "roles": [], "tagged": [],
-                "unknown": [], "alive_count": 0, "fleet_count": 0, "loading": True}
+                "unknown": [], "alive_count": 0, "fleet_count": 0, "armed_count": 0, "loading": True}
     return data  # 立即返回缓存(刷新线程保证 ≤interval 新鲜),绝不阻塞
 
 
@@ -585,45 +658,60 @@ def _compute_bi():
         per.setdefault(r.get("role", "?"), []).append(r)
 
     per_role = []
+    shared_codex_hosts = {}
     for role in sorted(set(list(per.keys()) + _roles())):
         a = _agg_metrics(per.get(role, []))
         sysu = None
+        codex_host_alive = False
         pf = BUS / role / "presence.json"
         if pf.exists():
             try:
                 pr = json.loads(pf.read_text(encoding="utf-8"))
-                pid = pr.get("daemon_pid") if pr.get("mode") == "daemon" else pr.get("claude_pid")
-                sysu = _proc_tree_usage(pid)
+                pid = pr.get("daemon_pid") if pr.get("mode") == "daemon" else (pr.get("host_pid") or pr.get("claude_pid"))
+                if pr.get("host_kind") == "codex":
+                    codex_host_alive = bool(pid and ab._host_pid_alive(pid, "codex"))
+                    if codex_host_alive:
+                        shared_codex_hosts.setdefault(pid, set()).add(role)
+                else:
+                    sysu = _proc_tree_usage(pid)
             except Exception:
                 pass
-        if a["tasks"] == 0 and not sysu:
+        if a["tasks"] == 0 and not sysu and not codex_host_alive:
             continue                      # 既无近24h活动、又无活进程 → 减噪不列
         a["role"] = role
         a["sys"] = sysu
         per_role.append(a)
     per_role.sort(key=lambda x: (-x["cost"], -x["tok_total"]))
 
-    running = []
-    for role in _roles():
-        pf = BUS / role / "presence.json"
-        if not pf.exists():
-            continue
-        try:
-            pr = json.loads(pf.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        if pr.get("current_task"):
-            running.append({"role": role, "task": pr.get("current_task"),
-                            "title": pr.get("current_title") or ""})
+    # A Codex App Server PID can host several exact role sessions. Attribute its
+    # process tree once to the shared host, never once per role.
+    resource_rows = [r for r in per_role if r.get("sys")]
+    for pid, roles in sorted(shared_codex_hosts.items()):
+        sysu = _proc_tree_usage(pid)
+        if sysu:
+            resource_rows.append({"role": "Codex 共享宿主 (%d 角色)" % len(roles),
+                                  "sys": sysu, "shared_roles": sorted(roles),
+                                  "codex_tokens_total": 0})
 
-    # bus 总占用内存:各角色进程树 RSS/CPU 合计(用户令·2026-07-02)
+    # The tray owns the fresh, non-notice processing rule. A lingering
+    # presence.current_task (including a completed notice) is not active work.
+    running = [{"role": role, "task": "", "title": "已认领 Bus 任务"}
+               for role in bus_tray_counts().get("running_roles", [])]
+
+    fleet_rows = compute_fleet_cached().get("roles") or []
+    active_sessions = sorted(r["role"] for r in fleet_rows
+                             if (r.get("runtime_status") or {}).get("type") == "active")
+    active_sessions_known = sum(1 for r in fleet_rows
+                                if (r.get("runtime_status") or {}).get("type") in ("active", "idle"))
+
+    # bus 总占用内存:独占角色进程树 + 去重后的 Codex 共享宿主。
     sys_total = None
     if ab.psutil is not None:
-        _srss = sum((r["sys"].get("rss_mb") or 0) for r in per_role if r.get("sys"))
-        _scpu = sum((r["sys"].get("cpu") or 0) for r in per_role if r.get("sys"))
-        _sn = sum((r["sys"].get("nproc") or 0) for r in per_role if r.get("sys"))
-        _sroles = sum(1 for r in per_role if r.get("sys"))
-        sys_total = {"rss_mb": round(_srss, 1), "cpu": round(_scpu, 1), "nproc": _sn, "roles": _sroles}
+        _srss = sum((r["sys"].get("rss_mb") or 0) for r in resource_rows)
+        _scpu = sum((r["sys"].get("cpu") or 0) for r in resource_rows)
+        _sn = sum((r["sys"].get("nproc") or 0) for r in resource_rows)
+        sys_total = {"rss_mb": round(_srss, 1), "cpu": round(_scpu, 1),
+                     "nproc": _sn, "groups": len(resource_rows)}
 
     # 今日消耗:改接 usage.db(全量·含前台 cli),取代已随 daemon 移除而冻结的 metrics 口径(统一运营口径·2026-07-02)
     today_usage = None
@@ -647,6 +735,28 @@ def _compute_bi():
     except Exception:
         today_usage = None
 
+    # Codex local rollouts report tokens but not a trustworthy per-call dollar cost.
+    # Keep that source separate from Claude usage.db and never estimate dollars.
+    codex_usage = _codex_historical_usage(bus_root=BUS)
+    today_key = time.strftime("%Y-%m-%d", time.gmtime(now + 8 * 3600))
+    codex_today = next((r for r in codex_usage.get("daily", []) if r.get("date") == today_key), {})
+    if today_usage is None:
+        today_usage = {"date": today_key, "is_today": True, "tokens_total": 0,
+                       "tokens_io": 0, "cost_usd": None, "calls": 0}
+    today_usage["codex"] = codex_today
+    sid_usage = codex_usage.get("by_session", {})
+    for role_row in per_role:
+        pf = BUS / role_row["role"] / "presence.json"
+        try:
+            pr = json.loads(pf.read_text(encoding="utf-8"))
+            sid = pr.get("host_session_id") if pr.get("host_kind") == "codex" else None
+            session_usage = sid_usage.get(sid, {}) if sid else {}
+            role_row["codex_tokens_total"] = session_usage.get("tokens_total", 0)
+            role_row["codex_tokens_io"] = session_usage.get("tokens_io", 0)
+        except Exception:
+            role_row["codex_tokens_total"] = 0
+            role_row["codex_tokens_io"] = 0
+
     # 模型用量统计:按会话维度 —— 各 bus 成员 presence.json → session_id → jsonl 尾部取模型名 → 聚合
     _proj_root = ABDIR.parent / "projects"  # C:/apphome/agent_fleet/projects
     def _role_model(session_id):
@@ -657,7 +767,7 @@ def _compute_bi():
                 with open(_f, "rb") as _fp:
                     _fp.seek(max(0, _sz - 32768))
                     _tail = _fp.read().decode("utf-8", "replace")
-                for _ln in reversed(_tail.split("\n")):
+                for _ln in reversed(_tail.split("\r\n")):
                     if not _ln.strip():
                         continue
                     try:
@@ -679,6 +789,12 @@ def _compute_bi():
             continue
         try:
             _pr = json.loads(_pf.read_text(encoding="utf-8"))
+            if _pr.get("host_kind") == "codex":
+                continue
+            _pid = _pr.get("host_pid") or _pr.get("claude_pid")
+            _age = ab._age_seconds(_pr.get("last_seen", ""))
+            if not ab._host_pid_alive(_pid, "claude") or _age is None or _age > 120:
+                continue
             _sid = _pr.get("session_id")
             if not _sid:
                 continue
@@ -686,6 +802,16 @@ def _compute_bi():
             model_sessions.setdefault(_model, []).append(_role)
         except Exception:
             pass
+    # Codex model telemetry is local to rollout files. Bind it through the exact
+    # registered host session and avoid counting a session twice.
+    _codex_rows = _codex_active_context(BUS, _CTX_ACTIVE_MIN)
+    _codex_seen = set()
+    for _row in _codex_rows:
+        _sid = _row.get("sid_full")
+        if not _sid or _sid in _codex_seen:
+            continue
+        _codex_seen.add(_sid)
+        model_sessions.setdefault(_row.get("model") or "Codex (model unknown)", []).append(_row.get("role") or "Codex")
     model_counts = sorted(
         [{"model": m, "sessions": len(roles), "roles": roles}
          for m, roles in model_sessions.items()],
@@ -696,8 +822,11 @@ def _compute_bi():
         "now": time.strftime("%H:%M:%S", time.localtime(now)),
         "today_usage": today_usage,          # ← usage.db 活数据(运营/资源新口径)
         "sys_total": sys_total,              # ← bus 总占用内存/CPU 合计
+        "resource_rows": resource_rows,
         "per_role": per_role,
         "running": running,
+        "active_sessions": active_sessions,
+        "active_sessions_known": active_sessions_known,
         "psutil": ab.psutil is not None,
         "model_counts": model_counts,        # ← 各模型会话数([{model,sessions,roles}])
     }
@@ -962,6 +1091,9 @@ def build_caps():
             form, fcls = "🅿️休眠", "off"   # 故意暂离≠离线红:与运维 verdict 短路口径一致
         elif mode == "daemon":
             form, fcls = "daemon", "daemon"
+        elif fr.get("host_kind") == "codex":
+            form, fcls = (("Codex 信使", "cli") if sw == "armed" else
+                          (("Codex 待确认", "daemon") if sw == "recent" else ("Codex 离线", "off")))
         elif vclass in ("live", "idle") or sw in ("armed", "recent") or mode == "listening":
             form, fcls = "前台cli", "cli"
         else:
@@ -1027,6 +1159,7 @@ def read_replies(role="Master"):
             except Exception:
                 o = {"id": p.stem, "result": "(无法解析)"}
             out.append({
+                "owner": role,
                 "file": p.name,
                 "id": o.get("id", p.stem),
                 "from": o.get("from", "?"),
@@ -1036,6 +1169,18 @@ def read_replies(role="Master"):
                 "finished": o.get("finished", ""),
             })
     return out
+
+
+def read_all_replies(roles=None, limit=200):
+    """统一读取各活跃角色的完成回报，供任务/协作页集中查看。"""
+    roles = roles if roles is not None else _roles()
+    out = []
+    for role in roles:
+        if not role or role.startswith((".", "_")):
+            continue
+        out.extend(read_replies(role))
+    out.sort(key=lambda item: str(item.get("finished") or ""), reverse=True)
+    return out[:max(1, int(limit))]
 
 
 def compute_daemons():
@@ -1078,7 +1223,7 @@ def read_events(n=40):
                 f.seek(-_TAIL_BYTES, 2)
                 raw = f.read()
                 # 跳过首行残段(可能被截断)
-                raw = raw[raw.find(b"\n") + 1:]
+                raw = raw[raw.find(b"\r\n") + 1:]
             else:
                 raw = f.read()
         lines = raw.decode("utf-8", errors="replace").splitlines()
@@ -1125,8 +1270,9 @@ def run_supervise(dry_run=False):
     return {"ok": r.returncode == 0, "error": (r.stderr or "").strip() or None, "lines": lines}
 
 
-def build_state(reply_role="Master", fresh=False):
+def build_state(reply_role="__all__", fresh=False):
     fleet = compute_fleet_cached()  # 只读缓存,后台线程保鲜;fresh 参数保留供路由层兼容
+    _fleet_enrich_model(fleet)       # 角色默认配置可由 UI 修改，按请求刷新配置字段
     # 给每个 role 附带可点开的任务明细(inbox/processing/held/failed 任一非空就读)
     for row in fleet["roles"]:
         row["turn"] = _turn_state(row["role"])   # 现读 turn 状态(不吃 20s 舰队缓存;/api/state 有 3s TTL → ≤3s 刷新,灵敏)
@@ -1134,13 +1280,17 @@ def build_state(reply_role="Master", fresh=False):
             row["tasks"] = _read_tasks(row["role"])
         else:
             row["tasks"] = []
+    all_roles = _roles()
+    replies = (read_all_replies(all_roles) if reply_role == "__all__"
+               else read_replies(reply_role))
     return {
         "now": ab._now(),
         "bus": str(BUS),
         "fleet": fleet,
         "reply_role": reply_role,
-        "replies": read_replies(reply_role),
-        "all_roles": _roles(),
+        "all_roles": all_roles,
+        "replies_all": reply_role == "__all__",
+        "replies": replies,
         "daemons": compute_daemons(),
         "events": read_events(40),
         "todos": _sorted_todos(),
@@ -1206,7 +1356,7 @@ _notified = set()
 
 
 def _role_has_live_executor(role):
-    """role 是否有活的可见执行 tab(/loop serve = mode listening + claude_pid 在跑且心跳新鲜)。"""
+    """role 是否有活的可见执行 tab(mode listening + bound host alive + fresh heartbeat)。"""
     pf = BUS / role / "presence.json"
     if not pf.exists():
         return False
@@ -1216,8 +1366,9 @@ def _role_has_live_executor(role):
         return False
     if pr.get("mode") != "listening":
         return False
-    pid = pr.get("claude_pid")
-    if not (pid and ab.psutil is not None and ab.psutil.pid_exists(pid)):
+    kind = pr.get("host_kind") or ("claude" if pr.get("claude_pid") else None)
+    pid = pr.get("host_pid") or pr.get("claude_pid")
+    if not ab._host_pid_alive(pid, kind):
         return False
     age = ab._age_seconds(pr.get("last_seen", ""))
     wt = pr.get("wait_timeout") or 110
@@ -1278,7 +1429,9 @@ def _build_fleet_status():
                 if mode == "daemon":
                     dp = pr.get("daemon_pid"); alive = bool(dp and ab.psutil and ab.psutil.pid_exists(dp))
                 else:
-                    cp = pr.get("claude_pid"); alive = bool(cp and ab.psutil and ab.psutil.pid_exists(cp))
+                    cp = pr.get("host_pid") or pr.get("claude_pid") or pr.get("codex_pid")
+                    ck = pr.get("host_kind") or ("claude" if pr.get("claude_pid") else ("codex" if pr.get("codex_pid") else None))
+                    alive = ab._host_pid_alive(cp, ck)
             except Exception:
                 pass
         # 传入预扫 wait_roles → _self_wake_state 内部不再 _wait_proc_roles() 全扫;pid_exists 便宜判活。
@@ -1584,14 +1737,14 @@ def todo_dispatch(b):
             parts = [o.get("detail") or ""]
             todo_note = (o.get("note") or "").strip()   # 待办常驻💬补充说明 → 派活【自动带上】,用户不必重写
             if todo_note:
-                parts.append("\n\n补充说明:%s" % todo_note)
+                parts.append("\r\n\r\n补充说明:%s" % todo_note)
             if o.get("source"):
-                parts.append("\n来源:%s" % o["source"])
+                parts.append("\r\n来源:%s" % o["source"])
             if o.get("deadline"):
-                parts.append("\n截止:%s" % o["deadline"])
+                parts.append("\r\n截止:%s" % o["deadline"])
             if note:
-                parts.append("\n\n派活额外说明(用户 via WebUI @ %s):%s" % (ab._now(), note))
-            parts.append("\n(由 WebUI 待办池派发,todo id=%s)" % tid)
+                parts.append("\r\n\r\n派活额外说明(用户 via WebUI @ %s):%s" % (ab._now(), note))
+            parts.append("\r\n(由 WebUI 待办池派发,todo id=%s)" % tid)
             task_text = "".join(p for p in parts if p).strip() or title
             try:
                 task_id = send_task(to, title, task_text,
@@ -1644,8 +1797,8 @@ def read_live(role=None, dispatch_id=None):
                 f.seek(size - _LIVE_TAIL)
             data = f.read()
         text = data.decode("utf-8", errors="replace")
-        if size > _LIVE_TAIL and "\n" in text:
-            text = text.split("\n", 1)[1]  # 丢掉被截断的首行残片
+        if size > _LIVE_TAIL and "\r\n" in text:
+            text = text.split("\r\n", 1)[1]  # 丢掉被截断的首行残片
         return {
             "ok": True, "exists": True, "content": text, "path": label,
             "size": size,
@@ -1773,20 +1926,45 @@ def _augment_daily_with_backfill(data):
         return data   # 任何异常都不拖垮正常用量返回
 
 
-def _run_token_stats():
-    r = subprocess.run([sys.executable, TOKEN_STATS, "--json"],
-                       capture_output=True, timeout=60, creationflags=_NO_WINDOW)
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300] or "token_stats 失败")
-    data = json.loads(r.stdout.decode("utf-8", "replace"))
-    return _augment_daily_with_backfill(data)
+def _with_codex_usage(data, force=False):
+    # Revalidate the current roster even when the older Claude response is cached.
+    # Never return a previously authorized Codex payload after binding revocation.
+    data = dict(data or {})
+    try:
+        codex = _codex_historical_usage(force=force, bus_root=BUS)
+    except Exception as exc:
+        codex = {"ok": False, "error": str(exc), "daily": [], "by_model": [],
+                 "totals": {}, "sessions": 0}
+    # Public history keeps Codex distinct: Codex input includes cached input,
+    # and its local source has no verified dollar cost field.
+    data["codex_usage"] = {k: v for k, v in codex.items() if k != "by_session"}
+    return data
+
+
+def _run_token_stats(force=False):
+    try:
+        r = subprocess.run([sys.executable, TOKEN_STATS, "--json"],
+                           capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300] or "token_stats 失败")
+        data = json.loads(r.stdout.decode("utf-8", "replace"))
+        if not isinstance(data, dict) or data.get("error"):
+            raise RuntimeError(data.get("error") if isinstance(data, dict) else "token_stats 响应格式无效")
+        data = _augment_daily_with_backfill(data)
+        data["claude_available"] = True
+    except Exception as exc:
+        # Each provider remains independently usable when the other fails.
+        data = {"claude_available": False, "claude_error": str(exc),
+                "daily": [], "by_model": [], "by_project": [], "totals": {}}
+    return _with_codex_usage(data, force=force)
 
 
 def _refresh_usage():
     try:
         data = _run_token_stats()
         with _usage_lock:
-            _usage_cache["data"] = data
+            # Codex authorization is re-evaluated separately on every request.
+            _usage_cache["data"] = {k: v for k, v in data.items() if k != "codex_usage"}
             _usage_cache["ts"] = time.time()
     except Exception as e:
         with _usage_lock:
@@ -1803,12 +1981,13 @@ def get_usage(force=False):
         # 不再「立即返回旧缓存 + 后台异步刷新」——那是旧 3s 全扫时代的设计,
         # 正是它导致 fresh=1 当次仍返回旧值、要点两下。失败则兜旧缓存。
         try:
-            data = _run_token_stats()
+            data = _run_token_stats(force=True)
         except Exception as e:
             with _usage_lock:
-                return _usage_cache["data"] or {"error": str(e)}
+                data = _usage_cache["data"] or {"error": str(e)}
+            return _with_codex_usage(data, force=True)
         with _usage_lock:
-            _usage_cache["data"] = data
+            _usage_cache["data"] = {k: v for k, v in data.items() if k != "codex_usage"}
             _usage_cache["ts"] = time.time()
         return data
     with _usage_lock:
@@ -1821,7 +2000,7 @@ def get_usage(force=False):
         except Exception as e:
             data = {"error": str(e)}
         with _usage_lock:
-            _usage_cache["data"] = data
+            _usage_cache["data"] = {k: v for k, v in data.items() if k != "codex_usage"}
             _usage_cache["ts"] = time.time()
         return data
     # 含今日数据 → 短 TTL 贴近实时;纯历史 → 长 TTL
@@ -1829,7 +2008,7 @@ def get_usage(force=False):
     if age >= ttl and not _usage_refreshing["v"]:
         _usage_refreshing["v"] = True
         threading.Thread(target=_refresh_usage, daemon=True).start()
-    return data
+    return _with_codex_usage(data)
 
 
 # =============================================================
@@ -2028,13 +2207,20 @@ def _refresh_ctx():
             "model": (model or "?"), "is_agent": is_agent,
             "proj": proj, "sid": sid_full[:8], "sid_full": sid_full,
             "ts": ts, "level": ("red" if pct >= _CTX_RED else "yellow" if pct >= _CTX_YELLOW else "green"),
+            "source": "claude", "compact_threshold_known": True,
         })
+    try:
+        rows.extend(_codex_active_context(BUS, _CTX_ACTIVE_MIN))
+    except Exception:
+        pass
     rows.sort(key=lambda x: x["pct"], reverse=True)
     reds = [r for r in rows if r["level"] == "red"]
     data = {
         "ok": True, "rows": rows, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "active_min": _CTX_ACTIVE_MIN, "red": _CTX_RED, "yellow": _CTX_YELLOW,
         "n": len(rows), "n_red": len(reds), "n_yellow": sum(1 for r in rows if r["level"] == "yellow"),
+        "n_codex": sum(1 for r in rows if r.get("source") == "codex"),
+        "max_source": rows[0].get("source") if rows else None,
         "max_pct": rows[0]["pct"] if rows else 0.0,
     }
     with _ctx_lock:
@@ -2058,23 +2244,74 @@ def _fleet_enrich_model(data):
             sid_full = row.get("sid_full") or ""
             if sid_full:
                 sid_model[sid_full] = row.get("model") or ""
-    # 声明模型兜底:agents.json 的 model 字段(如 培训师=claude-sonnet-4-6·唯一显式声明);读不到={}。
+    # 角色默认模型/effort 来自 agents.json；只影响后续 claude -p 派工/daemon，
+    # 不代表当前交互会话已切换模型或思考强度。
     try:
         _aj = json.loads((ABDIR / "agents.json").read_text(encoding="utf-8"))
-        declared = {k: (v or {}).get("model") for k, v in _aj.items() if isinstance(v, dict)}
+        declared = {k: v for k, v in _aj.items() if isinstance(v, dict)}
     except Exception:
         declared = {}
     for r in (data or {}).get("roles", []):
         sid = r.get("session_id") or ""
         m = sid_model.get(sid, "") if sid else ""         # ① 实测:ctx_cache 检出的真实运行 model
-        if not m:
-            m = declared.get(r.get("role")) or ""          # ② 声明兜底:agents.json model(培训师=sonnet)
+        model_source = "observed" if m else "none"
+        config = declared.get(r.get("role")) or {}
+        configured_model = config.get("model") or ""
+        configured_effort = config.get("effort") or ""
+        if not m and r.get("host_kind") != "codex":
+            m = configured_model                            # ② 声明兜底:agents.json model
+            if m:
+                model_source = "role-default"
         # ③ 在线agent仍无模型 → 统一默认 claude-opus-4-8(用户令 2026-08-21):opus-4-8=舰队默认模型
         #    (占量 94%);在岗(vclass live/idle/warn)但模型未检出且未声明 → 按默认注册,消除 model 列
         #    空白/BI unknown 噪声。dead/none/pseudo/parked 不在线 → 不默认(无会话可归属)。
-        if not m and r.get("vclass") in ("live", "idle", "warn"):
+        if not m and r.get("host_kind") != "codex" and r.get("vclass") in ("live", "idle", "warn"):
             m = "claude-opus-4-8"
-        r["model"] = m
+            model_source = "assumed-default"
+        elif not m and r.get("host_kind") == "codex":
+            model_source = "unreported"
+        r["model"] = m or ("Codex · 未上报" if r.get("host_kind") == "codex" else "")
+        r["model_source"] = model_source
+        r["configured_model"] = configured_model
+        r["configured_effort"] = configured_effort
+        r["model_editable"] = r.get("role") in declared and not r.get("pseudo")
+
+
+def update_role_model_prefs(payload):
+    """更新单个角色后续 Claude 派工/daemon 使用的模型与 effort 默认值。"""
+    if not isinstance(payload, dict):
+        return {"ok": False, "error": "请求内容必须是 JSON 对象"}
+    role = str((payload or {}).get("role") or "").strip()
+    model = str((payload or {}).get("model") or "").strip()
+    effort = str((payload or {}).get("effort") or "").strip().lower()
+    if not role or len(role) > 80:
+        return {"ok": False, "error": "role 无效"}
+    if len(model) > 160 or any(ord(ch) < 32 for ch in model):
+        return {"ok": False, "error": "模型标识无效（最多 160 字符）"}
+    if effort not in ("", "low", "medium", "high", "xhigh", "max"):
+        return {"ok": False, "error": "思考强度只支持 low/medium/high/xhigh/max 或继承全局"}
+
+    def mutate(agents):
+        record = agents.get(role)
+        if not isinstance(record, dict):
+            raise KeyError("找不到角色: " + role)
+        if model:
+            record["model"] = model
+        else:
+            record.pop("model", None)
+        if effort:
+            record["effort"] = effort
+        else:
+            record.pop("effort", None)
+
+    try:
+        update_agents(mutate)
+    except KeyError as exc:
+        return {"ok": False, "error": str(exc).strip("'")}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    _bump()
+    return {"ok": True, "role": role, "model": model, "effort": effort}
 
 
 def get_fleet_state():
@@ -2292,12 +2529,16 @@ def build_ctxpanel():
     n_bound = 0
     rows = []
     for cr in src:
-        bind = sid2role.get(cr.get("sid_full"))
-        if bind:
-            role, role_live, role_src = bind["role"], bind["alive"], "session_id"
+        if cr.get("source") == "codex" and cr.get("role"):
+            role, role_live, role_src = cr.get("role"), cr.get("role_live"), "host_session_id"
             n_bound += 1
         else:
-            role, role_live, role_src = None, False, None   # 未绑定:个人会话/daemon/未 re-hello,不猜
+            bind = sid2role.get(cr.get("sid_full"))
+            if bind:
+                role, role_live, role_src = bind["role"], bind["alive"], "session_id"
+                n_bound += 1
+            else:
+                role, role_live, role_src = None, False, None
         rows.append({
             "is_agent": cr.get("is_agent"), "role": role, "role_live": role_live, "role_src": role_src,
             "pct": cr.get("pct"), "level": cr.get("level"), "ctx": cr.get("ctx"),
@@ -2305,6 +2546,8 @@ def build_ctxpanel():
             "compact_at": cr.get("compact_at"), "margin": cr.get("margin"),
             "model": cr.get("model"), "sid": cr.get("sid"), "ts": cr.get("ts"),
             "proj": cr.get("proj"),
+            "source": cr.get("source", "claude"),
+            "compact_threshold_known": cr.get("compact_threshold_known", True),
         })
     return {
         "ok": True, "as_of": ctx.get("as_of"), "rows": rows, "n_bound": n_bound,
@@ -2312,6 +2555,8 @@ def build_ctxpanel():
         "active_min": _CTX_ACTIVE_MIN,
         "max_pct": ctx.get("max_pct", 0.0), "n_red": ctx.get("n_red", 0),
         "n_yellow": ctx.get("n_yellow", 0), "n": ctx.get("n", 0),
+        "n_codex": ctx.get("n_codex", 0),
+        "max_source": ctx.get("max_source"),
     }
 
 
@@ -2334,19 +2579,18 @@ def build_waitreg():
             continue
         wp = reg.get("wait_pid")
         wait_alive = bool(wp and _ps and _ps.pid_exists(wp))
-        hp = reg.get("host_claude_pid")
+        hp = reg.get("host_pid") or reg.get("host_claude_pid")
+        hk = reg.get("host_kind") or ("claude" if reg.get("host_claude_pid") else None)
         host_alive = None
         if hp and _ps:
-            try:
-                host_alive = "claude" in (_ps.Process(hp).name() or "").lower()
-            except Exception:
-                host_alive = False
+            host_alive = ab._host_pid_alive(hp, hk)
         started = _parse_claimed_epoch(reg.get("started") or "")
         hb = _parse_claimed_epoch(reg.get("last_heartbeat") or "")
         rows.append({
             "role": reg.get("role"),
             "wait_pid": wp, "wait_alive": wait_alive,
-            "host_claude_pid": hp, "host_alive": host_alive,
+            "host_kind": hk, "host_pid": hp,
+            "host_claude_pid": hp if hk == "claude" else None, "host_alive": host_alive,
             "host_session_id": (reg.get("host_session_id") or "")[:8],
             "generation": reg.get("generation"), "status": reg.get("status"),
             "timeout": reg.get("timeout"),                       # None=block 真无限(有消息才醒)
@@ -2394,26 +2638,26 @@ def build_prompts():
             content = p.read_text(encoding="utf-8", errors="replace")
             sections.append({"key": key, "title": title, "path": str(p),
                              "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
-                             "bytes": st.st_size, "lines": content.count("\n") + 1, "content": content,
+                             "bytes": st.st_size, "lines": len(content.splitlines()), "content": content,
                              "openable": True})  # 真实文件 → 允许 📂开文件(白名单源见 open_file)
         except Exception as e:
             sections.append({"key": key, "title": title, "path": str(p), "error": str(e)})
 
-    # ① hello onboarding 预览(调 MasterAgent 的 `ab hello --preview`;入口未就绪则诚实占位)
+    # ① Shared legacy hello feed: Codex startup uses its concise SessionStart hook instead.
     try:
         r = subprocess.run([_PYEXE, str(ABDIR / "agentbus.py"), "hello", "--preview"],
                            capture_output=True, timeout=30, creationflags=_NO_WINDOW)
         out = r.stdout.decode("utf-8", "replace")
         if r.returncode == 0 and out.strip():
-            sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+            sections.append({"key": "hello", "title": "① 旧总线 hello onboarding 预览（Codex 不按此启动）", "path": "ab hello --preview",
                              "mtime": "实时", "bytes": len(out.encode("utf-8")),
-                             "lines": out.count("\n") + 1, "content": out})
+                             "lines": len(out.splitlines()), "content": out})
         else:
             err = (r.stderr.decode("utf-8", "replace") or "")[:200]
-            sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+            sections.append({"key": "hello", "title": "① 旧总线 hello onboarding 预览（Codex 不按此启动）", "path": "ab hello --preview",
                              "error": "入口尚未就绪(待 MasterAgent 提供 hello --preview);" + err})
     except Exception as e:
-        sections.append({"key": "hello", "title": "① hello onboarding 预览", "path": "ab hello --preview",
+        sections.append({"key": "hello", "title": "① 旧总线 hello onboarding 预览（Codex 不按此启动）", "path": "ab hello --preview",
                          "error": "待 MasterAgent 提供 hello --preview 入口:" + str(e)})
 
     add("global", "② 全局 CLAUDE.md", str(Path.home() / ".claude" / "CLAUDE.md"))
@@ -2430,10 +2674,54 @@ def build_prompts():
         if cp.exists():
             add("proj:" + cwd, "③ 项目 CLAUDE.md · " + cwd, str(cp))
 
-    # ④ 基座文档层
+    # ④ Codex prompt layers: global source + host entrypoint + project and role context.
+    # Show both canonical source and host entrypoint so the user can audit drift/linking.
     BASE = Path(__file__).resolve().parent.parent
+    add("codex:global-source", "④ Codex · 全局指令（物理源）", BASE / "host_config" / "CODEX.global.md")
+    add("codex:global-entry", "④ Codex · 用户级 AGENTS.md（宿主入口）", Path.home() / ".codex" / "AGENTS.md")
+    add("codex:project-effective", "④ Codex · 项目 AGENTS.override.md（实际入口）", BASE / "AGENTS.override.md")
+    add("codex:project", "④ Codex · 历史 AGENTS.md（按需参考）", BASE / "AGENTS.md")
+    add("codex:role-card", "④ Codex · MasterAgent 压缩恢复角色卡", BASE / ".codex" / "MASTERAGENT_ROLE_CONTEXT.md")
+    add("codex:role-memory", "④ Codex · MasterAgent 角色记忆索引", Path.home() / ".claude" / "projects" / "C--apphome-agent-fleet" / "memory" / "MasterAgent.MEMORY.md")
+    add("codex:user-hooks", "④ Codex · 用户级 SessionStart hooks 配置", Path.home() / ".codex" / "hooks.json")
+    add("codex:hooks-source", "④ Codex · 用户级 hooks 物理源", BASE / "host_config" / "CODEX.hooks.json")
+    add("codex:project-hooks", "④ Codex · 项目 hooks 配置", BASE / ".codex" / "config.toml")
+
+    # Generated hook previews use only the explicitly registered MasterAgent
+    # Codex session. They never infer an identity from the WebUI cwd or PID.
+    try:
+        presence = json.loads((BUS / "MasterAgent" / "presence.json").read_text(encoding="utf-8"))
+        session_id = presence.get("host_session_id") if presence.get("host_kind") == "codex" else None
+        if not session_id:
+            raise RuntimeError("MasterAgent presence 当前没有 Codex session 精确绑定")
+        hook_specs = (
+            ("codex:startup-preview", "④ Codex · SessionStart startup/resume 实际注入预览",
+             BASE / ".codex" / "hooks" / "agentbus_codex_session_context.py", "startup"),
+            ("codex:compact-role-preview", "④ Codex · compact 角色卡与登记能力实际注入预览",
+             BASE / ".codex" / "hooks" / "reinject_masteragent_context.py", "compact"),
+            ("codex:compact-project-preview", "④ Codex · compact 项目参考与角色记忆实际注入预览",
+             BASE / ".codex" / "hooks" / "agentbus_codex_global_context.py", "compact"),
+        )
+        for key, title, script, source in hook_specs:
+            event = {"hook_event_name": "SessionStart", "source": source,
+                     "session_id": session_id, "cwd": str(BASE)}
+            result = subprocess.run(
+                [_PYEXE, "-B", str(script)], input=json.dumps(event, ensure_ascii=False).encode("utf-8"),
+                capture_output=True, timeout=15, creationflags=_NO_WINDOW)
+            payload = json.loads(result.stdout.decode("utf-8", "replace")) if result.returncode == 0 else {}
+            content = ((payload.get("hookSpecificOutput") or {}).get("additionalContext") or "")
+            if not content:
+                raise RuntimeError(result.stderr.decode("utf-8", "replace")[:300] or "hook 未返回 additionalContext")
+            sections.append({"key": key, "title": title, "path": "实时生成 · " + str(script),
+                             "mtime": "实时", "bytes": len(content.encode("utf-8")),
+                             "lines": len(content.splitlines()), "content": content})
+    except Exception as e:
+        sections.append({"key": "codex:generated-preview", "title": "④ Codex · SessionStart 实际注入预览",
+                         "path": "MasterAgent 当前 Codex 精确绑定", "error": str(e)})
+
+    # ⑤ 基座 onboarding/reference layer
     for fn in ("AGENTS.md", "CAPABILITIES.md", "BUS_ONBOARDING.md"):
-        add("base:" + fn, "④ 基座 · " + fn, str(BASE / fn))
+        add("base:" + fn, "⑤ 基座 · " + fn, str(BASE / fn))
 
     return {"ok": True, "as_of": time.strftime("%Y-%m-%dT%H:%M:%S"), "sections": sections}
 
@@ -2474,12 +2762,12 @@ def _check_path_entry(entry):
     path = entry.get("path", "")
     kind = entry.get("kind", "")
     p = Path(path)
-    out = {k: entry.get(k) for k in ("id", "name", "path", "kind", "desc", "owner", "target", "source", "cross_ref")}
+    out = {k: entry.get(k) for k in ("id", "name", "path", "kind", "desc", "owner", "target", "source", "cross_ref", "optional")}
     exists = p.exists() or p.is_symlink()
     out["exists"] = exists
     if not exists:
-        out["health"] = "bad"
-        out["health_msg"] = "路径不存在"
+        out["health"] = "ok" if entry.get("optional") else "bad"
+        out["health_msg"] = "按需创建，当前为空" if entry.get("optional") else "路径不存在"
         return out
 
     if kind == "junction":
@@ -2945,7 +3233,7 @@ def _md_fix_tables(text):
         if row.match(ln) and sep.match(nxt) and out and out[-1].strip() != "":
             out.append("")
         out.append(ln)
-    return "\n".join(out)
+    return "\r\n".join(out)
 
 
 def build_guide():
@@ -2996,7 +3284,7 @@ def build_user_absence():
     return d
 
 
-_agentprofile_cache = {}   # days -> (ts, result);12s TTL(MasterAgent 令·同其他面板缓存模式·避子进程/重算)
+_agentprofile_cache = {}   # days -> (ts, result);5min TTL，画像读取历史数据较慢
 
 
 def build_agent_profile(days=30):
@@ -3012,7 +3300,7 @@ def build_agent_profile(days=30):
         days = 30
     now = time.time()
     hit = _agentprofile_cache.get(days)
-    if hit and (now - hit[0] < 12):
+    if hit and (now - hit[0] < 300):
         return hit[1]
     try:
         from bus.agent_data import build_profile
