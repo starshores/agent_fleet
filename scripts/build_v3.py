@@ -31,6 +31,13 @@ def build(output: Path, force: bool = False) -> dict:
         if path.is_symlink():
             raise ValueError("Source package entries must not be symlinks.")
         entries[f"masteragent/{path.name}"] = path.read_bytes()
+    # Fixed local assets only: no source tree recursion, personal config or CDN.
+    asset_root = SOURCE_ROOT / "masteragent" / "workbench_assets"
+    for name in ("index.html", "styles.css", "app.mjs", "state.mjs", "api.mjs", "ui.mjs", "views.mjs", "navigation.mjs", "commands.mjs", "history.mjs"):
+        path = asset_root / name
+        if asset_root.is_symlink() or path.is_symlink() or not path.is_file():
+            raise ValueError("The workbench requires regular packaged asset files.")
+        entries[f"masteragent/workbench_assets/{name}"] = path.read_bytes()
     entries["__main__.py"] = b"from masteragent.cli import main\nraise SystemExit(main())\n"
     manifest = {"format": 1, "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(entries.items())}}
     entries["BUILD-MANIFEST.json"] = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="MasterAgent 本机工作台：查看业务、任务、团队与运行环境。">
+  <title>MasterAgent · 本机工作台</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#view">跳到主要内容</a>
+  <div class="app-shell" id="app-shell">
+    <aside class="sidebar" aria-label="工作台导航">
+      <a class="brand" href="#overview" aria-label="MasterAgent 工作台">
+        <span class="brand-mark" aria-hidden="true">m<span>·</span></span>
+        <span><strong>MasterAgent</strong><small>本机工作台</small></span>
+      </a>
+      <div class="nav-caption">工作空间</div>
+      <nav id="primary-nav" aria-label="主要页面"></nav>
+      <div class="sidebar-bottom">
+        <div class="local-label"><span class="status-dot"></span>数据留在本机</div>
+        <p>一个入口，了解工作的每一步。</p>
+        <div class="sidebar-version"><span>3.1 dev.3</span><span class="readonly-label" id="operation-mode">只读模式</span></div>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="scope-control">
+          <span class="scope-icon" aria-hidden="true">◈</span>
+          <div class="scope-field">
+            <label for="scope-select">当前业务</label>
+            <select id="scope-select" disabled><option>正在读取部署…</option></select>
+          </div>
+          <span id="generation-label" class="generation-chip"><label for="generation-input">第</label><input id="generation-input" type="number" min="0" step="1" value="0" disabled aria-label="查询代次">代</span>
+        </div>
+        <div class="topbar-actions">
+          <span class="snapshot-time" id="snapshot-time">尚未读取</span>
+          <button type="button" id="refresh-button" class="button button-secondary"><span aria-hidden="true">↻</span> 刷新快照</button>
+        </div>
+      </header>
+      <div id="snapshot-status" class="snapshot-status" role="status" aria-live="polite"></div>
+      <main id="view" class="main-content" tabindex="-1" aria-label="工作台内容">
+        <div class="initial-state"><span class="loading-orbit" aria-hidden="true"></span><h1>正在打开工作台</h1><p>读取此部署的业务与运行记录。</p></div>
+      </main>
+      <footer class="workspace-footer"><span>MasterAgent · 本机协调平台</span><span>快照按需刷新 · 查看不会执行任务</span></footer>
+    </div>
+  </div>
+  <noscript><p class="noscript">此工作台需要启用 JavaScript 才能读取本机数据。</p></noscript>
+</body>
+</html>
