@@ -1,0 +1,179 @@
+{
+  "recorded_at_utc": "2026-10-20T08:40:43.089396+00:00",
+  "product_version": "3.1.0-dev.4",
+  "scope": "synthetic_local_public_API_only",
+  "real_model": false,
+  "service_started": false,
+  "product_source_modified": false,
+  "temporary_root": "C:\\Users\\<用户>\\AppData\\Local\\Temp\\fleet-architecture-reassessment-b1thieu7",
+  "source_sha256": {
+    "masteragent/service.py": "64ec84254b2c47205124ba8361a5a642d36fad7bd5301a2c84c92f912bf899ce",
+    "masteragent/deployment.py": "7eb0f869de807dbcc8db04ed0e827594c8b962a1b08543d96408026b986dab89",
+    "masteragent/paths.py": "b82a2720d1a6c874cc75c61d24fed79b2424d04d511637b51959d7a3fffdeffe",
+    "masteragent/routing.py": "3b95e580a81b1aaf3b99434915c3dd8591bdd2e758fc177222d72c8ea53abfab",
+    "masteragent/source_store.py": "fb08b90db52b66a64c7da9475378456617a8e07f0a8980f0f8b72f1729813459",
+    "masteragent/receipt_store.py": "477db0f96acafcd2fd3682bd54e8b35254965a470cb12c82dea19e77083b77dc"
+  },
+  "cases": [
+    {
+      "case": "source_endpoint_first",
+      "steps": [
+        {
+          "operation": "install/activate A with distinct state and workspace",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "initialize independent SourceStore and ReceiptStore",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "configure controlled V3 route",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "bind route endpoints",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "baseline admit before overlapping installation",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "install inactive B with workspace equal to source root",
+          "expected": "rejected before installation is persisted",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "admit second distinct message on original A route",
+          "expected": "accepted because rejected B must not change A's valid route",
+          "outcome": "rejected",
+          "code": "route_endpoint_overlap"
+        }
+      ],
+      "installation_ids": [
+        "a",
+        "b"
+      ],
+      "admission_count": 1,
+      "attempt_count": 0,
+      "creation_order_gap_reproduced": true
+    },
+    {
+      "case": "source_workspace_first",
+      "steps": [
+        {
+          "operation": "install/activate A with distinct state and workspace",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "initialize independent SourceStore and ReceiptStore",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "configure controlled V3 route",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "install inactive B with workspace equal to source root",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "bind endpoints after B workspace reservation",
+          "expected": "rejected with route_endpoint_overlap",
+          "outcome": "rejected",
+          "code": "route_endpoint_overlap"
+        }
+      ],
+      "installation_ids": [
+        "a",
+        "b"
+      ],
+      "admission_count": 0,
+      "attempt_count": 0,
+      "creation_order_gap_reproduced": false
+    },
+    {
+      "case": "receiver_endpoint_first",
+      "steps": [
+        {
+          "operation": "install/activate A with distinct state and workspace",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "initialize independent SourceStore and ReceiptStore",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "configure controlled V3 route",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "bind route endpoints",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "baseline admit before overlapping installation",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "install inactive B with workspace equal to receiver root",
+          "expected": "rejected before installation is persisted",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "admit second distinct message on original A route",
+          "expected": "accepted because rejected B must not change A's valid route",
+          "outcome": "rejected",
+          "code": "route_endpoint_overlap"
+        }
+      ],
+      "installation_ids": [
+        "a",
+        "b"
+      ],
+      "admission_count": 1,
+      "attempt_count": 0,
+      "creation_order_gap_reproduced": true
+    },
+    {
+      "case": "receiver_workspace_first",
+      "steps": [
+        {
+          "operation": "install/activate A with distinct state and workspace",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "initialize independent SourceStore and ReceiptStore",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "configure controlled V3 route",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "install inactive B with workspace equal to receiver root",
+          "outcome": "accepted"
+        },
+        {
+          "operation": "bind endpoints after B workspace reservation",
+          "expected": "rejected with route_endpoint_overlap",
+          "outcome": "rejected",
+          "code": "route_endpoint_overlap"
+        }
+      ],
+      "installation_ids": [
+        "a",
+        "b"
+      ],
+      "admission_count": 0,
+      "attempt_count": 0,
+      "creation_order_gap_reproduced": false
+    }
+  ],
+  "temporary_root_removed": true,
+  "gap_reproduced_cases": [
+    "source_endpoint_first",
+    "receiver_endpoint_first"
+  ],
+  "script_sha256": "ec34749bb8830b42c209a1a9616d89ea9250aa41768419081aeceb1583f1fe87"
+}

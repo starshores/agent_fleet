@@ -1,0 +1,4656 @@
+{
+  "schema_version": 1,
+  "as_of_date": "2026-10-20",
+  "timezone": "Asia/Shanghai",
+  "visibility": "local_research_not_publication_approved",
+  "repository_scope": "Only commits reachable from HEAD; no private sessions or runtime mailboxes.",
+  "head": "f6857cded1b4dd3d3f6797b672dbc4eefaa2dda0",
+  "commit_count": 454,
+  "author_identity_count": 1,
+  "first_author_date": "2026-06-23T16:18:25+08:00",
+  "last_author_date": "2026-09-24T11:29:53+08:00",
+  "without_coauthor_trailer": 3,
+  "duplicate_trailer_commits": [
+    "f275fb2e0e1b35dd6d5b3f3b551df2247753a15e",
+    "39f850aa9131f8d96ea9727f58bd65e949a5b887"
+  ],
+  "interpretation": {
+    "counts_are": "Commits carrying a declared coauthor label, deduplicated per commit. Counts do not measure contribution share, effort, code authorship, quality or actual inference identity.",
+    "labels_are": "Repository text only; exact public product names, provider mappings and real model identity have not been independently authenticated.",
+    "date_basis": "Recorded Git author timestamps, not signed proof of event time or project start.",
+    "october": "October work is outside this HEAD history. Missing Git commits does not imply zero contribution.",
+    "omitted_fields": [
+      "author emails",
+      "coauthor emails",
+      "full commit message bodies",
+      "file contents",
+      "raw conversation history"
+    ]
+  },
+  "extraction": {
+    "git_arguments": [
+      "log",
+      "HEAD",
+      "--reverse",
+      "--format=%H%x00%aI%x00%cI%x00%s%x00%B%x00%x1e"
+    ],
+    "coauthor_regex": "^Generated-by:\\s*(.+)$ (case insensitive, multiline)",
+    "deduplication": "Exact coauthor name after stripping trailing email address, once per commit",
+    "family_rollup": "Opus: labels beginning Claude Opus; Fable: labels beginning Claude Fable; Sonnet: labels beginning Claude Sonnet. Role labels remain separate."
+  },
+  "summary": [
+    {
+      "label": "Claude Fable 5",
+      "commits": 99,
+      "first_author_date": "2026-07-28T08:57:31+08:00",
+      "last_author_date": "2026-08-11T17:36:21+08:00",
+      "identity_type": "model_label"
+    },
+    {
+      "label": "Claude Fable 5.1",
+      "commits": 35,
+      "first_author_date": "2026-09-23T16:19:33+08:00",
+      "last_author_date": "2026-09-24T11:29:53+08:00",
+      "identity_type": "model_label"
+    },
+    {
+      "label": "Claude Opus 4.8 (1M context)",
+      "commits": 299,
+      "first_author_date": "2026-06-23T16:18:25+08:00",
+      "last_author_date": "2026-09-21T15:26:02+08:00",
+      "identity_type": "model_label"
+    },
+    {
+      "label": "Claude Opus 5.5 (1M context)",
+      "commits": 4,
+      "first_author_date": "2026-09-23T16:52:09+08:00",
+      "last_author_date": "2026-09-24T11:12:37+08:00",
+      "identity_type": "model_label"
+    },
+    {
+      "label": "Claude Sonnet 4.6",
+      "commits": 12,
+      "first_author_date": "2026-07-28T15:14:24+08:00",
+      "last_author_date": "2026-07-29T11:17:08+08:00",
+      "identity_type": "model_label"
+    },
+    {
+      "label": "MasterUI",
+      "commits": 1,
+      "first_author_date": "2026-08-06T09:44:12+08:00",
+      "last_author_date": "2026-08-06T09:44:12+08:00",
+      "identity_type": "role_label"
+    },
+    {
+      "label": "Master数分",
+      "commits": 1,
+      "first_author_date": "2026-08-10T11:17:27+08:00",
+      "last_author_date": "2026-08-10T11:17:27+08:00",
+      "identity_type": "role_label"
+    }
+  ],
+  "monthly_commit_counts": {
+    "2026-06": 66,
+    "2026-07": 216,
+    "2026-08": 87,
+    "2026-09": 85
+  },
+  "monthly_declared_labels": {
+    "2026-06": {
+      "Claude Opus 4.8 (1M context)": 66
+    },
+    "2026-07": {
+      "Claude Opus 4.8 (1M context)": 146,
+      "Claude Fable 5": 58,
+      "Claude Sonnet 4.6": 12
+    },
+    "2026-08": {
+      "Claude Fable 5": 41,
+      "MasterUI": 1,
+      "<no trailer>": 3,
+      "Master数分": 1,
+      "Claude Opus 4.8 (1M context)": 41
+    },
+    "2026-09": {
+      "Claude Opus 4.8 (1M context)": 46,
+      "Claude Fable 5.1": 35,
+      "Claude Opus 5.5 (1M context)": 4
+    }
+  },
+  "commits": [
+    {
+      "commit": "a063a743f3c3c4532306ba7f822ed56ec1f07081",
+      "author_date": "2026-06-23T16:18:25+08:00",
+      "committer_date": "2026-06-23T16:18:25+08:00",
+      "subject": "v1.0: 多-agent 文件总线架构(self-bootstrapping)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c026b475e65a3b840c272d8ce5ef08c98392bbbe",
+      "author_date": "2026-06-23T16:32:02+08:00",
+      "committer_date": "2026-06-23T16:32:02+08:00",
+      "subject": "v1.1: done 完成通知触发发起方自醒 + 防 notice 环",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d89897a35d9c11c883cd30704deebde1efb9dc09",
+      "author_date": "2026-06-23T16:55:04+08:00",
+      "committer_date": "2026-06-23T16:55:04+08:00",
+      "subject": "v1.2: edge-lock — Edge/CDP 焦点冲突互斥锁(Master 派 ①,用户同意)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2b7166adedff9d7edb8101d02f11e85fc2247563",
+      "author_date": "2026-06-23T17:12:13+08:00",
+      "committer_date": "2026-06-23T17:12:13+08:00",
+      "subject": "v1.3: BI 资源消耗模块 — 舰队 token/成本/系统资源运营总览(用户需求)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6586d0dfd83b39ffc2567693e50fa9d2b8b0ff56",
+      "author_date": "2026-06-23T17:40:35+08:00",
+      "committer_date": "2026-06-23T17:40:35+08:00",
+      "subject": "v1.4: BI 加「任务活动历史」— 诚实区分消耗(前向)vs 活动(全程可重建)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e6b0b7128c907d937c56a1ca40bbe505c1266e82",
+      "author_date": "2026-06-23T20:28:38+08:00",
+      "committer_date": "2026-06-23T20:28:38+08:00",
+      "subject": "v1.4.1: 修 _wait_core spurious 唤醒提前空返(自醒空唤起费 token)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1d110f15d657746d81eef9807aedffa1d604f72e",
+      "author_date": "2026-06-24T09:17:15+08:00",
+      "committer_date": "2026-06-24T09:17:15+08:00",
+      "subject": "v1.4.2: 修 selfwake 对协调位误报掉线 — 改按进程判活",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3120aca0dee4ef7b8eb3790de0f8b1441843a721",
+      "author_date": "2026-06-24T09:28:18+08:00",
+      "committer_date": "2026-06-24T09:28:18+08:00",
+      "subject": "v1.4.3: BI 面板 3 处视觉打磨(MasterUI 经手)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ce0ee624eb9f8c7800b222133ea7ae9d28a731ca",
+      "author_date": "2026-06-24T09:33:32+08:00",
+      "committer_date": "2026-06-24T09:33:32+08:00",
+      "subject": "v1.4.4: 补 dispatch 自醒 gap — 完成通知抽共享 helper,dispatch 也触发派发方自醒",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ead0bdc9cdbe5926ced4e7e4a9c000934d12bf34",
+      "author_date": "2026-06-24T09:43:58+08:00",
+      "committer_date": "2026-06-24T09:43:58+08:00",
+      "subject": "v1.4.5: 合并进程扫描修 /api/state 慢(查 BI 首屏挖出的 v1.4.2 回归)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ddc1d69006048362bb2a6678a59431458ada0ab7",
+      "author_date": "2026-06-24T10:09:24+08:00",
+      "committer_date": "2026-06-24T10:09:24+08:00",
+      "subject": "v1.4.6: hello 注册时打印自醒 onboarding(新 agent 一上线就会)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9726948b5c5baa0fc7caac99afa713d3b84b0bfe",
+      "author_date": "2026-06-24T10:32:38+08:00",
+      "committer_date": "2026-06-24T10:32:38+08:00",
+      "subject": "v1.5.0: 能力池 + 最小授权 + 新人 onboarding 框架",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "50ca22fc70c2c6dd0dbba87ec61a7d4ac51bef0b",
+      "author_date": "2026-06-24T10:48:26+08:00",
+      "committer_date": "2026-06-24T10:48:26+08:00",
+      "subject": "v1.5.1: ab ask-user — agent 把待确认项投进 UI 待办池(不滚走)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a1b0543b90408d2e5cfe57a9229679e35edc8e5f",
+      "author_date": "2026-06-24T11:07:29+08:00",
+      "committer_date": "2026-06-24T11:07:29+08:00",
+      "subject": "v1.5.2: 打 tag 自动 snapshot zip 到 agent_fleet_releases/",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fdb64fa21e0a9a7da33a983f64cd056b464b59ef",
+      "author_date": "2026-06-24T11:18:45+08:00",
+      "committer_date": "2026-06-24T11:18:45+08:00",
+      "subject": "v1.5.3: ab sessions — 枚举可恢复 Claude Code 会话(给 UI 视图供数据)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "aab3e56883fa4f50d44172f339633ca962bd5a98",
+      "author_date": "2026-06-24T14:11:47+08:00",
+      "committer_date": "2026-06-24T14:11:47+08:00",
+      "subject": "v1.5.4: supervise 升级为期望态对账器(启缺的 + 回收孤儿 daemon)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "95e146846a607405ffca08715d96e6a061e21c2e",
+      "author_date": "2026-06-24T14:34:30+08:00",
+      "committer_date": "2026-06-24T14:34:30+08:00",
+      "subject": "v1.5.5: 重复 WebUI 守卫 — 清没占端口的陈旧 server.py 实例",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "30d3079b08ac3ebb3062cae3c45116016fefbb70",
+      "author_date": "2026-06-24T14:55:45+08:00",
+      "committer_date": "2026-06-24T14:55:45+08:00",
+      "subject": "v1.5.6: recover.py 体检增强 — 加进程卫生 + 自醒在岗",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b2a5cfcb743b25f50c7ef612b84dc1c00590a14e",
+      "author_date": "2026-06-24T15:00:51+08:00",
+      "committer_date": "2026-06-24T15:00:51+08:00",
+      "subject": "v1.5.7: agent_fleet 自举完整性补全(管理层 3 角色 + 镜像漏带修复)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1b7927ea286fd3f08cce6a074a710f905ad40163",
+      "author_date": "2026-06-24T15:36:41+08:00",
+      "committer_date": "2026-06-24T15:36:41+08:00",
+      "subject": "v1.5.8: ask-user(待办记录)列为底座基本能力,hello 与自醒并列印出",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1501747f5018b951af9cefdc1d4693f95fb7b585",
+      "author_date": "2026-06-25T09:53:53+08:00",
+      "committer_date": "2026-06-25T09:53:53+08:00",
+      "subject": "v1.5.9: ab roster 花名册(在岗/能力/专长/注册)+ 含 MasterUI 本轮 server.py 修复",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6babbbdd5d078302bfa798fdbda3f59db6af1ca3",
+      "author_date": "2026-06-25T10:59:12+08:00",
+      "committer_date": "2026-06-25T10:59:12+08:00",
+      "subject": "v1.6.0: 修 notice 白名单 bug — 自醒位失联(Master数分 报+诊断)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dabd004b5b5eebde22bbc7b54af6f9a4da3c0b21",
+      "author_date": "2026-06-25T11:04:39+08:00",
+      "committer_date": "2026-06-25T11:04:39+08:00",
+      "subject": "v1.6.1: 路由优先·广播兜底 — ab roster --grep + 协调效率协议",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d9845dc4142bb77c84d585a34f9da0c661230d50",
+      "author_date": "2026-06-25T11:17:24+08:00",
+      "committer_date": "2026-06-25T11:17:24+08:00",
+      "subject": "v1.6.2: 修 webui-guard 误杀 sql_agent server(业务侧 agent 报+钉死根因)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "60892876586998a67e2cf9f38a0075c951468c81",
+      "author_date": "2026-06-25T11:28:19+08:00",
+      "committer_date": "2026-06-25T11:28:19+08:00",
+      "subject": "文档化 Start-Process 被 Claude job 回收的坑(业务侧 agent 报)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c00386c671ad1d131294c2590f0f72932de48ae4",
+      "author_date": "2026-06-25T13:41:38+08:00",
+      "committer_date": "2026-06-25T13:41:38+08:00",
+      "subject": "v1.6.3: 认领竞态绝不崩 wait(Master 报)+ from=unknown 回执丢失警告",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e71d044ee89a1e963f75ef7889f3164b3bcfd13b",
+      "author_date": "2026-06-25T14:02:52+08:00",
+      "committer_date": "2026-06-25T14:02:52+08:00",
+      "subject": "v1.6.4: 系统级 bus 健康巡检(push 补 pull 盲区)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "99e7be85200c1e39fe907db985ccd2650eadb99e",
+      "author_date": "2026-06-25T14:23:46+08:00",
+      "committer_date": "2026-06-25T14:23:46+08:00",
+      "subject": "v1.6.5: ab health 只读健康总检(用户:我能知道 bus 健康状态)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ad1eca587dbb3925dcdafdb7165cf983943d4837",
+      "author_date": "2026-06-25T16:23:36+08:00",
+      "committer_date": "2026-06-25T16:23:36+08:00",
+      "subject": "v1.6.6: hello 自醒命令用 sys.executable 绝对解释器(根治 127 掉聋)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2aee2f8b3fc315d1d63dac5f78ce9fe05ac3ef4c",
+      "author_date": "2026-06-25T16:49:03+08:00",
+      "committer_date": "2026-06-25T16:49:03+08:00",
+      "subject": "v1.6.7: 退役机制——agents.json retired 标记 + 4 读取方识别(用户确认业务角色退役)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9e1b8b06c136e8cf9b799732e9b44080020a4dbb",
+      "author_date": "2026-06-25T17:09:36+08:00",
+      "committer_date": "2026-06-25T17:09:36+08:00",
+      "subject": "v1.6.8: health-sweep 自愈反收——异常解决后自动关闭对应待办(根治过时派发)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bbdf1a6694b86622f2bd9a1d61e618b101b62ec3",
+      "author_date": "2026-06-25T17:28:47+08:00",
+      "committer_date": "2026-06-25T17:28:47+08:00",
+      "subject": "v1.6.9: 自醒重挂铁律③——验证+重试(127 偶发是后台启动层,绝对路径治不了)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "67b6d538010e2f476791f3833f95c4ba3dbaca44",
+      "author_date": "2026-06-26T09:22:20+08:00",
+      "committer_date": "2026-06-26T09:22:20+08:00",
+      "subject": "v1.7.0: send 校验在岗(治静默漏接)+ 测试噪声隔离(Master数分 分析+用户确认)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8e043fb84cfca1d882f6e571c945d74f89ea84ba",
+      "author_date": "2026-06-26T10:45:04+08:00",
+      "committer_date": "2026-06-26T10:45:04+08:00",
+      "subject": "v1.7.1: 专一性纪律入 onboarding(防新 agent 重蹈全科失能,Master数分 分析+用户确认)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9c654ee9f129b6fc12cf13ee2378428a5dc4916a",
+      "author_date": "2026-06-26T10:54:32+08:00",
+      "committer_date": "2026-06-26T10:54:32+08:00",
+      "subject": "v1.7.2: 修 AGENTS.md 执行模型文档失真(Master数分 报·daemon 没退役)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0ea75bc0f7b62b945584863934f070c57df18049",
+      "author_date": "2026-06-26T10:57:20+08:00",
+      "committer_date": "2026-06-26T10:57:20+08:00",
+      "subject": "v1.7.3: 待办回路(闭环 ask-user)+ 对口路由(ab route)— 用户选的 bus 功能",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b199eee872d3500089633d8b56dc4abf85a1bac1",
+      "author_date": "2026-06-26T11:03:55+08:00",
+      "committer_date": "2026-06-26T11:03:55+08:00",
+      "subject": "v1.7.4: AGENTS.md 执行模型再修正——前台cli主流/daemon前台化迁移中(Master数分 二次报)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "14ce2e5c850a21cefbcb4792740a2bd6961dc1ea",
+      "author_date": "2026-06-26T11:06:53+08:00",
+      "committer_date": "2026-06-26T11:06:53+08:00",
+      "subject": "v1.7.5: AGENTS.md 残留旧态清净(Master数分 逐行验收第3处)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8f09e150ccef156399a81e7209d1ff0dd4386ad1",
+      "author_date": "2026-06-26T11:32:12+08:00",
+      "committer_date": "2026-06-26T11:32:12+08:00",
+      "subject": "v1.7.6: done 加 --to 覆盖 + sender=unknown 告警(治 reap后 done 回执静默丢失)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "133e2690fbcf46a76572587c11d52a50d8b06393",
+      "author_date": "2026-06-26T13:36:14+08:00",
+      "committer_date": "2026-06-26T13:36:14+08:00",
+      "subject": "v1.7.7: config 加 usage_db(用量存储归 bus 的 prep,用户定板)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9847ccf5a6fcb97ffb932210d579b52ecb6e2b38",
+      "author_date": "2026-06-26T13:47:18+08:00",
+      "committer_date": "2026-06-26T13:47:18+08:00",
+      "subject": "v1.7.8: BI 指标正名 UI 收尾(token 为主·项目 Top N 按真 token 排)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f00dec375b622d40d1886dbc4c56d56be4f43454",
+      "author_date": "2026-06-29T09:18:49+08:00",
+      "committer_date": "2026-06-29T09:18:49+08:00",
+      "subject": "v1.7.9: 补 daemon↔前台 双向迁移流程文档(用户提·Master数分转)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "87f375831b123ddea35a51d3537250b780b3890f",
+      "author_date": "2026-06-29T09:19:56+08:00",
+      "committer_date": "2026-06-29T09:19:56+08:00",
+      "subject": "培训师 onboarding 纳入\"执行体双向迁移\"(响应 v1.7.9 周知)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ef031bde416211f7eaad032d489ebc4231fe02b6",
+      "author_date": "2026-06-29T09:50:28+08:00",
+      "committer_date": "2026-06-29T09:50:28+08:00",
+      "subject": "v1.8.0: 退役 agent 档案馆/花名册(番号下掉+记录保留+可复用恢复,用户提·Master数分转)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9539055cb1cd9eb32cab172c7b74f1b6eec5c0c5",
+      "author_date": "2026-06-29T10:11:44+08:00",
+      "committer_date": "2026-06-29T10:11:44+08:00",
+      "subject": "v1.8.1: 补 4 个空 caps(最小授权·agent自报)+ 新增 edge-web cap",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0320b0bca60cf4511f1ec8ac6aa984f0dd0abacf",
+      "author_date": "2026-06-29T10:34:22+08:00",
+      "committer_date": "2026-06-29T10:34:22+08:00",
+      "subject": "v1.8.2: resume 剪裁 × usage.db 协同——剪前先 ETL 入库(用户提·Master数分转)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6db3dc8e33765daa8383cc84a72f1ba0dcc68f4c",
+      "author_date": "2026-06-29T11:34:30+08:00",
+      "committer_date": "2026-06-29T11:34:30+08:00",
+      "subject": "v1.8.3: claude_run 起 claude -p 加 CREATE_NO_WINDOW(治 daemon/dispatch 弹窗)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4d22d81b67230c6021cc9bc78d8a264b0f47b6c8",
+      "author_date": "2026-06-29T11:41:53+08:00",
+      "committer_date": "2026-06-29T11:41:53+08:00",
+      "subject": "专一性机制设计:骑本能不对抗(首要问题)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "75824ca22472a0a0d4a9b1a3db05ab1d9f1f4939",
+      "author_date": "2026-06-29T11:47:23+08:00",
+      "committer_date": "2026-06-29T11:47:23+08:00",
+      "subject": "专一性补第六节:高频轻量交流(bus=常开交流频道非仅任务队列)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b18b691822c61a101de55b48cd1a90d722331d0c",
+      "author_date": "2026-06-29T13:52:17+08:00",
+      "committer_date": "2026-06-29T13:52:17+08:00",
+      "subject": "L4 评估决定:不建自动 cap-mismatch 检测器,降级机会式+触发阈值",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e467abda71240fc64f2fd60b9f40f299b89b3ddc",
+      "author_date": "2026-06-29T16:56:35+08:00",
+      "committer_date": "2026-06-29T16:56:35+08:00",
+      "subject": "架构评估 v2:bus 不迁 Agent Teams 底座;真投入=自醒/投递可靠性硬化",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d0deb5673dc73fd60fa42babd0180566ef7fc8f7",
+      "author_date": "2026-06-29T17:37:43+08:00",
+      "committer_date": "2026-06-29T17:37:43+08:00",
+      "subject": "会话可靠性硬化主线:compact失忆+自醒/投递不可信归一(预研·未动CLAUDE.md)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a3094f21828ab926dc239cadd6d6174e481c08d3",
+      "author_date": "2026-06-30T09:28:49+08:00",
+      "committer_date": "2026-06-30T09:28:49+08:00",
+      "subject": "SESSION_RELIABILITY 加 D 节:idle 输出纪律(空唤醒收敛)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6cb1146e000b9ab1ecc663a41c11f86ddb37cf85",
+      "author_date": "2026-06-30T09:55:24+08:00",
+      "committer_date": "2026-06-30T09:55:24+08:00",
+      "subject": "SESSION_RELIABILITY 加 E 保鲜backlog:stats-cache纳入ETL(归业务侧)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c83d7b73e0721fd0d5b5db17cade3921659cd385",
+      "author_date": "2026-06-30T10:22:43+08:00",
+      "committer_date": "2026-06-30T10:22:43+08:00",
+      "subject": "hello 加铁律④·上下文卫生:空唤醒静默重挂·不重dump状态",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a3ecad4f3b49e820453006a7f4dc480022750c94",
+      "author_date": "2026-06-30T13:43:52+08:00",
+      "committer_date": "2026-06-30T13:43:52+08:00",
+      "subject": "SESSION_RELIABILITY A段加外部实证+三加固(口径标1M非200K)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cee8d635a43c107e38401423a37f655988cf85fe",
+      "author_date": "2026-06-30T14:03:42+08:00",
+      "committer_date": "2026-06-30T14:03:42+08:00",
+      "subject": "更正SESSION_RELIABILITY:Compact Instructions段不存在+全局CLAUDE.md未文档化",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d93f1c13812da339d859975021945f22666e90df",
+      "author_date": "2026-06-30T14:09:42+08:00",
+      "committer_date": "2026-06-30T14:09:42+08:00",
+      "subject": "再纠正SESSION_RELIABILITY:CLAUDE.md compact机制确实存在(primary source裁决)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "10b385d9840511a2f850a199dd51a1f625442074",
+      "author_date": "2026-06-30T14:22:37+08:00",
+      "committer_date": "2026-06-30T14:22:37+08:00",
+      "subject": "落地通用Compact指令进全局CLAUDE.md(用户本人直接批准)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "89b7d5fe5a920b1cd7e2dcab2880b5f18ff4eec2",
+      "author_date": "2026-06-30T14:41:27+08:00",
+      "committer_date": "2026-06-30T14:41:27+08:00",
+      "subject": "修全局Compact指令去项目专属化+记录advisory未触发实测",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3b1beee41039cc2f7becb9d82dbb44ed178dbb4a",
+      "author_date": "2026-06-30T14:46:35+08:00",
+      "committer_date": "2026-06-30T14:46:35+08:00",
+      "subject": "A③b 早压阈值核实(primary source /en/env-vars):1M须两变量同设",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4e7235f9f907816dc47d7114891ab870cf0d8ffa",
+      "author_date": "2026-06-30T14:59:07+08:00",
+      "committer_date": "2026-06-30T14:59:07+08:00",
+      "subject": "应用auto-compact 65%(用户指令)+落bus文档",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e99cacd3af13f3122635bd4a2d4edf36974a41dd",
+      "author_date": "2026-06-30T15:58:59+08:00",
+      "committer_date": "2026-06-30T15:58:59+08:00",
+      "subject": "记compact五例实验+PostCompact hook决策(暂不上)+65%实测确认",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cf36a3735a000a1905a80edc55a0bdafedb76643",
+      "author_date": "2026-06-30T16:19:23+08:00",
+      "committer_date": "2026-06-30T16:19:23+08:00",
+      "subject": "补回迁移基准(host_config快照)+ 立基础设施洁净基准",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7a9ef7d1f54da433f00caed28cbea8ef8ee0f0f0",
+      "author_date": "2026-06-30T16:25:39+08:00",
+      "committer_date": "2026-06-30T16:25:39+08:00",
+      "subject": "示例组员2(用户直派)健康模块·会话↔注册对齐 + who --json(MasterAgent复核接管)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fde1a23d9d89589f1035e3a4259af73f36117070",
+      "author_date": "2026-06-30T17:11:23+08:00",
+      "committer_date": "2026-06-30T17:11:23+08:00",
+      "subject": "hello加[基本能力3]卡住别硬扛(1+1·示例组员2出spec/MasterAgent实现·用户拍板)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cca5d16341d8eb0060e16fe1bceb1987cb4218e6",
+      "author_date": "2026-07-01T09:40:49+08:00",
+      "committer_date": "2026-07-01T09:40:49+08:00",
+      "subject": "权威session→role绑定(v2·1+1·示例组员2报bug/MasterAgent实现):presence落CLAUDE_CODE_SESSION_ID",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "40ab1587b1a8907983e9f88a622cdcd72227b699",
+      "author_date": "2026-07-01T09:41:23+08:00",
+      "committer_date": "2026-07-01T09:41:23+08:00",
+      "subject": "SESSION_RELIABILITY: v2精确会话归属标已实现(env CLAUDE_CODE_SESSION_ID)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "35210d384281232d5149d550d6c4e62d1b90c266",
+      "author_date": "2026-07-01T10:38:52+08:00",
+      "committer_date": "2026-07-01T10:38:52+08:00",
+      "subject": "ui/server: 精确 session→role 绑定 + 提示词审核页(只读)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "11d6aa09684fa46796edce2b3e41ef2eac2ac480",
+      "author_date": "2026-07-01T10:44:06+08:00",
+      "committer_date": "2026-07-01T10:44:06+08:00",
+      "subject": "纠正:脱敏是对外交付的事,基座内部不脱敏(用户2026-07-01纠正)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "561c10662bb9bdc4f021d8de3bc73265b852ec3b",
+      "author_date": "2026-07-01T10:49:29+08:00",
+      "committer_date": "2026-07-01T10:49:29+08:00",
+      "subject": "复核:误脱敏项按基座边界处理(用户令查 git log 核对)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e70bca7693c51d28c6dff73f338ec572453e8fc7",
+      "author_date": "2026-07-01T10:55:33+08:00",
+      "committer_date": "2026-07-01T10:55:33+08:00",
+      "subject": "能力池填充(重启前锁定·基座子集):5 cap类型+3角色caps补齐",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "eec4b6dda7e5b3050ca029bd08c5ade28c76d904",
+      "author_date": "2026-07-02T10:29:28+08:00",
+      "committer_date": "2026-07-02T10:29:28+08:00",
+      "subject": "bus演进(2026-07-02本会话·基座子集):hello强化+首动作自醒+daemon前台化",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0fe4d57374647bdbafddf80e5581852ec41abdf3",
+      "author_date": "2026-07-02T10:30:53+08:00",
+      "committer_date": "2026-07-02T10:31:10+08:00",
+      "subject": "host_config快照(基座):全局CLAUDE.md新增「Windows管道/文件编码→显式UTF-8」节",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5a96ac2b180803554ab71a3197159abc6f5aeb5d",
+      "author_date": "2026-07-02T11:03:32+08:00",
+      "committer_date": "2026-07-02T11:03:32+08:00",
+      "subject": "迁移记忆源 repoint:agent_fleet/memory 改镜像基座运行记忆而非业务知识",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "41967a62645801e53cc10cf115fcd4ab8eede486",
+      "author_date": "2026-07-02T11:09:05+08:00",
+      "committer_date": "2026-07-02T11:09:52+08:00",
+      "subject": "bus onboarding强化(基座):hello自醒块加「先在岗再开工」顺序铁律",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0468bc00d9405e69f14b7777d46e0abbfb07b148",
+      "author_date": "2026-07-02T11:29:01+08:00",
+      "committer_date": "2026-07-02T11:29:01+08:00",
+      "subject": "selfwake/who(基座):伪角色(用户/unknown)单列标注·不计掉线未醒",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "29c961dd1c6de148652c76698c19e67b87b19a9e",
+      "author_date": "2026-07-02T11:56:54+08:00",
+      "committer_date": "2026-07-02T11:56:54+08:00",
+      "subject": "compact自定位:whoami反查身份 + SessionStart(compact)重认身份/重载纪律 hook(用户2026-07-02)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9f1aed1032c5a0ff5118deaf5f09a187bf9a0dc4",
+      "author_date": "2026-07-02T15:55:09+08:00",
+      "committer_date": "2026-07-02T15:55:09+08:00",
+      "subject": "WebUI(基座·本会话累积):运营页消耗口径改usage.db + bus总占用KPI + 对比度/可读性修复",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2eabf6bd805a2b86a84a05e7ef37ab8fe472a7a5",
+      "author_date": "2026-07-02T16:01:10+08:00",
+      "committer_date": "2026-07-02T16:01:10+08:00",
+      "subject": "停滞项回收:ab stale + health待办池停滞节(防丢·Master2026-07-02提)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "904f310f4e162d9581457d825f2dae4bbe345d6b",
+      "author_date": "2026-07-02T22:29:22+08:00",
+      "committer_date": "2026-07-02T22:29:22+08:00",
+      "subject": "wait per-role幂等:挂wait前清同role旧wait,防累积空唤醒死循环(Master数分提·1+1)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "30f3b2b2886f25bac5e7af636547b69b04d416f5",
+      "author_date": "2026-07-06T10:47:34+08:00",
+      "committer_date": "2026-07-06T10:47:34+08:00",
+      "subject": "长期任务线看板:ab tasklines(看板+--id详情+--json)+决策点交叉todos.json显示已答/待答;数据源tasklines.json(运行态·gitignore·防compact跨会话·Master 2026-07-06拍板方案A)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c2a47178bccec9a84cc07fb73334cf992c593410",
+      "author_date": "2026-07-06T14:35:07+08:00",
+      "committer_date": "2026-07-06T14:35:07+08:00",
+      "subject": "AskUserQuestion阻塞会话→机制层硬拦转非阻塞待办池:PreToolUse hook(block_askuser.py)拦AskUserQuestion→自动投questions进todos.json+deny提示\"已代投继续别等\";全局CLAUDE.md加\"禁用AskUserQuestion卡片·走ab ask-user待办池\"节;host_config快照同步(用户2026-07-06 explicit:卡片占会话要优化掉)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b157dbebb2e00135a6e6096d8684d82509ee0a71",
+      "author_date": "2026-07-07T11:40:45+08:00",
+      "committer_date": "2026-07-07T11:40:45+08:00",
+      "subject": "ab sessions 支持打标记(可恢复会话):--tag/--untag/--label/--note/--tagged;session_tags.json存储(运行态·gitignore);标时快照cwd/title→jsonl归档后仍可列+给resume命令;列表显示🏷标签列+备注(用户2026-07-07提)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e331b856053b8451e83842d31f03640ac2185fea",
+      "author_date": "2026-07-07T13:59:26+08:00",
+      "committer_date": "2026-07-07T13:59:26+08:00",
+      "subject": "ab sessions 自动区分运行中/死:按 presence.session_id+进程存活实时算 live/dead(运行中显示role置顶·死=历史无活进程真可恢复);--live/--dead 筛选+顶部汇总(运行中N/死M)。答用户\"为何100+可恢复\"=历史jsonl累积、大多死的",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9e6e721e4aad1d485a20fac30507b22ff6997cc6",
+      "author_date": "2026-07-07T14:06:18+08:00",
+      "committer_date": "2026-07-07T14:06:18+08:00",
+      "subject": "ab sessions 加 bus/非bus 归属分类+筛选:is_bus 字段(session_id∈presence/退役档案 或 cwd∈bus agent目录=bus;否则非bus=个人会话)+ --non-bus/--bus 筛选+归属列。实测167=158bus+9个人(GBK/Google等个人会话)。用户2026-07-07提",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b6a66cb5a2133fd40b0d6b418d9c01c9aa2729b6",
+      "author_date": "2026-07-08T10:32:27+08:00",
+      "committer_date": "2026-07-08T10:32:27+08:00",
+      "subject": "自醒-loss防复发 A-min+B+D(Master 2026-07-08拍板·fleet运维域): A=Stop hook enforce_selfwake.py 回合结束前强制bus agent保有armed wait(无则block+指示重挂;放行subagent/个人会话/伪角色/已armed/120s内已拦·防死循环·fail-open) B=ab selfwake-guard 巡检掉自醒→dedup投重挂提醒到其inbox+WinRT toast报警(只报不代挂) D=ab done 后若本role无armed wait→打印重挂提示 验证:A逻辑5例过(掉线block/在岗放行/个人放行/subagent放行/防循环);B dry-run 验证通过;D nudge触发。发现:selfwake\"tab /loop serve\"启发式按心跳判在岗、与\"有无wait进程\"不符,A用后者更严更准",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "483e820d7ab2d2297d18a51a2b2e506e7ab3a467",
+      "author_date": "2026-07-08T10:39:41+08:00",
+      "committer_date": "2026-07-08T10:39:41+08:00",
+      "subject": "A-min(Stop hook)验证后摘除·全量前止损:实测硬拦对活跃coordinator误拦(回合末\"无wait进程\"无法区分\"掉线\"vs\"刚fire正要重挂\"·turn-gap时长不定)。留enforce_selfwake.py源码待重构。改以B(周期扫心跳超期·非回合末能区分掉线vs活跃)为主机制+D nudge。符合Master\"验证后再全量\"",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "04dca85e86b500dced15987c7a7cb8bbda2ceca2",
+      "author_date": "2026-07-08T14:12:15+08:00",
+      "committer_date": "2026-07-08T14:12:15+08:00",
+      "subject": "B selfwake-guard 加 2-scan 确认降噪:只对连续2次扫描都掉线的报警(瞬时假阳性=cycling agent post-fire窗口被撞·只1次→滤掉;真掉线持续→照报)。首轮实战撞到 cycling agent 瞬时误报暴露。prev基线存.selfwake_guard_prev.json(运行态·15min过期保护)。代价:真掉线检测延~2轮(~6min)仍远好于18h。MasterUI驱动不变",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bf3c202915c11b29d23ea93140bc6a7834e8ac65",
+      "author_date": "2026-07-08T14:30:27+08:00",
+      "committer_date": "2026-07-08T14:31:29+08:00",
+      "subject": "selfwake三态化(Master批·消虚报✓在岗):_self_wake_state新增recent态=有心跳无wait进程(刚fire待重挂/交互中·非event-armed·瞬时非告警),原\"listening+心跳新鲜\"误报armed改判recent。event在岗只认wait进程。同步所有消费者:selfwake/health显示+计数(在岗/待确认/掉线/未醒)、roster/route的mark、warn/notice门槛(recent不警不拦·消息入inbox重挂即领)、guard仍只对stale报(recent不告警)。实测◐正确显示(含我自己wait刚fire=◐)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c284f62424612321be9a0081f8b9a2d553aee200",
+      "author_date": "2026-07-08T21:41:03+08:00",
+      "committer_date": "2026-07-08T21:41:03+08:00",
+      "subject": "_wait_core 加 Observer 起失败兜底(Master 提·健壮性):obs.start()原在try外→抛异常会崩溃传播;现捕获→降级轮询式阻塞(每2s查inbox到deadline)绝不秒返idle。修掉watchdog装坏/资源限时wait崩溃的真实缺口。注:当前环境watchdog正常(实测Observer.start 0.001s·alive),此为防御非救火",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2de589a24c1de1611a67e2579d934c57e77f469d",
+      "author_date": "2026-07-10T09:57:12+08:00",
+      "committer_date": "2026-07-10T09:57:12+08:00",
+      "subject": "health-sweep根治待确认池噪声:卡死看owner存活+空指向不生成",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a2b026fac8fa7efe5f668d692ef634f85a332cce",
+      "author_date": "2026-07-10T10:27:26+08:00",
+      "committer_date": "2026-07-10T10:27:26+08:00",
+      "subject": "bus待办池防非bus泄漏:hook成员门禁+ask-user硬拒非成员+全局规则收窄",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "afb0d5aa75b960e2708c785067ca198966409549",
+      "author_date": "2026-07-10T10:53:03+08:00",
+      "committer_date": "2026-07-10T10:53:03+08:00",
+      "subject": "运维面板加实时turn状态列:hook盖thinking/tool/idle(核实官方hooks文档)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "420b2f806661434454e49df32191e59f1f98d309",
+      "author_date": "2026-07-10T11:16:44+08:00",
+      "committer_date": "2026-07-10T11:16:44+08:00",
+      "subject": "turn状态灵敏化+中断兜底:async Pre/PostToolUse细粒度+ts陈旧判停顿",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "be13f8578d60d100fdf28ce5b02c9d4c49fbe264",
+      "author_date": "2026-07-10T15:04:15+08:00",
+      "committer_date": "2026-07-10T15:04:15+08:00",
+      "subject": "Phase0 UTF-8根治:补stderr+daemon/dispatch/claude_run reconfigure+PYTHONUTF8",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "55be4a8c462b400ece8fc6d70807d6a772e6a75d",
+      "author_date": "2026-07-10T15:22:03+08:00",
+      "committer_date": "2026-07-10T15:22:03+08:00",
+      "subject": "Phase1定稿:运行时join-group+状态外置地基+组任务三层语义",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2c8bb993cfe3550e5353c6bb445a129b3bb50827",
+      "author_date": "2026-07-10T15:27:46+08:00",
+      "committer_date": "2026-07-10T15:27:46+08:00",
+      "subject": "gate①压测实证:组claim必用O_EXCL独占锁(os.replace本机Windows并发非单胜会双跑)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "96389273255d86586e093d86d3f92a0163060c85",
+      "author_date": "2026-07-10T15:34:30+08:00",
+      "committer_date": "2026-07-10T15:34:30+08:00",
+      "subject": "1a地基:工作组注册+join/leave+send-group+O_EXCL并发claim(gate①实路径验无双领)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2e28ab66b08756ab575015090146d47aa09bc5aa",
+      "author_date": "2026-07-10T15:42:33+08:00",
+      "committer_date": "2026-07-10T15:42:33+08:00",
+      "subject": "1a完成:_wait_core双听own+组inbox·成员经wait自动pull组任务(三自测PASS)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "216ea7a240a70cec482d786a35b1975bd43f94e4",
+      "author_date": "2026-07-10T15:52:29+08:00",
+      "committer_date": "2026-07-10T15:52:29+08:00",
+      "subject": "flagB修:组claim锁加stale回收(死pid/超ttl强清)+PYTHONUTF8用户级落地",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bf45bf08b27c00c8ae4c5ec97e31bcbcacb39377",
+      "author_date": "2026-07-10T16:18:36+08:00",
+      "committer_date": "2026-07-10T16:18:36+08:00",
+      "subject": "组注册加可选target_size软目标(WebUI激活进度分母·MasterUI请求)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5623f099342c00c602d286a1217152b036b527cf",
+      "author_date": "2026-07-10T16:38:37+08:00",
+      "committer_date": "2026-07-10T16:38:37+08:00",
+      "subject": "1b:fanout拆分片撒组+流式collect(边到边·治Master barrier join病根)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "82e53826f109b5b103809d976f370a12d6dfa1d6",
+      "author_date": "2026-07-10T17:05:48+08:00",
+      "committer_date": "2026-07-10T17:05:48+08:00",
+      "subject": "Phase2弹性池工人方案起草(内存墙·池成员持久tab→按需spin claude -p即释)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a765d4b1b366875aac4ff980eab27898fd655666",
+      "author_date": "2026-07-10T17:13:30+08:00",
+      "committer_date": "2026-07-10T17:13:30+08:00",
+      "subject": "Phase2a弹性池派发器:内存感知并发上限+按需spin claude -p worker(dry-run验gate)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "016a67ac9619c09292fd8b5b880fd977eb5e597d",
+      "author_date": "2026-07-10T17:14:52+08:00",
+      "committer_date": "2026-07-10T17:14:52+08:00",
+      "subject": "Phase2弹性派发器降future·不激活(用户改走手动管理tab下线)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c7517cd753c3f4789b329499bc9365a329db96da",
+      "author_date": "2026-07-10T17:28:27+08:00",
+      "committer_date": "2026-07-10T17:28:27+08:00",
+      "subject": "park/休眠机制:标故意暂离压guard误报(用户手动关tab省内存的配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "60f9f49d1095da652742037d329b007d8e56a305",
+      "author_date": "2026-07-13T13:58:30+08:00",
+      "committer_date": "2026-07-13T13:58:30+08:00",
+      "subject": "长程任务锚定生长网 P0 骨架:数据模型+脊柱+单段线性生长→达锚收敛→塌缩归档+防环+变更日志",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "061bb8e2da4a5ce3176d4da53a42f19bd03de6ef",
+      "author_date": "2026-07-13T14:04:34+08:00",
+      "committer_date": "2026-07-13T14:04:34+08:00",
+      "subject": "长程网 P0 对齐使用方数据契约:锚点status upcoming/active/reached+complexity{}块+归档collapsed{nodes,edges}+全局成长史longrange_events.jsonl+cross_edges预留",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "379a69f3ee2d9e0413f9cdcadf50f20bb84468e8",
+      "author_date": "2026-07-13T14:09:51+08:00",
+      "committer_date": "2026-07-13T14:09:51+08:00",
+      "subject": "长程网 complexity relabel:活跃段值明标_live+全网shape留null占位给使用方 snapshot填",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d712937668ccb060464048910840287688c51846",
+      "author_date": "2026-07-13T14:19:11+08:00",
+      "committer_date": "2026-07-13T14:19:11+08:00",
+      "subject": "complexity_snapshot.py 归位 agent_bus/(使用方挪·bus运行时口径模块=协调infra)+纳入镜像清单(17文件)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e751083f26e6b7f644597e415382e5aade641a8d",
+      "author_date": "2026-07-13T14:26:00+08:00",
+      "committer_date": "2026-07-13T14:26:00+08:00",
+      "subject": "长程网 P1 ★3自主分层+★4决策合批(反复确认头号杀手·使用方定优先):",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "23c4e67af6aa6ec22e47620b5d5d3db26c9c5b5f",
+      "author_date": "2026-07-13T14:34:34+08:00",
+      "committer_date": "2026-07-13T14:34:34+08:00",
+      "subject": "长程网 P1①:接入使用方 complexity_snapshot 三函数(全网shape+成长曲线+反复确认降幅)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d97d45c70fa11fd16c1d7f20283db7fed304df32",
+      "author_date": "2026-07-13T14:37:24+08:00",
+      "committer_date": "2026-07-13T14:37:24+08:00",
+      "subject": "长程网 P1②:fork/merge 便捷 op(结构完成·并行执行后补)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "26cab570dff3dd8227a3e78861fc3ccd862fad1d",
+      "author_date": "2026-07-13T16:07:32+08:00",
+      "committer_date": "2026-07-13T16:07:32+08:00",
+      "subject": "长程网 how-to 文档:消费方(Master/业务agent)用法·补简报缺口",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bfc6ab1b589f24edb939366204de20b99e37ddf4",
+      "author_date": "2026-07-13T16:55:43+08:00",
+      "committer_date": "2026-07-13T16:55:43+08:00",
+      "subject": "park一致性修:who/health 短路 _is_parked(与selfwake单一源一致)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b9fb8c3d4a4051b4f859ef8f7984a80f3afa56e4",
+      "author_date": "2026-07-13T17:02:54+08:00",
+      "committer_date": "2026-07-13T17:02:54+08:00",
+      "subject": "park一致性修·补全cmd_who人看表格路径(使用方抓漏) - 上轮只修了_who_data(who --json/WebUI路径),漏了cmd_who人看表格的独立verdict计算 - cmd_who表格循环:retired后加_is_parked短路显🅿️休眠·continue(与_who_data/selfwake同款) - 实测who表格:已park角色=🅿️休眠✓(原残留)。两条who路径+health+selfwake全一致",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "aa25a2c840adb690823e35068e57509c9b20a7ce",
+      "author_date": "2026-07-13T17:33:13+08:00",
+      "committer_date": "2026-07-13T17:33:13+08:00",
+      "subject": "长程网编辑/回退工具(demo-feat-migrate实战暴露·Master提·1/2最急):",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d2033da9fe45a48b52aaa5b681ce70b5c206f9d6",
+      "author_date": "2026-07-13T17:37:01+08:00",
+      "committer_date": "2026-07-13T17:37:01+08:00",
+      "subject": "how-to 补编辑/回退命令(set-goal/update-anchor/reopen/skip-node/remove-node/done网add自动复活)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3f19006c8c1f173fe573c92ef3577d7d9be24bf7",
+      "author_date": "2026-07-14T10:53:26+08:00",
+      "committer_date": "2026-07-14T10:53:26+08:00",
+      "subject": "长程网跟踪者可观测性(用户要看得到跟踪者在盯什么·方案②数据+③渲染·弃①presence):",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ed4ed128351303e1f15a66790586d55ed9df21ed",
+      "author_date": "2026-07-14T13:52:28+08:00",
+      "committer_date": "2026-07-14T13:52:28+08:00",
+      "subject": "发版预备 v1.10.0:长程任务锚定生长网(P0+P1)子系统 + 跟踪者可观测 + 安全红线",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "65f7b1d828768615a7107c259dedddf682c01c7c",
+      "author_date": "2026-07-14T16:37:31+08:00",
+      "committer_date": "2026-07-14T16:37:31+08:00",
+      "subject": "收尾 v1.10:bus_tray 系统托盘常驻监控 + 管理层轮换(Master数分2→Master数分)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4e318f501d965b615837a02209929ba33b92278a",
+      "author_date": "2026-07-14T16:49:47+08:00",
+      "committer_date": "2026-07-14T16:49:47+08:00",
+      "subject": "BUS 2.0 P0:安全网 + 回归冒烟基线",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1b865062a5fc8d079a7739c317ae755d0a4cf87f",
+      "author_date": "2026-07-14T17:22:04+08:00",
+      "committer_date": "2026-07-14T17:22:04+08:00",
+      "subject": "BUS 2.0 P1 增量1:抽共享基础层到 bus/ 包(config/io/roster·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8daa501ffcdcb38dab4b1cd5e8f12d45c338a95d",
+      "author_date": "2026-07-14T17:22:50+08:00",
+      "committer_date": "2026-07-14T17:22:50+08:00",
+      "subject": "轮换归档persist:Master数分2 正式退役入档(succeeded_by=Master数分)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "556cf8436b599f3c22800ff495ccf12bef481b77",
+      "author_date": "2026-07-14T17:36:18+08:00",
+      "committer_date": "2026-07-14T17:36:18+08:00",
+      "subject": "BUS 2.0 P1 增量2:抽 identity/presence 层到 bus/(proc + presence·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "638e6e7c9731dc68652a20d49024568d54bc2386",
+      "author_date": "2026-07-14T17:41:51+08:00",
+      "committer_date": "2026-07-14T17:41:51+08:00",
+      "subject": "BUS 2.0 P1 增量3:抽 self-wake/park 中层到 bus/selfwake.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cc7f4adba0a20a4e9f98162bf54cef816079027e",
+      "author_date": "2026-07-14T17:47:27+08:00",
+      "committer_date": "2026-07-14T17:47:27+08:00",
+      "subject": "BUS 2.0 P1 增量4:抽 notify(toast/完成通知)到 bus/notify.py + HUMAN_ATTENDED 归 roster(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a6f9cee6ff38804e01d305d0ec911bf7878629cf",
+      "author_date": "2026-07-15T09:39:24+08:00",
+      "committer_date": "2026-07-15T09:39:24+08:00",
+      "subject": "BUS 2.0 P1 增量5a:下沉任务原子领取原语到 bus/mailbox.py(解 core↔pool 环)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a182a3cb2b0f0548d40a348ec71dad0e09a3aeac",
+      "author_date": "2026-07-15T09:43:45+08:00",
+      "committer_date": "2026-07-15T09:43:45+08:00",
+      "subject": "BUS 2.0 目录整理(1):7 个设计/评审/简报文档归入 docs/(根目录去杂)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d893fed9737ce11f8b279cada6551ec66c475c42",
+      "author_date": "2026-07-15T09:45:10+08:00",
+      "committer_date": "2026-07-15T09:45:10+08:00",
+      "subject": "BUS 2.0 目录整理(2):加根级 README.md 工程地图",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2b6cb0cd1672bffe0fcdb3b6ead5f013ce3dc98b",
+      "author_date": "2026-07-15T09:49:58+08:00",
+      "committer_date": "2026-07-15T09:49:58+08:00",
+      "subject": "BUS 2.0 P1 增量5b:抽工作组池化层到 bus/pool.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3ec69b25f28ec24ee364e74bc83cea58aa97a4fe",
+      "author_date": "2026-07-15T09:56:35+08:00",
+      "committer_date": "2026-07-15T09:56:35+08:00",
+      "subject": "BUS 2.0 P1 增量5c:抽消息任务流 core 到 bus/core.py(命脉·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d68879cd9a6f7cd649de07643ef9986ae2ea604b",
+      "author_date": "2026-07-15T09:59:42+08:00",
+      "committer_date": "2026-07-15T09:59:42+08:00",
+      "subject": "roster persist:新注册 会话考古(归档深挖)+ Masteragent;清 __smoke__ 冒烟残留",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "179951f49e85bd1f2772d51602bfb4c26aebca46",
+      "author_date": "2026-07-15T10:10:23+08:00",
+      "committer_date": "2026-07-15T10:10:23+08:00",
+      "subject": "BUS 2.0 健壮性:新角色大小写碰撞防护 + 清 Masteragent 幽灵",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "020e4ed1038bd7914f255a953ec6e343e61df3f5",
+      "author_date": "2026-07-15T10:22:23+08:00",
+      "committer_date": "2026-07-15T10:22:23+08:00",
+      "subject": "BUS 2.0 健壮性:wait 中断/自恢复机制(用户 2026-07-15 令)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2c6b116bf101d268163e2bb44c46111ebb08c8a6",
+      "author_date": "2026-07-15T10:33:59+08:00",
+      "committer_date": "2026-07-15T10:33:59+08:00",
+      "subject": "BUS 2.0 结构:agent_bus junction 化 + 白名单 .gitignore + 补track external 文档源",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ea7d9de9d087166357c0a6032fda61d529e2cc41",
+      "author_date": "2026-07-15T10:41:32+08:00",
+      "committer_date": "2026-07-15T10:41:32+08:00",
+      "subject": "BUS 2.0:sync_code.ps1 junction 守卫(迁移后镜像作废)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4b0ede48888b58181684f0355225a15764a0709d",
+      "author_date": "2026-07-15T10:49:35+08:00",
+      "committer_date": "2026-07-15T10:49:35+08:00",
+      "subject": "BUS 2.0 使用体验:短命令入口 ab(修裸 python/长路径/junction 诸坑)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "00f2a74c36deb50dc06511c7489cffc85f43829e",
+      "author_date": "2026-07-15T10:53:00+08:00",
+      "committer_date": "2026-07-15T10:53:00+08:00",
+      "subject": "BUS 2.0 使用体验:onboarding 改教短命令 ab(替长 python+路径)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "af111b4480678cbd81797a88046b9bd8d7037a13",
+      "author_date": "2026-07-15T10:57:49+08:00",
+      "committer_date": "2026-07-15T10:57:49+08:00",
+      "subject": "BUS 2.0 使用体验:ab commands 分组命令总览(治 43 命令扁平难发现)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ef823c9d3f7b136abd8f1ccfd88cd5b35842ac04",
+      "author_date": "2026-07-15T11:04:15+08:00",
+      "committer_date": "2026-07-15T11:04:49+08:00",
+      "subject": "BUS 2.0 P1 UX:恢复文档+hook文案统一到 ab 短命令(fresh MasterAgent/全员一开就短命令)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "00572fa89023c74cd81b20dafd6c9caabbf1d4c2",
+      "author_date": "2026-07-15T11:06:54+08:00",
+      "committer_date": "2026-07-15T11:06:54+08:00",
+      "subject": "BUS 2.0 P1 UX:CLAUDE.md「迁移/换机」节改写为 junction 架构(纠正过时硬链镜像流程)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cf3830a5dcf59c4a90281be48943b4713bcb7915",
+      "author_date": "2026-07-15T11:16:42+08:00",
+      "committer_date": "2026-07-15T11:16:42+08:00",
+      "subject": "BUS 2.0 P1 增量:抽 edge 互斥锁到 bus/edge.py(cmd_edge_acquire/release + 锁 helper·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "74628e88adb16f8e28cc891f40f9d28054173e7f",
+      "author_date": "2026-07-15T11:16:53+08:00",
+      "committer_date": "2026-07-15T11:16:53+08:00",
+      "subject": "CLAUDE.md 角色分工:补「通用对称协作律(铁律·双向)」— 培训师缺口 route",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e3da56aef1b6e13b81caaa1cd9f4143cfb0b38ca",
+      "author_date": "2026-07-15T11:26:46+08:00",
+      "committer_date": "2026-07-15T11:26:46+08:00",
+      "subject": "BUS 2.0 P1 增量:抽 retire 生命周期到 bus/roles.py(retire/revive/retired + retired_roster 访问器·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "167608eb8682587f18d03df82cd95b85e78bce12",
+      "author_date": "2026-07-15T11:32:22+08:00",
+      "committer_date": "2026-07-15T11:32:22+08:00",
+      "subject": "BUS 2.0 P1 增量:抽 cmd_dispatch 到 bus/exec.py(派遣一次性 agent·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f5fe3d4f6ce19e3c16bc319cad87ccfc0efb8d2e",
+      "author_date": "2026-07-15T11:37:51+08:00",
+      "committer_date": "2026-07-15T11:37:51+08:00",
+      "subject": "BUS 2.0 P1 增量:抽会话元数据簇到 bus/sessions.py(cmd_sessions + 会话标记/活死态 helper·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "74d3c369b8bd77bc31d47ea25f41ca80ae2371ae",
+      "author_date": "2026-07-15T11:43:51+08:00",
+      "committer_date": "2026-07-15T11:43:51+08:00",
+      "subject": "BUS 2.0 P1 增量:抽长期任务线看板到 bus/tasks.py(cmd_tasklines + tasklines helper·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bbc0e0e6417bdd5a3efa5bb9de06e6614879d732",
+      "author_date": "2026-07-15T11:47:44+08:00",
+      "committer_date": "2026-07-15T11:47:44+08:00",
+      "subject": "BUS 2.0 P1 增量:cmd_answer 并入 bus/tasks.py(待办回路·闭环 ask-user·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "112b238d30b1c332897abfab469026956f69c71f",
+      "author_date": "2026-07-15T11:51:56+08:00",
+      "committer_date": "2026-07-15T13:53:00+08:00",
+      "subject": "BUS 2.0 P1 增量:_is_bus_member + cmd_ask_user 并入 bus/tasks.py(ask-user 待办池·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "55a99c1df495933fb3a330ef3a2c75e631358fef",
+      "author_date": "2026-07-15T14:50:27+08:00",
+      "committer_date": "2026-07-15T14:50:27+08:00",
+      "subject": "工作组面板文案修法(渲染·口径不变·口径owner定):①组卡片「更新」→「成员更新于」(源=members.json roster变更时间·非数据新鲜度·加title)②0任务时「窗口内无组任务活动」→「无send_group组路由(成员活动走直发·见舰队面板)」③tasks_in_window==0时④⑤显N/A不硬显0×/0%。group_metrics_spec口径未动。",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a192f041b45297521537264f4a91570be6e81559",
+      "author_date": "2026-07-15T20:01:19+08:00",
+      "committer_date": "2026-07-15T20:01:19+08:00",
+      "subject": "BUS 2.0 P1 增量:抽运维/健康簇到 bus/health.py(7 cmd + 8 helper·最大簇·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9e6360352b7d920411596c5753d567842dbc6c98",
+      "author_date": "2026-07-15T20:05:55+08:00",
+      "committer_date": "2026-07-15T20:05:55+08:00",
+      "subject": "BUS 2.0 P1 增量:抽状态视图簇到 bus/status.py(_who_data + who + list·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "77a9d0b14cb27052491f6756c706711384ba396b",
+      "author_date": "2026-07-15T20:11:57+08:00",
+      "committer_date": "2026-07-15T20:11:57+08:00",
+      "subject": "BUS 2.0 P1 增量:cmd_route 并入 bus/roles.py(对口路由助手·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "767b70da6494d8473c546ee746fb586b5fb25637",
+      "author_date": "2026-07-15T20:15:31+08:00",
+      "committer_date": "2026-07-15T20:15:31+08:00",
+      "subject": "BUS 2.0 P1 增量:_load_caps_pool + cmd_roster + cmd_caps 并入 bus/roles.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f77836b762894761e6948ef4a477cd4df7229650",
+      "author_date": "2026-07-15T20:20:30+08:00",
+      "committer_date": "2026-07-15T20:20:30+08:00",
+      "subject": "BUS 2.0 P1 收尾:抽身份/自醒/onboarding 域到 bus/identity.py(agentbus.py 成薄分发器·行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "633f3aff9f1550d2a8e024e200ef6bfc432993ef",
+      "author_date": "2026-07-15T20:26:26+08:00",
+      "committer_date": "2026-07-15T20:26:26+08:00",
+      "subject": "BUS 2.0 P1 收尾:dispatcher 清冗余 import + README 补 bus/ 模块图(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "744fd7ee588b9d94ce0e93a8b83c3dda6fe68915",
+      "author_date": "2026-07-16T05:00:19+08:00",
+      "committer_date": "2026-07-16T05:00:19+08:00",
+      "subject": "bus: 自醒巡检加【轮询模式豁免】selfwake-exempt(SQLAGent 请求·止空耗)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f452ac8fe01637f4c8187585cc6404a049eca5f3",
+      "author_date": "2026-07-16T05:03:51+08:00",
+      "committer_date": "2026-07-16T05:03:51+08:00",
+      "subject": "bus_smoke: 修 teardown 漏清 _groups/<grp> + 基线命令面更到45(selfwake-exempt)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "592fda5a7ce06e2d0c80557e891bfba02898b441",
+      "author_date": "2026-07-16T05:07:35+08:00",
+      "committer_date": "2026-07-16T05:07:35+08:00",
+      "subject": "bus: selfwake-exempt 防手滑改进(使用方 UX 反馈)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "85d3f7a269ee9a96b31ade68840953aeb3f3757b",
+      "author_date": "2026-07-16T14:28:15+08:00",
+      "committer_date": "2026-07-16T14:28:15+08:00",
+      "subject": "fleet verdict单元格限宽防撑UI(渲染·通用·口径owner定):verdict badge加vbadge类(max-width260+ellipsis+nowrap)+title完整串tooltip。某成员🅿️休眠长note(36字)等任何长verdict inline截断显…·hover看全文·对所有verdict生效。口径不动(note内容保留data+title)。",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c5c0800a3dca9340ae7735de48c230814021331f",
+      "author_date": "2026-07-17T16:09:02+08:00",
+      "committer_date": "2026-07-17T16:09:02+08:00",
+      "subject": "bus: 守卫提醒 fire-and-forget(no_receipt)—— 退役守卫回执洪水噪声(P2-2d 味)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "df81b887a718274a301ab2261ee81728372d0eaa",
+      "author_date": "2026-07-17T16:12:18+08:00",
+      "committer_date": "2026-07-17T16:12:18+08:00",
+      "subject": "BUS 2.0 P2 启动:机制优化设计 + 协调底(docs/BUS_2.0_P2_DESIGN.md)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6688c0a5a2716476990d9d3fcfd5c3372c03a6d5",
+      "author_date": "2026-07-17T16:16:33+08:00",
+      "committer_date": "2026-07-17T16:16:33+08:00",
+      "subject": "BUS 2.0 P2-2a 步骤1:cmd_who 表格 format-from _who_data(灭 agentbus 内 verdict #2->#1 分叉)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fe775480541c6ccf0804ba7b131bdd40e2f1f763",
+      "author_date": "2026-07-17T16:29:32+08:00",
+      "committer_date": "2026-07-17T16:29:32+08:00",
+      "subject": "BUS 2.0 P2-2a 步骤2:_who_data 引 _self_wake_state 去 parked 重复判 + 加 self_wake 字段(count 不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bcd13a073c7e0c52bcf47f6e0cf78aef7856ca79",
+      "author_date": "2026-07-17T16:42:10+08:00",
+      "committer_date": "2026-07-17T16:42:10+08:00",
+      "subject": "BUS 2.0 P2-2b:三 store 跨引用契约化(bus/refs.py·使用方签 B·纯 additive·解析不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "209dab776e7a77643da9067c6f5bfa6ec203e829",
+      "author_date": "2026-07-17T16:48:03+08:00",
+      "committer_date": "2026-07-17T16:48:03+08:00",
+      "subject": "运行态归档:示例成员2 入册(培训师 hello·2026-07-15)+ BUS_ONBOARDING 自醒闭环铁律(培训师撰·前台顽固失败模式)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "119a5bd5877f50b38baaa6c9b7d57e8971d5c4b5",
+      "author_date": "2026-07-17T16:50:56+08:00",
+      "committer_date": "2026-07-17T16:50:56+08:00",
+      "subject": "BUS 2.0 P2-2b 增补:ab refs --check 按使用方 3 类口径拆分 + ab refs --purge-smoke(只清①)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cfaf3cb6138b0afb5ac3935092fe2ef3f6271344",
+      "author_date": "2026-07-17T16:59:33+08:00",
+      "committer_date": "2026-07-17T16:59:33+08:00",
+      "subject": "BUS 2.0 修复:_retired_roles() archive-aware(培训师诊断·归档式退役恒判不出的真根因)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "84566d6d19270a354deb4e2893f8e08acd932a9f",
+      "author_date": "2026-07-20T10:14:02+08:00",
+      "committer_date": "2026-07-20T10:14:02+08:00",
+      "subject": "BUS 2.0 P2 推进结论(用户令「按序推」):2c 决议 B/2d 去重已尽/P3 达成·记录闭项",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "236b5732d39417aadeb6bb161a1880818ae9e160",
+      "author_date": "2026-07-20T10:26:06+08:00",
+      "committer_date": "2026-07-20T10:26:06+08:00",
+      "subject": "BUS2.0 2a步骤3(MasterUI侧·灭role-verdict 4处分叉之WebUI):compute_fleet 改吃 ab._who_data() 权威源·删本地自算verdict逻辑(~80行10分支)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8f0be0e2687d8a9929cec8b6a99b680da152cb2b",
+      "author_date": "2026-07-20T11:07:50+08:00",
+      "committer_date": "2026-07-20T11:07:50+08:00",
+      "subject": "docs: 新增逐文件详版目录地图 DIRECTORY_MAP.md + README 刷新(junction/46命令/ab/2.0状态)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "76da69940d8f2c54244c2be9b367ef27ab635e4d",
+      "author_date": "2026-07-20T11:24:59+08:00",
+      "committer_date": "2026-07-20T11:24:59+08:00",
+      "subject": "BUS 2.0 定版:README 标 v2.0 已定版 + 变更清单 docs/BUS_2.0_CHANGELOG.md",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "988ad6ab23fd546e1bc90663c7b1665ff4ba6141",
+      "author_date": "2026-07-20T11:38:21+08:00",
+      "committer_date": "2026-07-20T11:38:21+08:00",
+      "subject": "BUS2.0 P4·Phase A(MasterUI lane):抽 WebUI 共享基础层到 ui/common.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d5be5bf5a1d4a83d7d42be1c337c4465737db6e5",
+      "author_date": "2026-07-20T11:40:24+08:00",
+      "committer_date": "2026-07-20T11:40:24+08:00",
+      "subject": "修复: re-export _load_caps_pool 到 agentbus 顶层(P1 抽 bus/roles 漏 re-export·MasterUI 发现)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0380db4c13fcc2c553bb30b6d957f68733e34f3f",
+      "author_date": "2026-07-20T11:50:07+08:00",
+      "committer_date": "2026-07-20T11:50:07+08:00",
+      "subject": "BUS2.0 P4·Phase B(MasterUI lane):抽 INDEX_HTML(前端页面~2159行)到 ui/page.py(字节不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ce1913333323f67d7c1c0a52e4fb945d383dee87",
+      "author_date": "2026-07-20T15:04:36+08:00",
+      "committer_date": "2026-07-20T15:04:36+08:00",
+      "subject": "BUS2.0 P4·Phase C(MasterUI lane):抽后端数据/API层(~2106行)到 ui/api.py·server.py 变 facade(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "278b7ec95b8ac9665eae7e08a8d7a616fdc2a9be",
+      "author_date": "2026-07-20T15:11:21+08:00",
+      "committer_date": "2026-07-20T15:11:21+08:00",
+      "subject": "BUS2.0 P4·Phase D(MasterUI lane):抽 class Handler(HTTP路由)到 ui/routes.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d04c83839b27f2b17bcdb55f0963f8c3f7f2426f",
+      "author_date": "2026-07-20T15:14:51+08:00",
+      "committer_date": "2026-07-20T15:14:51+08:00",
+      "subject": "BUS2.0 P4·Phase E(MasterUI lane):server.py 变薄为装配入口(行为不变)·P4 收官",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "894429d445fcb171fe460d62aa392f0e3556c363",
+      "author_date": "2026-07-20T15:52:25+08:00",
+      "committer_date": "2026-07-20T15:52:25+08:00",
+      "subject": "BUS 2.0 P5(决议 B·保持留根):修 identity.py 悬挂指针 + 文档口径settle为\"运行时锚点留根\"",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b8b73286deea63d8adf5c33131c8d8de4c5f509c",
+      "author_date": "2026-07-20T15:59:39+08:00",
+      "committer_date": "2026-07-20T15:59:39+08:00",
+      "subject": "通道文档:Edge CDP 迁移到专用档(136+ 禁默认档 CDP)+ 通道泛化为通用 web 自动化",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fd013eda24809e8dfbc55761ae3de98aa7ea63cf",
+      "author_date": "2026-07-21T10:38:20+08:00",
+      "committer_date": "2026-07-21T10:38:20+08:00",
+      "subject": "docs: BUS 2.1 全方位联合分析落档(MasterAgent×Master数分·本体/内核/骨架/数据/UI)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9d81ff2e31bca9608df418c1679d47655dc1bd6a",
+      "author_date": "2026-07-21T11:14:13+08:00",
+      "committer_date": "2026-07-21T11:14:13+08:00",
+      "subject": "BUS 升级(A1·用户令):自醒 idle timeout 日/夜策略(日2h·夜6h)——砍闲置空唤醒重读·不牺牲接活",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d4098cb2b9c3bf80b4551a824a1b81511ccf676d",
+      "author_date": "2026-07-21T11:24:31+08:00",
+      "committer_date": "2026-07-21T11:24:31+08:00",
+      "subject": "B2 定期reap线程(MasterAgent联合分析·MasterUI lane·ui/server.py):加 start_reap(1800) 常驻孤儿/卡死回收",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1c911153439fe7bf1b523f73e4b7eac81a4627c8",
+      "author_date": "2026-07-21T11:27:46+08:00",
+      "committer_date": "2026-07-21T11:27:46+08:00",
+      "subject": "BUS 升级(C5·用户令):bus_smoke 补 re-export 完整性用例(防抽层漏 re-export 盲点)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "071d10a0e7bc4ea93cab8571eb83772e86ccdacb",
+      "author_date": "2026-07-21T11:32:54+08:00",
+      "committer_date": "2026-07-21T11:32:54+08:00",
+      "subject": "BUS 升级(B3·用户令):todos.json 完成态 auto-archive(ab todos-archive)——治膨胀根因",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3c3bf4cd286f76159780e3c1d360c26ca29bbd4c",
+      "author_date": "2026-07-21T11:35:36+08:00",
+      "committer_date": "2026-07-21T11:35:36+08:00",
+      "subject": "B2+B3 合并:start_reap 升级为 start_maint 维护心跳(reap+todos-archive·MasterUI lane)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "72205bb256654c3269baabe599560d4e3b8d3332",
+      "author_date": "2026-07-21T11:50:38+08:00",
+      "committer_date": "2026-07-21T11:50:38+08:00",
+      "subject": "docs: BUS 2.1 升级路线图落档(A1/B2/B3/C5 已落地 + D6/E7/F8 待推)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b456b8e3cf6543c19a7f166fe093f9742ae64d18",
+      "author_date": "2026-07-21T14:28:17+08:00",
+      "committer_date": "2026-07-21T14:28:17+08:00",
+      "subject": "BUS 升级:role_profiles.json 注册表(管理角色细化·启动流程+明/隐式输入)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1360427a4ea7a955b899d245af8c93bf1b4385ab",
+      "author_date": "2026-07-21T14:34:34+08:00",
+      "committer_date": "2026-07-21T14:34:34+08:00",
+      "subject": "新增 WebUI tab「👤角色」渲染 role_profiles.json(MasterUI lane·用户令细化管理角色)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5c5798e1beb724e4023038250507bb575bb23c00",
+      "author_date": "2026-07-21T14:56:52+08:00",
+      "committer_date": "2026-07-21T14:56:52+08:00",
+      "subject": "role_profiles 反面锚补全(Master数分核对归档提炼)+ sync 命令 -NonInteractive 口径",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9498534a21d5172e72e609bfb21421d9fbd45873",
+      "author_date": "2026-07-21T15:07:16+08:00",
+      "committer_date": "2026-07-21T15:07:16+08:00",
+      "subject": "role_profiles.json:MasterUI 条自校细化(去 _note·MasterUI lane)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d68d7cb6b9d806ef0b22991ee3e9833678be8535",
+      "author_date": "2026-07-21T15:11:37+08:00",
+      "committer_date": "2026-07-21T15:11:37+08:00",
+      "subject": "role_profiles: MasterUI boundary 并入Master数分给的不掩码反面锚(自看控制台127不掩码·privacy-mask-selfconsole病毒变体)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "67a247b4992d528012344fa30788ad6ed0deabfb",
+      "author_date": "2026-07-21T15:16:53+08:00",
+      "committer_date": "2026-07-21T15:16:53+08:00",
+      "subject": "prompts tab 两增强(用户令·MasterUI lane):行号 gutter + 📂开文件按钮(白名单硬约束)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2709efa71db7eead6d73df4ecebe3cef8c015d86",
+      "author_date": "2026-07-21T15:44:13+08:00",
+      "committer_date": "2026-07-21T15:44:13+08:00",
+      "subject": "de-bus连带补口:compact轴 _COMMON_RULES 补 ask-user待办池铁律(跨cwd业务agent compact后不掉这能力)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8028f1682b0bc02062558aa2e1f9a0049e96117d",
+      "author_date": "2026-07-21T16:05:11+08:00",
+      "committer_date": "2026-07-21T16:05:11+08:00",
+      "subject": "compact hook 注册表驱动化:_ROLE_RULES 硬编码 dict → 读 role_profiles.json 单一源(可扩展+灭分叉+修 stale 旧角色键)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ec1c53e0ab71096f381e7926fc152a6413e0088e",
+      "author_date": "2026-07-21T16:28:26+08:00",
+      "committer_date": "2026-07-21T16:28:26+08:00",
+      "subject": "compact注入两层全注册表化:全局层 _COMMON_RULES 移进 role_profiles.json meta.common_rules + hook 拆 render_common/render_role/build_context(server.py 可 import 渲染 WYSIWYG)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cad7f124dd6f183f7fad772497b034080ba84d4a",
+      "author_date": "2026-07-21T16:37:45+08:00",
+      "committer_date": "2026-07-21T16:37:45+08:00",
+      "subject": "角色 tab 渲染 compact hook 注入两层(Master数分派·用户令·单一源不手抄)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9a59f2e11e984fafa04e386be39271e8ad2d644f",
+      "author_date": "2026-07-22T09:40:34+08:00",
+      "committer_date": "2026-07-22T09:40:34+08:00",
+      "subject": "清游离副本 agent_bus.bak(65M·2.0前旧单体+陈旧usage.db子集)已删:更 CLAUDE.md/memory junction化条→目录以外均为引用不变量洁净成立",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bf539ba5fa35d428862e158766d1e92d83a6ac6f",
+      "author_date": "2026-07-22T16:10:53+08:00",
+      "committer_date": "2026-07-22T16:10:53+08:00",
+      "subject": "agents.json:会话考古 摘 confidentiality cap(基建层防脱敏病毒重染·对齐 role_profiles 边界·培训师 caps lane)+ 清 __smoke__ 冒烟测试污染",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1b7b070fe3af8b7d5ab25dd7bd82918da73e2c71",
+      "author_date": "2026-07-22T16:10:53+08:00",
+      "committer_date": "2026-07-22T16:10:53+08:00",
+      "subject": "host_config 快照刷新:全局 CLAUDE.md de-bus(bus内容剥离)+ 红线润色两改同步进迁移包(Master数分 de-bus·用户令)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3e6cf83757ad555d1e311a92d23c5b60a3114599",
+      "author_date": "2026-07-23T10:57:18+08:00",
+      "committer_date": "2026-07-23T10:57:18+08:00",
+      "subject": "工作组状态路由 push-by-state(MasterAgent建/Master数分口径·1+1定稿):按成员available自动RR路由·单通道push·全事件驱动",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f0e348f4046a04ad14546675280a46e0d966f5a0",
+      "author_date": "2026-07-23T11:00:20+08:00",
+      "committer_date": "2026-07-23T11:00:20+08:00",
+      "subject": "维护心跳加独立 route-reap 5min tick(MasterAgent令·工作组路由超时自愈)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8ac05c677fe18d42f459c9dada443d059124c7e5",
+      "author_date": "2026-07-23T11:00:24+08:00",
+      "committer_date": "2026-07-23T11:00:24+08:00",
+      "subject": "SESSION_RELIABILITY.md:补 compact 衰减【程序约束遵守力】≠丢信息(业务侧会话实证·会话考古深读+Master数分lean-grep交叉验证)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "17e94fa53b02be47c01314a1850fa93a6085a9c6",
+      "author_date": "2026-07-23T11:01:19+08:00",
+      "committer_date": "2026-07-23T11:01:19+08:00",
+      "subject": "WEBUI_FEATURES 补「后台常驻线程」节(含新 route-reap 5min tick + 既有 refresher/guard/maint 汇总)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "253f2f608c4db5eed34231e7b45c915d1ded2f0e",
+      "author_date": "2026-07-23T13:45:48+08:00",
+      "committer_date": "2026-07-23T13:45:48+08:00",
+      "subject": "compact 程序约束衰减·hook 兜底 + doctrine 分流:reinject build_context 加「compact自检·程序约束」行(每compact对所有role注入·戳agent自查约定落位)+ SESSION_RELIABILITY 补按role类型分流(通用铁律→common_rules/bus角色→boundary/业务约定→业务CLAUDE.md·hook无法自动捕获mid-session约定)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2bad9cad29ad1b75da8aad3979a1b1ba1a103ebb",
+      "author_date": "2026-07-23T13:49:10+08:00",
+      "committer_date": "2026-07-23T13:49:10+08:00",
+      "subject": "角色tab compact注入:_compact_inject 加 importlib.reload 坐实 WYSIWYG(消除 hook 改动 stale 脆弱点)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a5c6019e74877344e79557699296d4a74640c8d9",
+      "author_date": "2026-07-27T09:59:38+08:00",
+      "committer_date": "2026-07-27T09:59:38+08:00",
+      "subject": "约束(用户令2026-07-27):MasterAgent 自醒不降级——保事件即时自醒·绝不切轮询(轮询=丢实时任务投递响应)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5bcc723a7c0dc1c8d74443f5d0c56c1230b013a1",
+      "author_date": "2026-07-27T11:04:42+08:00",
+      "committer_date": "2026-07-27T11:04:42+08:00",
+      "subject": "sessions 采集会话 resume 大小:CLI 表格加【大小】列 + resume 合计 + --by-size 降序(辅助判断谁大/该归档清)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f4e87529c7f44950c86c50293f1668a62a4795de",
+      "author_date": "2026-07-27T11:12:57+08:00",
+      "committer_date": "2026-07-27T11:12:57+08:00",
+      "subject": "会话 resume 大小露到现有页面辅助判断(MasterAgent派·用户令·不新增页)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "20b8f164fde4ccd391f9a38b69c10fbb6f9dfe19",
+      "author_date": "2026-07-27T14:01:11+08:00",
+      "committer_date": "2026-07-27T14:01:11+08:00",
+      "subject": "role_profiles: MasterUI 切 ScheduleWakeup 轮询模式(用户令·防前台掉线)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6670d0a0f493f0e1b47ce753f78247da1c0e400c",
+      "author_date": "2026-07-28T08:57:31+08:00",
+      "committer_date": "2026-07-28T08:57:31+08:00",
+      "subject": "全局CLAUDE.md物理迁入 host_config + 宿主软链(用户令2026-07-27)·综合新老重编",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "94dffa8ce3b78c63a6e716c62babbc43e1b907fd",
+      "author_date": "2026-07-28T08:58:18+08:00",
+      "committer_date": "2026-07-28T08:58:18+08:00",
+      "subject": "docs: OPS_FINDINGS 运维/口径发现台账落库(Master数分 建·MasterAgent 代提交)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "432916d58dee8171bb1d99f49e25f237e84f8ee0",
+      "author_date": "2026-07-28T08:58:19+08:00",
+      "committer_date": "2026-07-28T08:58:19+08:00",
+      "subject": "onboarding: 程序性约定须活过 compact 的指针补充(培训师 lane·MasterAgent 代提交)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d0af71bd5ca2460d8b17509aa176558359053bad",
+      "author_date": "2026-07-28T09:08:39+08:00",
+      "committer_date": "2026-07-28T09:08:39+08:00",
+      "subject": "全局CLAUDE.md 加「agent bus 标准用法」节·普适无门禁(用户令2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "93c94c101d7e6a52253b7b9d46914f77b731759f",
+      "author_date": "2026-07-28T09:22:23+08:00",
+      "committer_date": "2026-07-28T09:22:23+08:00",
+      "subject": "role_profiles: MasterUI 回归标准事件自醒·轮询模式废止(用户令2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "12d5ed9bedb704804757b961025dee55d8c25fc0",
+      "author_date": "2026-07-28T09:48:40+08:00",
+      "committer_date": "2026-07-28T09:48:40+08:00",
+      "subject": "上岗喂入+培训闸:hello 即喂角色页/能力池 + 新角色 trained 软闸(用户令2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2758bfd96fd142893bb89dfaa9a1871c3c62f88f",
+      "author_date": "2026-07-28T10:05:35+08:00",
+      "committer_date": "2026-07-28T10:05:35+08:00",
+      "subject": "记忆随角色走:bus 记忆库索引分锅 + 三通道指路(用户令2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0196f27f1c8747496a2fc6256bf6612ef2a6a8d5",
+      "author_date": "2026-07-28T10:12:32+08:00",
+      "committer_date": "2026-07-28T10:12:32+08:00",
+      "subject": "path_registry.json:bus 特殊路径注册表(单一源·供 WebUI 路径页/迁移对账/健康校验)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d04a899ad9d3e801f0ec2ebb5c97505dfcb022d7",
+      "author_date": "2026-07-28T10:13:11+08:00",
+      "committer_date": "2026-07-28T10:13:11+08:00",
+      "subject": "path_registry: 修 metrics.jsonl 真实路径(agent_bus 根·非 bus/ 子目录)·19 条全实存",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ee484571862f400832f04df44c4564f9450e4195",
+      "author_date": "2026-07-28T11:29:34+08:00",
+      "committer_date": "2026-07-28T11:29:34+08:00",
+      "subject": "2.0收尾①:消息卫生代谢 _hygiene_core 挂 health-sweep(supervise 90s 自动跑)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9693acd000f51d1ba74c020ee5e5fc6688dc17c8",
+      "author_date": "2026-07-28T11:47:57+08:00",
+      "committer_date": "2026-07-28T11:47:57+08:00",
+      "subject": "会话可靠性立项①:wait 尸检 trace + guard 掉线根因分类 + E7 轮换 runbook",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9b47b449c18b20d7ee0f6a72fd33d5432f4cbf08",
+      "author_date": "2026-07-28T14:07:02+08:00",
+      "committer_date": "2026-07-28T14:07:02+08:00",
+      "subject": "全员禁轮询铁律(用户令2026-07-28)·兜底心跳废案",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5cb6d516e033c09ae0613b66c88d4fadc2514426",
+      "author_date": "2026-07-28T14:24:13+08:00",
+      "committer_date": "2026-07-28T14:24:13+08:00",
+      "subject": "doc-blind审查速修①:fanout-collect NameError + 两hook GBK炸弹 + 卸死sync_code空转",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ead84b7185e3b02640ab084b435572e7d7a292de",
+      "author_date": "2026-07-28T14:25:28+08:00",
+      "committer_date": "2026-07-28T14:25:28+08:00",
+      "subject": "docs: BUS 卓越工程清单(doc-blind 四路审查产出·P0/P1/P2+文档漂移)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "41124445f96637f324a34885719c766ffbd6aae7",
+      "author_date": "2026-07-28T14:33:01+08:00",
+      "committer_date": "2026-07-28T14:33:01+08:00",
+      "subject": "插话纠偏锚 hook:用户插话时若手上有 processing 任务,注入行为锚防带歪弃单(用户问·2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6aefce8b82626c04b2afb6bde87008fef6b5ee14",
+      "author_date": "2026-07-28T14:51:02+08:00",
+      "committer_date": "2026-07-28T14:51:02+08:00",
+      "subject": "projects 全员会话/记忆库物理迁入项目根 + 宿主 junction;业务会话库外置业务侧缓存区回链(用户令 2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ab62d9504cfadf198f6326d59ab6301337259b17",
+      "author_date": "2026-07-28T15:14:24+08:00",
+      "committer_date": "2026-07-28T15:14:24+08:00",
+      "subject": "fix(ui): P0安全修复+sonnet-4-6精化",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fc6fc0fa274e653121cb0cf4b9d1e1f0bfa7f462",
+      "author_date": "2026-07-28T15:25:51+08:00",
+      "committer_date": "2026-07-28T15:25:51+08:00",
+      "subject": "feat(WebUI): 新增「📁路径」tab(path_registry.json 渲染+健康校验)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "03f913eeb532c04d1507b7ef55d626e88242ca0c",
+      "author_date": "2026-07-28T15:28:18+08:00",
+      "committer_date": "2026-07-28T15:28:18+08:00",
+      "subject": "P0 六件齐修:claim 统一 O_EXCL/共享 JSON 加锁/roster 原子写/tmp 随机化/杀进程树/external 抢锁硬闸(doc-blind 清单)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "75190b982f7ac1602b2bbce4672c7e1473541d4d",
+      "author_date": "2026-07-28T15:48:49+08:00",
+      "committer_date": "2026-07-28T15:48:49+08:00",
+      "subject": "P1 第一批(8/11):ABA 夺锁/reap 崩溃窗/done 精确匹配/presence 锁/request 契约/审批闸/python_bin/策略注册表",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "644ec39ea7b086e0aca1cabaed0f77382ef76650",
+      "author_date": "2026-07-28T15:57:02+08:00",
+      "committer_date": "2026-07-28T15:57:02+08:00",
+      "subject": "P1 第二批(3/11):卫生代谢扩容/watchdog 抽公共 bus.watch/公共面 __all__ 契约(+2 实测抓获的雷)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "aac571e996f7db9e000a9895a57b92f4e38c6e6a",
+      "author_date": "2026-07-28T15:57:27+08:00",
+      "committer_date": "2026-07-28T15:57:27+08:00",
+      "subject": "PUNCHLIST:P1 勾 11/12(余 UI 项归 MasterUI lane)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c1737acc63aa881c27b63c6de75a569f8f5e5342",
+      "author_date": "2026-07-28T16:20:46+08:00",
+      "committer_date": "2026-07-28T16:20:46+08:00",
+      "subject": "P2 全清(MasterAgent lane)+ roster 枚举误报修(Master数分报):错误通道统一/入口 env 归一/external _lock 收敛/焦点策略成文等",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "13188156dbcf6c2d76c8d089d64d0108a7534535",
+      "author_date": "2026-07-28T16:21:42+08:00",
+      "committer_date": "2026-07-28T16:21:42+08:00",
+      "subject": "PUNCHLIST:P2 全勾——全清单仅剩 MasterUI 1 项 UI P1",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5ad25d1dfc209e72b73c89ac67b13389695f25a9",
+      "author_date": "2026-07-28T16:34:16+08:00",
+      "committer_date": "2026-07-28T16:34:16+08:00",
+      "subject": "fix(ui): P1收口 — 噪音压制+死代码+尾读+json_lock+路径无关机器名",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cfca31c312cccadd1420480378b4de59d0028a1d",
+      "author_date": "2026-07-28T16:35:20+08:00",
+      "committer_date": "2026-07-28T16:35:20+08:00",
+      "subject": "PUNCHLIST 全清归档:P0/P1/P2 28 项全勾(MasterAgent+MasterUI 双 lane)·转已完成审计记录",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f861b6520dae8863658686f9fbba85e23ef0d204",
+      "author_date": "2026-07-28T16:43:52+08:00",
+      "committer_date": "2026-07-28T16:43:52+08:00",
+      "subject": "舰队日志 + 维修模式(用户令 2026-07-28:守卫维修下休眠·档案馆补编年史面)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e9a89acc25cfa172094c815437f94db15146b6cc",
+      "author_date": "2026-07-28T16:48:22+08:00",
+      "committer_date": "2026-07-28T16:48:22+08:00",
+      "subject": "舰队状态判定引擎 + 预设条件注册表(用户令:UI 顶部显示舰队状态+自醒守卫·条件可配置)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0458677295845ed04ea4544842d9c3a07f3b95e6",
+      "author_date": "2026-07-28T16:55:05+08:00",
+      "committer_date": "2026-07-28T16:55:05+08:00",
+      "subject": "feat(WebUI): 舰队模型列 + 舰队日志 tab + 维修横幅(用户令2026-07-28)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fc436754a4943ec39db9bfe771a336178ea69d1a",
+      "author_date": "2026-07-28T16:58:41+08:00",
+      "committer_date": "2026-07-28T16:58:41+08:00",
+      "subject": "feat(WebUI): 顶栏舰队状态徽标(fleet_state_rules·守卫·掉线展开)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "60d7c610e6ebeca3b12a35ff3c44e6079c38ea3b",
+      "author_date": "2026-07-28T17:22:46+08:00",
+      "committer_date": "2026-07-28T17:22:46+08:00",
+      "subject": "hello 角色页尾加【boot 未完成=不算上岗】自检闸(用户案:新会话没走完启动流程就接话)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "cf85a131dafdef54ae9ff70ce6cc6f54973b6c1a",
+      "author_date": "2026-07-28T17:24:38+08:00",
+      "committer_date": "2026-07-28T17:24:38+08:00",
+      "subject": "BUS 2.3 立项路线图:角色/记忆/能力(headline=该读没读确定性核验·用户令 2026-07-28)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f75ef4b89f4562d93113211631722c6a1de3f82b",
+      "author_date": "2026-07-28T18:56:09+08:00",
+      "committer_date": "2026-07-28T18:56:09+08:00",
+      "subject": "fix(WebUI): 舰队表模型列移至Role右侧·判定列收窄90px",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c035f8df3381b9f620980a9614c0dbb6bd161a98",
+      "author_date": "2026-07-29T09:02:44+08:00",
+      "committer_date": "2026-07-29T09:02:44+08:00",
+      "subject": "对称协作律补迁移特化:文件系统迁移【先广播→动刀→再确认】(会考回声·Jul15 agentbus 迁移窗口致某业务角色掉线实证)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7a1287eb9003bb0f2d70e3633bb117aeb19f30fc",
+      "author_date": "2026-07-29T09:17:08+08:00",
+      "committer_date": "2026-07-29T09:17:08+08:00",
+      "subject": "BUS 2.3 P0「该读没读」确定性核验落地:session_reads 采集 + boot_reads 声明 + ab boot-check",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9326ed73ab32337b4f82dcc4aac3d86dea270c50",
+      "author_date": "2026-07-29T09:20:10+08:00",
+      "committer_date": "2026-07-29T09:20:10+08:00",
+      "subject": "boot_reads 补齐 MasterUI/Master数分/Master(培训师体检建议·2.3 P1 角色项首步)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ead5cbd564811b3c518a3f9dae027a07e3d53aba",
+      "author_date": "2026-07-29T09:31:19+08:00",
+      "committer_date": "2026-07-29T09:31:19+08:00",
+      "subject": "BUS 2.3 P1 机制面六件:伪角色注册表化/守卫系统名义/cap.reads 聚合/角色页·caps·记忆三体检/记忆漂移提醒",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "26ec7cbdf58be8a886e7306fe468012755da9a60",
+      "author_date": "2026-07-29T09:44:58+08:00",
+      "committer_date": "2026-07-29T09:44:58+08:00",
+      "subject": "角色注册表分仓(用户令 2026-07-29):基建表留抽象『业务角色』,具体业务角色入 role_profiles_biz.json(业务数据可整体清除)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8530c9ab7b4ad79ade74c86f59b9b14f72ddb442",
+      "author_date": "2026-07-29T09:48:52+08:00",
+      "committer_date": "2026-07-29T09:48:52+08:00",
+      "subject": "洁净基准平台化升格:bus=通用 agent 管理平台·业务=可插拔负载·新机制三问验收(用户纲领 2026-07-29)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f6b08de99f868f7c25ae7eeaa242ac5eee733a65",
+      "author_date": "2026-07-29T09:51:03+08:00",
+      "committer_date": "2026-07-29T09:51:03+08:00",
+      "subject": "biz-data 清单补:会考抢救业务残件过渡态(session-archive/extracted·迁业务库后清零)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f275fb2e0e1b35dd6d5b3f3b551df2247753a15e",
+      "author_date": "2026-07-29T09:56:12+08:00",
+      "committer_date": "2026-07-29T09:56:12+08:00",
+      "subject": "平台三问收口:业务角色名单从基建面移除,自动派生自业务注册表(换域零改基建)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 2
+    },
+    {
+      "commit": "33763c3598d1b9646ac013797c1832b4a27f0198",
+      "author_date": "2026-07-29T10:01:09+08:00",
+      "committer_date": "2026-07-29T10:01:09+08:00",
+      "subject": "2.3 P2 两件:fleet_state 装载维度(boot_pending 顶栏可见)+ boot-check 每会话首次✅自动记舰队日志(boot_state.json 防刷屏)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "acfa79e8c5220bb35901b14ae5f327479e50e51e",
+      "author_date": "2026-07-29T10:21:21+08:00",
+      "committer_date": "2026-07-29T10:21:21+08:00",
+      "subject": "onboarding:业务/基建分仓纲领必讲节(三问验收:归属/清除/换域)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bee241a6f21a14decca74f26645a0eb0ae6284ef",
+      "author_date": "2026-07-29T10:27:43+08:00",
+      "committer_date": "2026-07-29T10:27:43+08:00",
+      "subject": "BUS 2.4 立项+P0 落地:session-archive 素材外置 agent_fleet_data(junction 回链·项目根 250→172MB)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "59cc27c848362acc074fd7ff639a6f9526890812",
+      "author_date": "2026-07-29T10:28:18+08:00",
+      "committer_date": "2026-07-29T10:28:18+08:00",
+      "subject": "修 ③c 行转义坑坏路径(BEL/CR 控制字符)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b3ec7d6096807d8540f592b8b7eb390620f18452",
+      "author_date": "2026-07-29T10:32:08+08:00",
+      "committer_date": "2026-07-29T10:32:08+08:00",
+      "subject": "禁轮询残留根治:撤残留 polling 豁免 marker + selfwake-exempt 硬拒 polling 模式(用户抓获·2026-07-29)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "95aa7ffc8833c059c7cc2af77731c232cd271ab4",
+      "author_date": "2026-07-29T10:39:45+08:00",
+      "committer_date": "2026-07-29T10:39:45+08:00",
+      "subject": "feat(webui): 角色生命周期一页通 + 顶栏 boot_pending ⛔ 徽标(MasterUI·任务1785290470996)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "35e5abd85656dd396f25032d98d2f21591e992b5",
+      "author_date": "2026-07-29T10:44:04+08:00",
+      "committer_date": "2026-07-29T10:44:04+08:00",
+      "subject": "2.4 P1: ab storage-audit 存储体检 + 素材入库纪律锚(AGENTS.md)+ 大件定性",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "febcda1463affdad62cca42809a6c08a4c6ec930",
+      "author_date": "2026-07-29T10:44:57+08:00",
+      "committer_date": "2026-07-29T10:44:57+08:00",
+      "subject": "storage_audit 进 __all__ 稳定公共面(MasterUI 存储面板 P2 数据源·名单即契约)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3cb9c05a2d2ee76b12b1df44e57b2d365ee8d3eb",
+      "author_date": "2026-07-29T10:45:43+08:00",
+      "committer_date": "2026-07-29T10:45:43+08:00",
+      "subject": "BUS_ONBOARDING.md 二之四:素材入库纪律(2.4 存储·新素材不落项目根)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "667d2679fd65929a16e73396a34d6088de9798c1",
+      "author_date": "2026-07-29T10:51:23+08:00",
+      "committer_date": "2026-07-29T10:51:23+08:00",
+      "subject": "wait 阻塞期周期心跳(会话考古上报:_serve_wait 只进场 touch 一次,2h/6h 阻塞期 last_seen 老化像掉线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fc9a68e3bdeef6d5435bef09a1de32924c236d3d",
+      "author_date": "2026-07-29T10:56:16+08:00",
+      "committer_date": "2026-07-29T10:56:16+08:00",
+      "subject": "feat(bi): 运营/资源面板增加模型用量统计(今日+历史合计)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dd7beb76a584fe5901f840ffc735cee3722a894b",
+      "author_date": "2026-07-29T11:02:04+08:00",
+      "committer_date": "2026-07-29T11:02:04+08:00",
+      "subject": "fix(bi): 模型统计改为会话维度·去历史合计·优化排版",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "71a9dbf5be8ec2e874a3d955897b2a5deb90e84e",
+      "author_date": "2026-07-29T11:06:02+08:00",
+      "committer_date": "2026-07-29T11:06:02+08:00",
+      "subject": "路线图:v2.4 发版记录 + P2 派发登记(MasterUI 面板/Master数分保留期口径)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "beef948bec36012df20479fb964a9fc1fc24812a",
+      "author_date": "2026-07-29T11:09:51+08:00",
+      "committer_date": "2026-07-29T11:09:51+08:00",
+      "subject": "落Master数分 _data 保留期口径(path_registry data-home desc+roadmap):清瘦只清已提炼·recoverable=false 的 raw;保护集/提炼产物/失能实证素材全保留;真删走删raw闸非automatic。补提炼两 raw 已派会话考古",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "35c29c10c6299dc96d40f3341a10496ad9cb8b71",
+      "author_date": "2026-07-29T11:17:08+08:00",
+      "committer_date": "2026-07-29T11:17:08+08:00",
+      "subject": "feat(ui): 📁路径页加存储全景面板(2.4 P2)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6f91d55303bfa0bb2805f831ca6cb2c18b580117",
+      "author_date": "2026-07-29T11:18:44+08:00",
+      "committer_date": "2026-07-29T11:18:44+08:00",
+      "subject": "2.4 全项完成收口:P2 当天闭环(MasterUI 存储面板 35c29c1 实测✓+Master数分口径已落);登记 wait exit127 尸检样本",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ee5c35682284bb2d9b686d23ac5aa6753dc74329",
+      "author_date": "2026-07-29T11:46:45+08:00",
+      "committer_date": "2026-07-29T11:46:45+08:00",
+      "subject": "presence 心跳不冲 claude_pid/cwd(培训师报:compact 后 who 里 pid 空)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bb0fe13d51a657921540f957f72eb562e7cdbe9f",
+      "author_date": "2026-07-29T11:48:47+08:00",
+      "committer_date": "2026-07-29T11:48:47+08:00",
+      "subject": "2.4 待办清零:补提炼两 raw 会话考古当天完成(pending=0)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7e883cdbc6c55984e5dd5e762c094d1135fb9c2b",
+      "author_date": "2026-07-29T13:51:34+08:00",
+      "committer_date": "2026-07-29T13:51:34+08:00",
+      "subject": "纠正培训师写入的「hello→wait 顺序不可逆」假铁律(ee5c356 后已不成立·实证否证)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5a134a5248e255117caf51af4c15f63985ee9745",
+      "author_date": "2026-07-29T15:14:16+08:00",
+      "committer_date": "2026-07-29T15:14:16+08:00",
+      "subject": "feat(bus): ab resume 停机快速恢复面板(角色→最后绑定会话+粘贴即用恢复命令)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "38391ac7c0466dbfef0165ee013813f18e8f6d07",
+      "author_date": "2026-07-29T15:53:33+08:00",
+      "committer_date": "2026-07-29T15:53:33+08:00",
+      "subject": "fix(bus): presence pid 解析三层治本——session_id 反查 + 死 pid 不永续 + hello --pid 兜底",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2060b31e765836e9f62a1dc0e8e949af093e965b",
+      "author_date": "2026-07-29T17:13:03+08:00",
+      "committer_date": "2026-07-29T17:13:03+08:00",
+      "subject": "feat(ui2.0): U0 金标准 ui_smoke + 版本方案成文(UI 优化改造立项·同 BUS 2.0 策略)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a0762b3e58d54f6869ff89f60a8e1ba7fd88140c",
+      "author_date": "2026-07-29T17:19:03+08:00",
+      "committer_date": "2026-07-29T17:19:03+08:00",
+      "subject": "test(ui2.0): U0 金标准补Master数分审计三缺口(38→69 用例)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d2762af47dfb418b7efe04f47c5cd4f46884c4eb",
+      "author_date": "2026-07-29T17:36:31+08:00",
+      "committer_date": "2026-07-29T17:36:31+08:00",
+      "subject": "docs(ui2.0): 分工变更——U1-U4 实施改由 MasterAgent 主实现(用户令·模型等级考量);U0 标记完成+Master数分绿",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b73817670dba70481f0ffdadd733abb1ff56c02e",
+      "author_date": "2026-07-29T17:43:57+08:00",
+      "committer_date": "2026-07-29T17:43:57+08:00",
+      "subject": "feat(ui2.0-U1): morphdom 收尾——uProj/prompts 展开态状态驱动化 + procFoot/ctxKpis/archive汇总 morph 化",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c9e7c27fabf415b814ecb7fb4fca7456774972ca",
+      "author_date": "2026-07-29T17:48:02+08:00",
+      "committer_date": "2026-07-29T17:48:02+08:00",
+      "subject": "feat(ui2.0-U2): 复活派工效率死码面板 + 一致性审计收口(73 用例基线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f0cbb86a6de8bffe865940a970a064200e931314",
+      "author_date": "2026-07-29T17:54:31+08:00",
+      "committer_date": "2026-07-29T17:54:31+08:00",
+      "subject": "feat(ui2.0-U3): route 防误派——/api/route 端点 + 派活表单建议对口 chip(77 用例基线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dc33cc04c158a48369b85166ecde587d550e20f7",
+      "author_date": "2026-07-29T17:58:45+08:00",
+      "committer_date": "2026-07-29T17:58:45+08:00",
+      "subject": "refactor(ui2.0-U4): page.py 三分拆分(纯搬运·sha256 字节级一致)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "747260cc1ea1628a0cf34112b7f510c5fe0eec81",
+      "author_date": "2026-07-29T18:01:38+08:00",
+      "committer_date": "2026-07-29T18:01:38+08:00",
+      "subject": "docs(ui2.0): 收口决议成文(交付总览/关键决议/实况澄清/铁律执行记录)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4191e1fb001ce8182b8603698e52cd74a8b8018f",
+      "author_date": "2026-08-03T10:49:11+08:00",
+      "committer_date": "2026-08-03T10:49:11+08:00",
+      "subject": "feat(ui): 可恢复会话卡片加「属于角色」四态可靠度 + sid↔role 账本根治(79 用例基线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e4da235a9c8863da3f6afc2f6e6fbad00730ac19",
+      "author_date": "2026-08-03T11:02:46+08:00",
+      "committer_date": "2026-08-03T11:02:46+08:00",
+      "subject": "docs(ui-vis): U5 视觉升级方案成文(v2.6·Primer Dark 对标·Master数分交叉审核标的)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f1f9fa77341c1d874401710da2f477f75d1019af",
+      "author_date": "2026-08-03T11:12:16+08:00",
+      "committer_date": "2026-08-03T11:12:16+08:00",
+      "subject": "feat(ui-vis): U5 视觉升级实施——Primer Dark token 化 + 组件 8 规则(Master数分方案审 APPROVE 后动刀)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3cc10420155f8b446eec9b3da592a9906a8f29e7",
+      "author_date": "2026-08-03T11:26:05+08:00",
+      "committer_date": "2026-08-03T11:26:05+08:00",
+      "subject": "feat(ui-vis): U5b 构图重构首刀——正常态安静·异常态醒目(舰队页样板)+ 绿色回退薄荷绿",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ddb0b335147709908f79629eaa81d2ab7d952cbd",
+      "author_date": "2026-08-03T11:45:16+08:00",
+      "committer_date": "2026-08-03T11:45:16+08:00",
+      "subject": "feat(ui-vis): U5b 全站构图扫尾——四重灾页折叠化 + 全站钳行/折叠/chip 降噪原语",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5967db3f35977965e044b934b12abc7e4d0092a2",
+      "author_date": "2026-08-03T13:42:44+08:00",
+      "committer_date": "2026-08-03T13:42:44+08:00",
+      "subject": "fix(ui-vis): fold/clampable 展开态过 morph 保持(Master数分 U5b finding 修死)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "58d9426807e857d2fd610aa25369a8c56693dee1",
+      "author_date": "2026-08-03T17:52:22+08:00",
+      "committer_date": "2026-08-03T17:52:22+08:00",
+      "subject": "fix(bus): wait 重挂幂等化 yield-not-kill——根治 kill-churn 15s 自持热循环",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "df4f5ed7c13ccb988880c5f18b8e3231633f8b0d",
+      "author_date": "2026-08-04T10:11:29+08:00",
+      "committer_date": "2026-08-04T10:11:29+08:00",
+      "subject": "fix(ui+tray): 三处状态口径对不上实际——armed盖真活/托盘图标画错数/守卫消息虚报在跑",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "313a780055f379aa4e4fb5727ac0e0ad2a2a5c8f",
+      "author_date": "2026-08-04T10:20:24+08:00",
+      "committer_date": "2026-08-04T10:20:24+08:00",
+      "subject": "fix(tray): 图标数字定口径=在跑数(用户拍板)——0一眼判没活,在岗数悬停tooltip看",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6905a59f79314a1efdb3798dd5c134f239be0c54",
+      "author_date": "2026-08-04T10:23:46+08:00",
+      "committer_date": "2026-08-04T10:23:46+08:00",
+      "subject": "docs(onboarding)+chore(roster): already_armed 幂等化训导补节(培训师·随58d9426)+ 运行态快照",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d8d69d29c227d139ee088eddec815aa440460968",
+      "author_date": "2026-08-05T11:07:51+08:00",
+      "committer_date": "2026-08-05T11:07:51+08:00",
+      "subject": "docs(agents): 对外agent落定=external(培训师2026-08-05结业)——external-tool-edge铁律条目去'待建' + roster快照",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "262c77b13e6b2287e61e1c052839564fe493ca3c",
+      "author_date": "2026-08-06T08:42:57+08:00",
+      "committer_date": "2026-08-06T08:42:57+08:00",
+      "subject": "docs: 重构与优化边界确认书(2026-08-06 全模块巡检·用户令)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ce361b13658ee61ebeef90f5eabdf25d8d5b6260",
+      "author_date": "2026-08-06T09:44:12+08:00",
+      "committer_date": "2026-08-06T09:44:12+08:00",
+      "subject": "feat(ui): 手动done按钮(/api/done·_find_task补failed·_bump即推)+ 舰队表按模型分组排序",
+      "declared_coauthors": [
+        "MasterUI"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "777982765c733ff148e4524822ff4d3047c9717c",
+      "author_date": "2026-08-06T09:47:47+08:00",
+      "committer_date": "2026-08-06T09:47:47+08:00",
+      "subject": "feat(ui-usage): 历史用量页加 输入/输出 KPI(随范围)+ 单日缓存比(趋势hover)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e3117160bb0e8a489fc771bfb4077b44e0e406af",
+      "author_date": "2026-08-06T10:27:42+08:00",
+      "committer_date": "2026-08-06T10:27:42+08:00",
+      "subject": "docs: 边界确认书勘误——verdict收敛已在2.0 P2完成(初版误列待做)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d82241ecfa701f1331785dba6c0fb33afe7e3984",
+      "author_date": "2026-08-06T11:07:19+08:00",
+      "committer_date": "2026-08-06T11:07:19+08:00",
+      "subject": "docs: worker无状态化/抗context-rot机制分析(业务侧发起·用户令·供拍板)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d5d6fa837f90260b5e861359e0f02f373b68c502",
+      "author_date": "2026-08-06T11:10:53+08:00",
+      "committer_date": "2026-08-06T11:10:53+08:00",
+      "subject": "docs: 多bus进化转移设计备忘(未立项·YAGNI)——四层可转移性+经验包curation+现在的四条纪律",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e9c988807fa482f6b588b6e4988f8b271a66e878",
+      "author_date": "2026-08-06T11:12:25+08:00",
+      "committer_date": "2026-08-06T11:12:25+08:00",
+      "subject": "docs: 工人问题设计深化——stale三信号(compact为主判据)+E7轮换SOP+advisory接线",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "128326aa086a32516c5a15a9404e2b822b7a5826",
+      "author_date": "2026-08-06T11:24:10+08:00",
+      "committer_date": "2026-08-06T11:24:10+08:00",
+      "subject": "docs: 插件式记忆=工人问题状态侧方案(用户定方向)——四环节映射+缺口两处+并入实施顺序",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7b62cdda4bc1ea7e5d8915fa599d78dd9be5e4b3",
+      "author_date": "2026-08-10T09:25:57+08:00",
+      "committer_date": "2026-08-10T09:25:57+08:00",
+      "subject": "feat(bus): 自醒哨兵改block语义——'有消息才唤醒',消灭idle冷唤醒白烧(用户令2026-08-10)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "db119aba31a64d917ab6bddf9fb094fd0d84f3e8",
+      "author_date": "2026-08-10T09:33:25+08:00",
+      "committer_date": "2026-08-10T09:33:25+08:00",
+      "subject": "feat(fork-exchange): 分岔改动交换所+发布包带fork名前缀(用户令2026-08-10·多bus吸收)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1c95210d011c977e0a945c9cf2b35b4545e072b9",
+      "author_date": "2026-08-10T09:54:56+08:00",
+      "committer_date": "2026-08-10T09:54:56+08:00",
+      "subject": "fix(bus): yield精确化——只让位给同会话wait,跨会话孤儿takeover(治'接活不回报前台')",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "df1d150f0b6afbd03124a50172c89f84ce5596ea",
+      "author_date": "2026-08-10T09:55:59+08:00",
+      "committer_date": "2026-08-10T09:55:59+08:00",
+      "subject": "docs: wait注册表设计方案(用户定方向2026-08-10)——8要素落地+宿主自检根治孤儿+分阶段",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f97d22f49f7ab5920824f80f9f9f3b3c0d9521e1",
+      "author_date": "2026-08-10T10:04:35+08:00",
+      "committer_date": "2026-08-10T10:04:35+08:00",
+      "subject": "fix(bus): block语义改真无限ev.wait(None)——Master数分spec修正(巨大timeout会OverflowError)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7ea8999a1cf5535738ecb98db0cf663e72b10a8d",
+      "author_date": "2026-08-10T10:10:47+08:00",
+      "committer_date": "2026-08-10T10:10:47+08:00",
+      "subject": "feat(bus): P1 wait注册表核心+宿主自检(用户令2026-08-10·根治孤儿wait)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a3e846d06213c77dc03b7a3ee2a8e7862bfa6f95",
+      "author_date": "2026-08-10T10:11:38+08:00",
+      "committer_date": "2026-08-10T10:11:38+08:00",
+      "subject": "docs: WAIT_REGISTRY_DESIGN 标 P1 已交付(注册表核心+宿主自检)+ block真无限",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "29dcca0e45683e55292844acdc7d0d770c7e7a3f",
+      "author_date": "2026-08-10T10:18:09+08:00",
+      "committer_date": "2026-08-10T10:18:09+08:00",
+      "subject": "feat(bus): P1.1 宿主pid多源回退——让宿主自检在本harness环境真正生效",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "951858f6ae9305160314b22bc8c1a1a2f20968e9",
+      "author_date": "2026-08-10T10:31:40+08:00",
+      "committer_date": "2026-08-10T10:31:40+08:00",
+      "subject": "feat(bus): P2a 竞争裁决走reg——判据从psutil扫+environ归到wait.reg.json单一源",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "65a5718fd7dcd046383fca39c1b3b9263a407db9",
+      "author_date": "2026-08-10T10:32:30+08:00",
+      "committer_date": "2026-08-10T10:32:30+08:00",
+      "subject": "docs: WAIT_REGISTRY_DESIGN 标 P2a 已交付(裁决走reg)+ P2b独立轮说明",
+      "declared_coauthors": [],
+      "coauthor_line_count": 0
+    },
+    {
+      "commit": "f50507d94a0a27c8bd1af067c13d42c52623e360",
+      "author_date": "2026-08-10T10:39:43+08:00",
+      "committer_date": "2026-08-10T10:39:43+08:00",
+      "subject": "feat(bus): P2b 自醒态判据读reg——_self_wake_state加reg优先(用户令·Master数分逐视图验)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bfa2fe918b1df9838659bfa747ebe8ae956eedf3",
+      "author_date": "2026-08-10T10:40:26+08:00",
+      "committer_date": "2026-08-10T10:40:26+08:00",
+      "subject": "docs: WAIT_REGISTRY_DESIGN 标 P2b 已交付(自醒态判据读reg)",
+      "declared_coauthors": [],
+      "coauthor_line_count": 0
+    },
+    {
+      "commit": "4f56203c1b3a6b69391292229e6a47d01efb6aec",
+      "author_date": "2026-08-10T10:49:11+08:00",
+      "committer_date": "2026-08-10T10:49:11+08:00",
+      "subject": "feat(bus): who表格加'自醒'轴列——Master数分P2b验收建议(verdict健康轴/self_wake自醒轴双轴分明)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "06b31f09be38078fdc6552a0084616ba9304e379",
+      "author_date": "2026-08-10T10:54:05+08:00",
+      "committer_date": "2026-08-10T10:54:05+08:00",
+      "subject": "fix(bus): who自醒列前置修对齐——Master数分揪出verdict长文本撑破挤歪自醒符号",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "631e3ac37e7790e407427aa87a0409aa4b9992c4",
+      "author_date": "2026-08-10T11:00:43+08:00",
+      "committer_date": "2026-08-10T11:00:43+08:00",
+      "subject": "feat(ui): P3 wait注册表观测面板(用户令2026-08-10·wait注册表全线收官)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7ca455b5657ca22a0d1e8c4529d72e201b55db75",
+      "author_date": "2026-08-10T11:01:33+08:00",
+      "committer_date": "2026-08-10T11:01:33+08:00",
+      "subject": "docs: WAIT_REGISTRY_DESIGN 标 P3 已交付·wait注册表全线P0-P3收官",
+      "declared_coauthors": [],
+      "coauthor_line_count": 0
+    },
+    {
+      "commit": "f6aa62e88ae8a090a996e71e9565928fbc21f84d",
+      "author_date": "2026-08-10T11:17:27+08:00",
+      "committer_date": "2026-08-10T11:17:27+08:00",
+      "subject": "docs(ops): Master数分存证代落盘——idle冷唤醒白烧+周五限额三层机制拆解(内容其作)",
+      "declared_coauthors": [
+        "Master数分"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "648f1bdc41237495d16cfd85c62685c41ddb035f",
+      "author_date": "2026-08-10T11:33:03+08:00",
+      "committer_date": "2026-08-10T11:33:03+08:00",
+      "subject": "fix(ui): wait注册表tab漏登记TAB_NAMES致打不开 + smoke加tab白名单闭合闸",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "13b3a211d54c5b9180f260d1001d4d6a01d71078",
+      "author_date": "2026-08-10T11:40:25+08:00",
+      "committer_date": "2026-08-10T11:40:25+08:00",
+      "subject": "docs(role): fork分岔发布职责登记进MasterAgent角色定义(用户令2026-08-10)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "07ec70f94c0d5c6db51107a79bdf3b397a71e0d4",
+      "author_date": "2026-08-10T11:48:35+08:00",
+      "committer_date": "2026-08-10T11:48:35+08:00",
+      "subject": "docs: wait注册表登记进机制单一源+AGENTS(用户点:大机制漏登记bus_mechanisms)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "036f331c470519ee04524efdc7781c1c580b6e91",
+      "author_date": "2026-08-10T11:51:01+08:00",
+      "committer_date": "2026-08-10T11:51:01+08:00",
+      "subject": "docs: 活文本日2h/夜6h→block真无限口径统一(逐文件确认·用户令)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5b0b60ae0e51fc3888637d36050935d8b692043a",
+      "author_date": "2026-08-10T11:56:27+08:00",
+      "committer_date": "2026-08-10T11:56:27+08:00",
+      "subject": "docs(registry): fork_exchange 补登记三处清册——逐文件确认扫尾",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9955af2863a5ea858edea4b26c3221f48cabc06c",
+      "author_date": "2026-08-10T11:56:34+08:00",
+      "committer_date": "2026-08-10T11:56:34+08:00",
+      "subject": "docs(global): 等其他 agent → 先看对方 turn 状态别盲挂 wait 空等",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4d4813d482a0c5105c819bf30630adc0dc83b104",
+      "author_date": "2026-08-11T15:11:32+08:00",
+      "committer_date": "2026-08-11T15:11:32+08:00",
+      "subject": "feat(ui-usage): 历史用量全历史连续(backfill内缺口补src=zero)+ src=zero弱化渲染 + reap smoke超时修",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d1283f1bbbb991de43b5115170e4b9abb33a0f07",
+      "author_date": "2026-08-11T15:14:18+08:00",
+      "committer_date": "2026-08-11T15:14:18+08:00",
+      "subject": "docs(fork): fork_exchange 增问题库(一问题一文档)+ 首篇 WebUI BI 端点 GIL 冻结",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "efc8767123d40eea06446bf42e4198b743b35dc2",
+      "author_date": "2026-08-11T15:16:44+08:00",
+      "committer_date": "2026-08-11T15:16:44+08:00",
+      "subject": "docs(fork): BI 端点 GIL 冻结问题→已修复(MasterUI 交付·实测 1000ms→3ms·300×)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "018d2c6ffa5cfff9ff3dfeebe022f70bf7ff9432",
+      "author_date": "2026-08-11T15:17:07+08:00",
+      "committer_date": "2026-08-11T15:17:07+08:00",
+      "subject": "perf(ui-bi): build_bi加TTL缓存+后台刷新线程根治BI tab卡顿(请求路径1000ms→3ms零psutil)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4817063c3959e5afd5a63b12a9606bdaf6d8931e",
+      "author_date": "2026-08-11T15:17:47+08:00",
+      "committer_date": "2026-08-11T15:17:47+08:00",
+      "subject": "docs(fork): 回填 BI 冻结问题的吸收 commit 号 018d2c6(MasterUI 已提交)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1490d8532a7470ee3387dfb9154916e537d0ffff",
+      "author_date": "2026-08-11T17:32:20+08:00",
+      "committer_date": "2026-08-11T17:32:20+08:00",
+      "subject": "docs(fork): 问题库第二篇 SSE 心跳 firehose(过一会打开控制台卡)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4dbf8109cfba930d2454799f30f8504dbcf38bac",
+      "author_date": "2026-08-11T17:35:02+08:00",
+      "committer_date": "2026-08-11T17:35:02+08:00",
+      "subject": "perf(ui-sse): 静音心跳文件+ _bump去抖根治SSE firehose(空闲change 3次/秒→≈0)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d52f7e671efa3c2250ebc230f4c8b51d73b01e9b",
+      "author_date": "2026-08-11T17:36:21+08:00",
+      "committer_date": "2026-08-11T17:36:21+08:00",
+      "subject": "docs(fork): SSE firehose 问题→已修复(MasterUI 4dbf810·CPU40%→0%·change42→3)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fef86adfff5afbb26d94772da8ccef7e30afcabb",
+      "author_date": "2026-08-12T11:50:11+08:00",
+      "committer_date": "2026-08-12T11:50:11+08:00",
+      "subject": "fix(bus): boot-check 跨角色查取错 session_id → 假⛔误报装载未完成",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "0721870be6446b44e87cc8df6c8f1f9acfab95b6",
+      "author_date": "2026-08-14T11:16:20+08:00",
+      "committer_date": "2026-08-14T11:16:20+08:00",
+      "subject": "feat(tray): 图标球优先显示掉线agent数(异常态醒目·压过在跑数)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "904c4c65cd9740339b5ac9bbdf69ed656883b13c",
+      "author_date": "2026-08-14T11:23:33+08:00",
+      "committer_date": "2026-08-14T11:23:33+08:00",
+      "subject": "fix(tray): 掉线口径 union→只self_wake=='stale'(Master数分2终裁)+ 维修模式弱化",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c53d0f22f74e020cd4bb93a29d1f8547646bd1e0",
+      "author_date": "2026-08-17T11:41:01+08:00",
+      "committer_date": "2026-08-17T11:41:01+08:00",
+      "subject": "docs: 立项备忘——在DeepSeek Harness上深改建bus·GPLv3开源(用户令2026-08-17)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "03b3f660c707dc69f4ec89a2168274b666484b76",
+      "author_date": "2026-08-17T11:51:30+08:00",
+      "committer_date": "2026-08-17T11:51:30+08:00",
+      "subject": "docs: 舰队on-harness项目文档外置——genesis不做这个事(用户令)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "42fbba6256f240a6f8d39194d920be19e5d119c0",
+      "author_date": "2026-08-27T10:17:46+08:00",
+      "committer_date": "2026-08-27T10:17:46+08:00",
+      "subject": "feat(bus): per-role/per-task effort+model 注入 claude -p",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b489a1f1ff70e4c63a26332e80100604b6ceff9d",
+      "author_date": "2026-08-27T10:18:18+08:00",
+      "committer_date": "2026-08-27T10:18:18+08:00",
+      "subject": "feat(asr): 本地实时语音转写后端服务(不上云)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "825c72c33ef427b1773fd9212811d76573efe288",
+      "author_date": "2026-08-27T10:19:27+08:00",
+      "committer_date": "2026-08-27T10:19:27+08:00",
+      "subject": "docs(fork): genesis_20260827 effort/asr 分岔记录 + 全量变更清单约定",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9392828b704b0add532055c12aa7d089522b9bf7",
+      "author_date": "2026-08-27T10:31:28+08:00",
+      "committer_date": "2026-08-27T10:31:28+08:00",
+      "subject": "feat(bus): 示例组员5 max硬案daemon + per-role effort 口径接线",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b39f73a626394f24a75e33b4efb463ad2a4047d8",
+      "author_date": "2026-08-27T10:32:15+08:00",
+      "committer_date": "2026-08-27T10:32:15+08:00",
+      "subject": "docs(fork): 全量表 daemon 行回填 commit 9392828",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2f384fc74ea88ad0432f0374c98e4251f8bb8bb4",
+      "author_date": "2026-08-27T10:36:01+08:00",
+      "committer_date": "2026-08-27T10:36:01+08:00",
+      "subject": "feat(tray/ui): 托盘待办紫球 + 掉线双条件口径 + model兜底(用户令 2026-08-21)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7e3cb3e4abc36bab244706cffd78d58b11d5a252",
+      "author_date": "2026-08-27T10:36:24+08:00",
+      "committer_date": "2026-08-27T10:36:24+08:00",
+      "subject": "chore(roster): 示例组员5 registered 时间戳随 daemon 活态微调",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ecf11fecb7f5d53745cf3f7697b84fbd5b857b2b",
+      "author_date": "2026-08-27T10:41:00+08:00",
+      "committer_date": "2026-08-27T10:41:00+08:00",
+      "subject": "feat(asr): 语音转写 WebUI tab + API 端点 + 原声回放",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a7a20ebab857fa0b1db94b684f1d12f495d310cc",
+      "author_date": "2026-08-27T10:42:01+08:00",
+      "committer_date": "2026-08-27T10:42:01+08:00",
+      "subject": "docs(fork): 全量表 ASR UI 回填 ecf11fe + 多agent解缠教训",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e4077f24ca624856be3c9f7f8db234e4a05b3d8e",
+      "author_date": "2026-08-27T11:32:42+08:00",
+      "committer_date": "2026-08-27T11:33:52+08:00",
+      "subject": "feat(bus): daemon 跨任务上下文接续机制(状态文件层A + --resume层C)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a185b55be923932074ee4b8057d9c928c2702ccc",
+      "author_date": "2026-08-27T11:43:24+08:00",
+      "committer_date": "2026-08-27T11:46:16+08:00",
+      "subject": "docs(bus): BUS_GUIDE §3机制权威节(MasterAgent补)+ 机制注册表同步 effort注入/daemon接续(94→96)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "de9c291b1c8458f799b070d05c2c73363aa157f3",
+      "author_date": "2026-08-27T11:47:51+08:00",
+      "committer_date": "2026-08-27T11:47:51+08:00",
+      "subject": "docs(fork): genesis 补改动3(daemon接续四层详述)+ 全量表回填 e4077f2/a185b55",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1f3a7acdf7c75f96fff91a7e80014f30ea754dbb",
+      "author_date": "2026-08-27T13:59:24+08:00",
+      "committer_date": "2026-08-27T13:59:24+08:00",
+      "subject": "feat(fleet): 轨A daemon 化流程落地(kill-convert 分工·示例组员5 已转)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "fd38f6aea4c9684d49a253d35a831d16356f4a1b",
+      "author_date": "2026-08-27T14:10:36+08:00",
+      "committer_date": "2026-08-27T14:10:36+08:00",
+      "subject": "feat(fleet): 轨A 增转 daemon 会话考古 + 修 supervise GBK解码bug",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "37553d1d8b5cfafaf533f4020fed60886711c103",
+      "author_date": "2026-08-27T14:18:12+08:00",
+      "committer_date": "2026-08-27T14:18:12+08:00",
+      "subject": "feat(fleet): 轨A收尾 示例组员2 转daemon",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a3f798423844d5fa591bb1b679e8a1fcc6b34cd0",
+      "author_date": "2026-08-27T14:38:30+08:00",
+      "committer_date": "2026-08-27T14:38:30+08:00",
+      "subject": "chore(agents): 归档 smoke 测试角色 __smoke__(运行态残留)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9dc3ee064da898200242e16bd7b577a8b4e4c0dc",
+      "author_date": "2026-08-27T14:41:15+08:00",
+      "committer_date": "2026-08-27T14:41:15+08:00",
+      "subject": "refine(roster): 业务复制体 desc 记忆继承口径(基座无对应角色·空提交)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7f05f0bfb97983c36d66b3eb0a27e720af079820",
+      "author_date": "2026-08-27T14:41:41+08:00",
+      "committer_date": "2026-08-27T14:41:41+08:00",
+      "subject": "feat(fleet): 轨B 复制体并行模式(业务复制体条目不并入基座)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "edcab11503011a79ea5260957f246fff6482b161",
+      "author_date": "2026-08-27T14:53:40+08:00",
+      "committer_date": "2026-08-27T14:53:40+08:00",
+      "subject": "docs(fork): genesis 归档 舰队daemon化单元(轨A/轨B + GBK修复 + 验证harness设计)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ad728175c69ff3513607e6483236e846627275c2",
+      "author_date": "2026-08-27T15:04:52+08:00",
+      "committer_date": "2026-08-27T15:04:52+08:00",
+      "subject": "feat(fleet): 轨A补 daemon 条目(业务执行角色不入基座)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d077bd5952748d2d9dce7fe6043aaa2558ff848e",
+      "author_date": "2026-08-28T09:14:12+08:00",
+      "committer_date": "2026-08-28T09:14:12+08:00",
+      "subject": "revert(fleet): daemon化回退·清空daemons·不再使用daemon(用户令2026-08-27)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e457cddec34018c446d0864dc9d17d799664bbd4",
+      "author_date": "2026-08-28T10:33:26+08:00",
+      "committer_date": "2026-08-28T10:33:26+08:00",
+      "subject": "docs(bus): BUS_GUIDE §0 教训(daemon化方向性错误复盘v0)+ 回退现状",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c4f6d5ad4d8a0e548f35898d895d9299181e8f60",
+      "author_date": "2026-08-28T10:35:41+08:00",
+      "committer_date": "2026-08-28T10:35:41+08:00",
+      "subject": "docs(postmortem): daemon化方向性错误联合复盘(MasterAgent×Master数分)+ BUS_GUIDE §0定稿",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3e1c66dae519ea35b6b636717c76443afe13bbcc",
+      "author_date": "2026-08-28T11:07:42+08:00",
+      "committer_date": "2026-08-28T11:07:42+08:00",
+      "subject": "docs(fork): genesis 纳入 daemon回退+协作doctrine演进弧(供另一bus吸收)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4407e54018d4e7fcbaaa7c738088ff4eb3ad3b58",
+      "author_date": "2026-08-28T11:43:24+08:00",
+      "committer_date": "2026-08-28T11:43:24+08:00",
+      "subject": "docs(fork): genesis +§7 用户侧自醒对偶(user-absence detection·设计中·接会问escalate-to-user档)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "36bd525f1595cd27057c89195f76d4203b2dce3d",
+      "author_date": "2026-08-28T11:53:33+08:00",
+      "committer_date": "2026-08-28T11:53:33+08:00",
+      "subject": "feat(bus): 用户侧自醒对偶·user-absence检测(确认点缺席升级·Master数分口径)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dded19b006db3a0dbf60e6661f20fb5e5ad0e856",
+      "author_date": "2026-08-28T12:09:14+08:00",
+      "committer_date": "2026-08-28T12:09:14+08:00",
+      "subject": "feat(webui): 新增【📖操作说明】tab + 【用户确认点/缺席】面板(daemon回退后·协助为本)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8b5bcd12f1224d6ef0610c80e41f47d9ca0db0a8",
+      "author_date": "2026-08-28T12:16:17+08:00",
+      "committer_date": "2026-08-28T12:16:17+08:00",
+      "subject": "feat(user-absence): checkpoint 加 kind 维(待决策 decision vs 待知悉结论 fyi·Master数分 v2 口径)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b1698a9d15fef862e657183420b9f4088498fc29",
+      "author_date": "2026-08-28T12:18:23+08:00",
+      "committer_date": "2026-08-28T12:18:23+08:00",
+      "subject": "refine(user-absence): kind 派生加未决标记稳判 + fyi 过期窗口 720(Master数分答3问补精)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f98414286ae8c3a34e7493bb4721795f3cf68775",
+      "author_date": "2026-08-28T12:21:10+08:00",
+      "committer_date": "2026-08-28T12:21:10+08:00",
+      "subject": "feat(webui): 缺席面板接 kind 渲染(decision/fyi·Master数分口径·P2)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d7f49e1670f924d0d30b4b168f4acb34d66c2e0b",
+      "author_date": "2026-08-28T12:22:04+08:00",
+      "committer_date": "2026-08-28T12:22:04+08:00",
+      "subject": "tune(user-absence): fyi_after_min 720→4320(Master数分阈值lane·实证观察)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "aca4ec5f89cf8bc6ff4885b70022f5ff18d6b7d6",
+      "author_date": "2026-08-28T12:27:31+08:00",
+      "committer_date": "2026-08-28T12:27:31+08:00",
+      "subject": "polish(webui): 缺席面板计数栏 0-栏隐藏(Master数分建议·正常态安静)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "548eeb00d5622fc7c740671ae92aaa68584c314c",
+      "author_date": "2026-09-01T12:06:56+08:00",
+      "committer_date": "2026-09-01T12:06:56+08:00",
+      "subject": "feat(memory): 记忆分层机制 memory-history(active/historical/deleted 三级·用户令2026-09-01)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3e69ef2a62770cce6cdeb06038bb6bb2c9ea93c2",
+      "author_date": "2026-09-03T11:50:02+08:00",
+      "committer_date": "2026-09-03T11:50:02+08:00",
+      "subject": "feat(probe): 通用探针框架内核 ab probe(从agent数据派生·测方向性错误·用户令2026-09-03)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1fe57ced443e306916555ba9d62f209265ba58d2",
+      "author_date": "2026-09-03T11:58:40+08:00",
+      "committer_date": "2026-09-03T11:58:40+08:00",
+      "subject": "refine(probe): 记忆探针只从curated集选trap + 会问A去verbatim desc(Master数分对抗终验反馈)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e23ccb023b70c9d2feb438fca99d85b2a63bea05",
+      "author_date": "2026-09-04T16:32:29+08:00",
+      "committer_date": "2026-09-04T16:32:29+08:00",
+      "subject": "fix(reinject): compact立即做①改为先重载记忆(与Master数分新common_rules[0]一致)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "42ba345916401914dc3af10c9fed09b889ffc673",
+      "author_date": "2026-09-04T16:33:43+08:00",
+      "committer_date": "2026-09-04T16:33:43+08:00",
+      "subject": "docs(fork): genesis_20260904 质检仪器波(补记8-28以来平台机制)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f22d1055c38ad00565ead41432b943adf995a4a6",
+      "author_date": "2026-09-15T10:53:55+08:00",
+      "committer_date": "2026-09-15T10:53:55+08:00",
+      "subject": "chore(hygiene): 提交累积运行态漂移(EOL已对齐HEAD去噪·真改动135行)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7a24071eb18c213cc210a58a2dde464bc7116553",
+      "author_date": "2026-09-16T09:38:00+08:00",
+      "committer_date": "2026-09-16T09:38:00+08:00",
+      "subject": "chore(gitignore): _probes/README.md 显式压回忽略(spec类不落git·迭代波v1 MasterUI清理后工作树归零)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "57e8c0a9b5fa7c5bbb45ec824966b9106ad42794",
+      "author_date": "2026-09-16T09:41:54+08:00",
+      "committer_date": "2026-09-16T09:41:54+08:00",
+      "subject": "fix(probe): --dispatch防露馅(培训师gap)——加--visible真实场景入口+中性title+模板占位拒派",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "21dadb7842949f304c0b7f5d85b7e8330f70e78f",
+      "author_date": "2026-09-16T09:43:18+08:00",
+      "committer_date": "2026-09-16T09:43:18+08:00",
+      "subject": "docs(charter): 全功能自我迭代宪章(用户授权2026-09-16·两铁律=业务基建分离+永远在线)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "902f002343a7da778a51f73e23ba9c3aa2e0ef69",
+      "author_date": "2026-09-16T09:47:31+08:00",
+      "committer_date": "2026-09-16T09:47:31+08:00",
+      "subject": "docs(charter): v1.1 吸收Master数分实证方审计P0-P5(接管硬门槛/签字入闸/回滚触发线/度量/过渡分离/escalate判据)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6fd431a1cb58514c09ea15e5b76a6030323a5955",
+      "author_date": "2026-09-16T09:50:05+08:00",
+      "committer_date": "2026-09-16T09:50:05+08:00",
+      "subject": "feat(webui): 缺席面板 loading/error 态(自我迭代波·案②·B类行为改善)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "358f5a08de8454b7f7d1fb40258801cc9a5a7816",
+      "author_date": "2026-09-16T09:50:06+08:00",
+      "committer_date": "2026-09-16T09:50:06+08:00",
+      "subject": "fix(probe): _dispatch_probe两处崩——cmd_send import路径(mailbox→core)+stub补requires_approval",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "275faa2810a8eefd3a79a827c2790115f806cb2e",
+      "author_date": "2026-09-16T10:07:43+08:00",
+      "committer_date": "2026-09-16T10:07:43+08:00",
+      "subject": "refactor(webui): page_js 单体拆 8 子模块(自我迭代波·案①·A类字节同一)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "016c40255e133980fbff469991506152315abe99",
+      "author_date": "2026-09-16T10:12:29+08:00",
+      "committer_date": "2026-09-16T10:12:29+08:00",
+      "subject": "docs(fork): genesis_20260916 自我迭代宪章+首两案闭环(v2.9发版配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f55c3c5298c5fc79189fc6b7ef907818e34db0fd",
+      "author_date": "2026-09-16T10:16:57+08:00",
+      "committer_date": "2026-09-16T10:17:23+08:00",
+      "subject": "feat(bus): ab ack-notices 批清纯回执(notice代谢·档A手动零误吞·Master数分判据2026-09-16)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ccdc85ef7eee903f2106306f83c8eb1c185f6399",
+      "author_date": "2026-09-16T10:26:29+08:00",
+      "committer_date": "2026-09-16T10:26:29+08:00",
+      "subject": "docs(fork): genesis_20260916 追补§5(ack-notices档A+CRLF破案·v2.9.1配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "39f850aa9131f8d96ea9727f58bd65e949a5b887",
+      "author_date": "2026-09-16T10:26:53+08:00",
+      "committer_date": "2026-09-16T10:26:53+08:00",
+      "subject": "fix(fork): genesis_20260916 §5 断行typo(bash内\\n转义变真换行·同款坑连犯两次=纪律升级:CJK文本里换行符一律写字面「换行符」)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 2
+    },
+    {
+      "commit": "51996b08e3d1b77905a78a40137101eaa0ef2327",
+      "author_date": "2026-09-16T10:50:03+08:00",
+      "committer_date": "2026-09-16T10:50:03+08:00",
+      "subject": "test(smoke): bus_smoke 收编质检仪器波7用例(43→50·guard/绕行成对纪律制度化)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3ce73c17d4457887401efe8ba52b9711d3d9fd2b",
+      "author_date": "2026-09-16T17:05:54+08:00",
+      "committer_date": "2026-09-16T17:05:54+08:00",
+      "subject": "feat(hook): 复活Stop-hook自醒硬拦(C′·灰度仅MasterAgent·用户批案+Master数分L级A签字1b8992)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "da0cdb756ddc3b8f0442f644139030ee16995781",
+      "author_date": "2026-09-17T09:49:32+08:00",
+      "committer_date": "2026-09-17T09:49:32+08:00",
+      "subject": "refine(probe): 首波实战两精度改进(培训师执行方反馈2026-09-16)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ac7f99ac6c377eabcf1f67198de39c5a05674fc8",
+      "author_date": "2026-09-17T09:52:23+08:00",
+      "committer_date": "2026-09-17T09:52:23+08:00",
+      "subject": "fix(hook): Stop-hook宽限重查2s(灰度首日抓到首个误拦样本·启动窗口竞态残余)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c73ecefc93bab9b12efb2d1add60dc0b40f0ad2f",
+      "author_date": "2026-09-17T11:25:31+08:00",
+      "committer_date": "2026-09-17T11:25:31+08:00",
+      "subject": "docs(guide): BUS_GUIDE+机制注册表刷新v2.8-v2.9.1(96/13类→111/14类·操作说明面追平现实)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ba375f22dc6b3cd8ac26c7621bb11aff8f72415d",
+      "author_date": "2026-09-17T13:56:22+08:00",
+      "committer_date": "2026-09-17T13:56:22+08:00",
+      "subject": "docs(fork): genesis_20260917 C′Stop-hook全弧+探针实战迭代(v2.10配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "5d5cc4d8a0481d147ce7d02d234c14dec3dd8103",
+      "author_date": "2026-09-17T14:02:40+08:00",
+      "committer_date": "2026-09-17T14:02:40+08:00",
+      "subject": "feat(data): ab agent-profile——per-agent数据画像L1-L3(维度2纪律+4产出·用户任务2026-09-16)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8445604fec70e23616f032c33b27df6258e65611",
+      "author_date": "2026-09-17T14:06:33+08:00",
+      "committer_date": "2026-09-17T14:06:33+08:00",
+      "subject": "feat(probe): 纪律subtype execution-completion(route纪律三段之末·Master数分spec·培训师缺口)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b83e57977dc1176d07124964cc9fce4de4d8d7fb",
+      "author_date": "2026-09-17T14:10:03+08:00",
+      "committer_date": "2026-09-17T14:10:03+08:00",
+      "subject": "docs(data): _sid_role_map补权威序注释(Master数分终验doc note:账本优先·presence仅补漏不覆盖)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "08eb5dde23376761ec11302f7b484273f54fa7c0",
+      "author_date": "2026-09-17T14:16:52+08:00",
+      "committer_date": "2026-09-17T14:16:52+08:00",
+      "subject": "refactor(data): 抽build_profile纯函数API(供MasterUI /api/agent-profile端点调·零print)·cmd为CLI壳",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bca5f7fd68fce34bd74aa2f14e33e1f4bfcd2665",
+      "author_date": "2026-09-17T14:19:55+08:00",
+      "committer_date": "2026-09-17T14:19:55+08:00",
+      "subject": "fix(probe): _read_events_since解析ISO ts(培训师0d3316抓的系统性bug·auto层全瞎根治)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ea99a3b71586468f0d2b85abbc67b41c49cd7ee4",
+      "author_date": "2026-09-17T15:12:26+08:00",
+      "committer_date": "2026-09-17T15:12:26+08:00",
+      "subject": "refine(probe): --expected判据文本同步换名+retest自动归档roundN(培训师follow-up 5883e3)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "832c76d10d3b5e656bf643299d4d497e46756d41",
+      "author_date": "2026-09-17T15:36:56+08:00",
+      "committer_date": "2026-09-17T15:36:56+08:00",
+      "subject": "feat(bus): send --kind{task|request|fyi}(维度1问答比字段·Master数分口径2026-09-17)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a8753e203593a6a4350b901fe64ff57f1eebfde7",
+      "author_date": "2026-09-17T15:38:05+08:00",
+      "committer_date": "2026-09-17T15:38:05+08:00",
+      "subject": "docs(fork): genesis_20260917b per-agent画像+探针硬化(v2.11配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "c0cab286eaa41bebcffb39cfb786a229f841a72c",
+      "author_date": "2026-09-17T15:45:38+08:00",
+      "committer_date": "2026-09-17T15:45:38+08:00",
+      "subject": "feat(webui): per-agent 数据画像 tab【📇 数据画像】(L3·中性自我发现工具·非KPI)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3a216a3d4703be99773c53dc172ffeba357cc32d",
+      "author_date": "2026-09-17T16:07:43+08:00",
+      "committer_date": "2026-09-17T16:07:43+08:00",
+      "subject": "fix(smoke): ask-user.reject用例改真非成员+teardown防御清todos(用户撞见\"smoke q\"垃圾待办)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "303d2302101d574c5a8833d3b42f664f71a9624e",
+      "author_date": "2026-09-17T16:38:42+08:00",
+      "committer_date": "2026-09-17T16:38:42+08:00",
+      "subject": "feat(selfwake-hook): C'灰度段2·Master纳入GRAY_ROLES(Master数分APPROVE b01e26·实证40/42忘重挂型对症)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d2a592c2ff52ba31306e88488a3fca9306d9b1d4",
+      "author_date": "2026-09-17T17:02:03+08:00",
+      "committer_date": "2026-09-17T17:02:03+08:00",
+      "subject": "fix(agent-data): daemon/dispatch子会话落归属账本(L4画像第一轮自我发现·_unattributed根因修)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "be8466b14a7d9365559bd75d4bac6349d60e9854",
+      "author_date": "2026-09-17T17:03:43+08:00",
+      "committer_date": "2026-09-17T17:03:43+08:00",
+      "subject": "docs(fork): genesis_20260917c C'灰度段2+归属账本修(v2.11.1配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "628ee444770a5a16aae88b53fb81bd8c78893afc",
+      "author_date": "2026-09-17T17:07:57+08:00",
+      "committer_date": "2026-09-17T17:07:57+08:00",
+      "subject": "feat(agent-data): 无归属三分桶(Master数分Q1/Q2口径eeb4e5)_non_bus/_adhoc/_unattributed",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b54713116d3c293de7f7ec801c9eee21b3c4236a",
+      "author_date": "2026-09-17T17:13:29+08:00",
+      "committer_date": "2026-09-17T17:13:29+08:00",
+      "subject": "feat(webui): 画像面板加 non_bus/adhoc 两汇总桶(MasterAgent契约fyi·同unattr独立不摊派)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d222918e8bc3bf5c214fb79c5bc03a55ba7b75a4",
+      "author_date": "2026-09-17T18:00:48+08:00",
+      "committer_date": "2026-09-17T18:00:48+08:00",
+      "subject": "fix(selfwake): 活跃干活中不误标掉线(交叉turn_state·treat busy as recent)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4333664e78e5326a1b1e96e72c33f1fec2b791f3",
+      "author_date": "2026-09-18T09:11:38+08:00",
+      "committer_date": "2026-09-18T09:11:38+08:00",
+      "subject": "docs(mechanisms): 登记L4画像波(111→113)+selfwake/C'条目更新+GUIDE同步",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3baf13af2ec65f502743a017b02367eccffc13d6",
+      "author_date": "2026-09-18T09:14:56+08:00",
+      "committer_date": "2026-09-18T09:14:56+08:00",
+      "subject": "feat(selfwake): rearm事件instrument+尸检三分型(Master数分R1口径8a590b)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d0b3883e14fe71e165567cd5470b40b4651115d7",
+      "author_date": "2026-09-18T09:15:36+08:00",
+      "committer_date": "2026-09-18T09:15:36+08:00",
+      "subject": "docs(fork): genesis_20260918 掉线三分型instrument(v2.12配套)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9e43425e1ebf0f253cdcd3590b83413d71279e0d",
+      "author_date": "2026-09-18T10:20:07+08:00",
+      "committer_date": "2026-09-18T10:20:07+08:00",
+      "subject": "feat(tray): 桌面球在跑agent列名(用户令2026-09-18·和掉线名单一样)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f2328fa613288e0e45d27b75aaeae40ea8811da7",
+      "author_date": "2026-09-18T10:22:50+08:00",
+      "committer_date": "2026-09-18T10:22:50+08:00",
+      "subject": "feat(webui): /api/tray 加 running_roles 字段(桌面球 tooltip 列在跑名·用户令 2026-09-18)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d57cef6c107c81468ca51bbe712e55a4807ac4ff",
+      "author_date": "2026-09-21T15:21:39+08:00",
+      "committer_date": "2026-09-21T15:21:39+08:00",
+      "subject": "fix(tray+status): 静默列名+数字根治(在忙误记静默·用户令2026-09-21)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6d7199531a9b6ffe3b1535f814d9479910a85031",
+      "author_date": "2026-09-21T15:26:02+08:00",
+      "committer_date": "2026-09-21T15:26:02+08:00",
+      "subject": "feat(webui): /api/tray 加 silent_roles + _vclass_of 认新文案'🔧干活中'(用户令 2026-09-21)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6ef11763bde87c041c309a91498c17eb281b9dfa",
+      "author_date": "2026-09-23T16:19:33+08:00",
+      "committer_date": "2026-09-23T16:19:33+08:00",
+      "subject": "docs: 框架现状审视20260923 + 三闸提案autoproxy-on-wake-loss(治③唤醒丢失型40%)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2bfd2b10b299eefb106d4c97fff59f825f8eb5b5",
+      "author_date": "2026-09-23T16:21:50+08:00",
+      "committer_date": "2026-09-23T16:21:50+08:00",
+      "subject": "docs(proposal): 并入Master派发方意见(硬边界五条·白名单+业务侧/暂不纳调度·四坑对策§9)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2d1fe2b9e53b3fa166742e8a84067a366ee8fd87",
+      "author_date": "2026-09-23T16:23:30+08:00",
+      "committer_date": "2026-09-23T16:23:30+08:00",
+      "subject": "docs: autoproxy提案标搁置(用户令2026-09-23·只考虑在线agent)·审视文档同步",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "56d16de3b937a6cd31e9a6403250ee87414b4831",
+      "author_date": "2026-09-23T16:25:31+08:00",
+      "committer_date": "2026-09-23T16:25:31+08:00",
+      "subject": "docs: 审视③型口径修正(纯净窗81%·Master数分708a33)+提案留档Master数分三闸裁定作复签清单",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f1d0a4ee63d6d150f024bd44a43cf123e3f30061",
+      "author_date": "2026-09-23T16:26:36+08:00",
+      "committer_date": "2026-09-23T16:26:36+08:00",
+      "subject": "fix(dispatch+hook): resume必--fork-session+子进程摘CLAUDE_CODE_SESSION_ID(防presence劫持)·C'豁免AGENTBUS_DISPATCH子会话(Master数分708a33闸①两项·独立于autoproxy)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dfe25ee83209f6eaa432a486930b87ba8c5a13ca",
+      "author_date": "2026-09-23T16:40:44+08:00",
+      "committer_date": "2026-09-23T16:40:44+08:00",
+      "subject": "docs: ③唤醒丢失型根因侦查——实为广播惊群(429退避~28min)+守卫窗过短·零例永久丢失",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "b58603439a477af976ddd7573644dc0c8b877c7f",
+      "author_date": "2026-09-23T16:44:18+08:00",
+      "committer_date": "2026-09-23T16:44:18+08:00",
+      "subject": "docs(wakeloss): 按Master数分781e5d定稿口径修措辞(36=①6/③29(13+16·≤60自愈19/>60长延迟10)/环境1·两级守卫窗·两维标签)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "76036295f15e762d816a8634493c31ca57edd4db",
+      "author_date": "2026-09-23T16:48:47+08:00",
+      "committer_date": "2026-09-23T16:48:47+08:00",
+      "subject": "feat(guard+send+autopsy): 守卫两级窗(30/60min·config)+广播错峰jitter(burst≥3→5-15s·urgent免)+尸检③a/③b+画像≤60min自愈标签(Master数分781e5d裁定·惊群根因)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3db8d9d18c8d16ff329d005c69ca72ac365877df",
+      "author_date": "2026-09-23T16:52:09+08:00",
+      "committer_date": "2026-09-23T16:52:09+08:00",
+      "subject": "feat(webui): 画像掉线催单下加\"≤60min 自愈\"行(MasterAgent契约fyi·Master数分781e5d口径)",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2d0e55ca35f0c699c3f45258c50175bf1680f4ef",
+      "author_date": "2026-09-23T17:02:31+08:00",
+      "committer_date": "2026-09-23T17:02:31+08:00",
+      "subject": "docs: 三闸提案 回执代谢档B重定义(fyi免回执+回执去抖合并领取·数据:原档B靶子为非问题·真消耗=每回执一唤醒)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "dd701cf9923b353b4e5f3378ad6b966e25ca7b9a",
+      "author_date": "2026-09-23T17:05:22+08:00",
+      "committer_date": "2026-09-23T17:05:22+08:00",
+      "subject": "docs(noticeB): Master数分aef87e三闸全签·附C1/C2条件·口径修正(唤醒=notice-claim事件·基线)·回滚线1/4改可测",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "710241758df34103a902ea6e748c5797f9a2e221",
+      "author_date": "2026-09-23T17:08:39+08:00",
+      "committer_date": "2026-09-23T17:08:39+08:00",
+      "subject": "feat(noticeB): fyi免回执(+--receipt覆盖·索取语软警示)+纯回执去抖合并领取(notice_debounce_s·by_role·段1 MasterAgent=300)·Master数分aef87e三闸全签",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "322143a98a1ccd2ba901c27e87c2fd74860ca8b5",
+      "author_date": "2026-09-23T17:13:36+08:00",
+      "committer_date": "2026-09-23T17:13:36+08:00",
+      "subject": "test(smoke): 档B两场景脚本固化(agent_bus/tests·@py分派·嵌套保护·gitignore白名单)·bus_smoke 50→52 全绿无回归",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "e5c449c78ea117d17d60e46540bbedca22c01356",
+      "author_date": "2026-09-23T17:14:43+08:00",
+      "committer_date": "2026-09-23T17:14:43+08:00",
+      "subject": "docs(mechanisms): 登记惊群错峰/回执档B(113→115)·更新守卫两级窗/C'豁免/claude_run fork-session·GUIDE同步",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "a14dcc920cd64f13178821990d554f4af742b31b",
+      "author_date": "2026-09-23T17:14:44+08:00",
+      "committer_date": "2026-09-23T17:14:44+08:00",
+      "subject": "docs(fork): genesis_20260923 掉线根因翻案+回执档B(v2.13配套)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "7b6f66d6379192642c4d9a2525e34b1e430ff1e9",
+      "author_date": "2026-09-23T17:45:17+08:00",
+      "committer_date": "2026-09-23T17:45:17+08:00",
+      "subject": "docs: 业务/基建分离度盘点(四处未分离·整改方向A-D)+审视勘误(role_profiles_biz存在)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "d7f73f170d0ee55e52383fcbb45a2fe49d53bbad",
+      "author_date": "2026-09-23T17:56:17+08:00",
+      "committer_date": "2026-09-23T17:56:17+08:00",
+      "subject": "docs: 三闸提案 分离整改B+C合闸(caps两表+agents去业务desc·biz_registry自带git·空载清除验收)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "476f9973760ce06b260651de9122f30394ec1d16",
+      "author_date": "2026-09-23T18:05:19+08:00",
+      "committer_date": "2026-09-23T18:05:19+08:00",
+      "subject": "chore(agents): 清 smoke 残留 __smoke__ 条目(T3·归属MasterAgent smoke teardown)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "72e61f4d00e06bd7280107a41be589bd476ee4fb",
+      "author_date": "2026-09-23T18:12:22+08:00",
+      "committer_date": "2026-09-23T18:12:22+08:00",
+      "subject": "feat(separation-C): caps两表(infra 7/biz 7·confidentiality→biz培训师终裁)+biz_registry外迁自带git+读方合并视图(load_caps_pool/biz_registry_dir·hook单一解析T1)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "9a84dfa513122dfde442147a5c15c0dfe640652f",
+      "author_date": "2026-09-23T18:12:59+08:00",
+      "committer_date": "2026-09-23T18:12:59+08:00",
+      "subject": "chore(caps): infra表注释/纪律举例去业务名(分离C·capabilities.json业务词9→0)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6b689d3ab8093ee9864522e96ce88b467c1f63ac",
+      "author_date": "2026-09-23T18:20:57+08:00",
+      "committer_date": "2026-09-23T18:20:57+08:00",
+      "subject": "test(sepC): 空载清除测试固化为smoke用例(隔离·AGENTBUS_BIZ_REGISTRY指空目录·不动live)+caps残余业务措辞2处泛化(Master数分 fdbd6d复核)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ea7206494bbaf28099b076745f5144a5954661bf",
+      "author_date": "2026-09-23T18:25:22+08:00",
+      "committer_date": "2026-09-23T18:25:22+08:00",
+      "subject": "feat(separation-B1): roster.agents_view() 花名册只读视图(agents.json⊕角色页desc回退·写方仍读原件)·roles/probe只读读方切视图·agentbus re-export load_caps_pool/biz_registry_dir/agents_view(补C漏)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f933732fb6bdd8b463c645f11748144d2a6f4a7a",
+      "author_date": "2026-09-23T18:26:40+08:00",
+      "committer_date": "2026-09-23T18:26:40+08:00",
+      "subject": "docs(separation): 机制注册表+2(biz_registry合并视图/agents_view)·提案BC状态与落地记录",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f2abbc393f186e346131712e8364e211725e7d63",
+      "author_date": "2026-09-23T18:29:01+08:00",
+      "committer_date": "2026-09-23T18:29:01+08:00",
+      "subject": "docs: 三闸提案 分离整改A(Edge互斥→通用ab lock·prompt外部 IM段迁角色页·external_im_*.py工具族外迁biz_tools·审计漏项补遗)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "3d2f5d8aa3e151e6570ac07efc91da2366c67e51",
+      "author_date": "2026-09-23T18:37:38+08:00",
+      "committer_date": "2026-09-23T18:37:38+08:00",
+      "subject": "feat(separation-A1): 通用共享资源互斥 bus/lock.py(edge算法参数化·BUS/locks/<name>.lock·edge过渡特判旧路径)+ab lock acquire/release/status·edge-*成别名(JSON byte-identical·旧名re-export)·并发gate smoke(20争1恰1胜×3+四态键集)·AGENTS.md",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "ddfc358566e18c5858db439833e18843f028f8ae",
+      "author_date": "2026-09-23T18:39:04+08:00",
+      "committer_date": "2026-09-23T18:39:04+08:00",
+      "subject": "feat(separation-A4): status/health 双发 locks[](通用资源互斥·edge_lock保留一版待MasterUI切读方)·ab who 文本按locks渲染",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "6067eae5131a4d4525e561eb4a968a7f977f7018",
+      "author_date": "2026-09-23T18:44:12+08:00",
+      "committer_date": "2026-09-23T18:44:12+08:00",
+      "subject": "feat(separation-A2): 派活prompt云文档段→通用共享资源互斥段(roster.shared_resources_prompt按角色页shared_resources注入·无字段不注入)·daemon desc改读agents_view(B1前置)·daemon/dispatch prompt抽build_prompt可测·smoke a2(有载全覆盖/空载零业务词/源码零业务词)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "8cc78f8b7abcb935918d23309a48ee092c13a5d0",
+      "author_date": "2026-09-23T18:49:08+08:00",
+      "committer_date": "2026-09-23T18:49:08+08:00",
+      "subject": "feat(separation-A3): external_*.py 5工具外迁 agent_fleet_data/biz_tools/external(自带git)·旧位__main__转发桩(不可import·空载exit2)·external_common.edge_lock→canonical ab lock(K2原子)·smoke a3·path_registry biz-tools·机制注册表类7改名共享资源互斥·提案A落地记录",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "4807cbc4bbc2f7664185790b68d0b2a315ac8491",
+      "author_date": "2026-09-23T18:52:19+08:00",
+      "committer_date": "2026-09-23T18:52:19+08:00",
+      "subject": "chore(separation-A3): 删5个external转发桩(业务侧记忆旧路径改完·grep=0·外部IM确认)·smoke a3改为平台零external工具+新位K2+清除问·path_registry/提案记录",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "54896fec03df7d3c005e4ac6a364a431eaa9c91f",
+      "author_date": "2026-09-23T18:53:50+08:00",
+      "committer_date": "2026-09-23T18:53:50+08:00",
+      "subject": "release: v2.14 业务/基建分离整改 C+B1读方+A(fork_exchange genesis_20260923_separation-biz-infra)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1ffac706bfd118d908a37bb6da619fcacdb73213",
+      "author_date": "2026-09-24T09:07:20+08:00",
+      "committer_date": "2026-09-24T09:07:20+08:00",
+      "subject": "feat(separation-C/B1/A4 读方): WebUI 切新接口 - api.py: _ROLE_PROFILES_BIZ 改读 ab.biz_registry_dir()/role_profiles_biz.json(业务角色页恢复有载) - api.py: 能力池 ab.load_caps_pool()(infra⊕caps_biz 合并·14 caps)·花名册/生命周期 ab.agents_view()(desc 单一源·只读) - api.py: 删 _SEED_TODOS 业务种子(todos.json 缺失=平台空载返回[]) - page_js_tail.py: 健康面板 edge_lock → locks[] 多资源渲染(无 locks 时回退 edge_lock) ui_smoke 94/94",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "52034302aab05101f88a763aee1d14196e4e9883",
+      "author_date": "2026-09-24T09:22:21+08:00",
+      "committer_date": "2026-09-24T09:22:21+08:00",
+      "subject": "feat: 忙而聋可见化(turn活跃但inbox积压→selfwake/who标⚠聋·config deaf_inbox_min)+C′灰度config化(stop_hook_gray_roles 段③+MasterUI+Master数分·实证fire后未重挂积压15h)+B1剥agents.json业务desc(16角色·2最小页·14 legacy_desc·agents_view byte-identical)+A4摘edge_lock旧字段(health文本改资源锁行)·smoke deaf.busy 60/60",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "566ea00ecd87475077356df164111a5e04c24c87",
+      "author_date": "2026-09-24T09:24:50+08:00",
+      "committer_date": "2026-09-24T09:24:50+08:00",
+      "subject": "chore(separation-A4): 健康面板删 edge_lock 回退分支(MasterAgent 已摘旧字段·只读 locks[])·smoke 94/94",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "bd27d27cb05ff0136f4ff5494daa351ca2c2f9c5",
+      "author_date": "2026-09-24T09:37:29+08:00",
+      "committer_date": "2026-09-24T09:37:29+08:00",
+      "subject": "fix(④型悬单·Master数分15b5e5): harness内存回收→孤儿wait仍claim真修——_claim记claim_pid/ppid·wait心跳父壳create_time自检父亡自退·wait起手_requeue_orphans退悬单回inbox·reap判claim者已亡立即退回·selfwake/who标⚠悬单·守卫聋态只toast不投inbox·尸检四型口径;C′段③扩协调位回退(驳回);清agents.json __wgm*残留;smoke deaf.orphan 61/61",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1cbc8ed9d8fd32aeeff7f2c86799c9e89e04fe6b",
+      "author_date": "2026-09-24T09:53:20+08:00",
+      "committer_date": "2026-09-24T09:53:20+08:00",
+      "subject": "hotfix(④型悬单判据·Master数分d21617): claim_pid存活判反了(wait自身pid·正常claim即退恒亡→会把在办消息退回双处理)→改turn判据:listening角色processing消息claimed后无turn活动≥orphan_no_turn_min(30)才判悬单;reap同判据;daemon不判;smoke补『正常claim后wait退出·turn活跃不得退回』态·61/61",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "00bb07a1c28fbe1b66f55640edf6623801b4310a",
+      "author_date": "2026-09-24T11:04:13+08:00",
+      "committer_date": "2026-09-24T11:04:13+08:00",
+      "subject": "fix(resume守卫·Master数分4057c1/用户拍板): cmd_resume presence解析失败不再静默消失→列⚠presence损坏行;同一session_id被≥2 role登记→文本尾告警行(--json走stderr·rows结构不变);smoke resume.guard 62/62",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "1763f3572f88f2a5ae4c10e1531c09a191b233b1",
+      "author_date": "2026-09-24T11:10:50+08:00",
+      "committer_date": "2026-09-24T11:10:50+08:00",
+      "subject": "release: v2.15 忙而聋可见化+④型悬单真修(判据热修)+resume守卫+分离B1/A4收口(fork_exchange genesis_20260924)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "2f3da99de0dd702ff75a31b2b8a6d89aadcd96cc",
+      "author_date": "2026-09-24T11:12:37+08:00",
+      "committer_date": "2026-09-24T11:12:37+08:00",
+      "subject": "fix(ctx): 上下文窗口默认改 1M(用户令 2026-09-24) opus-5-5 不匹配任何分支落'未知=200K'→占用%夸大5倍假红警。_ctx_win_of:haiku=200K;Claude5(fable/mythos/opus-5/sonnet-5)/opus-4*/sonnet-4-6=1M;其余默认1M(known=False标注)。页脚口径同步。改动 by Master数分(ctx口径owner)·MasterUI 重载+提交。ui_smoke 94/94",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1
+    },
+    {
+      "commit": "f6857cded1b4dd3d3f6797b672dbc4eefaa2dda0",
+      "author_date": "2026-09-24T11:29:53+08:00",
+      "committer_date": "2026-09-24T11:29:53+08:00",
+      "subject": "chore(host_config): settings env += CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1(用户确认2026-09-24·禁harness低内存回收后台wait=④型掉线根因·近3天20次)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1
+    }
+  ]
+}

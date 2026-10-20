@@ -1,0 +1,923 @@
+{
+  "schema_version": 1,
+  "as_of_date": "2026-10-20",
+  "captured_at": "2026-10-20T16:19:17+08:00",
+  "visibility": "local_research_not_publication_approved",
+  "purpose": "Future open-source project history and contribution documentation; no external sharing.",
+  "report": "docs/MASTERAGENT_MODEL_CONTRIBUTIONS_20261020.md",
+  "git_ledger": {
+    "path": "docs/history/model-contributions-20261020/git-model-ledger.json",
+    "sha256": "4ff4b8aa5bfc546940b2094836aa6c6f13d1d576ec070192db3670fe137a0a01"
+  },
+  "source_scope": {
+    "included": [
+      "HEAD Git metadata and selected historical diffs",
+      "project design/change/review documents",
+      "release manifests and two binary SHA256 checks",
+      "current conversation user attestation"
+    ],
+    "excluded": [
+      "private native sessions",
+      "credentials",
+      "production mailboxes",
+      "unrelated agent identity or memory",
+      "external uploads"
+    ],
+    "historical_tests_rerun": false,
+    "real_model_acceptance_run_this_audit": false,
+    "runtime_services_started": false
+  },
+  "user_attestations": [
+    {
+      "id": "U01",
+      "recorded_date": "2026-10-20",
+      "origin": "current conversation user message",
+      "quote": "最开始我是用的claude的opus搭的，逐渐的fable出来了，我用fable优化了一些，直到10月1号",
+      "classification": "user_attestation",
+      "independently_verified": false
+    },
+    {
+      "id": "U02",
+      "recorded_date": "2026-10-20",
+      "origin": "current conversation user message",
+      "quote": "后面工具访问条件发生变化，10月开始我启用了Astra进行3.0的迭代改造",
+      "classification": "local_context_and_user_attestation",
+      "public_narrative_excludes_tool_access_context": true,
+      "independently_verified": false,
+      "unknowns": [
+        "provider details",
+        "exact date",
+        "reason for access condition change"
+      ]
+    },
+    {
+      "id": "U03",
+      "recorded_date": "2026-10-20",
+      "origin": "current conversation user message",
+      "quote": "这部分分析数据留到项目内，编写开源文档时会用到",
+      "classification": "local_storage_instruction_not_external_publication_authorization"
+    }
+  ],
+  "attribution_rules": [
+    "Role names, runtime names, requested model and server-reported model are not code authorship.",
+    "Coauthor trailers are declarations, not authenticated model identities.",
+    "Preserve Opus/Fable overlap and Sonnet contributions.",
+    "Deduplicate same-name trailers within each commit.",
+    "Commit/line/test/release counts are not contribution share or model quality scores.",
+    "Public naming of Fable/Astra and exact model strings is unverified.",
+    "Separate plans, implementation, synthetic checks, real acceptance, local release and production adoption."
+  ],
+  "git_snapshot": {
+    "head": "f6857cded1b4dd3d3f6797b672dbc4eefaa2dda0",
+    "commit_count": 454,
+    "author_identity_count": 1,
+    "author_date_range": [
+      "2026-06-23T16:18:25+08:00",
+      "2026-09-24T11:29:53+08:00"
+    ],
+    "families_declared_commit_counts": {
+      "Opus": 303,
+      "Fable": 134,
+      "Sonnet": 12,
+      "role_only": 2,
+      "no_coauthor": 3
+    },
+    "model_tagged_commits": 449,
+    "october_status_excerpt": [
+      "?? masteragent/",
+      "?? tests_v3/"
+    ],
+    "astra_commit_count": "not_applicable_outside_snapshot"
+  },
+  "claims": [
+    {
+      "id": "C01",
+      "claim": "用户自述Opus搭建、Fable优化至约10月1日、10月Astra迭代3.0。",
+      "attributed_labels": [
+        "Opus",
+        "Fable",
+        "Astra"
+      ],
+      "attribution_basis": "user_attestation",
+      "source_ids": [],
+      "commits": [],
+      "limitations": "Git显示期间交叠；精确切换和逐项作者未知。"
+    },
+    {
+      "id": "C02",
+      "claim": "首提交保存已有v1.0文件总线、自醒、执行体、WebUI和恢复体系。",
+      "attributed_labels": [
+        "Opus"
+      ],
+      "attribution_basis": "git_declared_coauthor_and_document",
+      "source_ids": [
+        "S01"
+      ],
+      "commits": [
+        "a063a743f3c3c4532306ba7f822ed56ec1f07081"
+      ],
+      "limitations": "首提交不是项目创建日期。"
+    },
+    {
+      "id": "C03",
+      "claim": "BUS2.0模块化、状态判据收敛和公共调用兼容。",
+      "attributed_labels": [
+        "Opus"
+      ],
+      "attribution_basis": "git_declared_coauthor_and_document",
+      "source_ids": [
+        "S02"
+      ],
+      "commits": [
+        "76da69940d8f2c54244c2be9b367ef27ab635e4d"
+      ],
+      "limitations": "行数和模块数是历史结构记录，不是价值计量。"
+    },
+    {
+      "id": "C04",
+      "claim": "7月28日为当前HEAD最早可见Fable署名。",
+      "attributed_labels": [
+        "Fable"
+      ],
+      "attribution_basis": "git_declared_coauthor",
+      "source_ids": [],
+      "commits": [
+        "6670d0a0f493f0e1b47ce753f78247da1c0e400c"
+      ],
+      "limitations": "不是首次实际使用或产品发布日。"
+    },
+    {
+      "id": "C05",
+      "claim": "Fable审计推动并发与崩溃加固，纠正领取协议排他保证。",
+      "attributed_labels": [
+        "Fable"
+      ],
+      "attribution_basis": "explicit_document_label_and_git_declared_coauthor",
+      "source_ids": [
+        "S01",
+        "S03"
+      ],
+      "commits": [
+        "5cb6d516e033c09ae0613b66c88d4fadc2514426",
+        "03f913eeb532c04d1507b7ef55d626e88242ca0c",
+        "75190b982f7ac1602b2bbce4672c7e1473541d4d"
+      ],
+      "limitations": "28项为多角色交付；120×6为历史测试记录，本轮未重跑；不泛化为os.replace不原子。"
+    },
+    {
+      "id": "C06",
+      "claim": "7月注册分仓及9月能力/工具/锁分离整改早于Astra3.0。",
+      "attributed_labels": [
+        "Fable"
+      ],
+      "attribution_basis": "git_declared_coauthor_and_document",
+      "source_ids": [
+        "S04",
+        "S05",
+        "S08"
+      ],
+      "commits": [
+        "26ec7cbdf58be8a886e7306fe468012755da9a60",
+        "f275fb2e0e1b35dd6d5b3f3b551df2247753a15e",
+        "72e61f4d00e06bd7280107a41be589bd476ee4fb",
+        "6b689d3ab8093ee9864522e96ce88b467c1f63ac",
+        "54896fec03df7d3c005e4ac6a364a431eaa9c91f"
+      ],
+      "limitations": "文件读取分离不等于3.0完整部署与执行隔离。"
+    },
+    {
+      "id": "C07",
+      "claim": "Sonnet参与SSE及写边界、角色生命周期和存储面板。",
+      "attributed_labels": [
+        "Sonnet"
+      ],
+      "attribution_basis": "git_declared_coauthor",
+      "source_ids": [
+        "S03"
+      ],
+      "commits": [
+        "ab62d9504cfadf198f6326d59ab6301337259b17",
+        "95aa7ffc8833c059c7cc2af77731c232cd271ab4",
+        "35c29c10c6299dc96d40f3341a10496ad9cb8b71"
+      ],
+      "limitations": "12条是署名声明，不是底层推理身份认证。"
+    },
+    {
+      "id": "C08",
+      "claim": "Fable参与后Opus仍有探针、画像、宪章和UI读方改造。",
+      "attributed_labels": [
+        "Opus"
+      ],
+      "attribution_basis": "git_declared_coauthor",
+      "source_ids": [
+        "S06"
+      ],
+      "commits": [
+        "3e69ef2a62770cce6cdeb06038bb6bb2c9ea93c2",
+        "5d5cc4d8a0481d147ce7d02d234c14dec3dd8103",
+        "21dadb7842949f304c0b7f5d85b7e8330f70e78f",
+        "1ffac706bfd118d908a37bb6da619fcacdb73213",
+        "2f3da99de0dd702ff75a31b2b8a6d89aadcd96cc"
+      ],
+      "limitations": "提交署名不使模型独占用户方向或多人输入。"
+    },
+    {
+      "id": "C09",
+      "claim": "10月8日审阅明确Astra为主力，用户指定业务替换主线。",
+      "attributed_labels": [
+        "Astra",
+        "user"
+      ],
+      "attribution_basis": "explicit_document_and_user_attestation",
+      "source_ids": [
+        "S08",
+        "S22"
+      ],
+      "commits": [],
+      "limitations": "这是阶段归属，不是十月所有会话的逐项作者认证。"
+    },
+    {
+      "id": "C10",
+      "claim": "3.0独立业务包、安装快照、部署绑定、SQLite协调、Task/Attempt与恢复。",
+      "attributed_labels": [
+        "Astra-led development"
+      ],
+      "attribution_basis": "phase_attribution",
+      "source_ids": [
+        "S08",
+        "S09",
+        "S10"
+      ],
+      "commits": [],
+      "limitations": "继承前期资产；跨会话输入不能全归单一模型。"
+    },
+    {
+      "id": "C11",
+      "claim": "10月13日3.0.0本机正式发行，最终10个真实Attempt/42项检查，失败候选2个另存。",
+      "attributed_labels": [
+        "Astra-led development"
+      ],
+      "attribution_basis": "release_document_and_bundle",
+      "source_ids": [
+        "S10",
+        "S17"
+      ],
+      "commits": [],
+      "limitations": "限纯文本Windows前台常驻；不等于生产接管、原生resume或工具审批；运行时请求模型不是作者证明。"
+    },
+    {
+      "id": "C12",
+      "claim": "3.1工作台、公共命令、跨代历史；用户纠偏后补21项旧入口清单。",
+      "attributed_labels": [
+        "Astra-led development",
+        "user",
+        "review collaborators"
+      ],
+      "attribution_basis": "phase_attribution",
+      "source_ids": [
+        "S11",
+        "S12"
+      ],
+      "commits": [],
+      "limitations": "目录不是完整迁移；浏览器使用合成数据。"
+    },
+    {
+      "id": "C13",
+      "claim": "3.1区分请求模型、服务端报告、实际推理证据及用量来源。",
+      "attributed_labels": [
+        "Astra-led development"
+      ],
+      "attribution_basis": "phase_attribution",
+      "source_ids": [
+        "S11"
+      ],
+      "commits": [],
+      "limitations": "实际模型保留未知；本报告亦不认证底层推理身份。"
+    },
+    {
+      "id": "C14",
+      "claim": "来源接纳/任务、结果/投递意图各自同事务；目的端去重、回执核对与held不重跑。",
+      "attributed_labels": [
+        "Astra-led development"
+      ],
+      "attribution_basis": "phase_attribution",
+      "source_ids": [
+        "S11",
+        "S12"
+      ],
+      "commits": [],
+      "limitations": "阶段B未完成，旧fleet全入口未切换。"
+    },
+    {
+      "id": "C15",
+      "claim": "dev.4受控SourceStore、固定端点、schema6与双通道搬运；648运行646通过2跳过，前端52。",
+      "attributed_labels": [
+        "Astra-led development"
+      ],
+      "attribution_basis": "phase_document_manifest_acceptance",
+      "source_ids": [
+        "S11",
+        "S18",
+        "S19",
+        "S20"
+      ],
+      "commits": [],
+      "limitations": "合成/替身及真实OS进程检查；没有本批真实模型验收、生产切换或完整held工作台。"
+    },
+    {
+      "id": "C16",
+      "claim": "34个后续工单、继任指引及版本与证据封存。",
+      "attributed_labels": [
+        "Astra-led development",
+        "user"
+      ],
+      "attribution_basis": "phase_attribution",
+      "source_ids": [
+        "S13",
+        "S14",
+        "S15",
+        "S16",
+        "S21"
+      ],
+      "commits": [],
+      "limitations": "规划不是未来功能已实现；封存不是公开授权。"
+    },
+    {
+      "id": "C17",
+      "claim": "用户定义协作、分离、版本定位，纠偏UI覆盖并要求长期交接。",
+      "attributed_labels": [
+        "user"
+      ],
+      "attribution_basis": "user_attestation_and_documents",
+      "source_ids": [
+        "S06",
+        "S07",
+        "S08",
+        "S11",
+        "S13"
+      ],
+      "commits": [],
+      "limitations": "不能因模型生成代码而抹去产品方向与纠偏贡献。"
+    },
+    {
+      "id": "C18",
+      "claim": "十月兼容线、运行负责人和MasterUI/MasterAgent审阅有独立贡献，模型归属不完整。",
+      "attributed_labels": [
+        "unresolved collaborators"
+      ],
+      "attribution_basis": "role_records",
+      "source_ids": [
+        "S09",
+        "S11",
+        "S12"
+      ],
+      "commits": [],
+      "limitations": "角色不是模型；不能全部算本Astra会话独立完成。"
+    },
+    {
+      "id": "C19",
+      "claim": "454条Git只覆盖6月23日至9月24日，不可计算包含Astra的贡献比例。",
+      "attributed_labels": [],
+      "attribution_basis": "git_snapshot",
+      "source_ids": [],
+      "commits": [],
+      "limitations": "十月核心和测试未进入HEAD；提交大小与劳动类型不等价。"
+    },
+    {
+      "id": "C20",
+      "claim": "8月daemon转换及回退沉淀系统层协作验证与可纠偏要求。",
+      "attributed_labels": [
+        "user",
+        "cross-role collaboration"
+      ],
+      "attribution_basis": "joint_postmortem",
+      "source_ids": [
+        "S06",
+        "S07"
+      ],
+      "commits": [],
+      "limitations": "不按日期把系统决策错误全归单一模型；历史建议不是当前执行指令。"
+    }
+  ],
+  "sources": [
+    {
+      "id": "S01",
+      "path": "docs/ARCHITECTURE_REVIEW.md",
+      "sha256": "12d763ad3e0c25f96fc3372c5727379afc2ee061ea90e8b530b17297e433c01f",
+      "bytes": 29302,
+      "line_count": 293,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 4,
+          "text": "> 作者:MasterAgent(本套多-agent 架构的演进/自我改进角色)\n> 日期:2026-06-22 · 范围:agentbus 文件总线 + daemon + WebUI + 自恢复体系"
+        },
+        {
+          "start_line": 14,
+          "end_line": 19,
+          "text": "| **#1 孤儿回收器** | `reap`:owner 进程已退(非心跳)且超 grace,或超 ttl(4000s) → 退回 inbox(requeue_count),毒任务(超3次)→ `failed/` | `agentbus reap [--dry-run]` + `_owner_live`/`_daemon_alive` | 造孤儿→退回;**dry-run 当场逮到正在写外部 IM的 in-flight 任务,验证\"按进程判活\"修复(否则会重复执行)** |\n| **#2 请求-应答** | `request`:send 子任务 + 阻塞等 `<from>/done/<id>`,读后消费;自请求拒/chain 环检测/强制超时三层防死锁;done 零改动 | `agentbus request --to --from --task [--chain --timeout]` + `_wait_for_reply` | 自请求拒、环拒、端到端 A↔B 同步应答、超时分支 |\n| **#3 完成通知** | done 端分级 WinRT toast:error 必发 / Master 完成发+45s 节流 / sync 应答不弹 / worker 互发不弹;`--notify auto\\|always\\|never` | `_maybe_toast`/`_fire_toast` 并入 `cmd_done` | 7 gating 用例全对 + 真 toast 验证 + 旧式 done 回归 |\n| **#4 路径外置** | 机器相关路径集中 `config.json`(env 可覆盖);worker_daemon/server/recover/hook 全改读;**修正\"迁 agent_fleet 即全部\"名实不符**(CLAUDE.md 加迁移清单) | `agent_bus/config.json` + `cfg()` | cfg/env/fallback + 4 模块解析 + 全回归 |\n| **#5 自愈+互斥** | `supervise` 读 `fleet.json` 重启已死 daemon(接进常驻 WebUI 90s 线程);start_worker 对已有活 tab-loop 的 role `REFUSE` | `agentbus supervise` + `fleet.json` + start_worker 守卫 + server `start_supervisor` | 杀→复活;互斥拒绝;WebUI roll 后 200 |\n| **#6 收尾** | `events.jsonl` 审计(send/claim/done);`prune` 清空遗留 role;**`requires_approval` 统一闸**(领取路径 `_wait_core` 实现:tab serve/daemon/wait 都不自动领高风险,留 inbox 待审;`send --requires-approval` 标记,`wait --include-approval` 人工领);`reap` 接入 recover 巡检 | `_audit` / `cmd_prune` / `_oldest_claimable`+`_wait_core` 闸 / recover [2.5] | 审计 3 行;prune 清 unknown;**统一闸实测:普通 wait 跳过高风险领普通、只剩高风险则 idle 留 inbox、--include-approval 才领;tab+daemon 一致** |"
+        },
+        {
+          "start_line": 28,
+          "end_line": 32,
+          "text": "### 一句话定位\n**一套跑在本机文件系统上、完全可观测的\"多个 Claude CLI 会话之间\"的任务分派总线。** 它把\"多个各司其职的交互式 tab\"变成 Master 可编排的 worker 队列。\n- **它解决什么**:用户嫌子代理(subagent)不可观测、不可旁观;想让每个 role 在自己的活 tab 里\"看得见地\"干活,且 tab 之间能互相派活、收结果。\n- **核心硬约束(决定了全部设计)**:**无法从外部唤醒一个 idle 的交互式会话**。所以不能\"推\"任务给会话——只能让会话主动\"阻塞监听\"(tab 里 `/loop`+`serve`,或无窗口 `daemon`),任务到了它自己醒。这是整套架构所有形态的根因。\n- **边界**:单机、单用户、本机文件系统信任域;无服务端、无网络传输、无鉴权。"
+        },
+        {
+          "start_line": 59,
+          "end_line": 60,
+          "text": "2. **claim(原子领取)**:`os.replace(inbox→processing)`。多监听者(tab loop + daemon)并存时**只有一个 rename 成功,抢输者 FileNotFoundError → None**,所以绝不重复执行。\n3. **执行**:tab loop 在同一会话内连续做(上下文累积、warm);daemon 每个任务**临时拉一个全新 `claude -p --dangerously-skip-permissions`**(cwd=biz_wh,冷启动、无跨任务记忆)。"
+        },
+        {
+          "start_line": 70,
+          "end_line": 75,
+          "text": "### 做得好的地方\n- **原子性扎实**:写用 tmp+os.replace,领取用 os.replace 抢占,两处都对——并发领取不会重复执行,半截文件读不到。这是整套设计最硬的一块。\n- **真·事件驱动**:wait/serve/WebUI 全用 watchdog,无 sleep polling,符合全局规则;`_wait_core` 在 observer 起来后**再查一次 inbox 消除竞态**,细节到位。\n- **零逻辑重复**:WebUI、recover 都复用 agentbus 的 helper(import 或 shell-out),没有第二套真相。\n- **身份机制诚实**:正视\"OS 里所有 claude.exe 同名,识别不出谁是谁\"这一事实,用\"会话自报+父链回溯+心跳\"解决,`who` 判据分级清楚。\n- **隐私边界落到代码**:private 标注只存 label,who/WebUI 对 private 进程不 psutil 探细节,不是只写在文档里。"
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "path": "docs/BUS_2.0_CHANGELOG.md",
+      "sha256": "ee16900a6f33b31aea20bee78cdeaaf480b7b3101ecc700ebfe3aabd411b023a",
+      "bytes": 3327,
+      "line_count": 41,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 10,
+          "text": "> 用户 2026-07-14 令:对 v1.10 全部功能重组 + 机制优化(方案 B),模块一体化「看着不散、内部仍模块」,列为 2.0。\n> 基线 `v1.10-pre2.0` → 检查点 `v2.0-p1` → 定版 **`v2.0`**(2026-07-20)。共 50+ commit,回归闸 `bus_smoke.py` 全程守(46 命令面 / 39 用例 / 无回归),三会话协作验证(MasterAgent 实现 / Master数分验口径 / 培训师 roster+onboarding / MasterUI UI)。\n\n## 一、结构一体化(P0/P1)\n- `agentbus.py` **3267 → 175 行(-95%)**,拆成 **20 个 `bus/` 模块**(依赖分层无环)。\n- 模块:config·io·roster·proc·presence·selfwake·notify·mailbox·pool·**core**(命脉)·edge·roles·exec·sessions·tasks·health·status·identity·refs·__init__。\n- 铁律:canonical `agentbus.py` 全程可跑 + re-export 保 `ab.*` 公共面(5 个外部导入方零影响)。\n- P0 建回归冒烟金标准 `bus_smoke.py` + 基线,每增量四件套自验(compile+import+分支实测+smoke)+ Master数分独立复验。"
+        },
+        {
+          "start_line": 13,
+          "end_line": 15,
+          "text": "- **role-verdict 4 处归一**:状态判定原散在 cmd_who 文本 / who --json / selfwake / WebUI 各算 → 收敛单一源 `_who_data`。**根治长期病根**(加新态漏改致显示不一致,自 2026-07-13)。\n- **跨引用契约化**:新 `bus/refs.py`,三 store(todos/tasklines/longrange)10 条跨引用契约单一真相源 + `ab refs --check` 只读校验 + `ab refs --purge-smoke`。\n- **守卫回执降噪**:`no_receipt` fire-and-forget,退役「守卫回执洪水」。"
+        },
+        {
+          "start_line": 23,
+          "end_line": 35,
+          "text": "## 四、使用体验\n- **`ab` 短命令入口**:固化 env python + 真实路径 + UTF-8,消除裸 python 崩 / 长路径 / 反斜杠 / 编码坑。\n- **分组入口**:`ab` / `ab commands` 按一体化模块分组呈现(治 43 命令扁平难发现)。\n- 恢复文档 + 3 个 hook 文案全统一到 `ab` 短命令。\n\n## 五、架构 / 健壮性\n- **junction 化**:`~/.claude/agent_bus` → 指向 agent_fleet 的 junction;agent_fleet = 唯一物理家(换机复制 agent_fleet 即带走全部含 `usage.db` 方舟)。\n- **wait 中断 / 自恢复**:维护哨兵 + 异常自恢复。\n- **目录整理**:根 .md 14→7,设计/评审文档归 `docs/` + README 工程地图 + `docs/DIRECTORY_MAP.md` 逐文件详版。\n\n## 六、UI 渲染(MasterUI lane)\n- `compute_fleet` 删本地自算 verdict(~80 行)→ 吃 `ab._who_data()` 权威源(2a 步骤3,灭 WebUI 侧分叉)。\n- verdict badge 限宽防撑 UI(长 note 截断 + hover 看全文);工作组面板文案口径修正。"
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "path": "docs/BUS_EXCELLENCE_PUNCHLIST.md",
+      "sha256": "b21458b54228fe9941b98131ae0eb7b2010c42d5cf8dc09e9762186f099cbe86",
+      "bytes": 8133,
+      "line_count": 61,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 7,
+          "text": "# BUS 卓越工程清单(doc-blind 四路代码审查 · 2026-07-28 · Fable)\n\n> 方法:4 个只读代码、禁读文档的审查代理(核心架构/并发与崩溃一致性/周边进程/WebUI)独立审查,\n> MasterAgent 拿疑点对文档/决议逐条销案——销不掉的进本清单。目标(用户令):让 bus 成为优秀项目。\n> 状态图例:☐待办 ☑完成 ◪部分。完成一项勾一项,全清后本文件归档。\n>\n> ✅ **全清归档(2026-07-28)**:P0 9 项 / P1 12 项 / P2 7 项全部完成。MasterAgent lane commit 链:5cb6d51→03f913e→75190b9→644ec39→c1737ac;MasterUI lane:ab62d95(安全三件)→fc6fc0f(路径页)→5ad25d1(UI P1+噪音静音)。每批 bus_smoke 43/43;claim 并发闸 120×6 恒一胜;端到端事件唤醒实测。本文件转为【已完成审计记录】留档。"
+        },
+        {
+          "start_line": 11,
+          "end_line": 26,
+          "text": "- ☑ **fanout-collect NameError**(pool.py 缺 import threading·等待路径必崩)——5cb6d51\n- ☑ **两 hook GBK 炸弹**(reinject/on_memory_write 裸 json.load·CJK payload 即崩=静默失效)——5cb6d51\n- ☑ **claim 原语统一 O_EXCL**(mailbox._claim 加 <task>.lock O_EXCL·pool 经 locked=True 直通;闸测 120 轮×6 进程恒 1 胜·2026-07-28)——原文:claim 原语统一 O_EXCL:个人 inbox `_claim`(mailbox.py)仍用本机已实证会双胜的 os.replace 争源;\n  docstring 自称支持 tab+daemon 双监听 → 同任务双执行风险。修法=与组池统一 O_EXCL 锁。\n  (销案注:os-replace 记忆承认\"只因单消费者没暴露\"=已知带伤;按卓越标准应机制层闸死,不靠组织纪律)\n- ☑ **共享 JSON 裸 RMW 加锁**(io.json_lock 公共原语+roster.update_agents;todos 五写点/agents 五写点全收口·2026-07-28)——原文:共享 JSON 裸 RMW 加锁:todos.json 四方并发读-改-写(ask-user/answer/sweep/WebUI)会丢待办丢答复;\n  agents.json 同病(register/hello/retire/revive 并发覆盖)。修法=复用 route_lock 的 O_EXCL 模式。\n- ☑ **_save_agents 改原子写**(_write_json·2026-07-28)(roster.py write_text 直写·崩溃截断=全花名册\"消失\")。\n- ☑ **_write_json tmp 名去确定性**(pid+随机后缀·2026-07-28)(io.py 固定 .tmp 名·两进程同写同目标时 B 的半截文件可被 A replace 进正式位;\n  加 pid+随机后缀,一行修)。\n- ☑ **claude_run 超时杀进程树**(taskkill /T /F + p.kill 兜底·2026-07-28)(p.kill 只杀 .cmd 宿主·node 孤儿续跑烧 token+stdout 管道卡死 daemon;\n  改 taskkill /T /F)。\n- ☑ **external 四件套抢锁失败禁继续**(canvas/msg/read/sheet_read 四处 _lock 解析 acquired,失败 exit 3·2026-07-28)(edge-acquire 失败只 warn 就照操作 Edge=互斥形同虚设=串台病根;\n  抢锁失败必须退出/重试)。\n- ☑ **UI 安全三件**(MasterUI lane):SSE 已死 / POST 零 Origin 校验 / clear_replies 路径穿越——MasterUI 修毕,\n  实测 SSE data:change 到达、跨 Origin POST 403、穿越校验生效(commit ab62d95·2026-07-28)。"
+        },
+        {
+          "start_line": 30,
+          "end_line": 43,
+          "text": "- ☑ 锁夺取 ABA(io._steal_stale_lock rename 原子占有;json_lock/claim/组锁/route锁/edge锁 五处统一·75190b9)——原文:锁夺取 ABA(两进程同判孤儿锁各自 unlink→双持锁;pool 组锁/route 锁/edge 锁三处;改 os.replace 改名占有)\n- ☑ done/reap 崩溃窗口(reap 改原地改写→os.replace 原子搬运;回执已在→归档免重跑·75190b9)——原文:done/reap 崩溃窗口(done 先写回执后删 processing→重跑;reap 写+删两步→双份;reap 前查回执已存在则归档)\n- ☑ request 走 send 契约(抽 _deliver 共用:审计/可达/培训闸/unknown 警示·75190b9)——原文:request 走 send 契约(现绕过审计/可达告警/培训闸→events.jsonl 不可见;抽 _deliver 共用)\n- ☑ done 归属禁前缀匹配(_find_task 精确 id + 含 archive;已归档只发回执不搬运·75190b9)——原文:done 归属禁前缀匹配(startswith 短 id 可错配;查找应含 archive)\n- ☑ presence 多写者(_touch_presence/_set_current_task 锁跨 RMW+心跳继承 current_task;_audit O_APPEND·75190b9)——原文:presence 多写者(心跳整写丢 current_task·靠时序假设;_audit 追加未用 O_APPEND)\n- ☑ 角色策略出代码进注册表(role_profiles.json meta.policy;代码留降级默认·75190b9;守卫伪造名/bus-router 名单随注册表可改不动代码)——原文:角色策略出代码进注册表(_BIZ_ROLES/_MGMT_OWNER/HUMAN_ATTENDED 硬编码;守卫伪造 from=MasterAgent;\n  bus-router 不在伪角色名单)\n- ☑ start_worker.ps1 用 config python_bin(AGENTBUS_PYTHON_BIN 可覆盖·75190b9)(现裸 PATH python·缺 watchdog=隐藏 daemon 静默死)\n- ☑ dispatch 路径补 requires_approval 闸(拒走无人审快跑面→导向 send+人工领取;实测拒收·75190b9)(现 --dangerously-skip-permissions 直跑高风险)\n- ☑ 卫生代谢扩容(tmp/lock/steal 残渣·pid_tags 死 pid·jsonl 轮转·终点站 90d→.trash 30d 真删两段式·644ec39)——原文:卫生代谢扩容(_hygiene_core 补:孤儿 .tmp/*.lock、fanout manifest、pid_tags 死 pid、\n  events/metrics.jsonl 轮转、done_archive//_dead_letter//.trash 终点站保留期)\n- ☑ watchdog 样板 4 处抽公共(bus/watch.py arm_watch;+2 降级轮询兜底;端到端事件唤醒实测·644ec39;pool_dispatcher 休眠脚本不动=随 P2 处置)(NameError 正是复制丢 import 所致)\n- ☑ 公共面定稳定 API 层(agentbus.__all__ 28 名·按消费方全量 grep 圈定=名单即契约;抓获活雷 ab._daemon_alive 从未 re-export 已补·644ec39)——原文:公共面定稳定 API 层(facade 现 re-export ~90 个 _私名无 __all__;UI 依赖 15 个私名)\n- ☑ UI:todos 锁(json_lock)/fresh no-op 参数清理/硬编码路径动态派生/read_events bounded 尾读(64KB)/死代码 build_activity 删除(62行)——MasterUI·5ad25d1;并顺带静音 routes._send 客户端中断噪音(WinError 10053·用户报)"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "path": "docs/FRAMEWORK_REVIEW_20260923.md",
+      "sha256": "9435e39057e98a49bdbdde27c318fbda3b98b72c0793703cc37624d8b98733df",
+      "bytes": 4242,
+      "line_count": 54,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 4,
+          "text": "# 框架现状审视 · 2026-09-23(MasterAgent · Fable 5.1 视角)\n\n> 触发:用户令\"重新审视框架现状\"(模型升级 Fable 5.1 后)。数据=当日实时采样(selfwake/events.jsonl/archive/git),不凭记忆。\n> 用途:定下一阶段方向;第 1 项已启动三闸提案(docs/PROPOSAL_autoproxy_wakeloss.md)。"
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "path": "fork_exchange/genesis_20260923_separation-biz-infra.md",
+      "sha256": "39adf44a6e40aebb3f3fed1f09fba06d36f450bcc283e4f4ba8fbfd122162d61",
+      "bytes": 4696,
+      "line_count": 28,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 26,
+          "text": "# genesis fork · 2026-09-23 · 业务/基建分离整改 C + B1 + A(v2.14)\n\n> 实例名=genesis。覆盖 v2.13 以来:分离度盘点(docs/SEPARATION_AUDIT_20260923.md)→ 三闸提案 B+C / A → 全部落地。平台纲领:bus=通用 agent 管理平台·业务=可插拔负载(装上能跑·卸掉干净·换域照用);三问验收=归属/清除/换域。\n\n## 1. 业务注册表外迁 biz_registry(分离 C)✅平台面\n- 业务角色页 `role_profiles_biz.json` + 业务 caps `caps_biz.json` 物理外迁 `<data>/biz_registry/`(**业务侧自带 git**·不进平台 git);平台根留 junction(gitignore)。\n- 读方【单一解析】:`bus.roster.biz_registry_dir()`(cfg `biz_registry` > `<home>/biz_registry`·env `AGENTBUS_BIZ_REGISTRY` 可重定向)· `load_caps_pool()`(infra ⊕ biz 合并视图·同名 infra 优先)· `load_role_profiles()`;compact 重注入 hook 经同一函数(import 失败同规则内联)。业务表缺失=合法空载·绝不抛。\n- caps 两表:infra 7(bus-comms/self-wake/high-risk/webui/data-analysis/bus-monitoring/token-usage-etl)/ biz 7(含 confidentiality·培训师终裁归业务)。`capabilities.json` 业务词 20→0。\n- **空载清除测试固化 smoke**(`tests/scenario_sepC_empty_biz.py`):env 指空目录=业务表全清等价态·不动 live 文件·caps 14→7 / 角色页 21→7 / hook 不抛 / roster·who·caps 渲染。验收方法论:有载回归=每业务角色 hook 注入文本迁移前后 byte-identical(备份目录存快照)。\n\n## 2. 花名册只读视图 agents_view(分离 B1 读方)✅平台面\n- `roster.agents_view()`:agents.json 深拷贝 ⊕ 角色页 desc(有页=单一源·标 `desc_src`;无页沿用)。**写方(register/hello/retire/update_agents)仍读原件**——视图注入的 desc 永不经 RMW 回写基建 git(分离复发防线)。只读读方 roster/route/probe/daemon 专责 desc 已切;WebUI 读方切换后再剥 agents.json 业务 desc(脚本就位:2 无页角色自动建最小页·14 存 legacy_desc)。\n- agentbus re-export 名单:`load_caps_pool / biz_registry_dir / agents_view / shared_resources_prompt`(★re-export 盲点纪律再命中一次:抽层被外部 `ab.*` 引用必进 `__all__`)。\n\n## 3. 通用共享资源互斥 ab lock(分离 A·取代 Edge/外部 IM专用锁)✅平台面\n- `bus/lock.py`:`ab lock acquire/release/status --resource <name>`;锁文件 `BUS/locks/<name>.lock`;O_EXCL 恰 1 胜 · stale 回收(持锁 role 进程死/超 ttl → rename 原子夺取·ABA 防)· watchdog 等释放。`edge-acquire/release` = `--resource edge` 别名(stdout byte-identical·resource=edge 过渡特判旧 `edge.lock`);status/health 双发 `locks[]`(`edge_lock` 保留一版待 UI 切)。\n- **并发 gate**(`tests/scenario_lock_contention.py`):20 进程争 1 ×3 轮恰 1 胜 + 四态 JSON 键集。★测试盲区三号实录:首版 20 胜——持锁 who 无 presence→被判 stale→人人夺锁;修=测试给自己的 smoke 角色写 presence 绑测试 pid(不借别人 role)。\n- **派活 prompt 通用化**(A2):daemon/dispatch prompt 的\"操作 Edge/外部 IM先抢锁\"段 → `roster.shared_resources_prompt(role, abpy)` 按角色页 `shared_resources:[{resource,hint}]` 注入;无字段不注入;ad-hoc 无页只给原语行。有载验收=从 events 近 30 天真用锁角色自动算清单·每个 prompt 必含锁提示(防\"删了外部 IM段但页没补\"的静默丢提示);空载验收=平台段零业务词;源码零外部 IM词。prompt 抽 `build_prompt()` 可测。\n- **业务工具族外迁**(A3):5 个外部 IM CDP 工具 → `<data>/biz_tools/external/`(自带 git);`edge_lock` 改调 canonical `ab lock`(env `AGENTBUS_PY` 可覆盖入口)与迁移同一原子步(K2);旧位 `__main__`-only 转发桩过渡(import 即 ImportError)→ 业务侧记忆 4 条旧路径改完·grep=0 → 同日删桩。迁移铁律:先广播(含旧路径引用清单给消费方)→ 动刀(前置核锁空闲)→ 确认。\n\n## 4. 方法论/纪律(★建议吸收)\n- 分离验收三件:**空载清除测试**(env 重定向隔离·不扰 live)/ **有载回归 byte-identical**(迁移前快照)/ **业务词计数**(git 跟踪文件·-i)。\n- Master数分独立复核发现:自报\"业务词归零\"漏 2 处(注释/举例文本)——自评不算·复核者按自己口径 grep。\n- bash heredoc 写 python 补丁会吞 `\\n` 转义生成坏代码(同日两次)→ 长脚本走 Write 工具再执行·生成后先 import/ast.parse。\n- 审计漏项自报(external_*.py 工具本体不在原审计 4 项中)→ 纳入同闸。\n"
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "path": "docs/SELF_REDESIGN_CHARTER.md",
+      "sha256": "59098a80a2fc4ef1676ceda9805330b1aa2cbacb6398645f476c92250d5083b3",
+      "bytes": 4325,
+      "line_count": 50,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 20,
+          "text": "# 全功能自我迭代宪章(Self-Redesign Charter)\n\n> **用户授权 2026-09-16(原话)**:\"全功能的自我迭代,你可以将所有功能都进行重设计,this is everyone module,为了更好而重构造,但是业务和基建分离,永远在线是铁率(律)\"。\n> 即:**所有模块**都可为更好而重设计/重构造;两条铁律不可违。\n\n## 两条铁律(每个重设计提案的硬闸)\n\n### 铁律1:业务 / 基建分离(separation)\n- 承接 `bus-pluggable-business-platform`:bus=通用 agent 管理平台,业务=可插拔负载。\n- **三问验收**每案必过:①归属问(这是机制还是业务内容?)②清除问(业务清完平台能空载跑?)③换域问(换业务域要改平台代码?)。\n- 重设计**不得**把业务口径/数据焊进平台代码;业务内容一律业务侧存储 + `path_registry.json` biz-data 登记。\n\n### 铁律2:永远在线(always-online)\n- **任何重构不允许下线/失联**:协作频道(事件自醒·轻问·可打断)在重构全程保持可用。\n- 落地方式=**增量绞杀(strangler)、禁大爆炸切换**:双跑期新旧并存,切换=灰度非一刀切。\n- **★接管硬门槛(Master数分 P0·实证方定·缺一不接管)**——\"新机制实证接管\"非口号,全绿才算:\n  ①双跑≥N 个**真实周期**(非造样本·N 按机制关键度定·协作频道类≥1 周);\n  ②行为对比:新旧对【同一真实历史输入】输出一致率≥阈值(探针作回归仪·辩证正/反/合);\n  ③探针回归全绿(无方向性错误新增);\n  ④**Master数分对抗签字**(非 owner 自评——daemon 化翻车根源=自证);"
+        }
+      ]
+    },
+    {
+      "id": "S07",
+      "path": "docs/POSTMORTEM_daemon_direction_error.md",
+      "sha256": "cc4bab6ed9ea70f45b960aa0831de55e0ae908076edb642d7aedd3d52ff1e232",
+      "bytes": 4914,
+      "line_count": 38,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 7,
+          "text": "# 复盘:daemon 化方向性错误(2026-08-27)——MasterAgent × Master数分 联合分析\n\n> 用户令 2026-08-28:复盘昨天 daemon 化的方向性错误怎么产生的。本文=MasterAgent(执行/fleet lane)+ Master数分(候选选型/口径 lane)联合复盘。\n> 关联:`fork_exchange/genesis_20260827_fleet-daemonization.md`(daemon 化始末) · `BUS_GUIDE.md §0`(教训摘要)。\n\n## 一句话\n把执行类角色从【前台 CLI 热态】批量转【daemon(无窗后台·每任务冷起 claude -p)】,图省内存 + 自动注入 effort;实战暴露 daemon **领任务不管不顾·卡死不可打断·跨集群执行做不了·闷头不轻问同伴** → 全退,回全前台 CLI。**为何自评全绿却翻车**是本复盘的核心。"
+        },
+        {
+          "start_line": 25,
+          "end_line": 38,
+          "text": "\n### D. 治理层——无人管方向\n6. **分工到位但无人管方向**:Master数分定候选·MasterAgent 执行·培训师注册,各司其职都称职,但没人退一步问\"这符合 bus 核心价值吗\"=**方向对不对无人 own**,最后靠用户抓出来。\n\n## 判据 / 教训(operating principles·别再犯)\n1. **大机制变更强制 gate**:先问【强化还是削弱 bus 核心价值(便宜协作 / 可打断 / 常开协作)】,**不是只问\"是否更高效\"**。\n2. **实证先于铺开**(validate-then-trust):先用**真失败模式**验代表性最难 case,再谈铺开;别信自评。data-truthfulness owner 尤其自律:preach 实证要 practice 实证。\n3. **系统属性不能分解成 per-role 自查**:协作是 system 级,必须 **system 层验**(舰队整体还便宜协作吗),不能靠\"每个角色能不能单独跑\"累加。\n4. **pilot 必挑代表性最难 case**(协作密集/长任务/边界),非最易 standalone;易 case 通过是假信心。\n5. **agent 是协作一等公民,不是黑盒批处理器**:能被打断、卡住先轻问同伴(轻问 >> 硬扛)。\n6. **要有人 own\"方向对不对\"**,不只 lane 执行;**owner 对本位外的价值轴要主动够记忆**(framing 别锁死 retrieval)。\n\n## 沉没成本里保留的价值(没全白做)\ndaemon 机制代码保留 dormant——effort per-role 注入 / `--resume` 接续(层C) / supervise GBK 修复,**都非 daemon 专属·可复用**(dispatch 一次性仍用)。且这次全铺开又全退的**\"此路不通\"实证本身是最贵的教训**,已归档供后来者。"
+        }
+      ]
+    },
+    {
+      "id": "S08",
+      "path": "docs/ASTRA_PLATFORM_REVIEW.md",
+      "sha256": "5bb6f81f1ec2030dfe8255cdec320d627d8dc7b05913309b0bebb5263023750a",
+      "bytes": 86018,
+      "line_count": 598,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 8,
+          "text": "审查日期：2026-10-08（Asia/Shanghai）  \n项目：`C:\\apphome\\agent_fleet`  \n审查基点：`master` / `f6857cd`；问题清单对应实施前旧代码，3.0新增实现及证据另记进度文档。  \n状态：用户已要求开始实施并继续；业务可替换基础、公共协作核心及Codex单次文本执行入口已落地，真实调用待专用登录验证，旧运行环境未切换。\n补充要求（2026-10-08）：用户明确要求业务与基座分离、业务可替换；本次将其提升为重构主线和前置验收条件。\n目标版本：**3.0**（用户指定，当前开发标记 `3.0.0-dev.3`，未发布）；Astra仍指本次主力模型，不作为平台版本号。"
+        },
+        {
+          "start_line": 13,
+          "end_line": 25,
+          "text": "**目标是业务可替换的在线 Agent 协作基座：基座提供身份、通信、执行协调、用户介入和恢复，业务包提供团队、知识、流程与工具。Codex 是当前执行运行时。业务分离与运行时分离是两条独立边界，都必须成立。**\n\n**业务可替换已是用户明确要求，不再列为可选优化。** 同一平台构建应能空载启动、安装业务 A、停用 A 后切换完全不同的业务 B，并显式恢复 A；不改基座代码，不让 B 继承 A 的知识、角色状态、权限或会话。现状只完成部分文件外迁和合并读视图，尚未达到这一标准，见第 3.2、7.6、9.3 节。“任意换”指遵守版本化业务契约的任意业务；新增外部系统可编写业务适配器，但不能要求修改基座分支。\n\n1. **先建立隔离基线，同时把业务可替换做成独立主线。** 现有冒烟会写真实总线，甚至强制释放共享锁；启动 WebUI 会自动回收、归档、派提醒。先隔离验证环境，再落实业务包、部署绑定和运行态的职责分离。第二阶段必须通过基础换域，第三阶段必须通过在飞任务、迟到事件和故障恢复下的换域，不能只搬目录后转去接 Codex。\n2. **优先解决协作正确性。** 已核实任务完成缺少 attempt/lease 所有权校验，回收与完成跨多个文件，部分终态和投递失败被当作成功或吞掉。换运行时之前需要统一 Task / Attempt / Lease / Result / Decision 契约。\n3. **纠正“在线”的含义。** 已知孤儿 wait 仍可被标为 `armed` 并推荐接单；进程存活、会话可控、消息已送达、模型开始处理和有空闲容量必须分别表达。\n4. **推荐渐进引入单一协调控制器与事务化状态账本，首选 SQLite。** 保留 `ab` 和文件邮箱作为兼容入口，历史文件先只读保留；只把新协调状态的写入权收口。纯文件单写者加持久日志是可行的最小替代方案，见第 7 节，不先做全量数据迁移。\n5. **Codex 默认执行路线分两步。** `codex exec --json` 先验证一条完整任务闭环；持续在线成员以 Codex CLI 的 app-server 接口为推荐接入方向，验证消息、审批、纠偏、中断、恢复与前台可见性。一次性后台命令成功不等于在线团队验收通过。\n6. **按价值收敛功能。** 保留角色与专长、通信、任务、用户介入、恢复、基本观测；合并重复状态计算、回填和维护机制。语音、长程图、复杂画像独立为可选扩展；休眠弹性派发器、Claude 特定自醒补丁和过时兼容分支是有条件的退役候选。\n7. **不等待 Claude 恢复。** Claude 当前不可用是本轮前提。其历史会话、用量和知识按价值保留；未来适配器只有接口与 `unavailable` 能力声明。本次所有真实执行验收用 Codex，Astra 是本次主力模型而非平台唯一模型。\n\n推荐实施顺序：**隔离基线与业务边界 → 同构建空载 / A→B→A → 带业务归属的协作与所有权契约 → Codex 接入与持续协作 → 故障及真实换域验证 → 分批迁移交接**。保留六阶段组织方式；业务可替换贯穿各阶段，在 Codex 接入前先用运行时替身证明，而非最后补做。"
+        },
+        {
+          "start_line": 65,
+          "end_line": 65,
+          "text": "- 9 月 23 日业务分离审计列出的全部缺口并非仍未处理：通用锁、profile/caps 合并读取、业务 desc 外迁读视图和 UI 待办去业务种子已有代码。剩余应逐项处理，不能重做已落地部分。"
+        }
+      ]
+    },
+    {
+      "id": "S09",
+      "path": "docs/MASTERAGENT_3_PROGRESS.md",
+      "sha256": "723ff0e5687f8c559333f2ab16f3d76546b5b0ade381532f52426fea113fb88d",
+      "bytes": 31777,
+      "line_count": 189,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 15,
+          "end_line": 21,
+          "text": "## 历史交付：常驻成员与事件接单（2026-10-13）\n\n用户要求检查当前修改并开启下一阶段。核对发现，前批 dev.4 交付文件未变；后续增量主要在旧兼容线：独立 Codex 信使、精确会话恢复、全链路自醒状态、近期空闲保护、持久领取去重与 App Server 用量统计。这些改动完善了旧团队宿主接入，但不能代替 V3 自己的持续调度或业务替换验收。\n\n沿原计划，本批补齐 V3 成员生命周期和事件接单，业务包契约仍为 schema 1 / platform_api 1。角色工作区、权限上限、模型和原生历史仍由部署层显式绑定；没有按具体业务或角色名修改基座。\n\n1. **持续接单入口。** 新增前台 `serve`，按显式 Actor、运行时配置和工具串行处理该角色的 queued 任务；支持任务数和运行时长上限。一个成员持续运行，每次 Attempt 仍拥有独立原生进程/thread，不等于原生会话恢复或系统服务托管。"
+        },
+        {
+          "start_line": 55,
+          "end_line": 59,
+          "text": "## 历史交付：Codex 兼容接入修复（2026-10-12）\n\n用户要求本周继续，先核对 V3 之后的修改与原计划，随后同意开始实施。核对结果：`masteragent/` 核心仍是 dev.3；后续增量主要是旧 bus 的 Codex 会话绑定、App Server 唤醒与 WebUI 统计。它们补充了宿主接入，尚不能视为 V3 常驻运行或业务替换验收。\n\n首批修复在隔离副本完成："
+        },
+        {
+          "start_line": 119,
+          "end_line": 137,
+          "text": "第一批基础保留：\n\n1. 纯标准库 `masteragent` 包与CLI；必须显式指定状态根。导入不访问旧配置，不启动运行时，观察不写状态。\n2. 版本化业务包契约，严格校验类型、重复定义、引用与版本，损坏/缺失明确报错；A/B两种合成业务无需固定Master/培训师。\n3. 业务包不可变快照、独立部署绑定、SQLite运行态；安装/停用/激活/卸载、安装归属与激活代次。卸载保留历史。\n4. 角色身份令牌、作用域检查、当前业务上下文、合成任务/结果/通知、请求与终态幂等。管理员试跑与worker身份生命周期分开。\n5. 可注册纯文本适配器，第三种合成业务通过公开接口增加工具，不修改基座。\n6. 受控路径防护：源码/宿主/旧bus/网络根拒绝，工作目录不重叠，junction与数据库硬链接拒绝；SQLite应用标识/结构检查，WAL只读副作用拒绝。\n7. 仅包含3.0通用代码的可复现 `.pyz` 构建，能在脱离源码和旧业务的目录里启动空载观察。\n\n本批新增：\n\n1. **Task与Attempt分开。** 每次领取都有唯一执行记录、所有者和限时租约；领取先提交，再允许事务外执行、续租与完成。并发进程只能有一个领取成功，结果、终态、通知和子任务回报一起提交。\n2. **未知结果不自动重跑。** 租约到期只进入`needs_reconcile`，需要带原因取消或确认安全后重试。迟到回填不得覆盖新执行或结果；已知原持有者的拒绝记录仅作为审计，不产生新通知或任务效果。\n3. **持久决策。** 问题、修订号、答案ID和截止时间持久保存；并发回答只接受一个版本，相同回答可重试，冲突明确拒绝。超时不算批准，业务重新激活后的旧批准也不能继续使用。\n4. **父子任务。** 用请求ID关联并去重，等待多个子任务完成后才解除等待；结果通过持久记录交接。父任务恢复时可重新看到已完成子任务，无需重复执行。拒绝父任务不撤销独立子任务，子任务后来完成也不会复活父任务。\n5. **持久通知队列。** outbox与结果原子提交，确认后仍保留证据。活跃视图限制当前业务和激活代次；本批没有外部通知传输器。\n6. **显式接续。** 恢复A后由`resume-task`接续指定待办，保留原任务ID和来源代次、记录理由及新代次，重新建立审批闸。终态任务不重跑，子任务也需逐个明确接续。\n7. **显式升级。** 第一批3.0 schema 1可通过`migrate`备份并事务升级到schema 2；读取不会自动升级。旧执行中任务标为来源明确的待核对，旧通知标为待核实而不重投，旧身份令牌撤销；这不是旧bus的数据迁移。"
+        }
+      ]
+    },
+    {
+      "id": "S10",
+      "path": "docs/MASTERAGENT_3_RELEASE.md",
+      "sha256": "fefd8ef2aeafae4ad7c186c092e84e9ca3c051b3c5f51a6572e8166c043e8b64",
+      "bytes": 5920,
+      "line_count": 50,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 24,
+          "text": "发布日期：2026-10-13。发布范围为 Windows 前台常驻调度与纯文本协作基座，状态 schema 4，业务包 schema 1 / platform_api 1。此为本机正式发行；不等于已迁移或接管现有旧 bus fleet。\n\n## 已放行能力\n\n业务包、部署配置与平台核心分离；同一构建支持空载与 A→B→A 切换。角色通过明确的 Actor、安装和代次绑定持续接单，独立 Attempt 拥有原生 App Server 进程/thread/turn。平台提供成员排他、双租约、事件唤醒、结果与通知持久化、文本纠偏、停止和显式任务恢复。\n\n本次最终真实验收使用独立状态、虚构文本和显式部署。两个角色各连续完成两项任务，验证真实 turn/steer 回执及最终文本采纳；在飞停止和本次拥有的原生进程断线后保留 needs_reconcile，确认退出后显式 reconcile 才重试；随后完成 B 和恢复 A 的真实执行。最终构建通过10个原生 Attempt；此前首轮执行2个原生 Attempt后失败，两轮实际合计12个。此为平台Attempt计数，不将其表述为包含原生内部重试在内的精确计费请求数。\n\n固定验收原生版本为 `codex-cli 0.162.0-alpha.17.2`，请求模型为 `gpt-6-astra`，原生 thread/start 报告的模型逐次核对。旧固定可执行路径已经失效，部署必须使用实际存在的明确路径及固定版本；不承诺任意 Codex 版本兼容。\n\n新版新增的 partial_answer 仅作为中间输出，不能替代或覆盖最终答案。适配器仍要求精确终态、最终文本与实际进程树退出证据。\n\n首轮暴露原生自动生成bundled skills目录，导致第二任务preflight拒绝。修复在显式原生启动参数中关闭 `skills.bundled.enabled` 和 `skills.include_instructions`；继续拒绝home中的自定义skills目录或配置。首轮失败报告、完整事件和原候选包保持原样，第二轮使用独立目录与重建候选包，不覆盖失败历史。\n\n## 验证与证据\n\n- 冻结源码回归：368项，367通过、1项跳过（Windows当前账户缺少创建符号链接的权限（WinError 1314）），耗时146.297秒。报告保存完整测试名、跳过理由、日志和对应源码哈希。\n- 旧 fleet 诊断定向回归：29/29通过，无跳过。修复缺失或损坏信使证据却仍显示健康的问题，守卫只记录去重诊断，不扩大自动接管权限。\n- 同一最终包真实验收：10个原生Attempt，42项检查通过；保留实际进程、精确thread/turn、模型、纠偏回执、任务状态与退出证据。\n- 两次构建字节一致；主目录同步后的复验结果、发布摘要与文件清单保存于本地交付目录。\n- 验收全过程计数：首轮失败2个 + 最终轮10个 = 12个实际原生Attempt。首轮失败记录独立保留并附哈希，不纳入最终构建通过项。\n- 实际运行的验收脚本另存原样并记录SHA；交付脚本随后仅增加“诊断日志写入失败时保留原预检异常”的保护及合成故障测试。该差异经纯合成自检验证，未更改产品包、执行逻辑或实际验收证据。"
+        },
+        {
+          "start_line": 36,
+          "end_line": 38,
+          "text": "旧 fleet 与 V3 不共用任务队列、领取标记或Actor。灰度承接时，每条业务任务只能选择一个入口；不能向两条运行线重复派发。此次没有导入真实业务任务、接管旧会话或重启旧服务。\n\n原生认证与角色历史当前仍随专用home部署，现有桌面登录不会自动出现在新home。本次用户逐项完成部分原生授权后，明确授权仅在本次验收目录之间复用新生成的认证；首轮剩余两个home及第二轮重建的五个used home通过不解析、不显示内容的本机复制完成。该授权不延伸到私人/旧fleet认证或后续部署；平台未增加隐式复制认证功能。这项重复登录体验仍是后续部署优化项。"
+        },
+        {
+          "start_line": 46,
+          "end_line": 48,
+          "text": "online只表示租约与身份有效；owned_attempt_active只表示执行归属；accepted只证明传输接收。outbox持久保存不等于已自动投递或已读。任务接续不等于native resume。\n\n本版不提供原生会话恢复、模型自主调用平台命令、运行中人工审批桥、业务文件工具、系统服务托管或生产迁移。纯文本基座的正式发布不替代这些能力的独立验收。"
+        }
+      ]
+    },
+    {
+      "id": "S11",
+      "path": "docs/MASTERAGENT_3_1_PROGRESS.md",
+      "sha256": "5ff2943d3030fb741f1ceac5b10c04fb405760c48c54d671bc715b0287b5493c",
+      "bytes": 31268,
+      "line_count": 163,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 13,
+          "text": "更新：2026-10-20。目标：统一本机 Web 工作台、Codex 与 Claude Code 接入契约、协调数据与制品存储一体化。开发代码已进入 `3.1.0-dev.4`，schema 6、公共 API `3.1-dev1`，正式发行仍为 3.0.0。阶段 B 新增受控本机来源、执行前端点绑定及双通道常驻搬运；旧 fleet 接入、完整 held 管理和真实单角色→双角色试点尚未完成。后续仍按 A → B → C → D 推进；开发包验收不代表整个 B、旧 fleet 切换或 3.1 正式发行。\n\n## 已确定\n\n2026-10-19 收尾与后续入口：已验包集中在项目 [releases](../releases/README.md)，原证据按相对于本会话目录的路径保存在 `releases/development-archive/2026-10-19/development-evidence.zip`。下文的历史绝对路径仅记录当时来源，原临时预览已离线，不能再当作当前可用链接。新会话从 [接手入口](MASTERAGENT_NEXT_SESSION.md) 开始，具体票据见 [执行工单](MASTERAGENT_EXECUTION_BACKLOG.md)，后续包号与放行门槛见 [版本路线](MASTERAGENT_VERSION_ROADMAP.md)。归档与维护脚本不增加平台功能、不改变开发版号，也没有新增真实模型验收。\n\n- 主要入口：本机 Web 工作台，用户已确认。\n- Claude Code：用户确认暂不可用，先完成接入设计；真实验证不能以替身代替。\n- 业务可替换、精确身份、执行归属与运行中收信能力继续保留。\n- 默认沿用每个独立状态根的 SQLite 事务库与本机制品目录，跨部署只读聚合。\n- 认证连接、角色部署和原生历史分层设计；3.0 验收目录的认证复用授权不扩展。"
+        },
+        {
+          "start_line": 17,
+          "end_line": 29,
+          "text": "- 核对主目录 18 个平台模块全部与正式 3.0.0 包一致。\n- 接续运行负责人新增的发行归档和 3.0 接管工作态，保持其当前文件与职责边界。\n- 完成 UI、存储、运行时三方面源码审查，识别旧 UI 查询写状态、页面启动耦合运维、双运行线缺路由/回执、V3 模型与用量观察不足等问题。\n- 查阅当前 Codex App Server 与 Claude Code/Agent SDK 官方资料，区分原生能力、项目已实现能力和待验收能力。\n- 保存 [3.1 方案](MASTERAGENT_3_1_PLAN.md)，明确 dev.1–dev.3、灰度与验收顺序。\n\n立项阶段只有静态核查和设计交付。后续 dev.1 的实现与测试单独记录如下。本开发会话仍无 agent-bus 角色绑定，不按工作目录推断身份，也不进行登记或接管。\n\n## dev.1 实现\n\n已实现统一查询契约及五入口工作台：部署/安装/代次上下文、任务分页与详情、成员与待确认视图、业务资料和运行连接状态。HTTP 与 CLI 使用同一查询对象，单响应只读事务；字段白名单排除身份令牌、原始协议与私有推理内容。\n\n页面与执行/维护生命周期独立，前端采用原生 ES modules 拆分组件、状态及请求层，不新增框架或运行期外部资源。所有七个静态资源由现有 Python 发行构建固定收录。提供显式创建新目录的合成样例脚本，完成 A→B→A、分页及任务状态场景。"
+        },
+        {
+          "start_line": 43,
+          "end_line": 57,
+          "text": "## dev.2 第一批实现与验收\n\n用户指出新旧界面差异后，已补做源码功能核对并形成 [21 入口迁移清单](MASTERAGENT_3_1_UI_COVERAGE.md)。本批在五个主页面增加原功能目录和操作说明，逐项标出局部对应、未迁入及兼容去向。显式配置本机旧控制台 URL 后提供 21 个页签链接，但不自动探测或启动旧服务。旧页面源码增加已知页签的片段导航；运行中的旧服务未重启、未点击验证，仍可能需要手动切换页签。目录齐全不等于全部功能迁入，现阶段仍不能替代现有控制台。\n\n公共命令层 `masteragent/workbench_commands.py` 由 HTTP 与 CLI 共用，接入提交、补充、明确决定和请求停止。默认只读，网页写操作由 `--enable-commands` 显式开启；同源、进程 CSRF、严格 JSON 字段与大小检查保护 HTTP 入口。业务、代次、任务和执行归属在同一领域事务内校验。命令只打开已有状态，不初始化或迁移，不读取运行配置或启动执行服务。\n\n表单草稿按状态根、业务、代次及目标隔离，刷新快照保留内容与焦点。提交后锁定请求；结果不明只重试原标识和内容。相同停止请求在当前代次下保持稳定回执，即使后续已退出或租约到期；不同原因、跨代次及错误目标仍被拒绝。补充保存不代表收到，停止请求不代表退出；未选择决定不会被解释为拒绝。\n\n查询增加公开的持久执行证据、操作可用性和有界通知元数据。实际模型/用量缺失继续显示未采集；最近执行记录不是即时登录或模型连接证明；通知 delivered 不是用户已读。查询仍不写状态、不回填通知、不读取原始协议或私有推理。本批没有实现新的原生模型/用量采集器。\n\n**自动化结果：** Python 全套 435 项、148.200 秒，434 项通过，1 项因 Windows 创建软链接权限不足跳过。前端行为 27 项和旧页签导航 3 项，共 30 项通过。覆盖命令事务守卫、严格载荷、重复请求及不明结果、读写边界、错误秘密抑制、公共观测、草稿隔离与全部已知旧页签。独立包清单与最终源码逐文件一致，包含 9 个前端资源。\n\n**浏览器结果：** 使用全新合成状态根，完成新任务提交、补充保存、明确批准及停止请求四个真实 HTTP 闭环；重读持久记录核对任务 queued、补充 pending、决定 approved/revision 1、停止请求已记录且退出未确认。另核对 21 个目录链接、刷新保留草稿、A→B→A 草稿隔离、未启用业务及历史代次禁用提交、运行能力与未知值。最终独立 `.pyz` 替换开发源码预览后重新加载，版本、目录、操作模式和持久结果一致，浏览器未记录警告或错误。仅桌面浏览器，未新增移动端验收。\n\n所有内容和执行记录均为合成数据，没有调用真实 Codex/Claude、复制认证、读取私人会话或接管生产。本会话仍未绑定 agent-bus 角色。正式 3.0.0 包摘要重新核对不变。"
+        },
+        {
+          "start_line": 65,
+          "end_line": 75,
+          "text": "## dev.2 第二批实现与验收（2026-10-19）\n\n续接前核对上一批包内 30 个平台源码及资源与主目录一致：本轮开始时，这部分没有新增平台变更；这不是对整个仓库、旧 bus 或其他角色工作的结论。本批保留既有修改，未登记 agent-bus 身份、接管生产或访问旧控制台。\n\n**已实现：** Codex App Server 协议层从 `thread/start` 保存服务端配置模型，从精确 thread/turn 的 `model/rerouted` 保存改道目标，并分别标注来源；这些是服务端报告，不能证明后端实际推理模型，`model_observed` 仍保持未知。`thread/tokenUsage/updated` 只读取本次新建原生会话的累计 `total`，不把 `last` 当累计、不累加重复快照。输入、缓存读取、输出、推理输出和总量分别校验；可选缓存写入缺失时保持未知。拒绝计数倒退、不完整、布尔值、负数及越界计数，跨作用域或终止后的消息不能覆盖本次事实。\n\n`runtime_observation` 将有来源的模型与用量写入当前执行事件，运行未结束即可查询；超时、中断或不确定结束保留已知事实，不变成成功结果。查询时间线截断时仍读取最近持久观测，按业务、角色、代次和执行隔离。新增 `runtime_native_request_denied` 只保存原生方法与固定拒绝原因，当前纯文本运行仍自动拒绝工具请求；事件不包含命令、补丁、原始载荷或凭据，也不证明原生端收到拒绝或工具完成。计数 0 仅表示没有已保存的拒绝事件。\n\n工作台分开展示请求模型、服务端报告和实际推理证据；用量改为逐项可读数值，标注协议来源和“本次新建原生会话累计，非单轮增量”。缺失值显示未采集，超过前端安全整数范围的值不伪装成准确数值。执行详情显示观测、异常结束和原生请求拒绝记录，默认只读策略不变。\n\n**原生审批设计：** 完成 [独立实施契约](MASTERAGENT_3_1_NATIVE_APPROVAL_CONTRACT.md)。现有业务 `Decision` 会改变任务状态和队列，不能直接承接运行中原生工具审批。契约要求独立的审批记录、精确原生关联、答复和不明回执语义，等待期间继续接收补充/停止；部署工具上限与可验证隔离能力须先落实。schema 5、审批持久层和按钮均未实现，本批不迁移状态库。协议形状已核对本机 `codex-cli 0.163.0` 导出的 318 个 JSON schema，未启动真实模型或读取认证。"
+        },
+        {
+          "start_line": 89,
+          "end_line": 99,
+          "text": "## 阶段 A 实现与验收：dev.2.2（2026-10-19）\n\n用户采纳 [审阅取舍](ASTRA_3_1_REVIEW_DECISIONS_20261019.md) 后，已把 [实施计划](MASTERAGENT_3_1_PLAN.md) 的后续顺序改为 A → B → C → D。阶段 A 只增加任务可见性和明确契约；没有创建路由账本、审批表或执行状态迁移。\n\n**已实现：** 新增稳定的 `task-history` 公共查询，HTTP 与 CLI 共用实现。任务按 installation + task 定位，目录包含创建、当前归属、接续及执行相关代次；纯排队、没有 Attempt 的多次续接也可见。接续、执行尝试、平台决定、成果、补充信息、公开事件、平台通知分别分页；游标绑定状态根、业务、任务、UI 查询代次、记录代次和分类。每节限制新增记录上界，但不声称提供过去时点快照。原 `task` 详情继续按 dispatch 代次过滤，历史 Attempt 不带写操作，已有写守卫保持不变。\n\n工作台增加完整任务 ID 查询入口，旧详情返回 404 时仍可进入跨代任务链。历史视图完全只读，当前代次的历史决定也不能在这里答复；切换业务、任务、代次、分类或页码时隔离迟到响应。配置增加 `contract_revision=2026-10-19-task-history-1` 与 `capabilities.task_history`，新界面遇到没有能力声明的旧服务时不请求新端点。\n\n保存新任务后可直达刚保存的任务；表单和时间线分别显示成员快照、租约、领取记录及模型连通未知状态。快照不完整或陈旧不能断言没有成员；没有常驻成员也不能否定已有的单次领取。详情常驻自己的快照时间，概览明确标为“平台决定”，不与原生工具审批混用。\n\n**后续契约：** 冻结 [持久路由与回执契约](MASTERAGENT_3_1_ROUTING_RECEIPT_CONTRACT.md)，覆盖核心原子接纳、来源去重、所有消费入口旧/新排他、目的端幂等接收与查回执、独立 lease/fence、held 核对、文本完整性及上限、冻结与回退、迁移阻断和单角色→双角色纯文本试点。原生审批契约移至 D，不再预占 schema 5；结构版本按实际落库顺序分配。这些是设计约束，不是已交付的持久通道。"
+        },
+        {
+          "start_line": 113,
+          "end_line": 129,
+          "text": "## 阶段 B 核心实现与验收：dev.3（2026-10-19）\n\n本批交付持久文本通道的核心与本机参考目的端，**未完成整个阶段 B**。新库为 schema 5，公共 API 继续 `3.1-dev1`；旧 fleet 没有适配、切流或迁移。旧入口的源码核对与接入门槛见 [入口清单](MASTERAGENT_3_1_ROUTING_ENTRYPOINTS.md)，管理接口见 [路由操作说明](MASTERAGENT_3_1_ROUTING.md)。\n\n**来源与执行归属：** 持久路由按 namespace、带类型的来源 ID、不可变信封和 epoch 裁决；V3 admission 与唯一 Task 同一事务保存。源搬运租约独立于执行租约，策略按签发时固定；重复接纳返回原对象，内容冲突明确拒绝。已接入来源的所有 V3 执行路径共用领取守卫，冻结的队首不会阻塞其他可领取任务；受控 legacy lane 使用单独的 fenced claim，过期执行进入 held。停止接纳、禁止新领取、停止投递分别控制，旧 admission 保留原业务、角色和目的端归属。这里的 legacy lane 仅是新核心裁决，不代表旧 bus 已遵守它。\n\n**结果与目的端：** 完成结果与投递意图同一事务保存，发送在事务外完成。目的端以固定 delivery ID 幂等保存完整 UTF-8 正文、摘要和持久回执；首次发送固定物理 root、随机持久 instance 与协议/限额，后续核对不能换同名空目录或新实例授权重发。发送不明保持 held；查回原回执可转 received，权威 absent 加显式决定才允许同 ID 重试，并有间隔和次数上限。结果超出目的端限额时保留完整平台结果并明确拒绝投递，不静默截断、不重新执行任务。旧 outbox 状态不回填成新 received；agent 处理和用户已读始终未知。\n\n**存储与迁移：** schema 1/2/3/4 仅经显式 `migrate` 保存一致备份后升级至 5，活动执行、未决补充和未停止成员按源版本守卫阻止迁移。固定真实 schema 4 测试 DDL，校验约束、索引以及额外触发器/视图，迁移失败回滚；旧 Actor token 在成功后撤销。没有自动访问旧库、生产迁移或原地降级。实际 3.0.0 独立包尝试读取本批合成 schema 5 时返回 unsupported_schema，库字节保持不变。\n\n**界面：** 成果页与跨代成果只读展示投递状态与回执；平台保存、目的端持久保存、agent 处理和用户已读各自呈现。缺失投递字段表示能力未知，空列表仅说明当前作用域无记录。工作台能力修订为 `2026-10-19-routing-receipts-1`，增加 `result_delivery=true`；未增加网页发送、核对或批准按钮，不展示传输令牌、目的端物理路径及私有绑定。\n\n**独立包合成验收：** 同一最终 `.pyz` 经公开 API 完成空载→A→B→恢复 A、来源重放去重、本机预编排双角色交接、pending/received/held/rejected，以及目的端已提交但回执丢失后查回原回执。恢复记录仍只有一次 Attempt 和一次发送调用。92,021 UTF-8 字节的正文、组合字符、换行、摘要与尾段完整一致；同名空目的端不能解除 held。双角色只是本机合成完成记录，不代表真实模型或模型自主派活。\n\n**浏览器验收：** 最终包独立启动默认只读服务，桌面浏览器验证四种投递状态、跨代成果同一回执和 A→B→A 后清除旧详情。没有警告或错误，回执截图已查看。整个浏览器窗口前后，合成核心数据库 SHA256、长度及修改时间完全一致。未新增移动端验收或重复上一批写操作闭环。\n\n**自动化结果：** 最终 Python 全套 546 项、240.391 秒，545 项通过，1 项因 Windows 软链接权限不足跳过；前端行为及旧导航共 52 项全部通过。包括来源并发/类型去重、epoch 与租约 fencing、冻结和队首跳过、事务回滚、目的端重复/冲突/迟到回执、丢响应核对、固定 root+instance、长文本及超限、显式迁移与备份恢复、真实 CLI 分发和公共投影隔离。初次全量有 1 项旧故障注入测试被新的 schema 检查提前拒绝；随后仅将其持久触发器注入改为 SQLite 连接故障注入，保留真实事务回滚及无孤立 Attempt 断言。成员与迁移专项 66/66、上述完整全量均已重跑通过，生产代码与开发包未因该测试修正改变。独立复核路由专项 31/31、目的端专项 36/36 通过，未发现新增阻断。"
+        },
+        {
+          "start_line": 137,
+          "end_line": 161,
+          "text": "## dev.4 首批：受控来源与常驻搬运（2026-10-20）\n\n本批限定为全新 `SourceStore / masteragent-source-v1`；来源仅发布明确的纯文本 task。17 行入口核对表明确旧消费者和恢复器仍留旧线，新代码不读取这些邮箱、配置或会话。操作步骤见 [受控搬运手册](MASTERAGENT_3_1_TRANSPORT.md)，逐票状态见 [执行工单](MASTERAGENT_EXECUTION_BACKLOG.md)。\n\n来源有独立 `sources.sqlite3`、固定 UUID 与 namespace，整条 UTF-8 信封保存正文、长度和摘要，整数与字符串 ID 分开。来源确认绑定原 admission；最后的 transport completion 只表示确认握手完成，不是模型完成。已确认但握手中断的记录仍在 pending，分页使用持久 sequence 对应的 typed ID 游标，前批失败不阻塞后续消息。\n\nschema 6 新增不可变 `route_endpoints`。首次绑定需要零接纳历史；新接纳前读取两端 descriptor，进入核心事务后对比固定 root、实例、协议与限额，再保存 admission。结果完成与投递意图在同事务写入原目的端绑定，不能到首次发送时再换根。两端与 state、所有保留业务工作区互不重叠；已有未绑定历史不会自动补造证据。schema 1–5 仅显式备份迁移至 6；有效来源租约、在飞或不明旧执行、claimed/sending/held 投递以及既有运行/成员/补充守卫均阻断迁移。\n\n新增 `source-init/publish/query`、`transport-bind/once/serve`。搬运独立于执行器，来源和结果分别等待 Windows 目录事件、分别按领取时固化策略续租，先 arm 再查库。启动先读 backlog；停止阻止新步骤，等待当前 IO 退出后才能报告 stopped。发送已保存但响应丢失时保持 held，服务不自动查询或授权重发，更不会重跑模型。配置改 lane 的竞争窗口以已检查的 route epoch 拒绝，已接纳消息始终查回原 admission。\n\n合成故障验证覆盖：核心接纳、来源确认、平台确认、来源完成各自已提交但响应丢失；来源确认后真实子进程被强制终止，再以新进程上下文接续；跨代/冻结后的原 admission 恢复；长 IO 续租和续租失败；停止期间目的端已经保存；并发 typed ID；空扫描与 wait 之间到达；阻塞来源 IO 时结果通道仍工作。独立审查发现并修复 WAL 拒绝前生成旁文件、过期内存重试导致 50ms 空闲扫描、来源目录误用平台状态目录检查三个问题。它们均为合成环境发现，不能描述为生产事故。\n\n独立 `.pyz` 通过空载→A→B→恢复 A，两种角色和业务包使用同一构建；每段 32,016 UTF-8 字节正文、组合字符、换行和尾段完全一致。回执丢失后同 ID 查回原回执，三段总计 3 次 Attempt、各 1 次 receive；同名替代根不能核对。实际 dev.3 二进制读取 schema 6 返回 `unsupported_schema`，库摘要不变。可重跑脚本为 `scripts/accept_transport.py`；运行目录使用项目外临时根并在完成后清理，证据只保存本机。\n\n本批没有修改 UI 布局或新增网页发送/核对按钮，没有真实 Codex/Claude 推理、生产切换、角色注册或认证读取。B-00（限定范围）、B-01～B-03完成；B-04～B-06在受控 V3 合成范围完成（入口签收表见搬运手册），B-07管理闭环未开始，B-08仅部分合成证据齐全，因此 B 仍未完成。原 3.0 正式包独立保留。\n\n最终 Python 全量 **648 项，646 通过、2 项因 Windows 软链接权限跳过**（219.962 秒）；前端 **52/52**。首次全量 646 项（644 通过、2 跳过）后，独立审查补修停止通知失败时跳过清理的问题，新增回归；随后一轮出现两项既有 Windows 测试时序失败，定位并修正测试握手后重新跑完上述最终全量，失败日志一并归档。停止异常时等待两个通道实际退出，失败仍报告错误；备用每段最多 30 秒的原生等待只检查停止，不查库或扫盘。\n\n最终包：`releases/3.1.0-dev.4/masteragent-3.1.0-dev.4.pyz`；SHA256：`65c7ae5a49260440bbbe9c5ac274e70aca94bca66a1470dd851dfae2c96094ca`。包内 41 个清单条目全部校验，40 个平台源码及资源与当前文件逐字节一致。`releases/3.1.0-dev.4/` 保存包内源码、源码/测试/文档快照、文件摘要和 `evidence/`；真实模型、旧 UI 浏览器和移动端不属于本批验收。\n\n## 下一阶段与剩余范围\n\n继续 B：完成 B-07 的有作用域 held 清单与带请求 ID、revision、操作者理由的共享幂等核对，再收齐 B-08。只有这些合成门槛通过后，才进入本次明确授权的独立真实文本环境。当前已有常驻搬运，但没有完整 held 工作台管理；本机回执不代表 agent 处理或用户已读，新受控来源也不代表旧 fleet 全入口接管。\n\nC 扩展制品索引、统一事件序号和存储可观测性；D 先落实部署工具策略、权限上限和可验证隔离，再做独立原生审批闭环，等待期间继续收信、纠偏和响应停止。历史用量、上下文、提示词审核、工作组、长程任务、生命周期、路径/存储、语音等依覆盖分类保留入口，不静默退役。Claude 真实执行待环境恢复。3.0 验收目录间的认证复用授权不扩展到 3.1。"
+        }
+      ]
+    },
+    {
+      "id": "S12",
+      "path": "docs/ASTRA_3_1_REVIEW_DECISIONS_20261019.md",
+      "sha256": "89c12b8671323947137f605911f696ffb7a1f01e320a05a580dcf56ef8d37f21",
+      "bytes": 22680,
+      "line_count": 147,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 3,
+          "text": "日期：2026-10-19。审阅对象：`3.1.0-dev.2.1`。输入为 [双方意见汇总](prompts/ASTRA_3_1_DEV_REVIEW_20261019.md) 和 [MasterUI 审阅](ASTRA_3_1_MASTERUI_REVIEW_20261019.md)。本报告提出下一批调整，不改写原计划、实现、状态库或运行服务。"
+        },
+        {
+          "start_line": 22,
+          "end_line": 36,
+          "text": "可继续沿用：业务包与部署分离、同构建 A→B→A 隔离、Task/Attempt/Decision、运行中补充和停止、只读查询、公共命令幂等与作用域检查、本机 SQLite 加制品目录、模型来源与累计用量事实。没有证据要求换前端框架、改用数据库服务或整体重写这些模块。\n\n## 对双方意见的逐项取舍\n\nMasterAgent 的五项建议均采纳目标，作三处修正：第一，先验证纯文本单入口闭环，不把工具审批作为所有接管的前提；第二，API 附加字段与数据库结构升级分开判断，审批文档里的 schema 5 改为后续实施时的实际版本；第三，第一轮双角色验证是平台编排的文本任务链，不是模型自主派活。\n\n现有 `request_child` 只接受 queued/waiting 父任务，原生纯文本运行不能自主调用协调工具。因此可先由平台控制方预先建立父子关系，验证子结果进入父任务输入；不能把这种成功算作原生 agent 协作桥完成。【事实 S6】\n\nMasterUI 的五项处理如下：\n\n1. **采纳交接可见性。** 保存回执旁提供“查看已保存任务”，显示同业务/代次/角色的成员快照及时间，再展示领取归属。可接单只是租约与成员状态口径，不写成模型在线；没有成员给出执行服务未就绪的说明，不禁止保存排队。\n2. **强化跨代次可达性。** 以 installation + task 建立稳定只读链入口，包含 continuations、各代次的 Attempt/决定/结果和分页；单独标注任务当前归属。保留当前代列表筛选和写操作守卫，不把读历史变成允许旧代操作。验收包括纯排队续接、旧决定、旧尝试、两次以上续接、截断和跨安装隔离。\n3. **采纳平台决定分名。** 概览与通知先改明确称谓；未来原生审批拥有独立对象、入口、计数和答复状态。当前不制造一个可操作的原生审批入口。\n4. **采纳详情独立快照时间。** 顶栏目前取任务列表快照，详情另行请求；详情应常驻自身 observed_at，显示“公开事件快照”。已有截断/断线说明继续保留。持久游标和补读交付前不宣称即时订阅。\n5. **采纳保留兼容，修改全量迁移预期。** 按下表迁移用户能力，未承接部分保持明确去向；新版深链、旧版页面和离线分别验收。当前没有使用率证据，不据菜单数量决定全部原生重建或退役。"
+        }
+      ]
+    },
+    {
+      "id": "S13",
+      "path": "docs/MASTERAGENT_LOCAL_HANDOFF_20261019.md",
+      "sha256": "deb1a7220158d80e1cf20dc36f25404e5edb3c1fc95db396660d48fc70d98324",
+      "bytes": 6574,
+      "line_count": 55,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 25,
+          "text": "本批次始于 2026-10-19，最终维护复验和封包于 2026-10-20 完成；归档目录保留批次日期。\n\n本次按用户要求规划后续版本、将已验版本和开发证据封存在项目内，并清理项目外的本轮开发副本。用户明确保留最终执行 Codex / Claude Code 会话清理的步骤；本次只交付脚本和合成测试，没有清理真实会话、注销账户或删除专用登录环境。\n\n## 后续接手\n\n从 [下一会话入口](MASTERAGENT_NEXT_SESSION.md) 开始。它记录首读文件、当前基线、路径和身份边界、第一张可安全执行的 B-00 工单，以及可直接复制给下一位接手者的提示。\n\n[执行工单](MASTERAGENT_EXECUTION_BACKLOG.md) 共 34 项：B 12 项、C 7 项、D 9 项、候选版与正式发行 6 项。每项都有前置、最小产物、涉及模块、范围、测试、证据和回退/停止条件。[版本路线](MASTERAGENT_VERSION_ROADMAP.md) 记录 dev.4 → dev.5 → dev.6 → rc → 3.1.0 → 3.1.x / 3.2 的门槛、设计理由及可重新评估条件。\n\n规划不等于发行。当前正式版仍为 `3.0.0`；已验开发版为 `3.1.0-dev.3`、schema 5、公共 API `3.1-dev1`。B 仍缺旧入口适配、常驻搬运和真实文本试点；Claude、工具与完整 UI 等缺口继续列入 3.1，不能挪到未来版本后宣称完成。\n\n## 已封存内容\n\n唯一归档入口为 [releases/README.md](../releases/README.md)。\n\n- 11 个历史版本的原始 `.pyz` 与包内源码，逐版清单记录大小、SHA256、schema、原来源和证据。没有重建或覆盖历史二进制。\n- 3.0 正式包摘要仍为 `69402eaad81035e121fed0d2af07b31f660ea49abc6f80b0516811831967addf`；dev.3 摘要仍为 `538172c6352df4ef79744e2e3582584f1fc223a564b0b65936cc491f5ebd078a`。\n- `releases/development-archive/2026-10-19/development-evidence.zip`：1748 个开发文件，原始总量 25,593,259 字节；ZIP 为 7,177,973 字节。每个文件已对照源文件与 ZIP 校验 SHA256；清理后又完成独立 ZIP 校验。\n- 本次源码、测试和接手材料封存于 `releases/handoff/2026-10-19/`；实际内容和摘要以该目录 `handoff-manifest.json` 为准。当前文档/测试快照不冒充旧版构建时的历史快照。\n- 原外部 `genesis_agent_fleet_v3.0.0_local-bundle.zip` 已按原字节复制到 `releases/3.0.0/`，摘要为 `241bf6b3c89ad64bc39a2dcfc93c416fa7f1580f92bc6d59387e34b5c41488a9`。\n\n归档只留本机，不是可公开分发的资料。认证、原生 home、私人会话与会话隔离备份不进入上述开发证据/源码包。归档库保留历史绝对路径与实例绑定，不可在项目内启动或手改绑定继续发送；新验收使用公开 API 建立独立合成环境。"
+        },
+        {
+          "start_line": 49,
+          "end_line": 53,
+          "text": "## 验证与保存责任\n\n本轮平台核心没有修改：当前 37 个平台源码/资源的摘要仍与 dev.3 包完全一致。历史平台回归为 Python 546 项（545 通过、1 项因软链接权限跳过）和前端 52 项通过；本轮未重复平台整套测试、未新增真实模型验收。\n\n本轮另验证了归档、清理维护脚本、Windows 路径边界、中断恢复及文档链接，最终维护测试记录保存在 `releases/handoff/2026-10-19/verification.json`。合成检查不等于真实账户清理或桌面重启验收。"
+        }
+      ]
+    },
+    {
+      "id": "S14",
+      "path": "docs/MASTERAGENT_VERSION_ROADMAP.md",
+      "sha256": "858644c413c7c53ccec12320a78eae8dca39f8535992f66769118c737ae3d8cd",
+      "bytes": 13939,
+      "line_count": 102,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 3,
+          "text": "更新：2026-10-20。当前正式版为 `3.0.0`；当前已验开发版为 `3.1.0-dev.4` 首批，schema 6、公共 API `3.1-dev1`，B 尚未整体完成。本文件把已采纳的 A → B → C → D 顺序对应到后续包号，不改变 [3.1 方案](MASTERAGENT_3_1_PLAN.md)、[审阅取舍](ASTRA_3_1_REVIEW_DECISIONS_20261019.md) 和 [UI 覆盖清单](MASTERAGENT_3_1_UI_COVERAGE.md) 的承诺。实际证据以 [实施进度](MASTERAGENT_3_1_PROGRESS.md) 为准。"
+        },
+        {
+          "start_line": 19,
+          "end_line": 40,
+          "text": "以下判断需保留理由。重新评估要有可复现证据与独立方案，不因接手模型变化重新猜一遍。\n\n| 判断 | 当前理由 | 何时重新评估 |\n| --- | --- | --- |\n| 每部署 SQLite 事务权威 | 任务/归属/结果/投递意图可在同一事务裁决；换数据库不能替代所有权协议 | 实测容量、锁等待或明确多机部署需求超过已验边界，再比较迁移成本；不默认引入服务或 WAL |\n| 共同契约、两种原生适配 | 用户工作流统一，Codex/Claude 的原生事件、权限和恢复语义不同 | 固定原生版本能力变化时按契约重新测试；不机械互译参数或拼接未知状态 |\n| 业务与部署分层 | 业务可换，目录/账户/权限属于运行环境；同构建 A→B→A 可直接验证 | 新业务确实无法通过公开契约表达时，扩通用契约并补跨业务测试，不能增加业务名分支 |\n| 等待期间继续收信和停止 | 用户需要纠偏；阻塞审批或协作不能令执行失去控制 | 若运行时缺少此能力，明确受限或停止接入；有实际新协议后独立适配，不删掉需求 |\n| held 先核对、不重跑 | 不明不等于未执行，重跑可能重复副作用或产生另一结果 | 只有原对象的权威证据及明确重试决定才推进；不能用超时、空目录或新 ID 证明安全 |\n\n| 版本 | 状态与交付范围 | 必须具备的放行证据 |\n| --- | --- | --- |\n| `3.0.0` | 已正式发行，独立纯文本基线，schema 4 | 保留原包、摘要、发布范围及原验收证据；不重写成具有 3.1 能力 |\n| `3.1.0-dev.1`～`dev.2.2` | 已交付的工作台、公共操作、运行事实与阶段 A | 保留各包独立证据及已知限制，不以新测试追认旧构建 |\n| `3.1.0-dev.3` | 已交付 B 的持久路由、本机参考目的端、回执显示和 schema 5 迁移核心 | 当前合成验收有效；旧入口接入、常驻搬运和真实文本仍未完成 |\n| `3.1.0-dev.4` 及后续修订 | B 收尾目标保留；首批已交付受控来源、端点绑定及常驻搬运，完整核对工作台与真实试点未完成 | B 放行仍要求全部参与入口签收、异常管理、单角色→预编排双角色真实 Codex；首批开发包不代表放行 |\n| `3.1.0-dev.5` | C：持久事件游标、断线补读、制品封存与索引、输入来源和备份恢复 | 不漏事件的补读或显式重取快照；制品崩溃点恢复；独立恢复目录对账；存储查询和 UI 作用域回归 |\n| `3.1.0-dev.6` | D：部署工具策略、可验证隔离、独立原生审批及协作工具契约；Claude 适配继续推进 | 每种开放工具独立过闸；精确请求/内容/答复发送与停止竞态；真实工具验证。Claude 契约与真实验证分别记录 |\n| `3.1.0-rc.N` | 候选版：冻结实际能力，收齐 UI 去向、连接/恢复体验、操作手册、迁移和降级清单 | 完成下述正式版清单；未达门槛继续 rc 或开发版，不通过改名称绕过 |\n| `3.1.0` | 仅对验收通过且明确声明的范围正式发行 | 完成发行复核；记录未开放能力与兼容去向。仍不等于旧 fleet 自动切换 |\n| `3.1.x` | 已发布范围内的缺陷修复、兼容与运维体验改进 | 复现、修复、针对性回归和原关键闭环验证；不以补丁包偷偷扩大工具或数据权限 |\n| `3.2` | 待 3.1 使用证据后立项的建议方向 | 单独范围决策；不能用此编号转移 3.1 未完成承诺 |"
+        },
+        {
+          "start_line": 70,
+          "end_line": 79,
+          "text": "Claude 按共同契约实现独立适配和替身测试，环境恢复后先验 Claude 单独闭环，再验 Codex/Claude 工作态交接。两种原生会话不互相 resume。Claude 不可用不阻塞前述公共实现和 Codex 试点，但真实 Claude/混合团队缺口持续保留在 3.1 放行表。\n\n## 候选版与正式版清单\n\n每个候选包保存一份带证据链接的放行表。必需项未通过，保持开发/候选状态；确需带已知限制发行时，先把具体受限能力、替代入口及用户影响列为范围决定，不能自行取消或挪至 3.2。\n\n1. 同一最终构建通过空载 → A → B → A，跨业务、角色、代次、执行及目的端隔离；公开契约可接不同业务，无具体业务分支。\n2. B 的参与入口、常驻搬运和真实文本闭环完成；C 的事件、制品与恢复证据齐全；D 对声明开放的每项工具、审批与协作能力单独通过。源码静态核查、替身和真实运行分别标记。\n3. 工作台日常路径完成浏览器验收：提交、交接、补充、决定/审批分名、停止、完整成果、回执、核对、历史与资料。缺失/离线/截断状态明确，刷新与切换保留或隔离正确的草稿和选择。\n4. 21 个旧入口逐项列出原生实现、兼容入口、未完成及消费方；二级功能和跨页交互一起核对。兼容深链在新版、旧版、离线状态分别验证；没有等价承接或明确范围决定的能力不退役，不用目录数量算覆盖率。"
+        }
+      ]
+    },
+    {
+      "id": "S15",
+      "path": "docs/MASTERAGENT_EXECUTION_BACKLOG.md",
+      "sha256": "155580fbfda51f7f92bebdece67573d11d6652b16d03d09aa77ea35e7b4b17bc",
+      "bytes": 43778,
+      "line_count": 439,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 22,
+          "text": "# MasterAgent 3.1 逐项执行工单\n\n更新：2026-10-20。开始前读 [下一会话入口](MASTERAGENT_NEXT_SESSION.md)。本表保留全部验收要求；未列于下表的工单仍为 **未开始**。阶段 B 已交付受控本机来源与搬运首批实现，整个 B 尚未完成。每次只领取依赖已满足的工单，证据写入 [进度](MASTERAGENT_3_1_PROGRESS.md)，注明构建、测试、范围与遗留项。\n\n| 工单 | 当前状态 | 证据与剩余要求 |\n| --- | --- | --- |\n| B-00 | 已完成（限定范围） | 17 行静态入口矩阵；首批仅新建 SourceStore，旧生产来源留旧线，未签收生产切换 |\n| B-01 | 已完成 | masteragent-source-v1、固定实例、typed ID、完整正文、两步来源确认、公平分页；来源存储测试 |\n| B-02 | 已完成 | schema 6 端点绑定、准入预检、同事务固化目的端；旧 5 冻结 DDL 与迁移故障测试 |\n| B-03 | 已完成 | 三库独立确认、四个响应丢失窗口、原生确认后强杀重启恢复；单 Task、不自动执行 |\n| B-04 / B-05 | 已完成（限定范围） | V3 入口逐行归口签收；两个独立进程争同一来源任务仅启动一个 Python 合成子进程；原子完成/失联恢复通过。旧 fleet 与真实模型未签收 |\n| B-06 | 已完成（限定范围） | 双通道通知、独立续租/停止、崩溃恢复及独立包 CLI 常驻验证通过；系统服务托管、真实执行与完整 B 放行仍不包含 |\n| B-07 | 未开始 | 已有 CLI 核对与只读投递卡；缺专用 held 列表、共享幂等决定与工作台管理闭环 |\n| B-08 | 进行中 | 独立包 A→B→A、丢回执、旧包拒新库已验；限定入口已签收，B-07 未齐，不能放行真实试点 |\n| B-09 / B-10 / B-11 | 未开始 | 需先过 B-08，随后确定本次专用真实环境；没有沿用旧认证授权 |\n\n首批操作说明见 [受控搬运手册](MASTERAGENT_3_1_TRANSPORT.md)。新开发包号不表示整张 B 清单已完成。\n\n约定：`masteragent/`、`tests_v3/`、`docs/` 都相对唯一项目根 `C:/apphome/agent_fleet`。标“拟新增”的模块名称是建议，实施时先冻结命名及契约。每张工单的“停止”表示停止该项危险或未知操作，独立文档/合成工作仍可推进。这里不授予生产接管、外发、认证复用或角色注册权限。\n\n不预填未来 schema 编号、运行时版本或模型。持久结构变更先冻结 DDL、兼容矩阵与迁移，才分配下一实际 schema；当前 schema 为 6。显式部署验证当前原生版本/能力，服务端模型报告不等于实际推理证据。每批完成后才能生成新版本包；未完 3.1 承诺不能改名放进 3.2。\n"
+        }
+      ]
+    },
+    {
+      "id": "S16",
+      "path": "docs/MASTERAGENT_NEXT_SESSION.md",
+      "sha256": "31ad8349c4d88188b6a0dccf00e67c4760babc20ceab9bf5f2d4dffc9faaa0fc",
+      "bytes": 9808,
+      "line_count": 94,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 9,
+          "end_line": 21,
+          "text": "| 项目 | 核对基线 |\n| --- | --- |\n| 正式版 | `3.0.0`，schema 4；`releases/3.0.0/masteragent-3.0.0.pyz` |\n| 正式包 SHA256 | `69402eaad81035e121fed0d2af07b31f660ea49abc6f80b0516811831967addf` |\n| 已验开发版 | `3.1.0-dev.4`，schema 6，公共 API `3.1-dev1`；`releases/3.1.0-dev.4/masteragent-3.1.0-dev.4.pyz` |\n| 开发包 SHA256 | `65c7ae5a49260440bbbe9c5ac274e70aca94bca66a1470dd851dfae2c96094ca` |\n| 当前能力 | A 完成；B 新增受控来源、准入端点绑定、独立常驻搬运；完整 held 管理及真实试点仍未完成 |\n| 最近完整验证 | 以 `releases/3.1.0-dev.4/release-manifest.json` 与 `evidence/python-tests-final.log` 为准；前端 52 项通过，独立包 A→B→A 与 CLI 常驻合成闭环通过 |\n| 发行索引 | `releases/release-catalog.json` 及各版 `release-manifest.json` |\n| 外部开发副本归档 | `releases/development-archive/2026-10-19/`；实际文件与迁移记录以其中清单为准 |\n| 临时预览 | 旧 55724、61670、54051、60141 预览已关闭或不存在；旧文档 URL 是历史证据，不能当现存服务 |\n\n归档包里的源码只代表该包实际包含内容。当前测试/文档快照的采集时间另记，不冒充历史版本当时快照。正式包、开发包、已运行服务是三种独立事实。"
+        },
+        {
+          "start_line": 54,
+          "end_line": 65,
+          "text": "## 已知未完成，不能口头跳过\n\n- B：完整 held 管理闭环、B-08 整体放行、真实 Codex 单角色及预编排双角色试点；旧生产来源继续留旧。常驻搬运已有合成实现，现有 `legacy` lane 仍不是旧 bus 已遵守核心 fence 的证据。\n- C：持久事件游标与断线补读、制品封存/索引、输入来源、协调状态及制品备份恢复。\n- D：部署工具策略、OS 隔离行为证据、独立 RuntimeApproval、真实工具与原生协作桥；`command` / `file_change` 当前均拒绝。\n- Claude：接入设计可继续，真实 Claude 与混合团队未验；不能用 Codex 或替身结果代替。\n- UI：21 项目录和兼容链接不等于完整迁移；连接、原生恢复、历史用量、工作组等仍须依清单落实去向和受限状态。\n- 发布：3.1 尚未正式发行，旧 fleet 尚未整体切换；3.1 原承诺不能移到 3.2 后宣称完成。\n\n## 第一项可安全开始的工作\n\n先核对本批包和 [工单状态](MASTERAGENT_EXECUTION_BACKLOG.md)，无需重做限定范围的 B-00～B-06。入口签收与常驻证据见 [受控搬运手册](MASTERAGENT_3_1_TRANSPORT.md)；下一项实现 B-07 的专用 held 清单、带请求 ID/revision/理由的共享核对命令与工作台入口，收齐 B-08。已有核心核对不代表工作台管理闭环；不得为跳过签收而扩读旧邮箱或切换在线服务。"
+        }
+      ]
+    },
+    {
+      "id": "S17",
+      "path": "releases/3.0.0/release-manifest.json",
+      "sha256": "7a113c5aaf7286e3a9c32de59c595ad01492a23b1ec1b42d4718783d8708423a",
+      "bytes": 1036,
+      "line_count": 26,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": []
+    },
+    {
+      "id": "S18",
+      "path": "releases/3.1.0-dev.4/release-manifest.json",
+      "sha256": "cf477a66db1533356920d8c38cc04ade6b11120646a3af850125d30bf5a8fb50",
+      "bytes": 2598,
+      "line_count": 79,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": []
+    },
+    {
+      "id": "S19",
+      "path": "releases/3.1.0-dev.4/evidence/acceptance-final.json",
+      "sha256": "142c4a0da37d16235ac2fd19ca77173f1410835a0898916d4bd330b7802a94a9",
+      "bytes": 2034,
+      "line_count": 62,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": []
+    },
+    {
+      "id": "S20",
+      "path": "releases/3.1.0-dev.4/evidence/review.json",
+      "sha256": "cce5b41e3ca4b708e9b3baf759998a636c5b650ee9e01d659e2e215b2184dedf",
+      "bytes": 1099,
+      "line_count": 23,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": []
+    },
+    {
+      "id": "S21",
+      "path": "releases/release-catalog.json",
+      "sha256": "4205de53e6e9471df105f0cdf43f8599fcb7546ad05e359d11312d79179ce37c",
+      "bytes": 16388,
+      "line_count": 378,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": []
+    },
+    {
+      "id": "S22",
+      "path": "docs/prompts/ASTRA_PLATFORM_REVIEW.md",
+      "sha256": "789d927618db8760077f5bd672f206eb7d8af0139bc8c9076ef6986a32d5de9c",
+      "bytes": 11287,
+      "line_count": 98,
+      "snapshot_kind": "working_file_at_capture_not_original_authorship_proof",
+      "excerpts": [
+        {
+          "start_line": 9,
+          "end_line": 15,
+          "text": "## 用户目标与判断标准\n\n项目的核心是在线 Agent 团队协作平台：多个 Agent 具有明确身份、职责和状态，可以持续协作、分派任务、交换结果，并让用户看见团队在做什么、介入决策、恢复中断工作。\n\n现有实现基于 Claude Code，但用户已明确：目前 Claude 完全不可用。本次所有可运行能力、实现与验收均以 Codex CLI 为主，Claude 只保留未来适配接口。Astra 是本次审查与改造使用的主力模型，不是平台唯一允许的模型。\n\n这项前提优先于旧文档中的 Claude 运行、恢复、角色上岗和回归要求。不要把修复 Claude、启动 Claude、获得 Claude 凭据、验证 Claude 执行或组建混合团队设为本次工作的前置条件，也不要因此阻塞重构。现有 Claude 代码可作为行为参考；有价值的协调机制迁入公共核心，失效或耦合的实现允许重构、禁用或退役。历史数据与会话按价值保留，不因 Claude 不可用而直接清空。"
+        },
+        {
+          "start_line": 38,
+          "end_line": 46,
+          "text": "## 目标架构要求\n\n- 平台核心与业务负载分离，支持空载运行和换业务域。\n- 以团队协作为核心整理架构；不预设必须沿用全部现有机制，也不预设必须更换文件总线。提出最小演进方案与必要的替代方案，并比较代价。\n- 区分 runtime、model、role、session、task。当前实现运行时是 Codex CLI，模型选择是另一层；Claude Code 为未来扩展，直接 API 执行是否需要列为独立决策。\n- 公共协调契约与运行时专属行为分离。适配层覆盖启动、事件规范化、终态、取消、超时、权限、身份、恢复和统计；不要把不同 CLI 的参数或行为强行等同。\n- 明确前台与后台执行的能力差异，表达无法支持的能力和退化行为，不能用虚假的在线状态掩盖差异。\n- 新会话历史按 Codex 原生方式保存；历史 Claude 会话不假定可以直接由 Codex resume。需要继承的知识与任务上下文通过可移植工作状态接续，区分任务接续与原生会话恢复。\n- 为 Claude 保留有依据的运行时接口、能力声明与扩展位置即可，不要求实现可用 Claude 适配器。未实现能力明确标为不可用；允许通过契约测试或测试替身验证扩展边界，但不能宣称完成真实 Claude 兼容验证。"
+        }
+      ]
+    }
+  ],
+  "release_verification": [
+    {
+      "version": "3.0.0",
+      "path": "releases/3.0.0/masteragent-3.0.0.pyz",
+      "sha256": "69402eaad81035e121fed0d2af07b31f660ea49abc6f80b0516811831967addf",
+      "bytes": 67055,
+      "matches_catalog": true,
+      "binary_executed_this_audit": false
+    },
+    {
+      "version": "3.1.0-dev.4",
+      "path": "releases/3.1.0-dev.4/masteragent-3.1.0-dev.4.pyz",
+      "sha256": "65c7ae5a49260440bbbe9c5ac274e70aca94bca66a1470dd851dfae2c96094ca",
+      "bytes": 169650,
+      "matches_catalog": true,
+      "binary_executed_this_audit": false
+    }
+  ],
+  "current_version_facts": {
+    "formal": "3.0.0",
+    "development": "3.1.0-dev.4",
+    "development_schema": 6,
+    "catalog_versions": 12,
+    "dev4_python": {
+      "run": 648,
+      "passed": 646,
+      "skipped": 2,
+      "skip_reason": "Windows symlink permissions"
+    },
+    "dev4_frontend_passed": 52,
+    "dev4_real_model": false,
+    "legacy_fleet_takeover": false,
+    "B_complete": false,
+    "full_UI_migration": false,
+    "Claude_real_acceptance": false
+  },
+  "future_evidence_gaps": [
+    {
+      "id": "G01",
+      "topic": "Project start before Git snapshot",
+      "resolution": "Creator attestation or supplied dated artifact, not file mtime."
+    },
+    {
+      "id": "G02",
+      "topic": "Fable first use and public naming",
+      "resolution": "Creator confirmation and authorized naming check at publication time."
+    },
+    {
+      "id": "G03",
+      "topic": "Sep25 through early October changes",
+      "resolution": "Add authorized project artifacts; missing Git commits does not imply no work."
+    },
+    {
+      "id": "G04",
+      "topic": "Other October collaborator models",
+      "resolution": "Retain unknown until explicit evidence."
+    },
+    {
+      "id": "G05",
+      "topic": "3.1 release, Claude/mixed-team and production adoption",
+      "resolution": "Append actual future acceptance records, preserve this baseline."
+    }
+  ],
+  "audit": {
+    "date": "2026-10-20",
+    "report_sha256": "57415f8e1e06f43ce16f62991676d561f6628b1fdfdefdb25404a2de12963aef",
+    "checks_passed": [
+      "454 Git records matched to repository metadata by independent reviewer",
+      "Per-commit coauthor deduplication, monthly and family counts verified",
+      "20 claims reference existing source IDs and Git commits",
+      "22 source file hashes and every saved line excerpt matched",
+      "Formal 3.0.0 and dev.4 binary hashes matched release catalog",
+      "All report links resolve inside project; README entry added",
+      "UTF-8 text and no-email checks passed"
+    ],
+    "independent_review": {
+      "git_history": "passed; no substantive attribution or statistics corrections",
+      "astra_release_scope": "passed after narrowing isolation wording; file/tool and OS permission isolation remain unaccepted"
+    },
+    "historical_tests_rerun": false,
+    "publication_performed": false,
+    "private_sessions_accessed": false,
+    "runtime_code_changed_this_task": false
+  }
+}

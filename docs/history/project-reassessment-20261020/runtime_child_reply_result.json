@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-20T08:40:45.206978+00:00",
+  "scope": "Real Platform SQLite, child completion, member claim, and runtime prompt construction; native probe and execution are synthetic.",
+  "not_verified": [
+    "No real Codex or Claude model execution.",
+    "No persistent MemberWorker event loop or live fleet acceptance.",
+    "Synthetic supervisor success does not prove model semantic adoption."
+  ],
+  "source_sha256": {
+    "masteragent/runtime.py": "343b278246f08b0f8e0ea61eee714225e39d6eac15383dc04eb29396cece0682",
+    "masteragent/runtime_config.py": "8c01c9c8910957aef3d601b5b616ea506c6c6c085326cce3026994beda2fbef1",
+    "masteragent/worker.py": "a631afd44755f9de7c427911fd3657102292a697d0830c8636af5600ead4072f",
+    "masteragent/members.py": "11a99c8796bd0999236f988977d5656fa69d47a2caaf73b6a61ca50eb3b45aba",
+    "masteragent/coordination.py": "0859e9cd2dd231bdbc7b69cd0dd3dd8eda9a9e5ed1bba3e5b48b17c39a04160e",
+    "masteragent/cli.py": "b81f3274d4a0abf52e4d083657e8fb03d68ff37665545993f589169159a61a89"
+  },
+  "script_sha256": "ae0a36b9e42ae9ee84f092b7eeca1cf52c9dfe338c91bb99f070cbe4b29d63fa",
+  "cases": [
+    {
+      "mode": "direct_run",
+      "durable_completed_child_replies_before_execution": 1,
+      "durable_child_output": "SYNTHETIC_CHILD_REPLY_20261020",
+      "parent_state_before_execution": "queued",
+      "prompt_has_completed_requests": false,
+      "prompt_completed_requests": null,
+      "parent_task_state_after_execution": "completed",
+      "parent_attempt_count": 1,
+      "native_supervisor": "in-process synthetic function; no subprocess"
+    },
+    {
+      "mode": "member_claimed_run",
+      "durable_completed_child_replies_before_execution": 1,
+      "durable_child_output": "SYNTHETIC_CHILD_REPLY_20261020",
+      "parent_state_before_execution": "queued",
+      "prompt_has_completed_requests": true,
+      "prompt_completed_requests": [
+        {
+          "request_id": "274b6769-6353-4867-b10b-a801201152bd",
+          "to_role": "child",
+          "request": "SYNTHETIC_CHILD_REPLY_20261020",
+          "child_state": "completed",
+          "result": {
+            "status": "ok",
+            "output": "SYNTHETIC_CHILD_REPLY_20261020",
+            "error": null
+          }
+        }
+      ],
+      "parent_task_state_after_execution": "completed",
+      "parent_attempt_count": 1,
+      "native_supervisor": "in-process synthetic function; no subprocess"
+    }
+  ],
+  "native_subprocess_attempts": 0,
+  "native_probe_attempts": 0,
+  "difference_reproduced": true,
+  "temporary_root_removed": true
+}

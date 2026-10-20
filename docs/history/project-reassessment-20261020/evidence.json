@@ -1,0 +1,607 @@
+{
+  "format": 1,
+  "assessment_id": "masteragent-project-reassessment-20261020",
+  "recorded_at_utc": "2026-10-20T08:47:07.258166+00:00",
+  "scope": "whole_project_reassessment_local_only",
+  "not_performed": [
+    "full_test_suite_rerun",
+    "real_model_execution",
+    "browser_crash_test",
+    "production_state_read",
+    "credential_read",
+    "fleet_start_or_cutover",
+    "source_fix",
+    "external_publication"
+  ],
+  "git": {
+    "head": "f6857cded1b4dd3d3f6797b672dbc4eefaa2dda0",
+    "head_commit_date": "2026-09-24T11:29:53+08:00",
+    "tracked_core_files": 0,
+    "tracked_v3_test_files": 0,
+    "archive_ignored": true
+  },
+  "bundles": [
+    {
+      "version": "3.0.0",
+      "schema_version": 4,
+      "binary": "releases/3.0.0/masteragent-3.0.0.pyz",
+      "sha256": "69402eaad81035e121fed0d2af07b31f660ea49abc6f80b0516811831967addf",
+      "bytes": 67055,
+      "manifest_entries_verified": 19,
+      "product_entries": 18,
+      "current_source_compared": false,
+      "current_source_mismatches": null
+    },
+    {
+      "version": "3.1.0-dev.4",
+      "schema_version": 6,
+      "binary": "releases/3.1.0-dev.4/masteragent-3.1.0-dev.4.pyz",
+      "sha256": "65c7ae5a49260440bbbe9c5ac274e70aca94bca66a1470dd851dfae2c96094ca",
+      "bytes": 169650,
+      "manifest_entries_verified": 41,
+      "product_entries": 40,
+      "current_source_compared": true,
+      "current_source_mismatches": []
+    }
+  ],
+  "static": {
+    "python_modules_parsed": 30,
+    "direct_legacy_imports": [],
+    "scope": "AST import statements only"
+  },
+  "historical_tests_not_rerun": {
+    "manifest_counts": {
+      "python_run": 648,
+      "python_passed": 646,
+      "python_skipped": 2,
+      "python_seconds": 219.962,
+      "frontend_passed": 52
+    },
+    "python_log_tail": [
+      "",
+      "----------------------------------------------------------------------",
+      "Ran 648 tests in 219.962s",
+      "",
+      "OK (skipped=2)"
+    ],
+    "node_log_tail": [
+      "✔ changing business resets history context, and returning from readonly history preserves current write guards (0.3569ms)",
+      "ℹ tests 52",
+      "ℹ suites 0",
+      "ℹ pass 52",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ duration_ms 434.2208"
+    ]
+  },
+  "new_reproductions": {
+    "R01": {
+      "file": "runtime_child_reply_result.json",
+      "difference_reproduced": true,
+      "scope": "Real Platform SQLite, child completion, member claim, and runtime prompt construction; native probe and execution are synthetic.",
+      "native_process_attempts": 0
+    },
+    "R02": {
+      "file": "architecture_endpoint_overlap_result.json",
+      "cases": 4,
+      "gap_cases": [
+        "source_endpoint_first",
+        "receiver_endpoint_first"
+      ],
+      "attempts": 0
+    },
+    "R03": {
+      "file": "product_uncertain_request_reproduction.json",
+      "observed": {
+        "same_store_retry_reuses_request_id": true,
+        "recreated_store_uses_different_request_id": true,
+        "simulated_distinct_saved_requests": 2
+      },
+      "scope": "actual_frontend_module_with_in_memory_backend_double"
+    },
+    "source_hashes_rechecked": 17
+  },
+  "findings": [
+    {
+      "id": "R01",
+      "priority": "P1",
+      "topic": "runtime_child_input",
+      "evidence_level": "synthetic_real_domain_fake_native",
+      "source_paths": [
+        "masteragent/runtime.py",
+        "masteragent/cli.py"
+      ],
+      "related_existing_work": [
+        "B-11"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R02",
+      "priority": "P1",
+      "topic": "endpoint_workspace_creation_order",
+      "evidence_level": "synthetic_real_domain",
+      "source_paths": [
+        "masteragent/service.py",
+        "masteragent/routing.py"
+      ],
+      "related_existing_work": [
+        "B-02",
+        "B-08"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R03",
+      "priority": "P1",
+      "topic": "uncertain_request_identity_recreation",
+      "evidence_level": "frontend_module_memory_double",
+      "source_paths": [
+        "masteragent/workbench_assets/commands.mjs",
+        "masteragent/service.py"
+      ],
+      "related_existing_work": [
+        "B-07",
+        "B-08"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R04",
+      "priority": "P1",
+      "topic": "delivery_exception_discoverability",
+      "evidence_level": "static",
+      "source_paths": [
+        "masteragent/workbench_query.py",
+        "masteragent/workbench_assets/views.mjs"
+      ],
+      "related_existing_work": [
+        "B-07"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R05",
+      "priority": "P2",
+      "topic": "two_delivery_paths",
+      "evidence_level": "static",
+      "source_paths": [
+        "masteragent/workbench_commands.py",
+        "masteragent/deliveries.py"
+      ],
+      "related_existing_work": [
+        "B-10",
+        "B-11"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R06",
+      "priority": "P2",
+      "topic": "deployment_connection_continuity",
+      "evidence_level": "static",
+      "source_paths": [
+        "masteragent/runtime_config.py",
+        "masteragent/workbench_query.py"
+      ],
+      "related_existing_work": [
+        "B-09"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R07",
+      "priority": "P2",
+      "topic": "runtime_vendor_coupling",
+      "evidence_level": "static",
+      "source_paths": [
+        "masteragent/runtime_config.py",
+        "masteragent/worker.py"
+      ],
+      "related_existing_work": [
+        "D"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R08",
+      "priority": "P2",
+      "topic": "observation_continuity",
+      "evidence_level": "static",
+      "source_paths": [
+        "masteragent/workbench_assets/app.mjs"
+      ],
+      "related_existing_work": [
+        "C-01",
+        "C-02"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R09",
+      "priority": "P2",
+      "topic": "coordinated_restore",
+      "evidence_level": "static_and_plan",
+      "source_paths": [
+        "masteragent/storage.py",
+        "masteragent/routing.py",
+        "masteragent/transport.py"
+      ],
+      "related_existing_work": [
+        "C-06",
+        "C-07"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R10",
+      "priority": "P2",
+      "topic": "unbounded_delivery_query",
+      "evidence_level": "static_not_benchmarked",
+      "source_paths": [
+        "masteragent/deliveries.py",
+        "masteragent/transport.py",
+        "masteragent/delivery_schema.py"
+      ],
+      "related_existing_work": [
+        "B-06"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R11",
+      "priority": "P2",
+      "topic": "current_fact_drift",
+      "evidence_level": "static",
+      "source_paths": [
+        "README.md",
+        "docs/MASTERAGENT_VERSION_ROADMAP.md",
+        "masteragent/workbench_assets/views.mjs"
+      ],
+      "related_existing_work": [],
+      "implementation_changed": false
+    },
+    {
+      "id": "R12",
+      "priority": "P1_conditional_before_tools",
+      "topic": "resource_takeover_fencing",
+      "evidence_level": "future_capability_gate",
+      "source_paths": [
+        "masteragent/members.py",
+        "tests_v3/test_members.py"
+      ],
+      "related_existing_work": [
+        "D"
+      ],
+      "implementation_changed": false
+    },
+    {
+      "id": "R13",
+      "priority": "P2",
+      "topic": "source_delivery_reproducibility",
+      "evidence_level": "git_metadata_and_archive",
+      "source_paths": [
+        ".gitignore",
+        "scripts/build_v3.py",
+        "releases/README.md"
+      ],
+      "related_existing_work": [],
+      "implementation_changed": false
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 1263,
+      "sha256": "98e55090833c9424d0fdd3507cdce9e9583dc47ce41600f9320a369392f7b40f"
+    },
+    {
+      "path": "agent_bus/bus/exec.py",
+      "bytes": 3236,
+      "sha256": "02e9923d961e5e636ee535dd4eea96ebc231a98fa81ea43c8e982d679af9742e"
+    },
+    {
+      "path": "agent_bus/worker_daemon.py",
+      "bytes": 7232,
+      "sha256": "39aaeaa304696a08814a4f8f7258fde6eb6fea0dbf7acbc39b61070a7ed90a41"
+    },
+    {
+      "path": "AGENTS.override.md",
+      "bytes": 7495,
+      "sha256": "e294ca800f4018d89458400917c7d165a2d348ea368cd184b16046250be5325e"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/architecture_endpoint_overlap_repro.py",
+      "bytes": 8941,
+      "sha256": "ec34749bb8830b42c209a1a9616d89ea9250aa41768419081aeceb1583f1fe87"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/architecture_endpoint_overlap_result.json",
+      "bytes": 5909,
+      "sha256": "303f49e6cd3ad7711941864e9144e8fadcebbd6ee5686ab6a0ffc6d81da02098"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/architecture_endpoint_overlap_summary.md",
+      "bytes": 3567,
+      "sha256": "a99512a80a1fc032a0076b84b3500ed5a6b32af0e68365a7fc7fc506b18c018e"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/collect_evidence.py",
+      "bytes": 11662,
+      "sha256": "5d3b9bb3633f716ed76cfc57f6e618b6b5ca184294edc7836eeb6f5a3de3f6fa"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/product_uncertain_request_reproduction.json",
+      "bytes": 3362,
+      "sha256": "d4076835b03b66452db0f10f65bb88a24f9ddb762ba5be235c560a5642ebe192"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/product_uncertain_request_reproduction.mjs",
+      "bytes": 5678,
+      "sha256": "fd620e875e83a20e1c929f1dc8483e03823da42b1982c29fcbceb59db8585add"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/README.md",
+      "bytes": 4000,
+      "sha256": "ad7e889b3ec62b6d48f8be0ac761afb528b35fdd1023801cb737e0cb9b11fc56"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/runtime_child_reply_repro.py",
+      "bytes": 9127,
+      "sha256": "ae0a36b9e42ae9ee84f092b7eeca1cf52c9dfe338c91bb99f070cbe4b29d63fa"
+    },
+    {
+      "path": "docs/history/project-reassessment-20261020/runtime_child_reply_result.json",
+      "bytes": 2594,
+      "sha256": "0a9333bcd78ce7771d33d2e60230bf9a3278c8a3c0ffbdfecdd03445d8eee260"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_1_NATIVE_APPROVAL_CONTRACT.md",
+      "bytes": 23945,
+      "sha256": "f8000f76c1683e272b1bfe04498026e497616044495af7b68e1aa304cd2eb8fa"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_1_PLAN.md",
+      "bytes": 26841,
+      "sha256": "61bdb6ea5cd1165be46e8271bd1313c836b1b701da6711dee69f4d75a7d13dc5"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_1_PROGRESS.md",
+      "bytes": 31268,
+      "sha256": "5ff2943d3030fb741f1ceac5b10c04fb405760c48c54d671bc715b0287b5493c"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_1_ROUTING_ENTRYPOINTS.md",
+      "bytes": 30342,
+      "sha256": "903378417f6586ed3c923bc78aa7e36dac460a8e08d001540e268fd5cb8579f6"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_1_UI_COVERAGE.md",
+      "bytes": 19638,
+      "sha256": "28219492f7809c9baf51ab1f6cc1ca91bc139dcb672f5250ad0841faf171b503"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_RELEASE.md",
+      "bytes": 5920,
+      "sha256": "fefd8ef2aeafae4ad7c186c092e84e9ca3c051b3c5f51a6572e8166c043e8b64"
+    },
+    {
+      "path": "docs/MASTERAGENT_3_TAKEOVER_20261013.md",
+      "bytes": 6051,
+      "sha256": "46a43a8db9f11370ee1bb0cd0a81381a9a9b0906a41bc542d36d558d0c5ea4b5"
+    },
+    {
+      "path": "docs/MASTERAGENT_EXECUTION_BACKLOG.md",
+      "bytes": 43778,
+      "sha256": "155580fbfda51f7f92bebdece67573d11d6652b16d03d09aa77ea35e7b4b17bc"
+    },
+    {
+      "path": "docs/MASTERAGENT_MODEL_CONTRIBUTIONS_REASSESSMENT_20261020.md",
+      "bytes": 16708,
+      "sha256": "d26bfd640d646bd075332cdd2e01f44065401ba297ef84376fd4b3b1acb25241"
+    },
+    {
+      "path": "docs/MASTERAGENT_NEXT_SESSION.md",
+      "bytes": 10259,
+      "sha256": "69d7c00476e328d8f3766b421820648b311f55db777d77c42926f5542d2fa682"
+    },
+    {
+      "path": "docs/MASTERAGENT_PROJECT_REASSESSMENT_20261020.md",
+      "bytes": 25343,
+      "sha256": "a55c23c8820ebfa949c312de4696fa5b0e16a67d45f43ed0296f2b96844255e0"
+    },
+    {
+      "path": "docs/MASTERAGENT_VERSION_ROADMAP.md",
+      "bytes": 13939,
+      "sha256": "858644c413c7c53ccec12320a78eae8dca39f8535992f66769118c737ae3d8cd"
+    },
+    {
+      "path": "docs/prompts/ASTRA_PLATFORM_REVIEW.md",
+      "bytes": 11287,
+      "sha256": "789d927618db8760077f5bd672f206eb7d8af0139bc8c9076ef6986a32d5de9c"
+    },
+    {
+      "path": "masteragent/cli.py",
+      "bytes": 26450,
+      "sha256": "b81f3274d4a0abf52e4d083657e8fb03d68ff37665545993f589169159a61a89"
+    },
+    {
+      "path": "masteragent/codex_app_server.py",
+      "bytes": 27950,
+      "sha256": "88515b5ecaafb08df6f0e2da2d5d78b66e5282f62320cfcbd2dc07352776c290"
+    },
+    {
+      "path": "masteragent/contracts.py",
+      "bytes": 10238,
+      "sha256": "08bf8f74bea54681e59593ca385689a3165600fb77dab37c02342390a876e2dd"
+    },
+    {
+      "path": "masteragent/coordination.py",
+      "bytes": 20947,
+      "sha256": "0859e9cd2dd231bdbc7b69cd0dd3dd8eda9a9e5ed1bba3e5b48b17c39a04160e"
+    },
+    {
+      "path": "masteragent/deliveries.py",
+      "bytes": 26119,
+      "sha256": "f5ac12346ec3dfda16a8042aea257e170dda8c819103ffebf42a5a8c55267198"
+    },
+    {
+      "path": "masteragent/delivery_schema.py",
+      "bytes": 2772,
+      "sha256": "69c2cf1cd82422ad377c3a5df6d6f0a6ab67d9631b8de74f724f7fc948943fac"
+    },
+    {
+      "path": "masteragent/deployment.py",
+      "bytes": 2336,
+      "sha256": "7eb0f869de807dbcc8db04ed0e827594c8b962a1b08543d96408026b986dab89"
+    },
+    {
+      "path": "masteragent/members.py",
+      "bytes": 15623,
+      "sha256": "11a99c8796bd0999236f988977d5656fa69d47a2caaf73b6a61ca50eb3b45aba"
+    },
+    {
+      "path": "masteragent/receipt_store.py",
+      "bytes": 17213,
+      "sha256": "477db0f96acafcd2fd3682bd54e8b35254965a470cb12c82dea19e77083b77dc"
+    },
+    {
+      "path": "masteragent/routing.py",
+      "bytes": 36582,
+      "sha256": "3b95e580a81b1aaf3b99434915c3dd8591bdd2e758fc177222d72c8ea53abfab"
+    },
+    {
+      "path": "masteragent/runtime.py",
+      "bytes": 17114,
+      "sha256": "343b278246f08b0f8e0ea61eee714225e39d6eac15383dc04eb29396cece0682"
+    },
+    {
+      "path": "masteragent/runtime_config.py",
+      "bytes": 18354,
+      "sha256": "8c01c9c8910957aef3d601b5b616ea506c6c6c085326cce3026994beda2fbef1"
+    },
+    {
+      "path": "masteragent/service.py",
+      "bytes": 57101,
+      "sha256": "64ec84254b2c47205124ba8361a5a642d36fad7bd5301a2c84c92f912bf899ce"
+    },
+    {
+      "path": "masteragent/source_store.py",
+      "bytes": 17203,
+      "sha256": "fb08b90db52b66a64c7da9475378456617a8e07f0a8980f0f8b72f1729813459"
+    },
+    {
+      "path": "masteragent/storage.py",
+      "bytes": 25208,
+      "sha256": "8d8137211df656729ab721e8d53238e9d5a2a4a872069bf01750a85df938fdec"
+    },
+    {
+      "path": "masteragent/transport.py",
+      "bytes": 16176,
+      "sha256": "1634c97c2f0765c9bdb3e9b0f40ae630bd55a1e349cc36eea043b2089d1f3294"
+    },
+    {
+      "path": "masteragent/workbench_assets/app.mjs",
+      "bytes": 18005,
+      "sha256": "ccba3c666ae269b015089b60c69692efeb46997be76371c7b3175925166f3f91"
+    },
+    {
+      "path": "masteragent/workbench_assets/commands.mjs",
+      "bytes": 7635,
+      "sha256": "d25acfa653a7811652c15d858f71b79ea390acf3a2a2d6636da9df928ce34c52"
+    },
+    {
+      "path": "masteragent/workbench_assets/index.html",
+      "bytes": 2891,
+      "sha256": "e28d8747cc04398d729e02fa66d50fc2c5a48e46d1cba71b09d021767233ccc3"
+    },
+    {
+      "path": "masteragent/workbench_assets/navigation.mjs",
+      "bytes": 9646,
+      "sha256": "30aeb4dca7ea7703ee36ef04b056e6eb6cb9b5b683cd792459b7654c3e6d82e0"
+    },
+    {
+      "path": "masteragent/workbench_assets/views.mjs",
+      "bytes": 51133,
+      "sha256": "8d05d238722f9a4e1499708ce7015f414daaf0b0ede75f562b407d739c57dbeb"
+    },
+    {
+      "path": "masteragent/workbench_commands.py",
+      "bytes": 6552,
+      "sha256": "367b9b4228aa8119c205dfb6af1f1b3bfb47fe774aa63c55e816259e117f3da0"
+    },
+    {
+      "path": "masteragent/workbench_query.py",
+      "bytes": 39521,
+      "sha256": "f04a21ce0cb2c480325707afd0142e2daa35be43ebfb1d4a16ab8d343a40bf43"
+    },
+    {
+      "path": "masteragent/worker.py",
+      "bytes": 8836,
+      "sha256": "a631afd44755f9de7c427911fd3657102292a697d0830c8636af5600ead4072f"
+    },
+    {
+      "path": "README.md",
+      "bytes": 7517,
+      "sha256": "4f8d479ab2cc5a7e6e8fde4e52cc8fbc95537e5cc74a9b808f37660e9845eb2c"
+    },
+    {
+      "path": "releases/3.0.0/release-manifest.json",
+      "bytes": 1036,
+      "sha256": "7a113c5aaf7286e3a9c32de59c595ad01492a23b1ec1b42d4718783d8708423a"
+    },
+    {
+      "path": "releases/3.1.0-dev.4/evidence/acceptance-final.json",
+      "bytes": 2034,
+      "sha256": "142c4a0da37d16235ac2fd19ca77173f1410835a0898916d4bd330b7802a94a9"
+    },
+    {
+      "path": "releases/3.1.0-dev.4/evidence/node-tests.log",
+      "bytes": 5688,
+      "sha256": "7962cf844591973a7b14cb7fdc38e7df148adf3a508efc86db7fedc194cb3ef7"
+    },
+    {
+      "path": "releases/3.1.0-dev.4/evidence/python-tests-final.log",
+      "bytes": 107864,
+      "sha256": "f86a478c51938a650b45857da79f457fb61d45862a30ccd9a636129b083cf153"
+    },
+    {
+      "path": "releases/3.1.0-dev.4/release-manifest.json",
+      "bytes": 2598,
+      "sha256": "cf477a66db1533356920d8c38cc04ade6b11120646a3af850125d30bf5a8fb50"
+    },
+    {
+      "path": "releases/README.md",
+      "bytes": 4385,
+      "sha256": "416c572014d018c02c1dcab929ece5b6cd73d000f6322351ceb995f8a51b5705"
+    },
+    {
+      "path": "releases/release-catalog.json",
+      "bytes": 16388,
+      "sha256": "4205de53e6e9471df105f0cdf43f8599fcb7546ad05e359d11312d79179ce37c"
+    },
+    {
+      "path": "scripts/build_v3.py",
+      "bytes": 3321,
+      "sha256": "c44fb841baa50b1f1e2afd9e7ae7290edddb8c43eeb38b94c96ec3a13c3715e8"
+    },
+    {
+      "path": "tests_v3/test_members.py",
+      "bytes": 19242,
+      "sha256": "590560fd49375b47c3a07570dfe75ebc83def345d3776c3730a3f680dd9402fc"
+    },
+    {
+      "path": "tests_v3/test_route_endpoints.py",
+      "bytes": 27807,
+      "sha256": "74f65c2188c4429c7ea3b24a467382d4fc39a344ee8ab4987e598aced112502d"
+    },
+    {
+      "path": "tests_v3/test_worker.py",
+      "bytes": 18416,
+      "sha256": "315a93c472187285397b8893eee3ee53790044a859d6c20524238377db1d0895"
+    }
+  ],
+  "integrity_note": "Hashes establish the local reviewed bytes; they are not external attestation."
+}

@@ -1,0 +1,1387 @@
+{
+  "schema_version": 1,
+  "as_of_date": "2026-10-20",
+  "captured_at": "2026-10-20T16:33:27+08:00",
+  "visibility": "local_only_not_publication_approved",
+  "report": "docs/MASTERAGENT_MODEL_CONTRIBUTIONS_REASSESSMENT_20261020.md",
+  "baseline": [
+    {
+      "path": "docs/MASTERAGENT_MODEL_CONTRIBUTIONS_20261020.md",
+      "sha256": "57415f8e1e06f43ce16f62991676d561f6628b1fdfdefdb25404a2de12963aef"
+    },
+    {
+      "path": "docs/history/model-contributions-20261020/evidence.json",
+      "sha256": "29f9840287f79ac7a4ad93a95ec9e178b8f6cad3afb044c3a9c983de44dc5320"
+    },
+    {
+      "path": "docs/history/model-contributions-20261020/git-model-ledger.json",
+      "sha256": "4ff4b8aa5bfc546940b2094836aa6c6f13d1d576ec070192db3670fe137a0a01"
+    }
+  ],
+  "git_head": "f6857cded1b4dd3d3f6797b672dbc4eefaa2dda0",
+  "baseline_source_hashes_unchanged": 22,
+  "method": {
+    "unit": "outcome_and_correction_case",
+    "separate_axes": [
+      "artifact_or_behavior_evidence",
+      "model_attribution_evidence"
+    ],
+    "labels_not_authenticated": true,
+    "no_numeric_ranking_or_share": true,
+    "acceptance_levels_kept_separate": [
+      "historical_static_record",
+      "historical_synthetic_or_protocol_test",
+      "actual_OS_process_check",
+      "limited_real_native_model_acceptance",
+      "production_adoption"
+    ],
+    "review_style": "three delegated read-only reviews within one task, not external replication or a multi-model benchmark"
+  },
+  "source_files": [
+    {
+      "id": "N01",
+      "path": "docs/UI_2.0_CLOSEOUT.md",
+      "sha256": "4f2ef64f495465adbc7105a272b4dd617194747ce1990db9c4b2dc51cdbcb479",
+      "bytes": 3512,
+      "line_count": 32,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 31,
+          "text": "# UI 2.0 收口决议(2026-07-29 · MasterAgent 主实现 · Master数分逐阶段验证)\n\n> 立项:用户 2026-07-29「下一个版本是 UI 优化改造,同 2.0 的策略」;当日「一直到完成,我明天来看结果」。\n> 方案 `docs/UI_2.0_PLAN.md`;分工变更:U1-U4 实施=MasterAgent(用户令·模型等级考量),MasterUI 保留 WebUI 运行位。\n\n## 交付总览(全部当日闭环)\n\n| 阶段 | 交付 | commit | 机器验 | Master数分验 |\n|---|---|---|---|---|\n| U0 金标准 | ui_smoke.py 38→69 用例(Master数分审计三缺口补齐) | 2060b31/a0762b3 | 69/69 | ✅绿(逐项复验) |\n| U1 morphdom 收尾 | uProj 钻取/prompts 展开【状态驱动化】+ ctxKpis/procFoot/archive 汇总 morph 化 | b738176 | 69/69 | ✅绿(白盒·结构保证级) |\n| U2 一致性 | 派工效率死码面板复活(dm* 容器从未落·git -S 佐证)+ 审计实况记录 | c9e7c27 | 73/73 | ✅绿(数据源核实) |\n| U3 route 防误派 | route_scores 单一源 + GET /api/route + 派活表单建议对口 chip | f0cbb86 | 77/77 | ✅绿(CLI/API 直接复现一致) |\n| U4 拆分 | page.py 2875 行 → 装配层 25 行 + css/body/js 三分(sha256 字节级一致) | dc33cc0 | 77/77+43/43 | 见 U4 验单 |\n\n## 关键决议与实况澄清(防后人按提案误判)\n\n1. **提案 vs 实况**:提案(WEBUI_UPGRADE_PROPOSAL.md)成文早于现状——舰队/daemon/事件/回填/BI/派工JS/caps/ctx/archive/sessions 的 morph 化、历史用量独立 tab、可见性门控(showTab 进 tab 拉数 + bi/caps 循环按 curTab)在本版本前已落地。本版本做的是**残留清障**,审计结论如实记录、不虚报工作量(data-truthfulness)。\n2. **状态驱动教义落地**:命令式注入子树(uProj 钻取、prompts 展开)一律先改 state(openProjRaws/openPrompts Set)再 morph——展开态是渲染的纯函数输入,刷新不丢是**构造保证**(Master数分 U1 白盒定性)。\n3. **innerHTML 合法残留**:morph 异常兜底、一次性 error/loading 占位、canvas 旁 legend/tooltip 小元素、health 点击弹层——无态无周期刷新,不闪,不改(改=无收益风险)。\n4. **主 load() 不门控**:/api/state 喂全局顶栏徽标(连接/在岗/待确认/健康),设计上跨 tab 常刷;门控只针对重面板(psutil/账单类)。\n5. **派工效率面板**:renderDispatch/loadDispatch JS 全套存在而 dm* 容器 HTML 从未进过 git(P4 拆分丢失或从未落)——本版本补容器 + showTab('bi') 接线,**不加轮询**(metrics.jsonl 只在任务完成时变,进 tab 拉足够)。\n6. **U4 拆分验收标准**:INDEX_HTML 拆前后 **sha256 字节级一致**(比\"冒烟绿\"更强的纯搬运证明);morphdom vendor blob 留在 page_js(单行、极少改动,单拆无收益)。\n7. **B2/D6 不在本版本**:B2(start_maint 周期 reap+todos-archive)/D6(cost 口径)属 MasterUI 运行位遗留,与 UI 代码改造无耦合,留 MasterUI 排期。\n8. **route chip 范围**:只做派活表单(send form);待办卡\"派给\"下拉未加 chip(卡片空间窄 + roleSel 已防冲选),需要时以 U3 同源端点扩展。\n\n## 铁律执行记录\n\n- 每阶段 ui_smoke + bus_smoke 双绿才进下一阶段(全过,无一例外);基线只增不减(38→69→73→77)。\n- 每次改 page.py:py_compile + 抽 JS node --check + WebUI 重启(pythonw 常驻,改码必须重启生效)+ 双冒烟。\n- Master数分逐阶段异步验证,不阻塞推进;其白盒验证口径(Edge CDP 未起时以代码路径结构验证替代盯屏,诚实标注边界)被采纳。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N02",
+      "path": "docs/UI_2.0_PLAN.md",
+      "sha256": "4580a987fd4594f6d20533974eb18ef5328214219e0b25d975a90c7aa026b007",
+      "bytes": 3659,
+      "line_count": 43,
+      "excerpts": [
+        {
+          "start_line": 17,
+          "end_line": 35,
+          "text": "| 阶段 | 内容 | 主实现 | 验证 | 备注 |\n|---|---|---|---|---|\n| **U0 金标准** | `ui_smoke.py` + 基线:GET 端点全量 200+JSON 键 / 页面关键面板锚 / 安全 POST(400 校验·supervise dry-run)/ SSE 连通;基线比对(端点消失=回归)。★Master数分审计补三缺口后 38→69 用例(a0762b3),Master数分绿灯已出 | MasterAgent(✅完) | Master数分(✅绿) | 对应 bus_smoke;每阶段必跑 |\n| **U1 morphdom 全铺** | ①舰队总览(M·最高收益) → ②BI/派工/会话/活动只读表(S×n) → ③用量表格周边(canvas 不 morph)+ live.log 保滚动位 | MasterAgent | Master数分逐面板 | 模式=待办池样板;一面板一上不阻断 |\n| **U2 一致性** | 历史用量拆独立 tab;刷新按【可见 tab】门控(省 psutil/token);0值/空折叠口径统一 | MasterAgent | Master数分 | 提案 §2 |\n| **U3 route 防误派** | `/api/route` 后端(shell ab route)+ 派活表单\"建议对口\"chip | MasterAgent | Master数分 | 有真实误派事故;nicety 排后 |\n| **U4 拆分收口** | page.py 拆分(F8 遗留·2823 行·同 P4 纯搬运契约);清 B2(start_maint 周期 reap + todos-archive)/ D6(cost 口径);收口决议成文 | MasterAgent | Master数分 | 结构收官 |\n\n> **★分工变更(2026-07-29 用户令)**:UI 实施(U1-U4)由 MasterAgent 主实现——长程改造任务对模型等级敏感,MasterUI 模型等级低不宜担纲;MasterUI 保留 WebUI 运行位 owner(start_ui/常驻控制台/B2 运行侧),MasterAgent 改 ui/ 代码按对称律每阶段知会 MasterUI。\n>\n> **★收口(2026-07-29 当日全交付)**:U0-U4 全部完成,Master数分 U0-U3 绿灯已出、U4 验单已发;交付明细/关键决议/实况澄清见 **`docs/UI_2.0_CLOSEOUT.md`**(单一收口档)。\n\n## 铁律(从 2.0 原样继承)\n\n1. **纯搬运阶段契约不变**(路由/端点响应/口径逐字保持,P4 判例)。\n2. **每阶段 ui_smoke + bus_smoke 双绿**才进下一阶段;基线只增不减(端点/用例消失=回归)。\n3. **每阶段成文决议**落 `docs/`(范围/取舍/验收证据),不留口头账。\n4. **1+1 配对**:实现方自测 ≠ 验收;Master数分逐视图实测绿灯(「验人看路径非 --json」·role-verdict 判例)。\n5. **MasterUI↔MasterAgent 对称律**:server/api/page 契约、agentbus 公共面改动,谁改谁通报对方。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N03",
+      "path": "docs/PROPOSAL_separation_A.md",
+      "sha256": "20e3334f4c4a361e755d9b397339d4fce8f17fea9e0142d2e932424aa56404f5",
+      "bytes": 6777,
+      "line_count": 47,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 16,
+          "text": "# 三闸提案 · 分离整改 A:Edge/外部 IM互斥 → 通用共享资源互斥(+ 外部 IM工具族外迁)\n\n> 提案方:MasterAgent · 2026-09-23 · 依 SELF_REDESIGN_CHARTER + SEPARATION_AUDIT_20260923 项 1(最重:业务专用协调机制烤进核心)。\n> 签字方:Master数分(三闸)· 消费方知会:**外部 IM**(external_*.py 调用方)/ MasterUI(health/status `edge_lock` 读方)/ 培训师(onboarding 文案 edge-acquire)/ Master(派活 prompt)。状态:**Master数分 b3282f 三闸签(A1/A2/A4 签·A3 条件签 K1/K2)→ 全部落地 2026-09-23**(A1 3d2f5d8 · A4 ddfc358 · A2 6067eae · A3 见 git log);桩已同日删除(外部 IM 1b0542 改完 4 条记忆·MasterAgent grep 业务库=0·agent_fleet 非归档引用=0)。\n\n## 0. 盘点补遗(审计漏项)\n审计项 1 只列了 `bus/edge.py` + 2 CLI + health/status + daemon/dispatch prompt 外部 IM段。**漏了 `agent_bus/external_{common,canvas,msg,read,sheet_read}.py` 5 个外部 IM CDP 工具本体**(业务工具住在基建目录·随 agent_fleet git 演进)。归属问✗(外部 IM CDP 操作=业务对外能力·非协调机制);清除问✗(卸业务后 5 文件仍在核心);换域问✗(换域这 5 文件是死代码)。纳入本闸 A3。\n\n## 1. 目标形态\n- 核心只有一个**通用互斥原语**:`ab lock acquire --resource <name> [--who --timeout --ttl]` / `ab lock release --resource <name> [--force]` / `ab lock status`。锁文件 `BUS/locks/<name>.lock`(O_EXCL·stale 回收·watchdog 等释放——**逐字复用 edge.py 现算法**,只把路径参数化)。\n- `edge-acquire / edge-release` = `--resource edge` 的**别名**(命令面不破·输出 JSON byte-identical);过渡期 resource `edge` 特判映射旧路径 `BUS/edge.lock`(health/status/UI 的 `edge_lock` 读方零改动),第二阶段再迁 `locks/edge.lock` 并让 status 输出通用 `locks` 列表(MasterUI 切读方后)。\n- daemon/dispatch prompt 的外部 IM段 → **通用措辞**「若本任务要独占某共享资源(见角色页 shared_resources)→ 先 `ab lock acquire --resource <名>` 再操作、用完 release」;具体\"Edge/外部 IM/写单元格/connect_over_cdp\"文案迁 `role_profiles_biz.json` 各业务角色 `shared_resources:[{\"resource\":\"edge\",\"hint\":\"…外部 IM CDP…\"}]`,prompt 拼装时按角色页注入(无页/无字段=不注入=空载干净)。\n- 5 个 `external_*.py` → 业务侧 `C:\\apphome\\agent_fleet_data\\biz_tools\\external\\`(自带 git·同 biz_registry 模式),`agent_bus/external_tools` 留 junction 过渡(agent_fleet git 忽略);`external_common._lock` 改调 `ab lock acquire --resource edge`(经 `ab` 启动器·不依赖相对路径)。\n- 机制注册表类 7「Edge互斥与external协调」→ 改名「共享资源互斥」;外部 IM专属 4 条移注为业务侧机制(biz_registry/README 记)。\n\n## 2. 分步(在线增量·每步可独立回滚)"
+        },
+        {
+          "start_line": 39,
+          "end_line": 47,
+          "text": "- Master:派活 prompt 通用化后·业务任务的\"要碰 Edge\"提示来自角色页·请在角色页补齐(归培训师建档/Master 口径)。\n\n## 7. 落地记录(2026-09-23)\n- A1 bus/lock.py + `ab lock` + edge-* 别名(三态 stdout 与基线逐字同);并发 gate 20争1恰1胜×3轮(首版 20 胜=测试盲区三号:持锁 who 无 presence→stale 夺锁·修=测试给 __smoke__ 写 presence 绑测试 pid)。旧名 _role_proc_alive/_edge_stale/_wait_file_gone 经 edge.py re-export(首跑 ImportError=re-export 盲点再命中)。\n- A4 status/health 双发 `locks[]`·`edge_lock` 保留一版待 MasterUI 切读方(page_js_tail.py:22)。\n- A2 roster.shared_resources_prompt 按角色页注入;外部 IM/示例成员(近 30 天 events 真用锁的全部角色)页已补 shared_resources(biz git);daemon desc 改读 agents_view(B1 前置);smoke a2 三段验收(有载全覆盖/空载平台段零业务词/源码零外部 IM词)。\n- A3 external_{common,canvas,msg,read,sheet_read}.py → agent_fleet_data/biz_tools/external(自带 git);旧位 __main__ 转发桩(不可 import·空载 exit2 报未安装);external_common.edge_lock 改调 canonical agentbus `lock acquire --resource edge`(K2 与迁移同一原子步);K1 业务记忆 4 条旧路径清单已交外部 IM(620771);smoke a3。path_registry biz-tools 登记。\n- 审计漏项 A3 补遗已纳入;机制注册表类 7 改名「共享资源互斥(通用原语)」。\n- 桩删除(同日):外部 IM改完业务记忆 4 条→MasterAgent grep 业务库旧路径=0·agent_fleet 内非归档引用=0(sync_code.ps1 遗留文件名列表=junction 守卫 no-op·不算引用)→ `git rm` 5 桩;smoke a3 改为『平台目录零 external 工具 + 新位 K2 + 清除问』。验收 f 满足。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N04",
+      "path": "docs/PROPOSAL_separation_BC.md",
+      "sha256": "8d6608567c085a9ef44ea8a521a7da3147e2404468c28afc52c26a13e03cac1e",
+      "bytes": 5432,
+      "line_count": 43,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 17,
+          "text": "# 三闸提案 · 分离整改 B+C 合闸:注册表业务成分外迁(caps 两表 + agents.json 去业务 desc)\n\n> 提案方:MasterAgent · 2026-09-23 · 依 SELF_REDESIGN_CHARTER + Master数分 6f6d66 口径(卸掉全部业务角色后还该在=基建;desc/业务 caps=残留;不重写 git 历史;biz 文件须自带版本控制;验收=空载清除测试)。\n> 签字方:Master数分(三闸)· **培训师(caps 分类否决权·caps-registration-owned-by-trainer)** · 消费方知会:MasterUI(角色页/能力页读方)。状态:**C 已落地并签收**(Master数分 fdbd6d·2026-09-23;空载测固化 smoke sepC.empty_biz 隔离版·caps 业务词 20→0);**B1 读方已上**(roster.agents_view·commit ea72064)·剥 desc 待 MasterUI 切 api.py 读方后执行(脚本 dry-run 就位:16 业务角色·2 无页自动建最小页·14 存 legacy_desc)。\n\n## 1. 目标形态\n```\nC:\\apphome\\agent_fleet_data\\biz_registry\\        ← 业务注册表物理家(同 session-archive 三分格局:_data=业务/素材)\n  .git/                                            ← 自带本地 git(Master数分要求:外迁≠丢版本)\n  role_profiles_biz.json                           ← 从 agent_fleet 根迁入(现 gitignore·无版本)\n  caps_biz.json                                    ← 从 capabilities.json 拆出的业务 caps\n  README.md                                        ← 清单/清除说明\nC:\\apphome\\agent_fleet\\biz_registry  → junction → 上面(agent_fleet .gitignore 忽略;path_registry biz-data 登记 3 项)\n```\n读方全部走**合并视图**(同 `load_role_profiles` 模式):`_load_caps_pool()` = capabilities.json(infra)⊕ caps_biz.json;`load_role_profiles` 路径改指 junction。业务表缺失/坏=合法(空载)。\n\n## 2. C · caps 两表拆分(培训师确认清单)"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N05",
+      "path": "fork_exchange/genesis_20260923_separation-biz-infra.md",
+      "sha256": "39adf44a6e40aebb3f3fed1f09fba06d36f450bcc283e4f4ba8fbfd122162d61",
+      "bytes": 4696,
+      "line_count": 28,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 28,
+          "text": "# genesis fork · 2026-09-23 · 业务/基建分离整改 C + B1 + A(v2.14)\n\n> 实例名=genesis。覆盖 v2.13 以来:分离度盘点(docs/SEPARATION_AUDIT_20260923.md)→ 三闸提案 B+C / A → 全部落地。平台纲领:bus=通用 agent 管理平台·业务=可插拔负载(装上能跑·卸掉干净·换域照用);三问验收=归属/清除/换域。\n\n## 1. 业务注册表外迁 biz_registry(分离 C)✅平台面\n- 业务角色页 `role_profiles_biz.json` + 业务 caps `caps_biz.json` 物理外迁 `<data>/biz_registry/`(**业务侧自带 git**·不进平台 git);平台根留 junction(gitignore)。\n- 读方【单一解析】:`bus.roster.biz_registry_dir()`(cfg `biz_registry` > `<home>/biz_registry`·env `AGENTBUS_BIZ_REGISTRY` 可重定向)· `load_caps_pool()`(infra ⊕ biz 合并视图·同名 infra 优先)· `load_role_profiles()`;compact 重注入 hook 经同一函数(import 失败同规则内联)。业务表缺失=合法空载·绝不抛。\n- caps 两表:infra 7(bus-comms/self-wake/high-risk/webui/data-analysis/bus-monitoring/token-usage-etl)/ biz 7(含 confidentiality·培训师终裁归业务)。`capabilities.json` 业务词 20→0。\n- **空载清除测试固化 smoke**(`tests/scenario_sepC_empty_biz.py`):env 指空目录=业务表全清等价态·不动 live 文件·caps 14→7 / 角色页 21→7 / hook 不抛 / roster·who·caps 渲染。验收方法论:有载回归=每业务角色 hook 注入文本迁移前后 byte-identical(备份目录存快照)。\n\n## 2. 花名册只读视图 agents_view(分离 B1 读方)✅平台面\n- `roster.agents_view()`:agents.json 深拷贝 ⊕ 角色页 desc(有页=单一源·标 `desc_src`;无页沿用)。**写方(register/hello/retire/update_agents)仍读原件**——视图注入的 desc 永不经 RMW 回写基建 git(分离复发防线)。只读读方 roster/route/probe/daemon 专责 desc 已切;WebUI 读方切换后再剥 agents.json 业务 desc(脚本就位:2 无页角色自动建最小页·14 存 legacy_desc)。\n- agentbus re-export 名单:`load_caps_pool / biz_registry_dir / agents_view / shared_resources_prompt`(★re-export 盲点纪律再命中一次:抽层被外部 `ab.*` 引用必进 `__all__`)。\n\n## 3. 通用共享资源互斥 ab lock(分离 A·取代 Edge/外部 IM专用锁)✅平台面\n- `bus/lock.py`:`ab lock acquire/release/status --resource <name>`;锁文件 `BUS/locks/<name>.lock`;O_EXCL 恰 1 胜 · stale 回收(持锁 role 进程死/超 ttl → rename 原子夺取·ABA 防)· watchdog 等释放。`edge-acquire/release` = `--resource edge` 别名(stdout byte-identical·resource=edge 过渡特判旧 `edge.lock`);status/health 双发 `locks[]`(`edge_lock` 保留一版待 UI 切)。\n- **并发 gate**(`tests/scenario_lock_contention.py`):20 进程争 1 ×3 轮恰 1 胜 + 四态 JSON 键集。★测试盲区三号实录:首版 20 胜——持锁 who 无 presence→被判 stale→人人夺锁;修=测试给自己的 smoke 角色写 presence 绑测试 pid(不借别人 role)。\n- **派活 prompt 通用化**(A2):daemon/dispatch prompt 的\"操作 Edge/外部 IM先抢锁\"段 → `roster.shared_resources_prompt(role, abpy)` 按角色页 `shared_resources:[{resource,hint}]` 注入;无字段不注入;ad-hoc 无页只给原语行。有载验收=从 events 近 30 天真用锁角色自动算清单·每个 prompt 必含锁提示(防\"删了外部 IM段但页没补\"的静默丢提示);空载验收=平台段零业务词;源码零外部 IM词。prompt 抽 `build_prompt()` 可测。\n- **业务工具族外迁**(A3):5 个外部 IM CDP 工具 → `<data>/biz_tools/external/`(自带 git);`edge_lock` 改调 canonical `ab lock`(env `AGENTBUS_PY` 可覆盖入口)与迁移同一原子步(K2);旧位 `__main__`-only 转发桩过渡(import 即 ImportError)→ 业务侧记忆 4 条旧路径改完·grep=0 → 同日删桩。迁移铁律:先广播(含旧路径引用清单给消费方)→ 动刀(前置核锁空闲)→ 确认。\n\n## 4. 方法论/纪律(★建议吸收)\n- 分离验收三件:**空载清除测试**(env 重定向隔离·不扰 live)/ **有载回归 byte-identical**(迁移前快照)/ **业务词计数**(git 跟踪文件·-i)。\n- Master数分独立复核发现:自报\"业务词归零\"漏 2 处(注释/举例文本)——自评不算·复核者按自己口径 grep。\n- bash heredoc 写 python 补丁会吞 `\\n` 转义生成坏代码(同日两次)→ 长脚本走 Write 工具再执行·生成后先 import/ast.parse。\n- 审计漏项自报(external_*.py 工具本体不在原审计 4 项中)→ 纳入同闸。\n\n## 5. 实例面(⏭跳过)\nbiz_registry / biz_tools 具体路径、外部 IM/示例成员角色页文案、caps 分类结论、业务记忆路径清单;机制注册表 115→118;bus_smoke 52→59。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N06",
+      "path": "fork_exchange/problems/webui-sse-heartbeat-firehose.md",
+      "sha256": "9e84990e22db590c53042e2c51ad4f99d197d52367edc3377ffd63798d685896",
+      "bytes": 3897,
+      "line_count": 38,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 17,
+          "text": "> 记录人 MasterAgent · 2026-08-11 · 状态 = **✅ 已修复·实测复验通过**(MasterUI lane 交付·commit 4dbf810)\n> 可吸收性 = **平台面**(任何 genesis 派生 bus 的同款 SSE watcher 同病)\n\n## 一句话\n协调 WebUI 的 watchdog 递归监听整个 bus 目录,`on_any_event` 对任何 `.json` 变化都 `_bump()`→SSE `notify_all`→所有浏览器收 \"change\" 重渲染。但只排除了 `fleet_status.json`,**漏排 `presence.json` / `wait.reg.json` 两个每 10s×N 角色的心跳文件** → SSE change ~3 次/秒全是心跳噪声 → 客户端被狂刷 = \"过一会打开控制台会卡\"。\n\n## 现象\n用户续报:BI 周期卡修好后,\"过一会再打开控制台还会卡\"(与 BI 是两条独立路)。表现为界面持续/间歇卡顿,非仅 BI tab。\n\n## 根因(实测)\n- `ui/api.py :: start_watcher()`:`obs.schedule(H(), str(BUS), recursive=True)` 递归监听整个 bus 目录;`H.on_any_event` 对任何 `.json` 事件 `_bump()`。\n- `_hit()` 只把 `fleet_status.json` 返 False,**漏排心跳噪声**:`presence.json`(每 10s×~20 角色写心跳)、`wait.reg.json`(wait 注册表新增·每 10s×~20 角色写心跳)。\n- 每次 `_bump()` → `_change_cv.notify_all()` → 所有 SSE 连接推 \"data: change\" → 客户端 JS 重新拉取/重渲染当前视图。\n- **实测(12s 窗口)**:36 次 `.json` 变化 = **3.0 次/秒** SSE change,其中 `presence.json`=18 + `wait.reg.json`=18,**100% 是心跳噪声、0 条真 UI 事件**。`wait.reg.json` 精确翻倍了 `presence.json` 的负载(→\"现在才明显\")。\n- server 稳态 CPU 被顶到均值 ~40%(0–92% 抖动),空闲服务器不该有。"
+        },
+        {
+          "start_line": 23,
+          "end_line": 38,
+          "text": "`_hit()` 把 `presence.json` 和 `wait.reg.json` 也返 False(与现有 `fleet_status.json` 排除【完全同类】——都是\"自己写的计时/心跳文件,不触发 SSE 否则刷屏\")。\n- presence 的真变更(上下线 / current_task)由 fleet 刷新器 20s 周期 + send/done 显式 `_bump()` 覆盖;wait.reg 纯自醒心跳,UI 无需实时。\n- 安全网:给 `_bump()` 加去抖(coalesce ~1–2s),防将来别的高频 `.json` 再成 firehose。\n- `turn_state.json` 未列入排除(真实时值·只在 agent 活跃时写·当前 0 噪声);活跃期若吵可靠去抖收敛。\n- 涉及文件:`ui/api.py :: start_watcher._hit`(+ `_bump` 去抖)。\n- **吸收 commit:`4dbf810`**（`perf(ui-sse): 静音心跳文件+_bump去抖根治SSE firehose`·1 file: ui/api.py）。MasterUI 实现:①`_hit` 把 presence.json+wait.reg.json 返 False;②`_bump` 去抖=前沿即时推(send/done 真事件零延迟)+ ~1s 冷却窗口内合并、后沿至多再推一次(二道网防将来高频 .json)。\n\n## 验收(✅ 实测通过)\n- 空闲 14s 窗口 SSE change:**42 → 3**（~93%↓·心跳 noise 清零·剩 3 是窗口内活跃 agent 真事件）。\n- **server 稳态 CPU:~40% → 0.0%**（MasterAgent 侧 5×1s 采样全 0）。\n- SSE 真事件(send / done / 新任务 / 路由)仍即时推;`ui_smoke` **83/83 绿**·SSE-connect 保持。\n- 平台三问:①归属=平台机制 ✓ ②清除=无业务数据 ✓ ③换域=不需改平台代码 ✓。\n\n## 关联\n- 与 [[webui-bi-endpoint-gil-freeze]] 同为\"WebUI 卡\"的独立成因;BI=请求线程 GIL 冻结(已修 018d2c6),本篇=SSE 心跳 firehose 狂刷客户端。两者叠加才是用户完整体感。\n- 本 bus 侧注:`wait.reg.json` 10s 心跳是 MasterAgent 的 wait 注册表设计(去语境化教训:心跳/计时文件别写进被 SSE-watch 的目录、或写了必在 watcher 排除)。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N07",
+      "path": "docs/POSTMORTEM_daemon_direction_error.md",
+      "sha256": "cc4bab6ed9ea70f45b960aa0831de55e0ae908076edb642d7aedd3d52ff1e232",
+      "bytes": 4914,
+      "line_count": 38,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 7,
+          "text": "# 复盘:daemon 化方向性错误(2026-08-27)——MasterAgent × Master数分 联合分析\n\n> 用户令 2026-08-28:复盘昨天 daemon 化的方向性错误怎么产生的。本文=MasterAgent(执行/fleet lane)+ Master数分(候选选型/口径 lane)联合复盘。\n> 关联:`fork_exchange/genesis_20260827_fleet-daemonization.md`(daemon 化始末) · `BUS_GUIDE.md §0`(教训摘要)。\n\n## 一句话\n把执行类角色从【前台 CLI 热态】批量转【daemon(无窗后台·每任务冷起 claude -p)】,图省内存 + 自动注入 effort;实战暴露 daemon **领任务不管不顾·卡死不可打断·跨集群执行做不了·闷头不轻问同伴** → 全退,回全前台 CLI。**为何自评全绿却翻车**是本复盘的核心。"
+        },
+        {
+          "start_line": 17,
+          "end_line": 38,
+          "text": "3. **失能定义太窄 + 自评天然乐观**:当时失能只认 ①记忆断 ②约束衰减(验了这俩);漏了 ③运行期不可纠偏(active runaway)+ 协作丧失。每角色\"失能自评\"天生乐观、结构上问不出这些。\n10. **★最深:per-role 判,但协作是 system 属性(分解错·Master数分)**:每角色失能自评问的是\"这角色能单独 daemon 跑吗\"(**每个都能**);真问题是\"舰队还便宜协作吗\"(**system 级·退化了**)。**分解方式本身藏缺陷:per-role 全过 · system 全崩**——这解释了为何自评全绿却翻车。系统属性不能分解成 per-role 自查。\n\n### C. 验证层——自证代替了实证\n4. **自证先于实证(顺序错)**:凭失能自评就铺开,实证 harness 是出事**之后**才想到设计。Master数分自认:**我是 data-truthfulness owner,却把最大决策跑在自证上;preach 实证却 practice 自证**——\"实证优于自证\"是用户点醒后才补 harness。\n5. **浅验收累积假信心**:pilot→batch→轨B 每步\"验收过\",但自检浅(空闲存活+琐碎任务),没打真失败模式(长任务卡死/需协作/跨集群)。真失败只在真负载下现形。\n7. **快照-proxy 谬误(Master数分)**:候选选型用【idle 快照(inbox/proc=0)】当【低协作】proxy。根子错:**idle-now ≠ 内在低协作**。看快照(此刻空)没看协作画像(示例组活跃时高频交叉核对业务侧/模型侧)。信号选错:问成\"它现在空吗\",该问\"它活跃时协作频繁吗\"。\n8. **pilot 选样偏差(Master数分·细化⑤)**:拿 GPCC 做 pilot=全队**最不协作**角色之一(GP 运维 standalone),它干净通过→泛化到高协作 示例 组。**挑了最易的没挑代表性最难的**;代表性 pilot(Master数分活跃协作中)本会当场暴露。\n\n### D. 治理层——无人管方向\n6. **分工到位但无人管方向**:Master数分定候选·MasterAgent 执行·培训师注册,各司其职都称职,但没人退一步问\"这符合 bus 核心价值吗\"=**方向对不对无人 own**,最后靠用户抓出来。\n\n## 判据 / 教训(operating principles·别再犯)\n1. **大机制变更强制 gate**:先问【强化还是削弱 bus 核心价值(便宜协作 / 可打断 / 常开协作)】,**不是只问\"是否更高效\"**。\n2. **实证先于铺开**(validate-then-trust):先用**真失败模式**验代表性最难 case,再谈铺开;别信自评。data-truthfulness owner 尤其自律:preach 实证要 practice 实证。\n3. **系统属性不能分解成 per-role 自查**:协作是 system 级,必须 **system 层验**(舰队整体还便宜协作吗),不能靠\"每个角色能不能单独跑\"累加。\n4. **pilot 必挑代表性最难 case**(协作密集/长任务/边界),非最易 standalone;易 case 通过是假信心。\n5. **agent 是协作一等公民,不是黑盒批处理器**:能被打断、卡住先轻问同伴(轻问 >> 硬扛)。\n6. **要有人 own\"方向对不对\"**,不只 lane 执行;**owner 对本位外的价值轴要主动够记忆**(framing 别锁死 retrieval)。\n\n## 沉没成本里保留的价值(没全白做)\ndaemon 机制代码保留 dormant——effort per-role 注入 / `--resume` 接续(层C) / supervise GBK 修复,**都非 daemon 专属·可复用**(dispatch 一次性仍用)。且这次全铺开又全退的**\"此路不通\"实证本身是最贵的教训**,已归档供后来者。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N08",
+      "path": "docs/MASTERAGENT_3_TAKEOVER_20261013.md",
+      "sha256": "46a43a8db9f11370ee1bb0cd0a81381a9a9b0906a41bc542d36d558d0c5ea4b5",
+      "bytes": 6051,
+      "line_count": 37,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 19,
+          "text": "更新：2026-10-13。责任角色：精确 session 绑定的 MasterAgent。目标是由 3.0 逐步承接协调基建，同时保持现有在线团队的收信、回填和业务单入口语义。本文是接管清单，不把本机发行视作旧 fleet 已切换。\n\n## 已核实的现场\n\n- 本机发行包 `3.0.0` 的 SHA256 为 `69402eaad81035e121fed0d2af07b31f660ea49abc6f80b0516811831967addf`；清单和主目录源码匹配。真实纯文本双角色验收已完成，正式范围见 [发行说明](MASTERAGENT_3_RELEASE.md)。\n- 2026-10-13 15:45，旧 bus `health --json`：`healthy=true`，20 个预期角色 armed，inbox/processing/held/failed 均为 0，WebUI owner 正常。该快照会变化，切换前必须重查。\n- 已把正式包、release gate、交接、正式版说明、最终真实验收及首轮失败证据共 10 个文件复制到 `C:\\apphome\\agent_fleet_releases\\3.0.0`，逐文件 SHA256 与原交付目录相同；这里是本机发行归档，不是运行中的部署。对拟用独立状态根的只读 `status` 返回 `initialized=false`。现有 3.0 发行包不含实际业务包、旧 bus 适配器或专用认证。\n- 同目录已生成 `genesis_agent_fleet_v3.0.0_local-bundle.rar` 和同名 `.zip`；两者均含上述 10 个文件与 `RELEASE_MANIFEST.json`。RAR 完整性检查退出码 0；ZIP 的 11 个条目、CRC 与清单 SHA256 一致。名称加 `local-bundle` 是为了与 Git `v*` tag 钩子生成的整个仓库快照区别；当前没有 v3 tag，不得把此归档称为 tag 快照。\n- 用户随后明确只保留 ZIP。已核对 ZIP 与 `3.0.0` 解压目录 11 个文件逐字节相同；删除 RAR 和重复解压目录的 `Remove-Item` 操作被自动审批策略拒绝（仅返回 `blocked by policy`），因此截至本记录时它们仍在本机发行目录。勿把目录当作运行状态或 Astra 文档仓；目录只是我创建的发行打包暂存副本。\n- 用户指出最初 ZIP 只有少数外层文件。已在同一 ZIP 中补入 `source/agent_fleet/` 下当前项目的 365 个源码、文档、Codex 接入和 MasterAgent 记忆文件，另加 `SOURCE_MANIFEST.json`、`PACKAGE_SCOPE.txt`；现共 378 个条目，SHA256 `241bf6b3c89ad64bc39a2dcfc93c416fa7f1580f92bc6d59387e34b5c41488a9`。CRC、发行清单与源码清单摘要均通过。它不含实时邮箱、会话历史、认证或外部业务目录，仍不是在线 fleet 的数据恢复备份；工作树未提交、无 v3 tag，不能称 tag 快照。此前 RAR/暂存目录仍只含原先 11 个文件，删除受自动策略阻断。\n- 工作树有大量既有未提交修改，Git 目前没有 `v3.0.0` tag。本地正式发行、Git tag 和旧 fleet 切换是三个不同事件；不能把它们混写。\n\n## 接管边界\n\n3.0 基座可运行纯文本角色，但**尚不能直接替代现有 MasterAgent 或全体业务角色**：当前模型没有业务文件工具或人工审批桥，不能自主调用协调命令；旧 bus 信使不向 3.0 提交任务，3.0 outbox 也不会自动送回旧 bus 或 WebUI。原生 resume、Windows 服务托管及生产迁移未交付。让同一业务任务同时进旧 inbox 与 3.0 队列会造成双领风险；停掉旧信使后直接启动 `serve` 则会失去现有消息通道。\n\n旧入口不止 `ab send`：请求、通知、工作组、用户待办及 WebUI 都可能写角色 inbox。只在 `ab send` 增加 3.0 分流会漏掉其它来源。切换必须在统一领取所有权处挡住旧消费者，或令所有写入来源共用一个经核对的路由；适配器需要持久记录旧消息 ID↔3.0 request/task/attempt ID、投递阶段与完成回执，以便断线时核对而非复制回 inbox 重放。对 `notice`、`fyi.no_receipt`、审批门禁和业务消息归口仍须保留各自语义。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N09",
+      "path": "docs/MASTERAGENT_3_1_UI_COVERAGE.md",
+      "sha256": "28219492f7809c9baf51ab1f6cc1ca91bc139dcb672f5250ad0841faf171b503",
+      "bytes": 19638,
+      "line_count": 115,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 14,
+          "text": "更新：2026-10-19。当前开发代码为 `3.1.0-dev.3`，schema 5，公共 API 保留 `3.1-dev1`。下表保留 dev.1 对 `ui/` 界面文件和 HTTP 路由的逐项核对基线；dev.2 公共操作、运行事实、审阅后阶段 A 和阶段 B 的变化分别记录。\n\n**3.1 dev.2 已增加原功能目录、显式兼容链接、四项公共操作及运行事实展示，仍未完整承接现有 UI。五个主入口是信息分类，不代表原有 21 个页签的功能已经归并完成。现阶段不能用新工作台替换现有控制台。**\n\n本清单依据源码核对功能存在性；没有启动旧服务、访问生产业务、读取原生私人会话或执行旧 UI 写操作。2026-10-12 的旧界面浏览器巡检另见 [巡检记录](CODEX_UI_AUDIT_20261012.md)，不作为本次在线复测结果。\n\n## 状态含义\n\n- **局部对应**：新工作台有相关能力，但字段、操作或数据来源不等价，尚未完成迁移。\n- **未承接**：新工作台中没有对应可用功能。\n- **完整承接**：需同时覆盖用户工作流、来源与权限、交互和验证；本次未将任何旧页整体判为完整承接。\n- 下表“去向与批次”是迁移安排，不是已实现状态。当前 UI 的“已提供兼容链接”仅表示已配置可点击链接，不证明旧服务在线，不能计为功能已重建；真正的兼容可达还需单独在线验证。"
+        },
+        {
+          "start_line": 20,
+          "end_line": 41,
+          "text": "| 原入口（导航标识） | 原有功能与源码位置 | dev.1 实际状态 | 去向与批次 |\n| --- | --- | --- | --- |\n| 舰队/运维 `fleet` | 角色队列、运行模型、默认模型/思考强度、心跳、宿主/turn、自醒状态；自愈、孤儿巡检、最近事件、可恢复会话。`page_body.py:72,160,178,408` | 局部对应：团队只呈现 V3 角色、工作区、能力声明、成员租约和执行归属；没有旧舰队操作、真实宿主观测或会话恢复入口 | 团队＋运行设置；dev.2 接运行控制/观测，dev.3 接兼容来源和诊断 |\n| 操作说明 `guide` | 本机指南、目录、锚点、刷新。`page_body.py:227`、`page_js_tabs.py:108` | 未承接：有仓库说明文档，但 UI 中没有指南页 | 补齐可达性时增加本机帮助；保留运行时差异说明 |\n| 数据画像 `agentprofile` | 单角色历史画像、7/30/90 日窗口，自我分析而非排名。`page_body.py:240`、`page_js_tabs.py:140` | 未承接 | 团队二级页；dev.3 增加来源受限的历史观测，过渡期保留兼容访问 |\n| 运营/资源 `bi` | 活跃会话、资源使用、模型统计、派工耗时/成本及效率。`page_body.py:100,118`、`page_js_bi.py:11,343` | 未承接：工作台任务计数不等价于运营/资源统计 | 工作台摘要＋运行设置观测；dev.2 实际执行观测，dev.3 历史/兼容统计 |\n| 历史用量 `usage` | Claude/Codex 分源用量、日趋势、范围筛选、项目下钻、模型变化。`page_body.py:255`、`page_js_bi.py:104` | 未承接：运行设置中“用量未采集”只是缺失提示 | 运行设置二级页；dev.2 采集契约，dev.3 历史查询；不得混算两种运行时口径 |\n| 能力池 `caps` | 角色能力详情、授权矩阵、风险持有人、分布与缺口。`page_body.py:292`、`page_js_caps.py:6` | 局部对应：只有角色工具声明和业务工具描述，无授权矩阵、风险或缺口视图 | 团队/资料；dev.2 明确声明、部署权限和实际工具授权，dev.3 兼容能力审视 |\n| 上下文 `ctx` | 精确会话上下文占用、窗口、压缩预警、模型和活动时间。`page_body.py:333`、`page_js_caps.py:107` | 未承接 | 团队会话详情/运行观测；dev.2 定义可验证字段，dev.3 兼容观察；未知阈值继续显示未知 |\n| wait 注册表 `waitreg` | wait 生命周期、宿主、代次、时长和心跳。`page_body.py:351`、`page_js_panels_a.py:5` | 未承接；V3 成员租约不是旧信使完整投递链 | 运行设置高级诊断；dev.3 保留来源明确的兼容视图 |\n| 提示词审核 `prompts` | 全局/项目入口、角色记忆、hooks、来源和注入预览，打开允许的文件。`page_body.py:368`、`page_js_panels_a.py:44` | 未承接：角色 instructions 不等价于完整注入来源审计 | 团队/资料二级页；dev.2 注入契约，dev.3 来源审计与兼容入口 |\n| 归档/退役 `archive` | 退役档案、接替者、记忆引用、归档会话信息、复制恢复命令。`page_body.py:381`、`page_js_panels_a.py:89` | 未承接；旧页面本身也不是一键原生恢复 | 团队生命周期＋资料归档；dev.3 索引/兼容引用，原生恢复单独验收 |\n| 任务线看板 `tasklines` | 长期任务线、阶段进展、关联待决策、展开详情。`page_body.py:431`、`page_js_tabs.py:294` | 未承接：单 Task 时间线不等于跨任务线看板 | 任务二级页；dev.3 兼容映射，原生重建需独立领域设计 |\n| 工作组 `groups` | 组成员、组队列、负载和并行情况。`page_body.py:442`、`page_js_panels_b.py:10` | 未承接：平铺角色卡没有组模型 | 团队二级页；dev.3 先保持兼容访问，不把角色列表冒充工作组 |\n| 机制 `mechanisms` | 平台机制注册表、关联能力。`page_body.py:453`、`page_js_panels_b.py:64` | 未承接；运行时支持声明不是机制注册表 | 运行设置高级说明；dev.3 显式来源适配 |\n| 角色 `roles` | 基建角色档案、职责边界、启动/输入流程、压缩恢复注入、生命周期子面板。`page_body.py:463,473`、`page_js_panels_b.py:106,190` | 局部对应：新团队仅显示当前业务包角色卡；没有完整档案、生命周期或注入详情 | 团队二级页；dev.2 角色/运行详情，dev.3 生命周期与兼容档案 |\n| 业务角色 `bizroles` | 业务角色档案、工作目录、模式、输入、职责边界。`page_body.py:478`、`page_js_panels_b.py:230` | 局部对应：能看包内角色指令、工具及部署路径；不能等价读取原注册表 | 团队；dev.3 经业务包/兼容来源承接，具体业务角色不固化进基座 |\n| 长程任务 `longrange` | 里程碑、活跃段、任务图、进度变化、批量裁决。`page_body.py:489`、`page_js_panels_b.py:295,304,317` | 未承接：新决定页只显示单任务决定记录，不能代替长程引擎 | 任务二级页；dev.3 保持兼容可达，原生重建需独立语义与批量操作验收 |\n| 任务/协作 `tasks` | 独立 TODO 池与历史、优先级/截止/来源、增改删/派发/答复、派活路由建议、通知/审批选择、回报筛选/清理。`page_body.py:134,183`、`page_js_core.py:295,390` | 局部对应：V3 任务筛选分页、详情、文本成果、公开事件、输入/决定记录只读；所有写操作未开放，也没有独立 TODO 管理 | dev.2 公共操作；dev.3 旧任务/回报映射。独立待办不能直接全部转换为执行任务 |\n| 实时 `live` | 旧 Claude daemon/dispatch 日志、角色选择、滚到底。`page_body.py:214`、`page_js_core.py:245` | 未承接：当前任务事件是快照读取，不是原生日志流 | 任务公开进度＋运行诊断；dev.2 运行事件，dev.3 持久订阅/兼容日志；不展示私有推理 |\n| 路径 `paths` | 路径分类、健康校验、复制/打开目录；存储全景、分布和异常候选。`page_body.py:499`、`page_js_tail.py:75,108,135` | 局部对应：只有角色工作区/状态根文字；文件成果索引和存储审计都未接入 | 资料＋运行设置；dev.3 制品索引、存储地图、备份恢复与允许路径操作 |\n| 舰队日志 `fleetlog` | 里程碑、维修、退役等平台事件编年记录。`page_body.py:517`、`page_js_tail.py:183` | 未承接：单任务公开事件不等于平台日志 | 运行设置高级诊断；dev.3 平台审计/兼容记录 |"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N10",
+      "path": "docs/CODEX_UI_AUDIT_20261012.md",
+      "sha256": "1a479636f34c8d3fbcd9d9d5727f81c0267b2668c273fd6fe7ab184d7244a06f",
+      "bytes": 3102,
+      "line_count": 31,
+      "excerpts": [
+        {
+          "start_line": 1,
+          "end_line": 31,
+          "text": "# Codex WebUI 逐页巡检（2026-10-12）\n\n在专用 Edge CDP 档案的 `127.0.0.1:8799` 控制台，逐个打开 21 个页签并保存本机截图与可见文本摘要：`C:\\apphome\\agent_fleet_data\\ui_audit_20261012\\after_restart\\`。修复后的重点页复核资料在同目录 `verified\\` 与 `verified_final\\`。未触发派活、清除、审批、恢复会话或麦克风启动等写操作。\n\n| 页签 | 巡检结论 |\n| --- | --- |\n| 舰队/运维 | Codex 的精确 session、信使在岗、实际模型、角色工作区与共享宿主 PID 已分别显示；无模型元数据时标未知。 |\n| 操作说明 | 顶部新增 Codex 当前入口；下文旧 Claude 手动 wait 流程注明只作历史参考。 |\n| 数据画像 | 首次汇总历史约 18 秒；加明确等待文案，缓存延至 5 分钟。当前用量指标仍只含 Claude，页面已明示。 |\n| 运营/资源 | Codex token 与 Claude usage.db 分源；共享 App Server 进程树按 PID 只算一次；只把当前会话计入模型分布。 |\n| 历史用量 | Claude 与 Codex 分区显示，Codex 不估美元成本。 |\n| 能力池 | Codex 状态标“Codex 信使”，避免误标为 Claude 前台 cli。 |\n| 上下文 | Codex 模型和窗口从精确 rollout 获取；长会话的模型元数据有界回溯；Claude 的 65% 自动压缩阈值不套给 Codex。 |\n| wait 注册表 | Codex wait 未登记宿主 PID 时展示精确 session 前缀；页面注明 wait 在册不足以证明投递链可用。 |\n| 提示词审核 | 显示 19 节来源与实际注入预览，Codex 全局、项目、角色卡和 hooks 分列。 |\n| 归档/退役 | 明确备份 resume 是 Claude 会话存档。 |\n| 任务线看板 | 页面正常加载，保留原任务数据。 |\n| 工作组 | 页面正常加载，保留原组指标口径。 |\n| 机制 | 页面正常加载，保留原机制数据。 |\n| 角色 | 明示旧启动流程与 Codex SessionStart 的差异。 |\n| 业务角色 | 同上。 |\n| 长程任务 | 页面正常加载；本次未操作决策按钮。 |\n| 任务/协作 | 最近 200 条回报先显示 30 条，正文折叠且可展开/显示更多；高风险提示不再要求 Codex 手动挂 wait。 |\n| 实时 | 标为旧 Claude daemon/dispatch 的 `live.log`，不误称 Codex 会话日志。 |\n| 路径 | 按需创建的空死信目录不再误报故障；复核为 0 红、0 黄。 |\n| 舰队日志 | 页面正常加载。 |\n| 语音转写 | 设备只读加载正常；本次未启动音频采集。 |\n\n修复后通过 Python AST、装配后的 JavaScript `node --check`，以及专用 Edge 的真实页面复核。最终复核：舰队与上下文显示 MasterAgent `gpt-6-sol`；运营资源显示 1 个 Codex 共享宿主进程组；任务回报首屏 30 条且可展开；浏览器 `pageerror` 为空。维修模式保持开启。\n\n限制：本次检查的是现有 WebUI 2.x 的页面与 Codex 宿主适配；未进行派活、审批、归档恢复、ASR 等会产生状态变化的端到端操作。数据画像的首次历史汇总仍需约 18 秒，现通过明确提示和 5 分钟缓存缓解。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N11",
+      "path": "docs/MASTERAGENT_EXECUTION_BACKLOG.md",
+      "sha256": "155580fbfda51f7f92bebdece67573d11d6652b16d03d09aa77ea35e7b4b17bc",
+      "bytes": 43778,
+      "line_count": 439,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 17,
+          "text": "更新：2026-10-20。开始前读 [下一会话入口](MASTERAGENT_NEXT_SESSION.md)。本表保留全部验收要求；未列于下表的工单仍为 **未开始**。阶段 B 已交付受控本机来源与搬运首批实现，整个 B 尚未完成。每次只领取依赖已满足的工单，证据写入 [进度](MASTERAGENT_3_1_PROGRESS.md)，注明构建、测试、范围与遗留项。\n\n| 工单 | 当前状态 | 证据与剩余要求 |\n| --- | --- | --- |\n| B-00 | 已完成（限定范围） | 17 行静态入口矩阵；首批仅新建 SourceStore，旧生产来源留旧线，未签收生产切换 |\n| B-01 | 已完成 | masteragent-source-v1、固定实例、typed ID、完整正文、两步来源确认、公平分页；来源存储测试 |\n| B-02 | 已完成 | schema 6 端点绑定、准入预检、同事务固化目的端；旧 5 冻结 DDL 与迁移故障测试 |\n| B-03 | 已完成 | 三库独立确认、四个响应丢失窗口、原生确认后强杀重启恢复；单 Task、不自动执行 |\n| B-04 / B-05 | 已完成（限定范围） | V3 入口逐行归口签收；两个独立进程争同一来源任务仅启动一个 Python 合成子进程；原子完成/失联恢复通过。旧 fleet 与真实模型未签收 |\n| B-06 | 已完成（限定范围） | 双通道通知、独立续租/停止、崩溃恢复及独立包 CLI 常驻验证通过；系统服务托管、真实执行与完整 B 放行仍不包含 |\n| B-07 | 未开始 | 已有 CLI 核对与只读投递卡；缺专用 held 列表、共享幂等决定与工作台管理闭环 |\n| B-08 | 进行中 | 独立包 A→B→A、丢回执、旧包拒新库已验；限定入口已签收，B-07 未齐，不能放行真实试点 |\n| B-09 / B-10 / B-11 | 未开始 | 需先过 B-08，随后确定本次专用真实环境；没有沿用旧认证授权 |\n\n首批操作说明见 [受控搬运手册](MASTERAGENT_3_1_TRANSPORT.md)。新开发包号不表示整张 B 清单已完成。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N12",
+      "path": "masteragent/runtime.py",
+      "sha256": "343b278246f08b0f8e0ea61eee714225e39d6eac15383dc04eb29396cece0682",
+      "bytes": 17114,
+      "line_count": 294,
+      "excerpts": [
+        {
+          "start_line": 13,
+          "end_line": 23,
+          "text": "CAPABILITIES = {\n    \"runtime\": \"codex-exec\", \"mode\": \"one-shot-text\", \"streamed_events\": True,\n    \"cancellation\": True, \"native_history\": True, \"native_resume\": False,\n    \"interactive_approval\": False, \"mid_turn_steering\": False,\n    \"live_team_member\": False, \"business_file_tools\": False,\n    \"os_isolation_verified\": False,\n}\nAPP_SERVER_CAPABILITIES = {**CAPABILITIES,\n    \"runtime\": \"codex-app-server\", \"mode\": \"owned-app-server-text\",\n    \"mid_turn_steering\": True, \"durable_inputs\": True,\n    \"native_resume\": False, \"live_team_member\": False,"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N13",
+      "path": "masteragent/codex_app_server.py",
+      "sha256": "88515b5ecaafb08df6f0e2da2d5d78b66e5282f62320cfcbd2dc07352776c290",
+      "bytes": 27950,
+      "line_count": 601,
+      "excerpts": [
+        {
+          "start_line": 33,
+          "end_line": 40,
+          "text": "_DENIALS = {\n    \"item/commandExecution/requestApproval\": {\"decision\": \"decline\"},\n    \"item/fileChange/requestApproval\": {\"decision\": \"decline\"},\n    \"item/permissions/requestApproval\": {\"permissions\": {}, \"scope\": \"turn\"},\n    \"mcpServer/elicitation/request\": {\"action\": \"decline\"},\n    \"item/tool/requestUserInput\": {\"answers\": {}},\n    \"item/tool/call\": {\"contentItems\": [], \"success\": False},\n}"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N14",
+      "path": "masteragent/service.py",
+      "sha256": "64ec84254b2c47205124ba8361a5a642d36fad7bd5301a2c84c92f912bf899ce",
+      "bytes": 57101,
+      "line_count": 887,
+      "excerpts": [
+        {
+          "start_line": 198,
+          "end_line": 256,
+          "text": "    def install(self, installation_id: str, package_path: Path | str, workspace: Path | str,\n                *, role_deployments: Mapping[str, Mapping] | None = None) -> dict:\n        _identifier(installation_id)\n        package = load_package(package_path)\n        self._check_adapters({\"tools\": package.tools})\n        snapshot = _json({\n            \"manifest\": package.manifest, \"roles\": list(package.roles),\n            \"knowledge\": package.knowledge, \"tools\": package.tools,\n            \"workflows\": package.workflows,\n        })\n        with self._db(write=True) as db:\n            if db.execute(\"SELECT 1 FROM installations WHERE installation_id=?\", (installation_id,)).fetchone():\n                raise PlatformError(\"installation_exists\", \"Installation identifiers cannot overwrite existing history.\")\n            workspace_path, bindings = normalize_deployments(\n                {role[\"role_id\"] for role in package.roles}, workspace, role_deployments,\n                self.state_root, self._workspace_paths(db))\n            timestamp = _now()\n            db.execute(\n                \"INSERT INTO installations VALUES (?,?,?,?,?,?,?,?,?,?)\",\n                (installation_id, package.package_id, package.version, package.digest,\n                 snapshot, _hash(snapshot), str(workspace_path), \"inactive\", 0, timestamp),\n            )\n            db.executemany(\"\"\"INSERT INTO role_deployments\n                (installation_id,role_id,workspace,access,created_at) VALUES (?,?,?,?,?)\"\"\",\n                [(installation_id, role_id, binding[\"workspace\"], binding[\"access\"], timestamp)\n                 for role_id, binding in bindings.items()])\n            return self._summary(self._installation(db, installation_id))\n\n    def activate(self, installation_id: str) -> dict:\n        with self._db(write=True) as db:\n            installation = self._installation(db, installation_id)\n            self._check_adapters(self._snapshot(installation))\n            if installation[\"state\"] == \"active\":\n                return self._summary(installation)\n            if installation[\"state\"] == \"uninstalled\":\n                raise PlatformError(\"installation_uninstalled\", \"This installation has been uninstalled; its history is retained.\")\n            if db.execute(\"SELECT 1 FROM installations WHERE state='active'\").fetchone():\n                raise PlatformError(\"active_conflict\", \"Deactivate the current installation before activating another.\")\n            self._check_workspace(db, installation)\n            db.execute(\"DELETE FROM actor_tokens WHERE installation_id=?\", (installation_id,))\n            db.execute(\"UPDATE installations SET state='active',generation=generation+1 WHERE installation_id=?\", (installation_id,))\n            return self._summary(self._installation(db, installation_id))\n\n    def deactivate(self, installation_id: str) -> dict:\n        with self._db(write=True) as db:\n            installation = self._installation(db, installation_id)\n            if db.execute(\"SELECT 1 FROM tasks WHERE installation_id=? AND state IN ('running','needs_reconcile')\", (installation_id,)).fetchone():\n                raise PlatformError(\"unfinished_work\", \"Running or uncertain work must be resolved before deactivation.\")\n            if installation[\"state\"] == \"active\":\n                db.execute(\"UPDATE installations SET state='inactive' WHERE installation_id=?\", (installation_id,))\n            db.execute(\"DELETE FROM actor_tokens WHERE installation_id=?\", (installation_id,))\n            return self._summary(self._installation(db, installation_id))\n\n    def uninstall(self, installation_id: str) -> dict:\n        with self._db(write=True) as db:\n            installation = self._installation(db, installation_id)\n            if installation[\"state\"] == \"active\":\n                raise PlatformError(\"installation_active\", \"Deactivate the installation before uninstalling it.\")\n            if db.execute(\"SELECT 1 FROM tasks WHERE installation_id=? AND state IN ('running','needs_reconcile')\", (installation_id,)).fetchone():"
+        },
+        {
+          "start_line": 621,
+          "end_line": 674,
+          "text": "    def complete(self, actor: Actor, attempt_id: str, lease_token: str,\n                 output: str | None = None, error: dict | None = None) -> dict:\n        output, error_json = self._completion_payload(output, error)\n        rejection = None\n        result = None\n        with self._db(write=True) as db:\n            attempt = self._attempt(db, attempt_id)\n            try:\n                task = self._owned_attempt(db, actor, attempt, lease_token)\n                if attempt[\"state\"] in (\"completed\", \"failed\"):\n                    previous = db.execute(\"SELECT * FROM results WHERE task_id=?\", (attempt[\"task_id\"],)).fetchone()\n                    if (previous is None or previous[\"attempt_id\"] != attempt_id\n                            or previous[\"output\"] != output or previous[\"error\"] != error_json):\n                        raise PlatformError(\"completion_conflict\", \"This attempt already completed with a different result.\")\n                    result = self._result(previous)\n                else:\n                    if attempt[\"state\"] != \"running\" or task[\"state\"] != \"running\":\n                        raise PlatformError(\"stale_attempt\", \"This attempt is no longer authorized to complete the task.\")\n                    if attempt[\"expires_at\"] <= self._clock_now():\n                        raise PlatformError(\"lease_expired\", \"This attempt's lease expired; effects require reconciliation.\")\n                    self._ensure_runtime_inputs_resolved(db, attempt)\n            except PlatformError as exc:\n                # Raise only after the transaction commits the diagnostic.\n                # No untrusted payload or credential is copied into the audit.\n                rejection = exc\n                if self._known_owner(attempt, actor, lease_token):\n                    self._attempt_event(db, attempt, \"completion_rejected\", {\"code\": exc.code})\n            if rejection is None and result is None:\n                # Persistence and coordination failures must roll back the\n                # whole completion, not be confused with rejected input.\n                result = self._finish(db, task, attempt, output, error_json)\n        if rejection is not None:\n            raise rejection\n        return result\n\n    def expire_attempts(self, installation_id: str) -> list[dict]:\n        \"\"\"Fence overdue attempts without guessing whether their work happened.\"\"\"\n        with self._db(write=True) as db:\n            self._installation(db, installation_id)\n            timestamp = self._clock_now()\n            rows = list(db.execute(\"\"\"SELECT * FROM attempts WHERE installation_id=?\n                AND state='running' AND expires_at<=? ORDER BY created_at,attempt_id\"\"\", (installation_id, timestamp)))\n            expired = []\n            for attempt in rows:\n                self._hold_runtime_inputs(db, attempt)\n                db.execute(\"UPDATE attempts SET state='expired',finished_at=? WHERE attempt_id=?\", (_now(), attempt[\"attempt_id\"]))\n                db.execute(\"\"\"UPDATE tasks SET state='needs_reconcile' WHERE task_id=?\n                    AND state='running' AND dispatch_generation=?\"\"\", (attempt[\"task_id\"], attempt[\"generation\"]))\n                self._attempt_event(db, attempt, \"expired\", {\"effects\": \"unknown\"})\n                expired.append(dict(db.execute(\"SELECT * FROM tasks WHERE task_id=?\", (attempt[\"task_id\"],)).fetchone()))\n            return expired\n\n    @staticmethod\n    def _reason(reason: str) -> str:"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N15",
+      "path": "masteragent/routing.py",
+      "sha256": "3b95e580a81b1aaf3b99434915c3dd8591bdd2e758fc177222d72c8ea53abfab",
+      "bytes": 36582,
+      "line_count": 555,
+      "excerpts": [
+        {
+          "start_line": 376,
+          "end_line": 439,
+          "text": "    def admit_source(self, route_id, route_epoch, source_id, text, owner_id,\n                     source_claim_epoch, source_claim_token, kind=\"task\", *, source=None, receiver=None):\n        source_key = _source_key(source_id)\n        _integer(route_epoch, 1, 2**53 - 1, \"Route epoch\")\n        text = _text(text, 64000)\n        if kind != \"task\" or type(kind) is not str:\n            raise PlatformError(\"unsupported_source_kind\", \"This adapter admits explicit text tasks only.\")\n        # Endpoint I/O occurs outside the core transaction, including on replay.\n        # The immutable stored binding is compared again under the write lock.\n        source_descriptor = self._source_descriptor(source) if source is not None else None\n        destination_descriptor = self._receiver_descriptor(receiver) if receiver is not None else None\n        self._preflight_endpoint_roots(source_descriptor, destination_descriptor)\n        with self._db(write=True) as db:\n            current = self._route(db, route_id)\n            self._source_owner(db, current, source_key, owner_id, source_claim_epoch, source_claim_token)\n            binding = db.execute(\"SELECT * FROM route_endpoints WHERE route_id=?\", (route_id,)).fetchone()\n            if binding is not None:\n                if source_descriptor is None or destination_descriptor is None:\n                    raise PlatformError(\"route_endpoint_preflight_required\", \"Bound routes require fresh source and receiver descriptors for every admission.\")\n                if (_json(source_descriptor), _json(destination_descriptor)) != (\n                        binding[\"source_binding\"], binding[\"destination_binding\"]):\n                    raise PlatformError(\"route_endpoint_mismatch\", \"The source or receiver root, persistent instance, protocol or limits changed.\")\n                self._guard_endpoint_overlaps(db, source_descriptor, destination_descriptor)\n            elif source_descriptor is not None or destination_descriptor is not None:\n                raise PlatformError(\"route_endpoints_unbound\", \"Explicitly bind the route before admitting from controlled endpoints.\")\n            version = db.execute(\"SELECT * FROM route_versions WHERE route_id=? AND route_epoch=?\", (route_id, route_epoch)).fetchone()\n            if version is None or _digest(version[\"snapshot\"]) != version[\"snapshot_digest\"]:\n                raise PlatformError(\"stale_route\", \"The route epoch is unavailable or invalid.\")\n            route = json.loads(version[\"snapshot\"])\n            envelope = {key: route[key] for key in (\"route_id\", \"source_namespace\", \"owner_lane\", \"installation_id\", \"role_id\", \"generation\", \"destination_namespace\", \"destination_id\")}\n            envelope.update(source_key=source_key, kind=kind, text_sha256=_digest(text), text_bytes=len(text.encode(\"utf-8\")))\n            encoded = _json(envelope)\n            envelope_digest = _digest(encoded)\n            previous = db.execute(\"SELECT * FROM source_admissions WHERE source_namespace=? AND source_key=?\", (route[\"source_namespace\"], source_key)).fetchone()\n            if previous is not None:\n                if previous[\"envelope_sha256\"] != envelope_digest:\n                    raise PlatformError(\"source_conflict\", \"This source identity already refers to different immutable content or routing.\")\n                return self._admission_view(previous)\n            if route_epoch != current[\"route_epoch\"]:\n                raise PlatformError(\"stale_route\", \"An old route epoch cannot admit new work.\")\n            if not current[\"admission_open\"]:\n                raise PlatformError(\"route_admission_closed\", \"New source admissions are frozen.\")\n            installation = self._installation(db, route[\"installation_id\"], active=True)\n            self._guard_command_generation(installation, route[\"generation\"])\n            self._role(installation, route[\"role_id\"])\n            policy = json.loads(route[\"policy\"])\n            _text(text, policy[\"input_limit\"])\n            if len(_json({**envelope, \"text\": text}).encode(\"utf-8\")) > policy[\"envelope_limit\"]:\n                raise PlatformError(\"route_envelope_limit\", \"The complete source envelope exceeds its byte limit.\")\n            if binding is not None:\n                policy[\"source_binding\"] = json.loads(binding[\"source_binding\"])\n                policy[\"destination_binding\"] = json.loads(binding[\"destination_binding\"])\n            task_id = str(uuid.uuid4()) if route[\"owner_lane\"] == \"v3\" else None\n            admission_id, timestamp = str(uuid.uuid4()), _now()\n            if task_id is not None:\n                db.execute(\"\"\"INSERT INTO tasks (task_id,installation_id,role_id,generation,text,\n                    client_request_id,state,created_at,completed_at,dispatch_generation,parent_task_id)\n                    VALUES (?,?,?,?,?,NULL,'queued',?,NULL,?,NULL)\"\"\", (\n                    task_id, route[\"installation_id\"], route[\"role_id\"], route[\"generation\"], text, timestamp, route[\"generation\"]))\n            db.execute(\"INSERT INTO source_admissions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\", (\n                admission_id, route_id, route_epoch, route[\"source_namespace\"], source_key, kind, text,\n                envelope[\"text_bytes\"], envelope[\"text_sha256\"], envelope_digest, route[\"owner_lane\"],\n                route[\"installation_id\"], route[\"role_id\"], route[\"generation\"], task_id,\n                route[\"destination_namespace\"], route[\"destination_id\"], _json(policy), 0, timestamp, None))"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N16",
+      "path": "masteragent/deliveries.py",
+      "sha256": "f5ac12346ec3dfda16a8042aea257e170dda8c819103ffebf42a5a8c55267198",
+      "bytes": 26119,
+      "line_count": 417,
+      "excerpts": [
+        {
+          "start_line": 62,
+          "end_line": 95,
+          "text": "    def _create_result_delivery(self, db, task, attempt, output, error_json):\n        \"\"\"Create intent alongside results; no external I/O, truncation, or execution.\"\"\"\n        admission = db.execute(\"SELECT * FROM source_admissions WHERE task_id=?\", (task[\"task_id\"],)).fetchone()\n        if admission is None:\n            return None\n        if admission[\"owner_lane\"] != \"v3\":\n            raise PlatformError(\"delivery_scope\", \"Only V3 admissions can publish platform result deliveries.\")\n        policy = self._delivery_policy(admission)\n        text = output if output is not None else (error_json or \"\")\n        body = utf8(text, code=\"invalid_result\")\n        delivery_id = str(uuid.uuid4())\n        envelope = {\n            \"purpose\": \"masteragent.result-delivery\", \"payload_version\": PAYLOAD_VERSION,\n            \"delivery_id\": delivery_id, \"admission_id\": admission[\"admission_id\"],\n            \"route_id\": admission[\"route_id\"], \"route_epoch\": admission[\"route_epoch\"],\n            \"installation_id\": task[\"installation_id\"], \"role_id\": attempt[\"role_id\"],\n            \"generation\": attempt[\"generation\"], \"task_id\": task[\"task_id\"],\n            \"attempt_id\": attempt[\"attempt_id\"], \"result_id\": task[\"task_id\"],\n            \"destination_namespace\": admission[\"destination_namespace\"],\n            \"destination_id\": admission[\"destination_id\"], \"result_status\": \"error\" if error_json else \"ok\",\n            \"text\": text, \"text_bytes\": len(body), \"text_sha256\": digest(text),\n        }\n        encoded = canonical_json(envelope)\n        state, reason = \"pending\", None\n        try:\n            validate_envelope(envelope, policy[\"result_limit\"], policy[\"envelope_limit\"])\n        except PlatformError as exc:\n            # A completed model result remains intact even if this destination\n            # cannot carry it. Fixing transport never authorizes another run.\n            state, reason = \"rejected\", exc.code\n        stamp = self._delivery_stamp()\n        db.execute(\"\"\"INSERT INTO result_deliveries (\n            delivery_id,admission_id,route_id,route_epoch,installation_id,role_id,generation,\n            task_id,attempt_id,result_task_id,destination_namespace,destination_id,payload_version,"
+        },
+        {
+          "start_line": 337,
+          "end_line": 380,
+          "text": "    def send_delivery_once(self, delivery_id, sender_id, receiver):\n        \"\"\"Explicit one-shot send; never retries an uncertain receive or a model.\"\"\"\n        claim = self.claim_delivery(delivery_id, sender_id, receiver)\n        args = (delivery_id, sender_id, claim[\"claim_epoch\"], claim[\"claim_token\"])\n        envelope = self.begin_delivery(*args)\n        try:\n            receipt = receiver.receive(envelope)\n            return self.complete_delivery(*args, receipt)\n        except Exception:\n            # A thrown exception may occur after the other database commits.\n            # Never infer absence, and never discard the original delivery ID.\n            try:\n                return self.hold_delivery(*args)\n            except PlatformError:\n                return self.delivery_status(delivery_id)\n\n    def reconcile_delivery(self, delivery_id, receiver, *, retry_absent=False):\n        \"\"\"Fence uncertain sends, query their fixed destination, and optionally requeue.\n\n        This operation can requeue the original bytes only on a matching\n        authoritative absent response. It never calls receive or claims work.\n        \"\"\"\n        if type(retry_absent) is not bool:\n            raise PlatformError(\"invalid_reconcile\", \"Retry of authoritative absence must be explicit.\")\n        descriptor = self._receiver_descriptor(receiver)\n        with self._db(write=True) as db:\n            row = self._delivery(db, delivery_id)\n            self._match_destination(row, descriptor)\n            if row[\"state\"] == \"received\":\n                return self._delivery_view(row)\n            if row[\"state\"] == \"sending\":\n                if row[\"expires_at\"] > self._clock_now():\n                    raise PlatformError(\"delivery_busy\", \"The live sender still owns this sending intent.\")\n                row = self._delivery_hold(db, row, \"sending_lease_expired\")\n            if row[\"state\"] != \"held\":\n                raise PlatformError(\"delivery_not_held\", \"Only uncertain held deliveries need receipt reconciliation.\")\n            envelope = self._delivery_envelope(row)\n            revision = row[\"revision\"]\n        # The destination is a separate authority. Never hold the core writer\n        # lock while it reads its own database or raises an unavailable error.\n        try:\n            response = receiver.query(envelope)\n        except Exception:\n            response = {\"status\": \"unavailable\"}"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N17",
+      "path": "docs/MASTERAGENT_3_RELEASE.md",
+      "sha256": "fefd8ef2aeafae4ad7c186c092e84e9ca3c051b3c5f51a6572e8166c043e8b64",
+      "bytes": 5920,
+      "line_count": 50,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 24,
+          "text": "发布日期：2026-10-13。发布范围为 Windows 前台常驻调度与纯文本协作基座，状态 schema 4，业务包 schema 1 / platform_api 1。此为本机正式发行；不等于已迁移或接管现有旧 bus fleet。\n\n## 已放行能力\n\n业务包、部署配置与平台核心分离；同一构建支持空载与 A→B→A 切换。角色通过明确的 Actor、安装和代次绑定持续接单，独立 Attempt 拥有原生 App Server 进程/thread/turn。平台提供成员排他、双租约、事件唤醒、结果与通知持久化、文本纠偏、停止和显式任务恢复。\n\n本次最终真实验收使用独立状态、虚构文本和显式部署。两个角色各连续完成两项任务，验证真实 turn/steer 回执及最终文本采纳；在飞停止和本次拥有的原生进程断线后保留 needs_reconcile，确认退出后显式 reconcile 才重试；随后完成 B 和恢复 A 的真实执行。最终构建通过10个原生 Attempt；此前首轮执行2个原生 Attempt后失败，两轮实际合计12个。此为平台Attempt计数，不将其表述为包含原生内部重试在内的精确计费请求数。\n\n固定验收原生版本为 `codex-cli 0.162.0-alpha.17.2`，请求模型为 `gpt-6-astra`，原生 thread/start 报告的模型逐次核对。旧固定可执行路径已经失效，部署必须使用实际存在的明确路径及固定版本；不承诺任意 Codex 版本兼容。\n\n新版新增的 partial_answer 仅作为中间输出，不能替代或覆盖最终答案。适配器仍要求精确终态、最终文本与实际进程树退出证据。\n\n首轮暴露原生自动生成bundled skills目录，导致第二任务preflight拒绝。修复在显式原生启动参数中关闭 `skills.bundled.enabled` 和 `skills.include_instructions`；继续拒绝home中的自定义skills目录或配置。首轮失败报告、完整事件和原候选包保持原样，第二轮使用独立目录与重建候选包，不覆盖失败历史。\n\n## 验证与证据\n\n- 冻结源码回归：368项，367通过、1项跳过（Windows当前账户缺少创建符号链接的权限（WinError 1314）），耗时146.297秒。报告保存完整测试名、跳过理由、日志和对应源码哈希。\n- 旧 fleet 诊断定向回归：29/29通过，无跳过。修复缺失或损坏信使证据却仍显示健康的问题，守卫只记录去重诊断，不扩大自动接管权限。\n- 同一最终包真实验收：10个原生Attempt，42项检查通过；保留实际进程、精确thread/turn、模型、纠偏回执、任务状态与退出证据。\n- 两次构建字节一致；主目录同步后的复验结果、发布摘要与文件清单保存于本地交付目录。\n- 验收全过程计数：首轮失败2个 + 最终轮10个 = 12个实际原生Attempt。首轮失败记录独立保留并附哈希，不纳入最终构建通过项。\n- 实际运行的验收脚本另存原样并记录SHA；交付脚本随后仅增加“诊断日志写入失败时保留原预检异常”的保护及合成故障测试。该差异经纯合成自检验证，未更改产品包、执行逻辑或实际验收证据。"
+        },
+        {
+          "start_line": 36,
+          "end_line": 48,
+          "text": "旧 fleet 与 V3 不共用任务队列、领取标记或Actor。灰度承接时，每条业务任务只能选择一个入口；不能向两条运行线重复派发。此次没有导入真实业务任务、接管旧会话或重启旧服务。\n\n原生认证与角色历史当前仍随专用home部署，现有桌面登录不会自动出现在新home。本次用户逐项完成部分原生授权后，明确授权仅在本次验收目录之间复用新生成的认证；首轮剩余两个home及第二轮重建的五个used home通过不解析、不显示内容的本机复制完成。该授权不延伸到私人/旧fleet认证或后续部署；平台未增加隐式复制认证功能。这项重复登录体验仍是后续部署优化项。\n\n## 升级、恢复与边界\n\nschema 1/2/3仅通过显式migrate备份升级到4，旧Actor撤销；schema 2/3存在running Task/Attempt时拒绝升级。dev.4不能打开schema 4。新状态已产生工作后，不可直接用旧备份覆盖。\n\n先停止接纳，再由拥有者确认进程退出；未知执行保留待核对。确认重复执行无副作用后才显式reconcile。回退保留新状态、备份与原生历史，不清理未知任务或未确认通知。\n\nonline只表示租约与身份有效；owned_attempt_active只表示执行归属；accepted只证明传输接收。outbox持久保存不等于已自动投递或已读。任务接续不等于native resume。\n\n本版不提供原生会话恢复、模型自主调用平台命令、运行中人工审批桥、业务文件工具、系统服务托管或生产迁移。纯文本基座的正式发布不替代这些能力的独立验收。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N18",
+      "path": "docs/MASTERAGENT_3_1_PROGRESS.md",
+      "sha256": "5ff2943d3030fb741f1ceac5b10c04fb405760c48c54d671bc715b0287b5493c",
+      "bytes": 31268,
+      "line_count": 163,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 23,
+          "text": "更新：2026-10-20。目标：统一本机 Web 工作台、Codex 与 Claude Code 接入契约、协调数据与制品存储一体化。开发代码已进入 `3.1.0-dev.4`，schema 6、公共 API `3.1-dev1`，正式发行仍为 3.0.0。阶段 B 新增受控本机来源、执行前端点绑定及双通道常驻搬运；旧 fleet 接入、完整 held 管理和真实单角色→双角色试点尚未完成。后续仍按 A → B → C → D 推进；开发包验收不代表整个 B、旧 fleet 切换或 3.1 正式发行。\n\n## 已确定\n\n2026-10-19 收尾与后续入口：已验包集中在项目 [releases](../releases/README.md)，原证据按相对于本会话目录的路径保存在 `releases/development-archive/2026-10-19/development-evidence.zip`。下文的历史绝对路径仅记录当时来源，原临时预览已离线，不能再当作当前可用链接。新会话从 [接手入口](MASTERAGENT_NEXT_SESSION.md) 开始，具体票据见 [执行工单](MASTERAGENT_EXECUTION_BACKLOG.md)，后续包号与放行门槛见 [版本路线](MASTERAGENT_VERSION_ROADMAP.md)。归档与维护脚本不增加平台功能、不改变开发版号，也没有新增真实模型验收。\n\n- 主要入口：本机 Web 工作台，用户已确认。\n- Claude Code：用户确认暂不可用，先完成接入设计；真实验证不能以替身代替。\n- 业务可替换、精确身份、执行归属与运行中收信能力继续保留。\n- 默认沿用每个独立状态根的 SQLite 事务库与本机制品目录，跨部署只读聚合。\n- 认证连接、角色部署和原生历史分层设计；3.0 验收目录的认证复用授权不扩展。\n\n## 立项核查\n\n- 核对主目录 18 个平台模块全部与正式 3.0.0 包一致。\n- 接续运行负责人新增的发行归档和 3.0 接管工作态，保持其当前文件与职责边界。\n- 完成 UI、存储、运行时三方面源码审查，识别旧 UI 查询写状态、页面启动耦合运维、双运行线缺路由/回执、V3 模型与用量观察不足等问题。\n- 查阅当前 Codex App Server 与 Claude Code/Agent SDK 官方资料，区分原生能力、项目已实现能力和待验收能力。\n- 保存 [3.1 方案](MASTERAGENT_3_1_PLAN.md)，明确 dev.1–dev.3、灰度与验收顺序。\n\n立项阶段只有静态核查和设计交付。后续 dev.1 的实现与测试单独记录如下。本开发会话仍无 agent-bus 角色绑定，不按工作目录推断身份，也不进行登记或接管。"
+        },
+        {
+          "start_line": 43,
+          "end_line": 57,
+          "text": "## dev.2 第一批实现与验收\n\n用户指出新旧界面差异后，已补做源码功能核对并形成 [21 入口迁移清单](MASTERAGENT_3_1_UI_COVERAGE.md)。本批在五个主页面增加原功能目录和操作说明，逐项标出局部对应、未迁入及兼容去向。显式配置本机旧控制台 URL 后提供 21 个页签链接，但不自动探测或启动旧服务。旧页面源码增加已知页签的片段导航；运行中的旧服务未重启、未点击验证，仍可能需要手动切换页签。目录齐全不等于全部功能迁入，现阶段仍不能替代现有控制台。\n\n公共命令层 `masteragent/workbench_commands.py` 由 HTTP 与 CLI 共用，接入提交、补充、明确决定和请求停止。默认只读，网页写操作由 `--enable-commands` 显式开启；同源、进程 CSRF、严格 JSON 字段与大小检查保护 HTTP 入口。业务、代次、任务和执行归属在同一领域事务内校验。命令只打开已有状态，不初始化或迁移，不读取运行配置或启动执行服务。\n\n表单草稿按状态根、业务、代次及目标隔离，刷新快照保留内容与焦点。提交后锁定请求；结果不明只重试原标识和内容。相同停止请求在当前代次下保持稳定回执，即使后续已退出或租约到期；不同原因、跨代次及错误目标仍被拒绝。补充保存不代表收到，停止请求不代表退出；未选择决定不会被解释为拒绝。\n\n查询增加公开的持久执行证据、操作可用性和有界通知元数据。实际模型/用量缺失继续显示未采集；最近执行记录不是即时登录或模型连接证明；通知 delivered 不是用户已读。查询仍不写状态、不回填通知、不读取原始协议或私有推理。本批没有实现新的原生模型/用量采集器。\n\n**自动化结果：** Python 全套 435 项、148.200 秒，434 项通过，1 项因 Windows 创建软链接权限不足跳过。前端行为 27 项和旧页签导航 3 项，共 30 项通过。覆盖命令事务守卫、严格载荷、重复请求及不明结果、读写边界、错误秘密抑制、公共观测、草稿隔离与全部已知旧页签。独立包清单与最终源码逐文件一致，包含 9 个前端资源。\n\n**浏览器结果：** 使用全新合成状态根，完成新任务提交、补充保存、明确批准及停止请求四个真实 HTTP 闭环；重读持久记录核对任务 queued、补充 pending、决定 approved/revision 1、停止请求已记录且退出未确认。另核对 21 个目录链接、刷新保留草稿、A→B→A 草稿隔离、未启用业务及历史代次禁用提交、运行能力与未知值。最终独立 `.pyz` 替换开发源码预览后重新加载，版本、目录、操作模式和持久结果一致，浏览器未记录警告或错误。仅桌面浏览器，未新增移动端验收。\n\n所有内容和执行记录均为合成数据，没有调用真实 Codex/Claude、复制认证、读取私人会话或接管生产。本会话仍未绑定 agent-bus 角色。正式 3.0.0 包摘要重新核对不变。"
+        },
+        {
+          "start_line": 65,
+          "end_line": 81,
+          "text": "## dev.2 第二批实现与验收（2026-10-19）\n\n续接前核对上一批包内 30 个平台源码及资源与主目录一致：本轮开始时，这部分没有新增平台变更；这不是对整个仓库、旧 bus 或其他角色工作的结论。本批保留既有修改，未登记 agent-bus 身份、接管生产或访问旧控制台。\n\n**已实现：** Codex App Server 协议层从 `thread/start` 保存服务端配置模型，从精确 thread/turn 的 `model/rerouted` 保存改道目标，并分别标注来源；这些是服务端报告，不能证明后端实际推理模型，`model_observed` 仍保持未知。`thread/tokenUsage/updated` 只读取本次新建原生会话的累计 `total`，不把 `last` 当累计、不累加重复快照。输入、缓存读取、输出、推理输出和总量分别校验；可选缓存写入缺失时保持未知。拒绝计数倒退、不完整、布尔值、负数及越界计数，跨作用域或终止后的消息不能覆盖本次事实。\n\n`runtime_observation` 将有来源的模型与用量写入当前执行事件，运行未结束即可查询；超时、中断或不确定结束保留已知事实，不变成成功结果。查询时间线截断时仍读取最近持久观测，按业务、角色、代次和执行隔离。新增 `runtime_native_request_denied` 只保存原生方法与固定拒绝原因，当前纯文本运行仍自动拒绝工具请求；事件不包含命令、补丁、原始载荷或凭据，也不证明原生端收到拒绝或工具完成。计数 0 仅表示没有已保存的拒绝事件。\n\n工作台分开展示请求模型、服务端报告和实际推理证据；用量改为逐项可读数值，标注协议来源和“本次新建原生会话累计，非单轮增量”。缺失值显示未采集，超过前端安全整数范围的值不伪装成准确数值。执行详情显示观测、异常结束和原生请求拒绝记录，默认只读策略不变。\n\n**原生审批设计：** 完成 [独立实施契约](MASTERAGENT_3_1_NATIVE_APPROVAL_CONTRACT.md)。现有业务 `Decision` 会改变任务状态和队列，不能直接承接运行中原生工具审批。契约要求独立的审批记录、精确原生关联、答复和不明回执语义，等待期间继续接收补充/停止；部署工具上限与可验证隔离能力须先落实。schema 5、审批持久层和按钮均未实现，本批不迁移状态库。协议形状已核对本机 `codex-cli 0.163.0` 导出的 318 个 JSON schema，未启动真实模型或读取认证。\n\n**自动化结果：** 最终源码 Python 全套 448 项、178.622 秒，447 项通过，1 项因 Windows 创建软链接权限不足跳过。前端行为 31 项和旧页签导航 3 项，共 34 项通过。新增覆盖累计快照、重复/倒退/非法用量、thread/turn 隔离、中断保留证据、服务端模型来源、查询白名单与时间线截断、业务/代次隔离及 UI 未知值。协议、执行器和真实子进程替身检查包含在完整回归内；它们不代表真实 Codex 推理验收。另有独立审查对照当前 schema 核对协议、查询和页面实现，未发现 P1/P2 问题。\n\n**浏览器结果：** 最终独立 `.pyz` 使用新建合成状态根启动默认只读工作台。检查请求模型、服务端改道模型及未知实际模型，输入 1200、缓存读取 300、缓存写入 40、输出 160、推理输出 60、累计总量 1360 的逐项显示与来源说明。完成 A→B→A 及代次 2→1→2 切换检查；中断任务保持待核对、无已保存成果，并可见一次自动拒绝记录。页面没有原生批准操作，浏览器未记录警告或错误，截图已人工查看。此轮为桌面浏览器验收，未重复上一批四个写操作闭环，也未新增移动端验收。\n\n全部数据为显式标注的合成业务/协议事件，没有调用真实模型、复制认证、读取私人会话、接入 Claude 或启动业务工具。最终公共查询前后，合成数据库 SHA256、长度和修改时间一致；该比对只覆盖保存验收证据时的查询，不冒充整个浏览器操作过程的前后校验。"
+        },
+        {
+          "start_line": 137,
+          "end_line": 161,
+          "text": "## dev.4 首批：受控来源与常驻搬运（2026-10-20）\n\n本批限定为全新 `SourceStore / masteragent-source-v1`；来源仅发布明确的纯文本 task。17 行入口核对表明确旧消费者和恢复器仍留旧线，新代码不读取这些邮箱、配置或会话。操作步骤见 [受控搬运手册](MASTERAGENT_3_1_TRANSPORT.md)，逐票状态见 [执行工单](MASTERAGENT_EXECUTION_BACKLOG.md)。\n\n来源有独立 `sources.sqlite3`、固定 UUID 与 namespace，整条 UTF-8 信封保存正文、长度和摘要，整数与字符串 ID 分开。来源确认绑定原 admission；最后的 transport completion 只表示确认握手完成，不是模型完成。已确认但握手中断的记录仍在 pending，分页使用持久 sequence 对应的 typed ID 游标，前批失败不阻塞后续消息。\n\nschema 6 新增不可变 `route_endpoints`。首次绑定需要零接纳历史；新接纳前读取两端 descriptor，进入核心事务后对比固定 root、实例、协议与限额，再保存 admission。结果完成与投递意图在同事务写入原目的端绑定，不能到首次发送时再换根。两端与 state、所有保留业务工作区互不重叠；已有未绑定历史不会自动补造证据。schema 1–5 仅显式备份迁移至 6；有效来源租约、在飞或不明旧执行、claimed/sending/held 投递以及既有运行/成员/补充守卫均阻断迁移。\n\n新增 `source-init/publish/query`、`transport-bind/once/serve`。搬运独立于执行器，来源和结果分别等待 Windows 目录事件、分别按领取时固化策略续租，先 arm 再查库。启动先读 backlog；停止阻止新步骤，等待当前 IO 退出后才能报告 stopped。发送已保存但响应丢失时保持 held，服务不自动查询或授权重发，更不会重跑模型。配置改 lane 的竞争窗口以已检查的 route epoch 拒绝，已接纳消息始终查回原 admission。\n\n合成故障验证覆盖：核心接纳、来源确认、平台确认、来源完成各自已提交但响应丢失；来源确认后真实子进程被强制终止，再以新进程上下文接续；跨代/冻结后的原 admission 恢复；长 IO 续租和续租失败；停止期间目的端已经保存；并发 typed ID；空扫描与 wait 之间到达；阻塞来源 IO 时结果通道仍工作。独立审查发现并修复 WAL 拒绝前生成旁文件、过期内存重试导致 50ms 空闲扫描、来源目录误用平台状态目录检查三个问题。它们均为合成环境发现，不能描述为生产事故。\n\n独立 `.pyz` 通过空载→A→B→恢复 A，两种角色和业务包使用同一构建；每段 32,016 UTF-8 字节正文、组合字符、换行和尾段完全一致。回执丢失后同 ID 查回原回执，三段总计 3 次 Attempt、各 1 次 receive；同名替代根不能核对。实际 dev.3 二进制读取 schema 6 返回 `unsupported_schema`，库摘要不变。可重跑脚本为 `scripts/accept_transport.py`；运行目录使用项目外临时根并在完成后清理，证据只保存本机。\n\n本批没有修改 UI 布局或新增网页发送/核对按钮，没有真实 Codex/Claude 推理、生产切换、角色注册或认证读取。B-00（限定范围）、B-01～B-03完成；B-04～B-06在受控 V3 合成范围完成（入口签收表见搬运手册），B-07管理闭环未开始，B-08仅部分合成证据齐全，因此 B 仍未完成。原 3.0 正式包独立保留。\n\n最终 Python 全量 **648 项，646 通过、2 项因 Windows 软链接权限跳过**（219.962 秒）；前端 **52/52**。首次全量 646 项（644 通过、2 跳过）后，独立审查补修停止通知失败时跳过清理的问题，新增回归；随后一轮出现两项既有 Windows 测试时序失败，定位并修正测试握手后重新跑完上述最终全量，失败日志一并归档。停止异常时等待两个通道实际退出，失败仍报告错误；备用每段最多 30 秒的原生等待只检查停止，不查库或扫盘。\n\n最终包：`releases/3.1.0-dev.4/masteragent-3.1.0-dev.4.pyz`；SHA256：`65c7ae5a49260440bbbe9c5ac274e70aca94bca66a1470dd851dfae2c96094ca`。包内 41 个清单条目全部校验，40 个平台源码及资源与当前文件逐字节一致。`releases/3.1.0-dev.4/` 保存包内源码、源码/测试/文档快照、文件摘要和 `evidence/`；真实模型、旧 UI 浏览器和移动端不属于本批验收。\n\n## 下一阶段与剩余范围\n\n继续 B：完成 B-07 的有作用域 held 清单与带请求 ID、revision、操作者理由的共享幂等核对，再收齐 B-08。只有这些合成门槛通过后，才进入本次明确授权的独立真实文本环境。当前已有常驻搬运，但没有完整 held 工作台管理；本机回执不代表 agent 处理或用户已读，新受控来源也不代表旧 fleet 全入口接管。\n\nC 扩展制品索引、统一事件序号和存储可观测性；D 先落实部署工具策略、权限上限和可验证隔离，再做独立原生审批闭环，等待期间继续收信、纠偏和响应停止。历史用量、上下文、提示词审核、工作组、长程任务、生命周期、路径/存储、语音等依覆盖分类保留入口，不静默退役。Claude 真实执行待环境恢复。3.0 验收目录间的认证复用授权不扩展到 3.1。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    },
+    {
+      "id": "N19",
+      "path": "docs/ASTRA_3_1_REVIEW_DECISIONS_20261019.md",
+      "sha256": "89c12b8671323947137f605911f696ffb7a1f01e320a05a580dcf56ef8d37f21",
+      "bytes": 22680,
+      "line_count": 147,
+      "excerpts": [
+        {
+          "start_line": 3,
+          "end_line": 5,
+          "text": "日期：2026-10-19。审阅对象：`3.1.0-dev.2.1`。输入为 [双方意见汇总](prompts/ASTRA_3_1_DEV_REVIEW_20261019.md) 和 [MasterUI 审阅](ASTRA_3_1_MASTERUI_REVIEW_20261019.md)。本报告提出下一批调整，不改写原计划、实现、状态库或运行服务。\n\n建议把下一阶段主线调整为：**先补齐任务交接和历史可达性，再交付持久单入口与目的端回执，用独立纯文本角色完成真实验证；工具隔离和原生审批并行准备，条件通过后另行开放。** 这调整了上一轮“先工具策略和审批、后存储投递”的顺序，沿用已经交付的协调内核、工作台和运行观测。"
+        },
+        {
+          "start_line": 22,
+          "end_line": 36,
+          "text": "可继续沿用：业务包与部署分离、同构建 A→B→A 隔离、Task/Attempt/Decision、运行中补充和停止、只读查询、公共命令幂等与作用域检查、本机 SQLite 加制品目录、模型来源与累计用量事实。没有证据要求换前端框架、改用数据库服务或整体重写这些模块。\n\n## 对双方意见的逐项取舍\n\nMasterAgent 的五项建议均采纳目标，作三处修正：第一，先验证纯文本单入口闭环，不把工具审批作为所有接管的前提；第二，API 附加字段与数据库结构升级分开判断，审批文档里的 schema 5 改为后续实施时的实际版本；第三，第一轮双角色验证是平台编排的文本任务链，不是模型自主派活。\n\n现有 `request_child` 只接受 queued/waiting 父任务，原生纯文本运行不能自主调用协调工具。因此可先由平台控制方预先建立父子关系，验证子结果进入父任务输入；不能把这种成功算作原生 agent 协作桥完成。【事实 S6】\n\nMasterUI 的五项处理如下：\n\n1. **采纳交接可见性。** 保存回执旁提供“查看已保存任务”，显示同业务/代次/角色的成员快照及时间，再展示领取归属。可接单只是租约与成员状态口径，不写成模型在线；没有成员给出执行服务未就绪的说明，不禁止保存排队。\n2. **强化跨代次可达性。** 以 installation + task 建立稳定只读链入口，包含 continuations、各代次的 Attempt/决定/结果和分页；单独标注任务当前归属。保留当前代列表筛选和写操作守卫，不把读历史变成允许旧代操作。验收包括纯排队续接、旧决定、旧尝试、两次以上续接、截断和跨安装隔离。\n3. **采纳平台决定分名。** 概览与通知先改明确称谓；未来原生审批拥有独立对象、入口、计数和答复状态。当前不制造一个可操作的原生审批入口。\n4. **采纳详情独立快照时间。** 顶栏目前取任务列表快照，详情另行请求；详情应常驻自身 observed_at，显示“公开事件快照”。已有截断/断线说明继续保留。持久游标和补读交付前不宣称即时订阅。\n5. **采纳保留兼容，修改全量迁移预期。** 按下表迁移用户能力，未承接部分保持明确去向；新版深链、旧版页面和离线分别验收。当前没有使用率证据，不据菜单数量决定全部原生重建或退役。"
+        }
+      ],
+      "evidence_kind": "current_static_source_or_historical_document_not_rerun"
+    }
+  ],
+  "commit_evidence": [
+    {
+      "commit": "a063a743f3c3c4532306ba7f822ed56ec1f07081",
+      "author_date": "2026-06-23T16:18:25+08:00",
+      "committer_date": "2026-06-23T16:18:25+08:00",
+      "subject": "v1.0: 多-agent 文件总线架构(self-bootstrapping)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": []
+    },
+    {
+      "commit": "6688c0a5a2716476990d9d3fcfd5c3372c03a6d5",
+      "author_date": "2026-07-17T16:16:33+08:00",
+      "committer_date": "2026-07-17T16:16:33+08:00",
+      "subject": "BUS 2.0 P2-2a 步骤1:cmd_who 表格 format-from _who_data(灭 agentbus 内 verdict #2->#1 分叉)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- bus_smoke 45/39/39/无回归"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "6688c0a5a2716476990d9d3fcfd5c3372c03a6d5",
+          "--",
+          "agent_bus/bus/status.py"
+        ],
+        "sha256_utf8": "e2f29269d96c8ba863b2044251dc70eccbc83bc30b1f8f4a2b8e6a99a16094ce",
+        "total_lines": 116,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 85,
+        "excerpt_truncated": true,
+        "excerpt": "diff --git a/agent_bus/bus/status.py b/agent_bus/bus/status.py\nindex 1746ddd..144a57b 100644\n--- a/agent_bus/bus/status.py\n+++ b/agent_bus/bus/status.py\n@@ -114,88 +114,38 @@ def _who_data():\n \n \n def cmd_who(args):\n-    \"\"\"谁在跑 + 是谁:交叉核对 presence 心跳 与 实际 claude 进程。\"\"\"\n+    \"\"\"谁在跑 + 是谁:交叉核对 presence 心跳 与 实际 claude 进程。\n+    表格与 --json 同源 `_who_data()`(2a 收敛:原表格自算 verdict=#2 分叉,已并入 _who_data 单一源)。\"\"\"\n+    d = _who_data()\n     if getattr(args, \"json\", False):\n-        print(json.dumps(_who_data(), ensure_ascii=False)); return\n-    fresh = args.max_age\n-    alive = _alive_claude_pids()\n-    roles = _list_roles()\n-    retired_set = _retired_roles()\n-    claimed = set()\n+        print(json.dumps(d, ensure_ascii=False)); return\n     print(\"%-14s %-22s %-9s %8s  %s\" % (\"role\", \"verdict\", \"claude_pid\", \"心跳age\", \"cwd\"))\n     print(\"-\" * 88)\n-    for r in roles:\n-        plabel = _pseudo_role_label(r)\n-        if plabel:                  # 伪角色/系统桶:非执行体,不当掉线/未醒,单列标注\n-            print(\"%-14s %-22s  %s\" % (r, \"◇ 伪角色\", plabel)); continue\n-        if r in retired_set:        # 退役:标注、不当残留/异常(进程退是应该的)\n-            print(\"%-14s %-22s\" % (r, \"⊘ 退役\")); continue\n-        pk = _is_parked(r)          # 故意暂离(park/休眠):进程死是目的非崩溃,别显\"残留\"(与 _who_data/selfwake 单一源一致)\n-        if pk:\n-            ext = \"·已到期待unpark\" if _park_expired(pk) else (((\"·%s天\" % pk.get(\"days\")) if pk.get(\"days\") else \"\"))\n-            note = (\"·\" + pk[\"note\"]) if pk.get(\"note\") else \"\"\n-            print(\"%-14s %-22s %s\" % (r, \"🅿️ 休眠\", \"用户故意暂离%s%s\" % (ext, note))); continue\n-        pf = BUS / r / \"presence.json\"\n-        if not pf.exists():\n-            print(\"%-14s %-22s\" % (r, \"未声明(无 presence)\"))\n-            continue\n-        try:\n-            pr = json.loads(pf.read_text(encoding=\"utf-8\"))\n-        except Exception:\n-            print(\"%-14s %-22s\" % (r, \"presence 损坏\")); continue\n-        pid = pr.get(\"claude_pid\")\n-        age = _age_seconds(pr.get(\"last_seen\", \"\"))\n-        mode = pr.get(\"mode\", \"?\")\n-        wt = pr.get(\"wait_timeout\") or 110\n-        listen_fresh = (age is not None and age <= wt + 60)\n-        if mode == \"daemon\":\n-            # 无可见 tab 的后台守护进程:按 daemon_pid 判活(不算进 claude 认领集)\n-            dpid = pr.get(\"daemon_pid\")\n-            d_alive = psutil.pid_exists(dpid) if (dpid and psutil is not None) else None\n-            verdict = (\"✓ daemon在听\" if d_alive else (\"✗ daemon已退\" if dpid else \"daemon?\"))\n-            cur = pr.get(\"current_task\")\n-            last = (\"▶ 在做:%s\" % (pr.get(\"current_title\") or cur)) if cur else (pr.get(\"cwd\") or \"-\")\n-            print(\"%-14s %-22s %-9s %7ss  %s\" % (\n-                r, verdict, \"d:%s\" % (dpid or \"?\"), str(age if age is not None else \"?\"), last))\n-            continue\n-        proc_alive = (pid in alive) if (pid and psutil is not None) else None\n-        if pid:\n-            claimed.add(pid)\n-        if psutil is None:\n-            verdict = \"心跳%ss前(mode=%s)\" % (age if age is not None else \"?\", mode)\n-        elif pid and not proc_alive:\n-            verdict = \"✗ 进程已退(残留)\"\n-        elif mode == \"listening\" and proc_alive and listen_fresh:\n-            verdict = \"✓ worker在听\"\n-        elif mode == \"listening\" and proc_alive:\n-            verdict = \"⚠ worker静默(超心跳%ss)\" % (age if age is not None else \"?\")\n-        elif proc_alive:\n-            verdict = \"已声明(hello),未起循环\"\n-        else:\n-            verdict = \"心跳%ss前(无pid)\" % (age if age is not None else \"?\")\n-        cur = pr.get(\"current_task\")\n-        last = (pr.get(\"cwd\") or \"-\") + ((\"  ▶ 在做:%s\" % (pr.get(\"current_title\") or cur)) if cur else \"\")\n-        print(\"%-14s %-22s %-9s %7ss  %s\" % (\n-            r, verdict, str(pid or \"-\"), str(age if age is not None else \"?\"), last))\n-    # 在跑但没认领的 claude 进程:区分\"已标注(非fleet)\"和\"真未声明\"\n-    if psutil is not None:\n-        tags = _load_pidtags()\n-        rest = sorted(alive - claimed)\n-        tagged = [(pid, tags[str(pid)]) for pid in rest if str(pid) in tags]\n-        unknown = [pid for pid in rest if str(pid) not in tags]\n-        print(\"-\" * 88)\n+    for rec in d[\"roles\"]:\n+        r = rec[\"role\"]; verdict = rec.get(\"verdict\") or \"?\"\n+        age = rec.get(\"age_s\"); age_s = str(age if age is not None else \"?\")"
+      }
+    },
+    {
+      "commit": "bcd13a073c7e0c52bcf47f6e0cf78aef7856ca79",
+      "author_date": "2026-07-17T16:42:10+08:00",
+      "committer_date": "2026-07-17T16:42:10+08:00",
+      "subject": "BUS 2.0 P2-2b:三 store 跨引用契约化(bus/refs.py·使用方签 B·纯 additive·解析不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "BUS 2.0 P2-2b:三 store 跨引用契约化(bus/refs.py·Master数分签 B·纯 additive·解析不变)",
+        "Master数分签 B(分层保留+契约化 ref·否 A 归一)。落 bus/refs.py:",
+        "- 自验:compile+import+ab refs 列 10 契约+ab refs --check 跑通+bus_smoke 45/39/39/无回归",
+        "- 副产(数据卫生发现·非本契约阻塞):--check surface 出 71 条 stale todo(长期退役 role 历史条目+我的 __smoke__ 测试污染),留Master数分定是否 purge"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "bcd13a073c7e0c52bcf47f6e0cf78aef7856ca79",
+          "--",
+          "agent_bus/bus/refs.py"
+        ],
+        "sha256_utf8": "c13f8dbf77d490f786e00783d8173a2b3bc1b19aef5aa9885a5ff6e36e7aff4c",
+        "total_lines": 138,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 85,
+        "excerpt_truncated": true,
+        "excerpt": "diff --git a/agent_bus/bus/refs.py b/agent_bus/bus/refs.py\nnew file mode 100644\nindex 0000000..97ac53f\n--- /dev/null\n+++ b/agent_bus/bus/refs.py\n@@ -0,0 +1,132 @@\n+# -*- coding: utf-8 -*-\n+\"\"\"bus.refs —— BUS 2.0 P2-2b:三 store 跨引用【契约化】(Master数分签 B=分层保留+契约化 ref,否 A 归一)。\n+\n+三 store 各留各的(不合并),跨 store 只准通过下面【声明的 ref 字段】关联;\n+ref 存【标识符】、不存对方 payload 副本(禁内联=防偷偷 A 归一)。本模块=契约的单一真相源 + 只读校验器。\n+纯 additive:不改任何现有解析代码,故\"解析结果不变\"天然满足(验收铁律·Master数分 2026-07-17 口径)。\n+\n+三 store 边界:\n+- todos(todos.json)        = ask-user 待办池(用户面待拍板·非阻塞)\n+- tasklines(role 目录)     = agent 间任务(inbox/processing/done/archive 生命周期)\n+- longrange(_longrange/…)  = 长程多根 DAG 生长网(拆解/执行/跟踪 + 里程碑闸 + 决策合批)\n+\n+依赖:config(BUS)· roster(_list_roles)。只读·best-effort·绝不改 store。无反向依赖=无环。\n+\"\"\"\n+import json, os\n+\n+from bus.config import BUS\n+from bus.roster import _list_roles, _retired_roles\n+\n+# 每条 ref 契约锁 4 要素:id 空间 / 基数 / 悬挂处理 / 解析目标(契约化只显式化·禁改现解析)。\n+# owner=校验归属(bus=本模块可 disk 校验 / longrange_net=引擎侧深校验,本模块只声明)。\n+REF_CONTRACTS = [\n+    # ── todos store ──\n+    {\"n\": 1, \"store\": \"todos\", \"ref\": \"todo.from\", \"id_space\": \"bus role\", \"card\": \"1:1\",\n+     \"dangling\": \"非 bus 成员 ab ask-user 已硬拒(_is_bus_member)\", \"means\": \"哪个 agent 在等这个决策/答案回填给谁\", \"owner\": \"bus\"},\n+    {\"n\": 2, \"store\": \"todos\", \"ref\": \"todo.answer/resolution\", \"id_space\": \"用户回填(WebUI POST)\", \"card\": \"1:1\",\n+     \"dangling\": \"未答默认不阻塞(非阻塞池)\", \"means\": \"用户对该待办的答复\", \"owner\": \"bus\"},\n+    # ── tasklines store ──\n+    {\"n\": 3, \"store\": \"tasklines\", \"ref\": \"task.from / task.to\", \"id_space\": \"bus role\", \"card\": \"N:1\",\n+     \"dangling\": \"from=unknown 时 done --to 兜底\", \"means\": \"任务路由:谁派给谁\", \"owner\": \"bus\"},\n+    {\"n\": 4, \"store\": \"tasklines\", \"ref\": \"notice.notice_of\", \"id_space\": \"task-id\", \"card\": \"1:1\",\n+     \"dangling\": \"原任务已归档时读 <sender>/done/<id> 兜底\", \"means\": \"完成通知指向它通告的任务·读完即弃防环\", \"owner\": \"bus\"},\n+    {\"n\": 5, \"store\": \"tasklines\", \"ref\": \"done -> archive/<同名>\", \"id_space\": \"task-id\", \"card\": \"1:1\",\n+     \"dangling\": \"归档不改 id\", \"means\": \"完成任务归档留痕·id 保持\", \"owner\": \"bus\"},\n+    {\"n\": 6, \"store\": \"tasklines\", \"ref\": \"presence.current_task\", \"id_space\": \"task-id\", \"card\": \"1:1\",\n+     \"dangling\": \"完成后清 None\", \"means\": \"该 role 当前在做的任务\", \"owner\": \"bus\"},\n+    # ── longrange store(引擎侧深校验·本模块只声明契约)──\n+    {\"n\": 7, \"store\": \"longrange\", \"ref\": \"node -> taskline task\", \"id_space\": \"task-id(跨 store!)\", \"card\": \"1:1\",\n+     \"dangling\": \"任务归档→节点标记\", \"means\": \"生长网节点挂到一个真实任务\", \"owner\": \"longrange_net\"},\n+    {\"n\": 8, \"store\": \"longrange\", \"ref\": \"edge -> node<->node\", \"id_space\": \"node-id\", \"card\": \"N:N\",\n+     \"dangling\": \"含分叉合并+跨任务边\", \"means\": \"边遍历边长·不动点收敛\", \"owner\": \"longrange_net\"},\n+    {\"n\": 9, \"store\": \"longrange\", \"ref\": \"milestone -> 覆盖节点\", \"id_space\": \"node-id\", \"card\": \"1:N\",\n+     \"dangling\": \"里程碑通过才放行\", \"means\": \"验收闸\", \"owner\": \"longrange_net\"},\n+    {\"n\": 10, \"store\": \"longrange\", \"ref\": \"resolve_batch -> 一批 task/milestone\", \"id_space\": \"task/milestone-id\", \"card\": \"1:N\",\n+     \"dangling\": \"approve->ready/reject->failed/未答默认 reject\", \"means\": \"决策合批·一次批完\", \"owner\": \"longrange_net\"},\n+]\n+\n+\n+def _load_json(path, default):\n+    try:\n+        return json.loads(path.read_text(encoding=\"utf-8\")) if path.exists() else default\n+    except Exception:\n+        return default\n+\n+\n+def check_refs():\n+    \"\"\"只读校验 bus-native ref(悬挂检测):todo.from / task.from-to / notice.notice_of / presence.current_task\n+    的目标是否可解析。longrange 内部 ref(node/edge/milestone/batch)归 longrange_net 引擎深校验,此处不展开。\n+    返回 {checked, dangling:[...], notes:[...]}。best-effort·纯读·不改任何 store。\"\"\"\n+    roles = set(_list_roles())\n+    retired = set(_retired_roles())\n+    dangling = []            # 真悬挂(目标既非活跃 role 也非退役档案=可能笔误/脏数据·值得看)\n+    accepted = 0             # 契约内可接受悬挂(退役 role 历史条目=契约#1 悬挂处理明确允许)\n+    checked = 0\n+\n+    # #1 todo.from → bus role(活跃在册=OK;退役=契约可接受;都不在=真悬挂)\n+    todos = _load_json(BUS / \"todos.json\", [])\n+    for t in (todos if isinstance(todos, list) else []):\n+        frm = t.get(\"from\") or t.get(\"confirm_from\")\n+        if frm and frm not in (\"bus健康\", \"unknown\", \"用户\"):\n+            checked += 1\n+            if frm in roles:\n+                pass\n+            elif frm in retired:\n+                accepted += 1\n+            else:\n+                dangling.append(\"todo %s: from=%r 既不在活跃 role 也不在退役档案(疑笔误/脏数据)\" % (t.get(\"id\", \"?\"), frm))\n+\n+    # #3 task.from/to + #4 notice.notice_of + #6 presence.current_task(遍历 role 目录)"
+      }
+    },
+    {
+      "commit": "ce1913333323f67d7c1c0a52e4fb945d383dee87",
+      "author_date": "2026-07-20T15:04:36+08:00",
+      "committer_date": "2026-07-20T15:04:36+08:00",
+      "subject": "BUS2.0 P4·Phase C(MasterUI lane):抽后端数据/API层(~2106行)到 ui/api.py·server.py 变 facade(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- 实测:py_compile OK·facade完整性missing NONE·子进程compute_fleet roles=24·全端点200(tray/state/bi/caps/usage/health/sessions/ctxpanel/prompts/tasklines/groups/mechanisms/archive/dispatch_metrics/ctx/longrange/live/todos)·SSE /api/events连上·线程填充缓存(loading=None)·tray present19/parked1不漂"
+      ]
+    },
+    {
+      "commit": "278b7ec95b8ac9665eae7e08a8d7a616fdc2a9be",
+      "author_date": "2026-07-20T15:11:21+08:00",
+      "committer_date": "2026-07-20T15:11:21+08:00",
+      "subject": "BUS2.0 P4·Phase D(MasterUI lane):抽 class Handler(HTTP路由)到 ui/routes.py(行为不变)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- 实测:py_compile OK·server.Handler来自routes·子进程compute_fleet roles=24·全19端点200·SSE /api/events连上·page sha256=4bcd10259e22752c字节一致·tray present19/parked1"
+      ]
+    },
+    {
+      "commit": "ab62d9504cfadf198f6326d59ab6301337259b17",
+      "author_date": "2026-07-28T15:14:24+08:00",
+      "committer_date": "2026-07-28T15:14:24+08:00",
+      "subject": "fix(ui): P0安全修复+sonnet-4-6精化",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "验收: SSE data:change 实测到达 / 跨Origin POST 403 / sonnet-4-6 (1000000,True)"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "ab62d9504cfadf198f6326d59ab6301337259b17",
+          "--",
+          "ui/routes.py"
+        ],
+        "sha256_utf8": "7a83de8e2a97a37720d897ceb11e5996766434ef7c1bf9a6e1b829fc302f64cf",
+        "total_lines": 44,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 44,
+        "excerpt_truncated": false,
+        "excerpt": "diff --git a/ui/routes.py b/ui/routes.py\nindex 75d7992..39623ae 100644\n--- a/ui/routes.py\n+++ b/ui/routes.py\n@@ -125,6 +125,10 @@ class Handler(BaseHTTPRequestHandler):\n             self._send(404, {\"error\": \"not found\"})\n \n     def do_POST(self):\n+        origin = self.headers.get(\"Origin\", \"\")\n+        if origin and origin not in (\"http://127.0.0.1:8799\", \"http://localhost:8799\"):\n+            self._send(403, {\"error\": \"forbidden\"})\n+            return\n         path = urlparse(self.path).path\n         if path == \"/api/send\":\n             b = self._body_json()\n@@ -173,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):\n             self._send(404, {\"error\": \"not found\"})\n \n     def _sse(self):\n-        global _change_ver\n+        # 直接引用 api 模块属性，绕过 facade int 定格副本(facade 拷贝时 _change_ver=0 定格，api._bump() 只改 api 侧)\n         self.send_response(200)\n         self.send_header(\"Content-Type\", \"text/event-stream; charset=utf-8\")\n         self.send_header(\"Cache-Control\", \"no-cache\")\n@@ -182,14 +186,13 @@ class Handler(BaseHTTPRequestHandler):\n         try:\n             self.wfile.write(b\": connected\\n\\n\")\n             self.wfile.flush()\n-            with _change_cv:\n-                last = _change_ver\n+            with api._change_cv:\n+                last = api._change_ver\n             while True:\n-                with _change_cv:\n-                    # 最长 15s 等变更;到点发心跳保活\n-                    got = _change_cv.wait_for(lambda: _change_ver != last, timeout=15)\n+                with api._change_cv:\n+                    got = api._change_cv.wait_for(lambda: api._change_ver != last, timeout=15)\n                     if got:\n-                        last = _change_ver\n+                        last = api._change_ver\n                 if got:\n                     self.wfile.write(b\"data: change\\n\\n\")\n                 else:"
+      }
+    },
+    {
+      "commit": "5ad25d1dfc209e72b73c89ac67b13389695f25a9",
+      "author_date": "2026-07-28T16:34:16+08:00",
+      "committer_date": "2026-07-28T16:34:16+08:00",
+      "subject": "fix(ui): P1收口 — 噪音压制+死代码+尾读+json_lock+路径无关机器名",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": []
+    },
+    {
+      "commit": "35c29c10c6299dc96d40f3341a10496ad9cb8b71",
+      "author_date": "2026-07-29T11:17:08+08:00",
+      "committer_date": "2026-07-29T11:17:08+08:00",
+      "subject": "feat(ui): 📁路径页加存储全景面板(2.4 P2)",
+      "declared_coauthors": [
+        "Claude Sonnet 4.6"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": []
+    },
+    {
+      "commit": "b73817670dba70481f0ffdadd733abb1ff56c02e",
+      "author_date": "2026-07-29T17:43:57+08:00",
+      "committer_date": "2026-07-29T17:43:57+08:00",
+      "subject": "feat(ui2.0-U1): morphdom 收尾——uProj/prompts 展开态状态驱动化 + procFoot/ctxKpis/archive汇总 morph 化",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "占位保留 innerHTML(无态无闪·记入阶段决议)。JS node --check 过;ui_smoke 69/69+bus_smoke"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "b73817670dba70481f0ffdadd733abb1ff56c02e",
+          "--",
+          "ui/page.py"
+        ],
+        "sha256_utf8": "f4bb23cef9b656a3595e6372d93b061b02216837530662863817b0d27f77a838",
+        "total_lines": 172,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 85,
+        "excerpt_truncated": true,
+        "excerpt": "diff --git a/ui/page.py b/ui/page.py\nindex 6d76a1c..e3d3688 100644\n--- a/ui/page.py\n+++ b/ui/page.py\n@@ -944,7 +944,7 @@ function render(){\n   if(f.tagged.length) foot.push('已标注(非fleet):'+f.tagged.map(t=>`<span class=\"tag ${t.private?'lock':''}\">${esc(t.label)} pid ${t.pid}${t.private?' 🔒':(t.cwd?' · '+esc(t.cwd):'')}</span>`).join(''));\n   foot.push(`<span class=\"muted\">在跑 claude ${f.alive_count} · 在岗(已认领)${f.fleet_count} · 已标注 ${f.tagged.length} · 未声明 ${f.unknown.length}</span>`);\n   if(f.unknown.length) foot.push('未声明(非fleet·未标记):'+f.unknown.map(u=>`<span class=\"tag\">pid ${u.pid}${u.cwd?' · '+esc(u.cwd):''}</span>`).join(''));\n-  document.getElementById('procFoot').innerHTML=foot.join('<br>');\n+  morphInto(document.getElementById('procFoot'), foot.join('<br>'));\n \n   // daemon 自愈面板(fleet.json × 存活)\n   const db=document.getElementById('daemonBox'); const dm=state.daemons||{daemons:[]};\n@@ -1410,6 +1410,7 @@ function modelShort(m){ return m.replace('claude-','').replace('-20251001','');\n function projShort(p){ return p.replace('C--BaseSpace-XXX-','').replace('C--apphome-','').replace('C--Users-<用户>','~'); }\n \n let _usageData=null, _uRange=30;\n+const openProjRaws=new Set();   // 展开钻取的项目名(状态驱动·morph 刷新不丢;U1 响应式教义:命令式注入子树先状态化)\n function sliceDaily(daily,r){\n   // 按\"日历范围\"切片(以数据最后一天为锚,非系统今天 — 与数据对齐、免时区抖动)\n   if(!r||!daily||!daily.length) return (daily||[]).slice();\n@@ -1433,7 +1434,14 @@ function renderUsage(d){\n   if(rg && !rg._bound){ rg._bound=1; rg.querySelectorAll('button').forEach(b=>b.onclick=()=>applyRange(+b.dataset.r)); }\n   _bindTrendHover('uTrend','uTrendTip'); _bindTrendHover('uTrendTotal','uTrendTotalTip');\n   applyRange(_uRange);\n-  // 项目 Top N —— token 为主(用量分析已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径\n+  renderUProj();\n+  // 模型迁移\n+  drawModels(d.by_month_model||[]);\n+}\n+// 项目 Top N —— token 为主(用量分析已补 by_project token 分项):按 tokens_total 排;并列 io + $(参考),与 KPI 同口径。\n+// U1 响应式:钻取展开=openProjRaws 状态驱动、raw 内容随主渲染一并出 html → morphInto 增量 patch,刷新中展开态/内容天然保留。\n+function renderUProj(){\n+  const d=_usageData; if(!d) return;\n   let projs=(d.by_project||[]).slice();\n   const tokOf=p=>p.tokens_total!=null?p.tokens_total:(p.input!=null?((p.input||0)+(p.output||0)+(p.cache_read||0)+(p.cache_write_5m||0)+(p.cache_write_1h||0)):null);\n   const ioOf=p=>p.tokens_io!=null?p.tokens_io:(p.input!=null?((p.input||0)+(p.output||0)):null);\n@@ -1446,20 +1454,27 @@ function renderUsage(d){\n   const lmax=Math.log(Math.max(1,max)), lspan=(lmax-lmin)||1;\n   const unit=document.getElementById('uProjUnit');\n   if(unit) unit.textContent=hasTok?'(全历史 · 按 tokens_total 排 · 条=对数刻度 · io/$ 对照)':'(全历史 · $ API等价·参考 — token 分项待 token_stats 迁移补齐)';\n-  document.getElementById('uProj').innerHTML=projs.map((p,i)=>{\n+  const rawHtml=(proj)=>{\n+    let raws=rawFor(proj), note='';\n+    if(!raws.length){ raws=(d.by_project_raw||[]).slice(0,12); note='<div class=\"muted\" style=\"font-size:11px;padding:1px 0 3px\">未能自动映射,列出全部原始目录:</div>'; }\n+    const rmax=raws.length?Math.max.apply(null,raws.map(x=>x.cost_usd))||1:1;\n+    return note+raws.map(rr=>{const pct=Math.max(2,rr.cost_usd/rmax*100).toFixed(1);\n+      return `<div class=\"bar-row\" style=\"grid-template-columns:150px 1fr 90px\"><span class=\"lbl\" title=\"${esc(rr.project)}\">${esc(projShort(rr.project))}</span><span class=\"bar-track\"><span class=\"bar-fill\" style=\"width:${pct}%;background:var(--idle)\"></span></span><span class=\"num\">${usd(rr.cost_usd)} · ${fmtN(rr.calls)}</span></div>`;\n+    }).join('')||'<div class=\"muted\" style=\"font-size:11px;padding:2px 0\">无</div>';\n+  };\n+  morphInto(document.getElementById('uProj'), projs.map(p=>{\n     const v=valOf(p); const pct=(8+(Math.log(Math.max(1,v))-lmin)/lspan*92).toFixed(1);\n     const num=hasTok\n       ? `${fmtN(tokOf(p))} tok <span style=\"color:var(--dim)\">· io ${fmtN(ioOf(p))} · ${usd(p.cost_usd)}参考</span>`\n       : usd(p.cost_usd);\n-    return `<div class=\"bar-row uproj-row\" data-proj=\"${esc(p.project)}\" title=\"点击展开原始目录构成\">\n+    const open=openProjRaws.has(p.project);\n+    return `<div class=\"bar-row uproj-row\" data-key=\"up-${esc(p.project)}\" data-proj=\"${esc(p.project)}\" title=\"点击展开原始目录构成\">\n       <span class=\"lbl\">${esc(p.project)}</span>\n       <span class=\"bar-track\"><span class=\"bar-fill\" style=\"width:${pct}%\"></span></span>\n       <span class=\"num\">${num}</span></div>\n-      <div class=\"uproj-raw\" id=\"uraw-${i}\" style=\"display:none\"></div>`;\n-  }).join('')||'<div class=\"muted\" style=\"padding:6px 0\">无数据</div>';\n+      <div class=\"uproj-raw\" data-key=\"ur-${esc(p.project)}\" style=\"display:${open?'block':'none'}\">${open?rawHtml(p.project):''}</div>`;\n+  }).join('')||'<div class=\"muted\" style=\"padding:6px 0\">无数据</div>');\n   bindProjDrill();\n-  // 模型迁移\n-  drawModels(d.by_month_model||[]);\n }\n function applyRange(r){\n   _uRange=r;\n@@ -1565,19 +1580,13 @@ function rawFor(logical){\n   return raws.filter(r=>{const n=norm(r.project); return n===l||(n&&l&&(n.indexOf(l)>=0||l.indexOf(n)>=0));});\n }\n function bindProjDrill(){\n-  const up=document.getElementById('uProj'); if(!up)return;\n-  up.querySelectorAll('.uproj-row').forEach((row,i)=>{\n-    row.onclick=()=>{\n-      const box=document.getElementById('uraw-'+i); if(!box)return;\n-      if(box.style.display!=='none'){ box.style.display='none'; return; }\n-      let raws=rawFor(row.dataset.proj), note='';\n-      if(!raws.length){ raws=((_usageData&&_usageData.by_project_raw)||[]).slice(0,12); note='<div class=\"muted\" style=\"font-size:11px;padding:1px 0 3px\">未能自动映射,列出全部原始目录:</div>'; }\n-      const rmax=raws.length?Math.max.apply(null,raws.map(x=>x.cost_usd))||1:1;\n-      box.innerHTML=note+raws.map(rr=>{const pct=Math.max(2,rr.cost_usd/rmax*100).toFixed(1);\n-        return `<div class=\"bar-row\" style=\"grid-template-columns:150px 1fr 90px\"><span class=\"lbl\" title=\"${esc(rr.project)}\">${esc(projShort(rr.project))}</span><span class=\"bar-track\"><span class=\"bar-fill\" style=\"width:${pct}%;background:var(--idle)\"></span></span><span class=\"num\">${usd(rr.cost_usd)} · ${fmtN(rr.calls)}</span></div>`;"
+      }
+    },
+    {
+      "commit": "c9e7c27fabf415b814ecb7fb4fca7456774972ca",
+      "author_date": "2026-07-29T17:48:02+08:00",
+      "committer_date": "2026-07-29T17:48:02+08:00",
+      "subject": "feat(ui2.0-U2): 复活派工效率死码面板 + 一致性审计收口(73 用例基线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "不加轮询=门控口径);dm* 4 锚进 ui_smoke 基线(69→73)。JS node --check 过,",
+        "ui_smoke 73/73 + bus_smoke 43/43 无回归(WebUI pid 34852)。"
+      ]
+    },
+    {
+      "commit": "f0cbb86a6de8bffe865940a970a064200e931314",
+      "author_date": "2026-07-29T17:54:31+08:00",
+      "committer_date": "2026-07-29T17:54:31+08:00",
+      "subject": "feat(ui2.0-U3): route 防误派——/api/route 端点 + 派活表单建议对口 chip(77 用例基线)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "smoke:route 端点+routeChips 锚+空q必拒/角色名必命中两行为用例(73→77);",
+        "ui_smoke 77/77 + bus_smoke 43/43 无回归(WebUI pid 424)。"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "f0cbb86a6de8bffe865940a970a064200e931314",
+          "--",
+          "agent_bus/bus/roles.py"
+        ],
+        "sha256_utf8": "eb55869ae5b7c07523d933631e2a6f6c9e388393625f75c8ade3cc9ddc91bba5",
+        "total_lines": 54,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 54,
+        "excerpt_truncated": false,
+        "excerpt": "diff --git a/agent_bus/bus/roles.py b/agent_bus/bus/roles.py\nindex 3cf9d8d..5c4207e 100644\n--- a/agent_bus/bus/roles.py\n+++ b/agent_bus/bus/roles.py\n@@ -123,12 +123,13 @@ def cmd_retired(args):\n     print(\"复用某番号:ab revive --role <名>(从档案馆调回 agents.json 活跃在册)\")\n \n \n-def cmd_route(args):\n-    \"\"\"对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,\n-    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。\"\"\"\n-    terms = [t.lower() for t in (args.keywords or []) if t.strip()]\n+def route_scores(terms, limit=5):\n+    \"\"\"对口路由评分(单一源:cmd_route CLI 与 WebUI /api/route 共用·UI2.0 U3)。\n+    terms=关键词列表(内部转小写);按花名册 role/desc/caps 子串命中计分,\n+    命中多优先、在岗优先,退役/测试排除。返回 [{role,score,state,desc}](仅命中>0,前 limit 条)。\"\"\"\n+    terms = [t.lower() for t in (terms or []) if t and t.strip()]\n     if not terms:\n-        print(\"用法: ab route <关键词...>(按专长/能力找对口角色)\"); return\n+        return []\n     agents = _load_agents()\n     retired = _retired_roles()\n     wait_roles = _wait_proc_roles()\n@@ -140,15 +141,25 @@ def cmd_route(args):\n         score = sum(hay.count(t) for t in terms)\n         if score > 0:\n             st = _self_wake_state(role, wait_roles=wait_roles)[0]\n-            scored.append((score, 0 if st == \"armed\" else 1, role, st, (v.get(\"desc\") or \"\")[:58]))\n+            scored.append({\"role\": role, \"score\": score, \"state\": st, \"desc\": (v.get(\"desc\") or \"\")[:58]})\n+    scored.sort(key=lambda x: (-x[\"score\"], 0 if x[\"state\"] == \"armed\" else 1))   # 命中多优先、在岗优先\n+    return scored[:limit]\n+\n+\n+def cmd_route(args):\n+    \"\"\"对口路由助手(强化专一性·防全科自接):按关键词在花名册 desc/caps 找【最对口】角色,\n+    推荐派给谁——命中多优先、在岗优先、退役/测试排除。派活前先 route 找对口,别自接跨领域活/别乱广播。\"\"\"\n+    terms = [t for t in (args.keywords or []) if t.strip()]\n+    if not terms:\n+        print(\"用法: ab route <关键词...>(按专长/能力找对口角色)\"); return\n+    scored = route_scores(terms, limit=5)\n     if not scored:\n         print(\"无对口专责命中「%s」——考虑广播,或 ab register 新专家。\" % \" \".join(terms)); return\n-    scored.sort(key=lambda x: (-x[0], x[1]))   # 命中多优先、在岗优先\n     mark = {\"armed\": \"✓在岗\", \"recent\": \"◐待确认\", \"stale\": \"⚠掉线\", \"off\": \"—未醒\", \"parked\": \"🅿️休眠\"}\n     print(\"对口路由推荐(命中「%s」):\" % \" \".join(terms))\n-    for i, (sc, _o, role, st, desc) in enumerate(scored[:5]):\n-        tag = \" ← 推荐(对口+在岗)\" if i == 0 and st == \"armed\" else (\" ← 最对口但掉线,先让它重挂\" if i == 0 else \"\")\n-        print(\"  %-12s %s 命中%d  %s%s\" % (role, mark.get(st, \"?\"), sc, desc, tag))\n+    for i, s in enumerate(scored):\n+        tag = \" ← 推荐(对口+在岗)\" if i == 0 and s[\"state\"] == \"armed\" else (\" ← 最对口但掉线,先让它重挂\" if i == 0 else \"\")\n+        print(\"  %-12s %s 命中%d  %s%s\" % (s[\"role\"], mark.get(s[\"state\"], \"?\"), s[\"score\"], s[\"desc\"], tag))\n     print(\"→ 对口直派:ab send --to <角色> --from <你> ...(别自接跨领域、别乱广播)\")\n \n "
+      }
+    },
+    {
+      "commit": "dc33cc04c158a48369b85166ecde587d550e20f7",
+      "author_date": "2026-07-29T17:58:45+08:00",
+      "committer_date": "2026-07-29T17:58:45+08:00",
+      "subject": "refactor(ui2.0-U4): page.py 三分拆分(纯搬运·sha256 字节级一致)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "INDEX_HTML sha256 一致(88e74a93…)+ ui_smoke 77/77 + bus_smoke 43/43 无回归"
+      ]
+    },
+    {
+      "commit": "03f913eeb532c04d1507b7ef55d626e88242ca0c",
+      "author_date": "2026-07-28T15:28:18+08:00",
+      "committer_date": "2026-07-28T15:28:18+08:00",
+      "subject": "P0 六件齐修:claim 统一 O_EXCL/共享 JSON 加锁/roster 原子写/tmp 随机化/杀进程树/external 抢锁硬闸(doc-blind 清单)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- todos.json 五写点(ask-user/answer/archive/sweep/purge-smoke)全部锁跨 RMW;health 异常扫描留锁外。",
+        "- 回归:bus_smoke 43/43 无回归;全模块编译过。PUNCHLIST P0 全清(UI 三件 MasterUI 已交付)。"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "03f913eeb532c04d1507b7ef55d626e88242ca0c",
+          "--",
+          "agent_bus/bus/mailbox.py"
+        ],
+        "sha256_utf8": "985309865267bc587045be10cdc6b3e26cb566c77c43a66081e92f17271f7db7",
+        "total_lines": 82,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 82,
+        "excerpt_truncated": false,
+        "excerpt": "diff --git a/agent_bus/bus/mailbox.py b/agent_bus/bus/mailbox.py\nindex 406d407..f07b37d 100644\n--- a/agent_bus/bus/mailbox.py\n+++ b/agent_bus/bus/mailbox.py\n@@ -12,25 +12,61 @@ from bus.presence import _set_current_task\n from bus.proc import _claude_ancestor\n \n \n-def _claim(role, taskpath):\n+def _claim(role, taskpath, locked=False):\n     \"\"\"原子领取:把任务从 inbox 移到 processing,返回 task dict。\n-    多监听者(tab /loop + daemon)并存时只有一个 rename 成功,其余返回 None(没抢到),\n-    所以绝不会重复执行同一任务。坏文件返回 {\"error\":...}。\"\"\"\n+    并发安全 = O_EXCL 独占锁(<task>.lock 谁建成谁独占;P0 统一·2026-07-28):\n+    本机实测 os.replace 争同源【会双胜】(pool.py gate① 压测 200-300 轮出 2-8 胜者),\n+    多监听者(tab wait + daemon)并存时靠 replace 判胜=同任务双执行风险,故与组池统一 O_EXCL。\n+    抢输/文件没了返回 None;坏文件返回 {\"error\":...}。\n+    locked=True:调用方(pool._claim_group_task)已持有同名 <task>.lock → 跳过抢锁直接搬运\n+    (否则自伤:组池持锁调进来会被自己的锁打成落空)。\n+    stale 回收:锁主建锁后崩溃留孤儿 .lock → mtime 超 60s 强清重抢(claim 是毫秒级动作)。\"\"\"\n+    lock = taskpath.with_name(taskpath.name + \".lock\")\n+    fd = None\n+    if not locked:\n+        for attempt in range(2):\n+            try:\n+                fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)\n+                break\n+            except FileExistsError:\n+                try:\n+                    if attempt == 0 and time.time() - lock.stat().st_mtime > 60:\n+                        lock.unlink()      # 孤儿锁(持有者崩了)→ 强清重抢一次\n+                        continue\n+                except OSError:\n+                    pass\n+                return None                # 真被别的监听者独占(锁新鲜)→ 干净落空\n+            except OSError:\n+                return None\n+        if fd is None:\n+            return None\n+        try:\n+            os.write(fd, json.dumps({\"who\": role, \"pid\": os.getpid(), \"acquired_at\": _now()},\n+                                    ensure_ascii=False).encode(\"utf-8\"))   # 记 pid/时间供排障\n+        except Exception:\n+            pass\n+        os.close(fd)\n     proc = BUS / role / \"processing\" / taskpath.name\n-    for attempt in range(4):\n+    try:\n+        for attempt in range(4):\n+            try:\n+                os.replace(str(taskpath), str(proc))  # 此刻仅持锁者到达,replace 无并发争用=纯搬运\n+                break\n+            except FileNotFoundError:\n+                return None  # 已被(旧版本监听者/reap)移走——不重试\n+            except OSError:\n+                # Windows 下源文件被 watcher/AV 瞬时占用会抛 PermissionError(OSError 子类)。\n+                # 源还在就短重试(Master 实测反馈);源没了=被移走,放弃。\n+                if not taskpath.exists():\n+                    return None\n+                if attempt == 3:\n+                    return None  # 重试仍失败,本轮放弃(任务留 inbox,下轮再领)\n+                time.sleep(0.04 * (attempt + 1))\n+    finally:\n         try:\n-            os.replace(str(taskpath), str(proc))  # 原子;抢输的那个抛 FileNotFoundError\n-            break\n-        except FileNotFoundError:\n-            return None  # 已被别的监听者领走 / 文件没了——不重试\n-        except OSError:\n-            # Windows 下源文件被 watcher/AV 瞬时占用会抛 PermissionError(OSError 子类)→ 领取竞态。\n-            # 源还在就短重试(Master 实测反馈);源没了=被领走,放弃。\n-            if not taskpath.exists():\n-                return None\n-            if attempt == 3:\n-                return None  # 重试仍失败,本轮放弃(任务留 inbox,下轮再领)\n-            time.sleep(0.04 * (attempt + 1))\n+            lock.unlink()   # task 已移走/放弃,释放锁(残留也无害:_oldest_claimable 只认 *.json)\n+        except Exception:\n+            pass\n     try:\n         obj = json.loads(proc.read_text(encoding=\"utf-8\"))\n     except Exception as e:"
+      }
+    },
+    {
+      "commit": "75190b982f7ac1602b2bbce4672c7e1473541d4d",
+      "author_date": "2026-07-28T15:48:49+08:00",
+      "committer_date": "2026-07-28T15:48:49+08:00",
+      "subject": "P1 第一批(8/11):ABA 夺锁/reap 崩溃窗/done 精确匹配/presence 锁/request 契约/审批闸/python_bin/策略注册表",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "  代码留降级默认);Master数分/会话考古孤儿回执归 MasterAgent(原误归 Master)。",
+        "- 回归:bus_smoke 43/43;策略加载/审批闸实测过。"
+      ]
+    },
+    {
+      "commit": "bd27d27cb05ff0136f4ff5494daa351ca2c2f9c5",
+      "author_date": "2026-09-24T09:37:29+08:00",
+      "committer_date": "2026-09-24T09:37:29+08:00",
+      "subject": "fix(④型悬单·Master数分15b5e5): harness内存回收→孤儿wait仍claim真修——_claim记claim_pid/ppid·wait心跳父壳create_time自检父亡自退·wait起手_requeue_orphans退悬单回inbox·reap判claim者已亡立即退回·selfwake/who标⚠悬单·守卫聋态只toast不投inbox·尸检四型口径;C′段③扩协调位回退(驳回);清agents.json __wgm*残留;smoke deaf.orphan 61/61",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "fix(④型悬单·Master数分15b5e5): harness内存回收→孤儿wait仍claim真修——_claim记claim_pid/ppid·wait心跳父壳create_time自检父亡自退·wait起手_requeue_orphans退悬单回inbox·reap判claim者已亡立即退回·selfwake/who标⚠悬单·守卫聋态只toast不投inbox·尸检四型口径;C′段③扩协调位回退(驳回);清agents.json __wgm*残留;smoke deaf.orphan 61/61"
+      ]
+    },
+    {
+      "commit": "1cbc8ed9d8fd32aeeff7f2c86799c9e89e04fe6b",
+      "author_date": "2026-09-24T09:53:20+08:00",
+      "committer_date": "2026-09-24T09:53:20+08:00",
+      "subject": "hotfix(④型悬单判据·Master数分d21617): claim_pid存活判反了(wait自身pid·正常claim即退恒亡→会把在办消息退回双处理)→改turn判据:listening角色processing消息claimed后无turn活动≥orphan_no_turn_min(30)才判悬单;reap同判据;daemon不判;smoke补『正常claim后wait退出·turn活跃不得退回』态·61/61",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "hotfix(④型悬单判据·Master数分d21617): claim_pid存活判反了(wait自身pid·正常claim即退恒亡→会把在办消息退回双处理)→改turn判据:listening角色processing消息claimed后无turn活动≥orphan_no_turn_min(30)才判悬单;reap同判据;daemon不判;smoke补『正常claim后wait退出·turn活跃不得退回』态·61/61"
+      ],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "1cbc8ed9d8fd32aeeff7f2c86799c9e89e04fe6b",
+          "--",
+          "agent_bus/bus/selfwake.py"
+        ],
+        "sha256_utf8": "088f9d927de6197a64bb7f2ab3c03bd8999877ed0444a4b2a61e78722dd5ebcb",
+        "total_lines": 87,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 85,
+        "excerpt_truncated": true,
+        "excerpt": "diff --git a/agent_bus/bus/selfwake.py b/agent_bus/bus/selfwake.py\nindex 2c41e12..08584ab 100644\n--- a/agent_bus/bus/selfwake.py\n+++ b/agent_bus/bus/selfwake.py\n@@ -144,28 +144,53 @@ def _inbox_backlog(role, min_age_s=None):\n         return 0, 0.0\n \n \n+def _is_orphan_claim(role, obj, now=None, min_s=None, turn_ts=None):\n+    \"\"\"单条 processing 消息是否悬单(④型·Master数分 d21617 判据·2026-09-24):\n+    claimed 之后该 role【无任何 turn 活动】(turn_state.ts <= claimed 或无 turn_state)且距 claimed ≥ orphan_no_turn_min(默认 30)分钟\n+    = wait 领了但输出没送到会话(harness 回收/不再通知)。★不能用 claim_pid 存活判(claim_pid=wait 自身·正常 claim 后即退=恒亡·判据反了会把在办消息退回=双处理)。\n+    turn_ts 可由调用方预读传入(批量时省 IO)。\"\"\"\n+    try:\n+        from bus.config import cfg\n+        if min_s is None:\n+            min_s = float(cfg(\"orphan_no_turn_min\", 30)) * 60\n+        now = now or time.time()\n+        cl = str(obj.get(\"claimed\") or \"\")[:19]\n+        if not cl:\n+            return False\n+        cl_ts = time.mktime(time.strptime(cl, \"%Y-%m-%dT%H:%M:%S\"))\n+        if now - cl_ts < min_s:\n+            return False\n+        if turn_ts is None:\n+            try:\n+                turn_ts = (json.loads((BUS / role / \"turn_state.json\").read_text(encoding=\"utf-8\")).get(\"ts\") or \"\")[:19]\n+            except Exception:\n+                turn_ts = \"\"\n+        return not (turn_ts and turn_ts > cl)\n+    except Exception:\n+        return False\n+\n+\n def _orphan_claims(role):\n-    \"\"\"processing 里 claim 者已亡的悬单(④型·harness 内存回收杀掉 wait 包装壳·python 孤儿 claim 后无 turn 处理):\n-    判据=claim_pid 已记且进程不存在(pid 复用成非 python 也算亡)。返回 [path,...]。无 claim_pid 的旧消息不判(留 reap ttl 兜)。\"\"\"\n+    \"\"\"processing 里的悬单列表(见 _is_orphan_claim)。只判 mode=listening 的会话角色;daemon(worker 跑 claude -p·turn_state 不由 hook 盖)不判·交 reap ttl 兜。\"\"\"\n     out = []\n     try:\n-        import psutil as _ps\n+        pr = json.loads((BUS / role / \"presence.json\").read_text(encoding=\"utf-8\"))\n+        if pr.get(\"mode\") != \"listening\":\n+            return out\n     except Exception:\n         return out\n+    try:\n+        turn_ts = (json.loads((BUS / role / \"turn_state.json\").read_text(encoding=\"utf-8\")).get(\"ts\") or \"\")[:19]\n+    except Exception:\n+        turn_ts = \"\"\n+    now = time.time()\n     try:\n         for p in (BUS / role / \"processing\").glob(\"*.json\"):\n             try:\n                 o = json.loads(p.read_text(encoding=\"utf-8\"))\n             except Exception:\n                 continue\n-            cp = o.get(\"claim_pid\")\n-            if not cp:\n-                continue\n-            try:\n-                alive = _ps.pid_exists(int(cp)) and \"python\" in (_ps.Process(int(cp)).name() or \"\").lower()\n-            except Exception:\n-                alive = False\n-            if not alive:\n+            if _is_orphan_claim(role, o, now=now, turn_ts=turn_ts):\n                 out.append(p)\n     except Exception:\n         pass\n@@ -180,7 +205,7 @@ def _requeue_orphans(role):\n         try:\n             o = json.loads(p.read_text(encoding=\"utf-8\"))\n             o[\"status\"] = \"pending\"; o[\"requeue_count\"] = int(o.get(\"requeue_count\", 0)) + 1\n-            o[\"requeued_at\"] = time.strftime(\"%Y-%m-%dT%H:%M:%S\"); o[\"requeue_why\"] = \"claim者已亡(④harness回收孤儿claim)\"\n+            o[\"requeued_at\"] = time.strftime(\"%Y-%m-%dT%H:%M:%S\"); o[\"requeue_why\"] = \"claimed后无turn活动≥阈值(④型悬单·输出未送达会话)\"\n             o.pop(\"claimed\", None); o.pop(\"claim_pid\", None); o.pop(\"claim_ppid\", None)\n             p.write_text(json.dumps(o, ensure_ascii=False, indent=1), encoding=\"utf-8\")\n             os.replace(str(p), str(BUS / role / \"inbox\" / p.name)); n += 1\n@@ -195,7 +220,7 @@ def _deaf_tag(role):\n     tag = (\"⚠忙而聋:inbox积压%d条(最老%sh)·无wait=收不到协作消息·任务间隙请 ab peek 排空+重挂\" % (n, h)) if n else \"\"\n     o = len(_orphan_claims(role))\n     if o:\n-        tag = (tag + \"·\" if tag else \"\") + \"⚠悬单%d(claim者已亡=④harness回收孤儿·重挂wait即自动退回inbox)\" % o\n+        tag = (tag + \"·\" if tag else \"\") + \"⚠悬单%d(claimed后无turn≥阈值=④型·重挂wait即自动退回inbox)\" % o\n     return tag"
+      }
+    },
+    {
+      "commit": "26ec7cbdf58be8a886e7306fe468012755da9a60",
+      "author_date": "2026-07-29T09:44:58+08:00",
+      "committer_date": "2026-07-29T09:44:58+08:00",
+      "subject": "角色注册表分仓(用户令 2026-07-29):基建表留抽象『业务角色』,具体业务角色入 role_profiles_biz.json(业务数据可整体清除)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- 验证:role-audit 21/21 完备;业务角色 boot-check 走 biz 表生效;bus_smoke 43/43。"
+      ]
+    },
+    {
+      "commit": "72e61f4d00e06bd7280107a41be589bd476ee4fb",
+      "author_date": "2026-09-23T18:12:22+08:00",
+      "committer_date": "2026-09-23T18:12:22+08:00",
+      "subject": "feat(separation-C): caps两表(infra 7/biz 7·confidentiality→biz培训师终裁)+biz_registry外迁自带git+读方合并视图(load_caps_pool/biz_registry_dir·hook单一解析T1)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "- 示例组员3cb6d5三闸签·培训师da0e31/a0d0d6分类终裁",
+        "- 验收: 空载bus_smoke 52/52·roster/who空载渲染·有载回归14业务角色reinject注入byte-identical·biz git 1 commit·capabilities.json业务词20→9"
+      ]
+    },
+    {
+      "commit": "ea7206494bbaf28099b076745f5144a5954661bf",
+      "author_date": "2026-09-23T18:25:22+08:00",
+      "committer_date": "2026-09-23T18:25:22+08:00",
+      "subject": "feat(separation-B1): roster.agents_view() 花名册只读视图(agents.json⊕角色页desc回退·写方仍读原件)·roles/probe只读读方切视图·agentbus re-export load_caps_pool/biz_registry_dir/agents_view(补C漏)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "ea7206494bbaf28099b076745f5144a5954661bf",
+          "--",
+          "agent_bus/bus/roster.py"
+        ],
+        "sha256_utf8": "c7aa1b0d1bc859f4f3c98ffb1b27fa1f9160373790c1767b5876ad29cc26df6f",
+        "total_lines": 38,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 38,
+        "excerpt_truncated": false,
+        "excerpt": "diff --git a/agent_bus/bus/roster.py b/agent_bus/bus/roster.py\nindex 658938f..4450d78 100644\n--- a/agent_bus/bus/roster.py\n+++ b/agent_bus/bus/roster.py\n@@ -60,6 +60,33 @@ def load_role_profiles():\n     return out\n \n \n+def agents_view():\n+    \"\"\"花名册【只读合并视图】(分离 B1·2026-09-23):agents.json(机制态:registered/caps/…)⊕ 角色页 desc。\n+    规则:角色在 role_profiles(基建表或 biz_registry 业务表)有页 → desc 取角色页 `desc`(无则 one_liner)=单一源;\n+    无角色页 → 沿用 agents.json 自带 desc(兜底·新注册未建档)。返回深拷贝·改它不回写。\n+    ★ 写方(register/hello/train-done/retire…)仍走 _load_agents/update_agents 读原始文件——本视图注入的 desc\n+    绝不能经 RMW 写回 agents.json(会把业务 desc 灌回基建 git·分离 B 复发)。只读读方(roster/find/route/\n+    probe/WebUI 花名册/agent 详情)一律走本函数。\"\"\"\n+    import copy\n+    a = copy.deepcopy(_load_agents())\n+    try:\n+        prof = {r.get(\"role\"): r for r in (load_role_profiles().get(\"roles\") or []) if r.get(\"role\")}\n+    except Exception:\n+        prof = {}\n+    for role, rec in a.items():\n+        if not isinstance(rec, dict):\n+            continue\n+        p = prof.get(role)\n+        if p:\n+            d = (p.get(\"desc\") or p.get(\"one_liner\") or \"\").strip()\n+            if d:\n+                rec[\"desc\"] = d\n+                rec[\"desc_src\"] = \"role_profile\"\n+        elif \"desc\" in rec:\n+            rec[\"desc_src\"] = \"agents.json\"\n+    return a\n+\n+\n def _policy():\n     \"\"\"角色策略注册表(P1·2026-07-28 出代码):role_profiles.json meta.policy——\n     human_attended / mgmt_owner / biz_roles 原是三处硬编码,角色增减要改代码且守卫可被伪造名绕过。"
+      }
+    },
+    {
+      "commit": "3d2f5d8aa3e151e6570ac07efc91da2366c67e51",
+      "author_date": "2026-09-23T18:37:38+08:00",
+      "committer_date": "2026-09-23T18:37:38+08:00",
+      "subject": "feat(separation-A1): 通用共享资源互斥 bus/lock.py(edge算法参数化·BUS/locks/<name>.lock·edge过渡特判旧路径)+ab lock acquire/release/status·edge-*成别名(JSON byte-identical·旧名re-export)·并发gate smoke(20争1恰1胜×3+四态键集)·AGENTS.md",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "feat(separation-A1): 通用共享资源互斥 bus/lock.py(edge算法参数化·BUS/locks/<name>.lock·edge过渡特判旧路径)+ab lock acquire/release/status·edge-*成别名(JSON byte-identical·旧名re-export)·并发gate smoke(20争1恰1胜×3+四态键集)·AGENTS.md"
+      ]
+    },
+    {
+      "commit": "6067eae5131a4d4525e561eb4a968a7f977f7018",
+      "author_date": "2026-09-23T18:44:12+08:00",
+      "committer_date": "2026-09-23T18:44:12+08:00",
+      "subject": "feat(separation-A2): 派活prompt云文档段→通用共享资源互斥段(roster.shared_resources_prompt按角色页shared_resources注入·无字段不注入)·daemon desc改读agents_view(B1前置)·daemon/dispatch prompt抽build_prompt可测·smoke a2(有载全覆盖/空载零业务词/源码零业务词)",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "feat(separation-A2): 派活prompt外部 IM段→通用共享资源互斥段(roster.shared_resources_prompt按角色页shared_resources注入·无字段不注入)·daemon desc改读agents_view(B1前置)·daemon/dispatch prompt抽build_prompt可测·smoke a2(有载全覆盖/空载零业务词/源码零外部 IM词)"
+      ]
+    },
+    {
+      "commit": "8cc78f8b7abcb935918d23309a48ee092c13a5d0",
+      "author_date": "2026-09-23T18:49:08+08:00",
+      "committer_date": "2026-09-23T18:49:08+08:00",
+      "subject": "feat(separation-A3): external_*.py 5工具外迁 agent_fleet_data/biz_tools/external(自带git)·旧位__main__转发桩(不可import·空载exit2)·external_common.edge_lock→canonical ab lock(K2原子)·smoke a3·path_registry biz-tools·机制注册表类7改名共享资源互斥·提案A落地记录",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "feat(separation-A3): external_*.py 5工具外迁 agent_fleet_data/biz_tools/external(自带git)·旧位__main__转发桩(不可import·空载exit2)·external_common.edge_lock→canonical ab lock(K2原子)·smoke a3·path_registry biz-tools·机制注册表类7改名共享资源互斥·提案A落地记录"
+      ]
+    },
+    {
+      "commit": "4807cbc4bbc2f7664185790b68d0b2a315ac8491",
+      "author_date": "2026-09-23T18:52:19+08:00",
+      "committer_date": "2026-09-23T18:52:19+08:00",
+      "subject": "chore(separation-A3): 删5个external转发桩(业务侧记忆旧路径改完·grep=0·外部IM确认)·smoke a3改为平台零external工具+新位K2+清除问·path_registry/提案记录",
+      "declared_coauthors": [
+        "Claude Fable 5.1"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "chore(separation-A3): 删5个external转发桩(业务侧记忆旧路径改完·grep=0·外部 IM确认)·smoke a3改为平台零external工具+新位K2+清除问·path_registry/提案记录"
+      ]
+    },
+    {
+      "commit": "1ffac706bfd118d908a37bb6da619fcacdb73213",
+      "author_date": "2026-09-24T09:07:20+08:00",
+      "committer_date": "2026-09-24T09:07:20+08:00",
+      "subject": "feat(separation-C/B1/A4 读方): WebUI 切新接口 - api.py: _ROLE_PROFILES_BIZ 改读 ab.biz_registry_dir()/role_profiles_biz.json(业务角色页恢复有载) - api.py: 能力池 ab.load_caps_pool()(infra⊕caps_biz 合并·14 caps)·花名册/生命周期 ab.agents_view()(desc 单一源·只读) - api.py: 删 _SEED_TODOS 业务种子(todos.json 缺失=平台空载返回[]) - page_js_tail.py: 健康面板 edge_lock → locks[] 多资源渲染(无 locks 时回退 edge_lock) ui_smoke 94/94",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "ui_smoke 94/94"
+      ]
+    },
+    {
+      "commit": "7ea8999a1cf5535738ecb98db0cf663e72b10a8d",
+      "author_date": "2026-08-10T10:10:47+08:00",
+      "committer_date": "2026-08-10T10:10:47+08:00",
+      "subject": "feat(bus): P1 wait注册表核心+宿主自检(用户令2026-08-10·根治孤儿wait)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "正常退出清自己reg。实测:reg生成字段正确;host_pid=999999→1s内自杀验证。bus_smoke"
+      ]
+    },
+    {
+      "commit": "f50507d94a0a27c8bd1af067c13d42c52623e360",
+      "author_date": "2026-08-10T10:39:43+08:00",
+      "committer_date": "2026-08-10T10:39:43+08:00",
+      "subject": "feat(bus): P2b 自醒态判据读reg——_self_wake_state加reg优先(用户令·Master数分逐视图验)",
+      "declared_coauthors": [
+        "Claude Fable 5"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "feat(bus): P2b 自醒态判据读reg——_self_wake_state加reg优先(用户令·Master数分逐视图验)",
+        "WebUI才在运维面板生效(已重启pid33072验证④一致)。bus_smoke 43/43绿。"
+      ]
+    },
+    {
+      "commit": "4dbf8109cfba930d2454799f30f8504dbcf38bac",
+      "author_date": "2026-08-11T17:35:02+08:00",
+      "committer_date": "2026-08-11T17:35:02+08:00",
+      "subject": "perf(ui-sse): 静音心跳文件+ _bump去抖根治SSE firehose(空闲change 3次/秒→≈0)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [],
+      "diff_evidence": {
+        "git_arguments": [
+          "show",
+          "--format=",
+          "--unified=3",
+          "4dbf8109cfba930d2454799f30f8504dbcf38bac",
+          "--",
+          "ui/api.py"
+        ],
+        "sha256_utf8": "ff1eb7e896abdb7e71f9293f3637f9b2c09583fbd9a777090f882a10ee1b4ccb",
+        "total_lines": 70,
+        "excerpt_start_line": 1,
+        "excerpt_end_line": 70,
+        "excerpt_truncated": false,
+        "excerpt": "diff --git a/ui/api.py b/ui/api.py\nindex c203e46..8577cf1 100644\n--- a/ui/api.py\n+++ b/ui/api.py\n@@ -979,13 +979,50 @@ _change_cv = threading.Condition()\n _change_ver = 0\n \n \n-def _bump():\n+def _emit_change():\n     global _change_ver\n     with _change_cv:\n         _change_ver += 1\n         _change_cv.notify_all()\n \n \n+_bump_lock = threading.Lock()\n+_bump_pending = False\n+_bump_active = False          # 去抖冷却窗口内\n+_BUMP_DEBOUNCE = 1.0          # 秒:合并此窗口内的多次变更为一次 SSE 推送\n+\n+\n+def _schedule_bump_flush():\n+    t = threading.Timer(_BUMP_DEBOUNCE, _bump_flush)\n+    t.daemon = True\n+    t.start()\n+\n+\n+def _bump_flush():\n+    global _bump_pending, _bump_active\n+    with _bump_lock:\n+        if not _bump_pending:\n+            _bump_active = False   # 窗口内无新变更 → 结束冷却,回到即时态\n+            return\n+        _bump_pending = False      # 有合并的变更 → 推后沿,再排一个冷却窗口\n+    _emit_change()\n+    _schedule_bump_flush()\n+\n+\n+def _bump():\n+    \"\"\"SSE 变更推送(去抖·MasterAgent 建议安全网 2026-08-11):首次即时推(前沿·send/done 等真事件零延迟),\n+    冷却窗口(~1s)内的后续变更合并,窗口末尾至多再推一次(后沿)——防将来某高频 .json 刷屏 SSE。\n+    当前噪声源(presence/wait.reg 心跳)已在 watcher._hit 直接静音,本去抖是二道网。\"\"\"\n+    global _bump_pending, _bump_active\n+    with _bump_lock:\n+        if _bump_active:\n+            _bump_pending = True   # 冷却中:标记待推,窗口末尾统一发\n+            return\n+        _bump_active = True\n+    _emit_change()                 # 前沿:立即推\n+    _schedule_bump_flush()\n+\n+\n # --- 通知/消息管理(新架构:daemon 不再执行,执行交可见 CLI tab;通知收进常驻 WebUI)---\n # 某 role 来了新任务但【没有活的可见执行 tab】(mode=listening 的 /loop)→ 弹 OS toast 提醒人去处理。\n # 复用 agentbus 的 _fire_toast(WinRT)。已通知过的 task id 记下,避免 watchdog 重复事件刷屏。\n@@ -1120,8 +1157,11 @@ def start_watcher():\n     class H(FileSystemEventHandler):\n         def _hit(self, path):\n             s = str(path)\n-            if s.endswith(\"fleet_status.json\"):\n-                return False   # 5s 定时战报文件,自己写的,不触发 SSE(否则 5s 刷屏)\n+            # 自写心跳/计时文件:纯周期噪声(每 10s×~20 角色),不触发 SSE(否则刷屏顶 CPU·MasterAgent 实测 3次/秒)。\n+            #  · fleet_status.json = 5s 定时战报;presence.json = 角色心跳(真变更由 fleet 刷新器 20s + send/done 显式 _bump 覆盖);\n+            #  · wait.reg.json = 自醒 wait 心跳(UI 无需实时·MasterUI 2026-08-11 wait 注册表引入·翻倍了 presence 噪声)。\n+            if s.endswith((\"fleet_status.json\", \"presence.json\", \"wait.reg.json\")):\n+                return False\n             return s.endswith(\".json\")\n \n         def on_created(self, e):"
+      }
+    },
+    {
+      "commit": "1f3a7acdf7c75f96fff91a7e80014f30ea754dbb",
+      "author_date": "2026-08-27T13:59:24+08:00",
+      "committer_date": "2026-08-27T13:59:24+08:00",
+      "subject": "feat(fleet): 轨A daemon 化流程落地(kill-convert 分工·示例组员5 已转)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "feat(fleet): 轨A pilot GPCC 转 daemon(舰队 daemon 化·Master数分定候选+kill·MasterAgent拉起)",
+        "- 先杀后拉防双holder:Master数分已kill交互pid29972+验退·MasterAgent自核presence.claude_pid=null无残留",
+        "- _comment 记轨A推进态(已转:示例组员5/GPCC)"
+      ]
+    },
+    {
+      "commit": "fd38f6aea4c9684d49a253d35a831d16356f4a1b",
+      "author_date": "2026-08-27T14:10:36+08:00",
+      "committer_date": "2026-08-27T14:10:36+08:00",
+      "subject": "feat(fleet): 轨A 增转 daemon 会话考古 + 修 supervise GBK解码bug",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "舰队 daemon 化(Master数分定候选+失能自评+kill·MasterAgent拉起·用户令2026-08-27):",
+        "- fleet.json.daemons +8:业务侧/示例成员6/示例组员3/示例组员4/模型侧/示例成员/模型侧(cwd=biz_wh)、会话考古(cwd=agent_fleet·离散per-session提炼天然daemon-fit·先unpark)"
+      ]
+    },
+    {
+      "commit": "d077bd5952748d2d9dce7fe6043aaa2558ff848e",
+      "author_date": "2026-08-28T09:14:12+08:00",
+      "committer_date": "2026-08-28T09:14:12+08:00",
+      "subject": "revert(fleet): daemon化回退·清空daemons·不再使用daemon(用户令2026-08-27)",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": []
+    },
+    {
+      "commit": "c4f6d5ad4d8a0e548f35898d895d9299181e8f60",
+      "author_date": "2026-08-28T10:35:41+08:00",
+      "committer_date": "2026-08-28T10:35:41+08:00",
+      "subject": "docs(postmortem): daemon化方向性错误联合复盘(MasterAgent×Master数分)+ BUS_GUIDE §0定稿",
+      "declared_coauthors": [
+        "Claude Opus 4.8 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "docs(postmortem): daemon化方向性错误联合复盘(MasterAgent×Master数分)+ BUS_GUIDE §0定稿",
+        "- Master数分补4条深因:⑦快照-proxy谬误⑧pilot选样偏差⑨framing决定retrieval⑩per-role分解错(协作是system属性·解释自评全绿却翻车)",
+        "- BUS_GUIDE §0教训定稿(MasterAgent×Master数分联合)·供MasterUI操作说明面渲染"
+      ]
+    },
+    {
+      "commit": "2f3da99de0dd702ff75a31b2b8a6d89aadcd96cc",
+      "author_date": "2026-09-24T11:12:37+08:00",
+      "committer_date": "2026-09-24T11:12:37+08:00",
+      "subject": "fix(ctx): 上下文窗口默认改 1M(用户令 2026-09-24) opus-5-5 不匹配任何分支落'未知=200K'→占用%夸大5倍假红警。_ctx_win_of:haiku=200K;Claude5(fable/mythos/opus-5/sonnet-5)/opus-4*/sonnet-4-6=1M;其余默认1M(known=False标注)。页脚口径同步。改动 by Master数分(ctx口径owner)·MasterUI 重载+提交。ui_smoke 94/94",
+      "declared_coauthors": [
+        "Claude Opus 5.5 (1M context)"
+      ],
+      "coauthor_line_count": 1,
+      "model_identity_status": "declared_only_not_authenticated",
+      "role_or_acceptance_notes": [
+        "opus-5-5 不匹配任何分支落'未知=200K'→占用%夸大5倍假红警。_ctx_win_of:haiku=200K;Claude5(fable/mythos/opus-5/sonnet-5)/opus-4*/sonnet-4-6=1M;其余默认1M(known=False标注)。页脚口径同步。改动 by Master数分(ctx口径owner)·MasterUI 重载+提交。ui_smoke 94/94"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "K01",
+      "title": "既有产品与工程契约",
+      "original_claim_ids": [
+        "C02",
+        "C03",
+        "C08"
+      ],
+      "outcome": "初始产品和统一状态/引用契约已有实作",
+      "contribution_kind": "early_product_and_contracts",
+      "artifact_evidence": {
+        "source_ids": [],
+        "commit_hashes": [
+          "a063a743f3c3c4532306ba7f822ed56ec1f07081",
+          "6688c0a5a2716476990d9d3fcfd5c3372c03a6d5",
+          "bcd13a073c7e0c52bcf47f6e0cf78aef7856ca79"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "用户确认Opus初始主线；提交声明Opus协作，不是逐组件作者证明",
+      "counterevidence_or_limits": "首快照已有体系，不能由快照推断逐项作者；可靠性仍有后续纠正",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K02",
+      "title": "模块化后SSE行为纠正",
+      "original_claim_ids": [
+        "C03",
+        "C07"
+      ],
+      "outcome": "模块化和真正事件送达是不同验收点",
+      "contribution_kind": "cross_model_fix",
+      "artifact_evidence": {
+        "source_ids": [
+          "N01"
+        ],
+        "commit_hashes": [
+          "ce1913333323f67d7c1c0a52e4fb945d383dee87",
+          "278b7ec95b8ac9665eae7e08a8d7a616fdc2a9be",
+          "ab62d9504cfadf198f6326d59ab6301337259b17"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Opus/Sonnet为相关提交声明标签；未认证底层模型",
+      "counterevidence_or_limits": "SSE连上不能证明change到达；不能把整个模块化价值抵消",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K03",
+      "title": "补入Fable UI2.0交付",
+      "original_claim_ids": [
+        "C05"
+      ],
+      "outcome": "状态驱动展开、派工面板、CLI/UI推荐接口及页面拆分",
+      "contribution_kind": "full_stack_product_delivery",
+      "artifact_evidence": {
+        "source_ids": [
+          "N01",
+          "N02"
+        ],
+        "commit_hashes": [
+          "b73817670dba70481f0ffdadd733abb1ff56c02e",
+          "c9e7c27fabf415b814ecb7fb4fca7456774972ca",
+          "f0cbb86a6de8bffe865940a970a064200e931314",
+          "dc33cc04c158a48369b85166ecde587d550e20f7"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Fable协作声明；文档记录MasterAgent实施、Master数分复核、MasterUI运行",
+      "counterevidence_or_limits": "多数局部刷新此前已有；部分验证为白盒而非视觉复测",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K04",
+      "title": "并发加固与错误悬单修订",
+      "original_claim_ids": [
+        "C05"
+      ],
+      "outcome": "改进竞争/崩溃场景；新增判断错误又被复核修正",
+      "contribution_kind": "reliability_and_correction",
+      "artifact_evidence": {
+        "source_ids": [],
+        "commit_hashes": [
+          "03f913eeb532c04d1507b7ef55d626e88242ca0c",
+          "75190b982f7ac1602b2bbce4672c7e1473541d4d",
+          "bd27d27cb05ff0136f4ff5494daa351ca2c2f9c5",
+          "1cbc8ed9d8fd32aeeff7f2c86799c9e89e04fe6b"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Fable声明提交；Master数分反馈有正文支持，实现及审阅模型不混同",
+      "counterevidence_or_limits": "两个版本都记录61/61，不能据数量或单个案例计算覆盖率/错误率",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K05",
+      "title": "兼容运行中的平台化",
+      "original_claim_ids": [
+        "C06"
+      ],
+      "outcome": "分离涉及读取、写回、提示、工具和消费方兼容，不只是搬目录",
+      "contribution_kind": "platformization",
+      "artifact_evidence": {
+        "source_ids": [
+          "N03",
+          "N04",
+          "N05"
+        ],
+        "commit_hashes": [
+          "26ec7cbdf58be8a886e7306fe468012755da9a60",
+          "72e61f4d00e06bd7280107a41be589bd476ee4fb",
+          "ea7206494bbaf28099b076745f5144a5954661bf",
+          "3d2f5d8aa3e151e6570ac07efc91da2366c67e51",
+          "6067eae5131a4d4525e561eb4a968a7f977f7018",
+          "8cc78f8b7abcb935918d23309a48ee092c13a5d0",
+          "4807cbc4bbc2f7664185790b68d0b2a315ac8491",
+          "1ffac706bfd118d908a37bb6da619fcacdb73213"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Fable主体提交与Opus UI提交；Master数分/培训师/消费方有独立角色贡献",
+      "counterevidence_or_limits": "前期证据不等于后来独立部署、执行代次和工具隔离已完成",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K06",
+      "title": "等待注册表与UI组合负载修复",
+      "original_claim_ids": [
+        "C08"
+      ],
+      "outcome": "身份登记机制继承统一状态判据；使用反馈推动噪声过滤与去抖",
+      "contribution_kind": "system_integration",
+      "artifact_evidence": {
+        "source_ids": [
+          "N06"
+        ],
+        "commit_hashes": [
+          "7ea8999a1cf5535738ecb98db0cf663e72b10a8d",
+          "f50507d94a0a27c8bd1af067c13d42c52623e360",
+          "4dbf8109cfba930d2454799f30f8504dbcf38bac"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Fable/Opus声明；文档记录MasterUI实现与MasterAgent复核",
+      "counterevidence_or_limits": "新旧心跳与已有watcher组合问题，不是单一模型单因事故",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K07",
+      "title": "daemon试点扩张回退",
+      "original_claim_ids": [
+        "C20"
+      ],
+      "outcome": "方向损失和可复用机制均保留",
+      "contribution_kind": "decision_and_rollback",
+      "artifact_evidence": {
+        "source_ids": [
+          "N07"
+        ],
+        "commit_hashes": [
+          "1f3a7acdf7c75f96fff91a7e80014f30ea754dbb",
+          "fd38f6aea4c9684d49a253d35a831d16356f4a1b",
+          "d077bd5952748d2d9dce7fe6043aaa2558ff848e",
+          "c4f6d5ad4d8a0e548f35898d895d9299181e8f60"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "提交声明Opus；用户纠偏及MasterAgent/Master数分联合决策复盘，不能独占归责",
+      "counterevidence_or_limits": "提交署名不能证明所有候选选择和审批由同一模型独立作出",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K08",
+      "title": "Astra新核与产品迁移分列",
+      "original_claim_ids": [
+        "C09",
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15"
+      ],
+      "outcome": "安装/归属/异常恢复与持久交接为净新增；日常替代未完成",
+      "contribution_kind": "new_runtime_and_delivery",
+      "artifact_evidence": {
+        "source_ids": [
+          "N08",
+          "N09",
+          "N12",
+          "N13",
+          "N14",
+          "N15",
+          "N16",
+          "N17",
+          "N18",
+          "N19"
+        ],
+        "commit_hashes": [],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "用户及立项支持Astra主力阶段，单模块作者未逐项认证",
+      "counterevidence_or_limits": "真实纯文本验收、合成搬运、旧产品迁移不是同一层；不能据测试数比较总体优劣",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K09",
+      "title": "撤回上下文修复的直接模型归因",
+      "original_claim_ids": [
+        "C08"
+      ],
+      "outcome": "Master数分修改、UI重载和集成，提交有Opus署名",
+      "contribution_kind": "attribution_correction",
+      "artifact_evidence": {
+        "source_ids": [],
+        "commit_hashes": [
+          "2f3da99de0dd702ff75a31b2b8a6d89aadcd96cc"
+        ],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "直接实现模型unknown；声明参与不变",
+      "counterevidence_or_limits": "不得将提交标签自动赋给别人所做的改动",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K10",
+      "title": "十月兼容维护单列",
+      "original_claim_ids": [
+        "C18"
+      ],
+      "outcome": "旧WebUI2.x Codex适配和浏览器巡检有成果",
+      "contribution_kind": "compatibility_maintenance",
+      "artifact_evidence": {
+        "source_ids": [
+          "N10"
+        ],
+        "commit_hashes": [],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "实现模型unknown；gpt-6-sol仅是当时UI显示标签",
+      "counterevidence_or_limits": "不新增Sol作者认证，不统归Astra，不将只读巡检扩写为写操作端到端验收",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    },
+    {
+      "id": "K11",
+      "title": "34项工单总量口径",
+      "original_claim_ids": [
+        "C16"
+      ],
+      "outcome": "整张工单表含已完成限定项和未完成项",
+      "contribution_kind": "handoff",
+      "artifact_evidence": {
+        "source_ids": [
+          "N11"
+        ],
+        "commit_hashes": [],
+        "observation": "static_current_source_or_historical_diff_and_record"
+      },
+      "attribution_evidence": "Astra主线交接与用户要求，具体参与模型未逐项追溯",
+      "counterevidence_or_limits": "不是34项都尚待完成；规划与实现不能重复计功",
+      "historical_tests_rerun": false,
+      "actual_model_identity_authenticated": false
+    }
+  ],
+  "original_claim_dispositions": [
+    {
+      "original_id": "C01",
+      "disposition": "retain",
+      "reason": "主力经历保留，交叠和切换日期精度仍按原证据。"
+    },
+    {
+      "original_id": "C02",
+      "disposition": "narrow",
+      "reason": "用户确认Opus初始主线，首快照不认证所有组件作者。"
+    },
+    {
+      "original_id": "C03",
+      "disposition": "narrow",
+      "reason": "模块化成果成立，分列实现、复核和UI集成。"
+    },
+    {
+      "original_id": "C04",
+      "disposition": "retain",
+      "reason": "最早可见Fable署名，不是首次实际使用。"
+    },
+    {
+      "original_id": "C05",
+      "disposition": "expand_and_qualify",
+      "reason": "补UI2.0及错误悬单反例；不将审计写成单向根治。"
+    },
+    {
+      "original_id": "C06",
+      "disposition": "expand",
+      "reason": "前期平台化包括写入边界、通用锁、提示和消费方兼容。"
+    },
+    {
+      "original_id": "C07",
+      "disposition": "expand_and_narrow_attribution",
+      "reason": "具体化Sonnet行为/安全/运维价值，仍限署名参与。"
+    },
+    {
+      "original_id": "C08",
+      "disposition": "correct",
+      "reason": "撤回2f3da99的直接实现模型归因，其他长期参与证据保留并补跨角色修复。"
+    },
+    {
+      "original_id": "C09",
+      "disposition": "retain",
+      "reason": "阶段主力有用户和项目文档支持。"
+    },
+    {
+      "original_id": "C10",
+      "disposition": "qualify",
+      "reason": "新边界净增量与单模块作者、完整业务承接分开。"
+    },
+    {
+      "original_id": "C11",
+      "disposition": "qualify",
+      "reason": "正式本机纯文本发行成立，非生产替换。"
+    },
+    {
+      "original_id": "C12",
+      "disposition": "qualify",
+      "reason": "工作台部分交付，旧功能迁移仍待完成。"
+    },
+    {
+      "original_id": "C13",
+      "disposition": "retain",
+      "reason": "模型事实分层成立，不推底层模型身份。"
+    },
+    {
+      "original_id": "C14",
+      "disposition": "qualify",
+      "reason": "事务和回执已实现，真实入口/下游处理不自动成立。"
+    },
+    {
+      "original_id": "C15",
+      "disposition": "qualify",
+      "reason": "dev4合成及进程测试范围保留，不推生产稳定性。"
+    },
+    {
+      "original_id": "C16",
+      "disposition": "correct",
+      "reason": "34为完整工单目录，含已做和未做，不是34项未来工作。"
+    },
+    {
+      "original_id": "C17",
+      "disposition": "retain_and_expand",
+      "reason": "用户的方向、纠偏和共同试验责任均保留。"
+    },
+    {
+      "original_id": "C18",
+      "disposition": "expand",
+      "reason": "补旧WebUI兼容巡检成果，具体实现模型未知。"
+    },
+    {
+      "original_id": "C19",
+      "disposition": "retain",
+      "reason": "Git样本不适于包含十月的比例计算。"
+    },
+    {
+      "original_id": "C20",
+      "disposition": "expand_and_qualify",
+      "reason": "执行/归档提交的Opus标签可记录，联合决策不得独占归责。"
+    }
+  ],
+  "unresolved": [
+    "Exact implementation model for delegated/context fix 2f3da99",
+    "Per-module October author identities",
+    "Underlying model identity of historical declared labels",
+    "Comparable end-user outcome/effort/cost/incident metrics across stages",
+    "3.1 complete old-workflow migration and real Claude/mixed-team acceptance"
+  ],
+  "operations": {
+    "product_code_modified": false,
+    "private_sessions_read": false,
+    "production_mailboxes_read": false,
+    "credentials_read": false,
+    "historical_tests_rerun": false,
+    "services_started": false,
+    "real_acceptance_model_calls": false,
+    "external_publication": false
+  },
+  "validation": {
+    "date": "2026-10-20",
+    "report_sha256": "d26bfd640d646bd075332cdd2e01f44065401ba297ef84376fd4b3b1acb25241",
+    "baseline_files_unchanged": 3,
+    "baseline_source_hashes_unchanged": 22,
+    "new_source_hashes_and_excerpts_matched": 19,
+    "git_diff_hashes_and_excerpts_matched": 9,
+    "cases_reference_valid_sources_commits_claims": 11,
+    "all_original_claims_disposed": 20,
+    "local_report_links_valid": 11,
+    "utf8_and_no_email_check": "passed",
+    "independent_legacy_review": "passed",
+    "independent_methodology_review": "passed",
+    "runtime_tests": "not_run_document_analysis_only"
+  }
+}
