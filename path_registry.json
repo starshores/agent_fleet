@@ -1,7 +1,7 @@
 {
  "meta": {
   "version": "1.0",
-  "updated": "2026-07-28",
+  "updated": "2026-10-19",
   "owner": "MasterAgent",
   "purpose": "bus 特殊路径注册表(单一源)——记忆库/存档/外链(junction·symlink·硬链)/宿主配置/运行态方舟。供 WebUI「📁路径」页渲染(MasterUI)+ 换机迁移对账 + 健康校验(kind 与 expect 字段)。",
   "kind_legend": {
@@ -62,9 +62,9 @@
     {
      "id": "releases",
      "name": "发版快照",
-     "path": "C:\\apphome\\agent_fleet_releases",
+     "path": "C:\\apphome\\agent_fleet\\releases",
      "kind": "dir",
-     "desc": "打 vX tag 时 githooks/reference-transaction 自动 zip 全目录快照(bsdtar);在项目根同级、不在项目根内(防自包含膨胀)。",
+     "desc": "项目内版本封包与验收证据；release-catalog.json 为包摘要目录；tag快照写 legacy-tag-snapshots 且排除 releases/maintenance 自身。运行态与认证不属于可执行发行包。",
      "owner": "MasterAgent"
     },
     {
@@ -344,6 +344,7 @@
      "name": "卫生代谢归档位(done_archive/_dead_letter/.trash)",
      "path": "C:\\apphome\\agent_fleet\\agent_bus\\unknown\\_dead_letter",
      "kind": "dir",
+     "optional": true,
      "desc": "health-sweep 卫生代谢(2026-07-28)三个去处:各 role done_archive/(回执>14d)、unknown/_dead_letter/(死信>7d)、agent_bus/.trash/(bak>14d);supervise 90s 周期自动跑。",
      "owner": "MasterAgent"
     }

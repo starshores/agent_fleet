@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 *.tmp
+releases/
+maintenance/
 .last_toast
 .claude/
 .idea/
