@@ -120,7 +120,7 @@ class SchemaThreeMigrationTests(unittest.TestCase):
         old_rows = self.rows()
         result = storage.migrate_state(self.state)
         self.assertTrue(result["migrated"])
-        self.assertEqual(result["schema_version"], 4)
+        self.assertEqual(result["schema_version"], storage.SCHEMA_VERSION)
         self.assertTrue(result["tokens_revoked"])
         self.assertEqual(result["legacy_notifications"], "preserved")
         backup = Path(result["backup_path"])
@@ -134,7 +134,7 @@ class SchemaThreeMigrationTests(unittest.TestCase):
                 self.assertEqual(upgraded[table], values, table)
         self.assertEqual(upgraded["actor_tokens"], [])
         self.assertEqual(upgraded["migration_log"][0], old_rows["migration_log"][0])
-        self.assertEqual(upgraded["migration_log"][-1][:2], (4, 2))
+        self.assertEqual(upgraded["migration_log"][-1][:2], (storage.SCHEMA_VERSION, 2))
         self.assertEqual(upgraded["attempt_inputs"], [])
         expected = {(name, role, str(workspace), "none")
                     for name, workspace in self.workspaces.items() for role in ("reviewer", "editor")}
@@ -191,9 +191,9 @@ class SchemaThreeMigrationTests(unittest.TestCase):
     def test_late_failure_rolls_back_schema_tokens_version_and_data(self):
         before, old_rows = self.database.read_bytes(), self.rows()
         verify = storage.verify_schema
-        def fail_final_check(db, version=4):
-            if version == 4:
-                self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 4)
+        def fail_final_check(db, version=storage.SCHEMA_VERSION):
+            if version == storage.SCHEMA_VERSION:
+                self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], storage.SCHEMA_VERSION)
                 self.assertEqual(db.execute("SELECT count(*) FROM actor_tokens").fetchone()[0], 0)
                 self.assertEqual(db.execute("SELECT count(*) FROM role_deployments").fetchone()[0], 6)
                 raise RuntimeError("synthetic late migration failure")
@@ -241,7 +241,7 @@ class SchemaThreeMigrationTests(unittest.TestCase):
         storage.migrate_state(self.state)
         before = self.filesystem_snapshot()
         self.assertEqual(storage.migrate_state(self.state),
-                         {"migrated": False, "schema_version": 4, "backup_path": None})
+                         {"migrated": False, "schema_version": storage.SCHEMA_VERSION, "backup_path": None})
         self.assertEqual(self.filesystem_snapshot(), before)
 
 

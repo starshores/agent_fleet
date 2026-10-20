@@ -27,6 +27,8 @@ from .storage import StorageMixin, SCHEMA_VERSION, APPLICATION_ID
 from .coordination import CoordinationMixin
 from .interactions import RuntimeInteractionMixin
 from .members import MemberMixin
+from .routing import RoutingMixin
+from .deliveries import DeliveryMixin
 from .paths import prepare_state_root
 from .deployment import WORKSPACE_ACCESS, normalize_deployments
 
@@ -34,7 +36,8 @@ from .deployment import WORKSPACE_ACCESS, normalize_deployments
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 _RUNTIME_REASON = re.compile(r"[a-z][a-z0-9_.-]{0,99}\Z", re.ASCII)
 _RUNTIME_EVENTS = frozenset({"runtime_start_requested", "runtime_started",
-                             "runtime_thread", "runtime_progress", "runtime_stopped"})
+                             "runtime_thread", "runtime_progress", "runtime_stopped",
+                             "runtime_observation", "runtime_native_request_denied"})
 
 
 @dataclass(frozen=True)
@@ -63,13 +66,15 @@ def _identifier(value: str) -> str:
     return value
 
 
-class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberMixin):
+class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberMixin, RoutingMixin, DeliveryMixin):
     """Explicit state root, immutable package snapshots, and scoped execution."""
 
     def __init__(self, state_root: Path | str, readonly: bool = False,
                  adapters: Mapping[str, Callable[[str], str]] | None = None,
                  clock: Callable[[], float] | None = None,
-                 external_adapters: set[str] | None = None):
+                 external_adapters: set[str] | None = None, *, initialize: bool = True):
+        if type(initialize) is not bool:
+            raise PlatformError("invalid_initialization", "Initialization must be explicitly enabled or disabled.")
         self.readonly = readonly
         self.clock = clock or time.time
         # Deployment code may explicitly supply side-effect-free text transforms.
@@ -87,9 +92,9 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
         self.external_adapters = frozenset(external_adapters or ())
         if self.external_adapters & self.adapters.keys():
             raise PlatformError("invalid_adapters", "External and synchronous adapter registrations must be distinct.")
-        self.state_root = prepare_state_root(state_root, create=not readonly)
+        self.state_root = prepare_state_root(state_root, create=not readonly and initialize)
         self.db_path = self.state_root / "state.sqlite3"
-        if not readonly:
+        if not readonly and initialize:
             self._initialize()
 
     def _check_adapters(self, package: dict) -> None:
@@ -143,6 +148,30 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
         if active and row["state"] != "active":
             raise PlatformError("installation_inactive", "The installation is not active.")
         return row
+
+    @staticmethod
+    def _guard_command_generation(installation, expected_generation):
+        """Validate a UI/CLI scope while holding the domain write transaction."""
+        if expected_generation is None:
+            return
+        if type(expected_generation) is not int or not 1 <= expected_generation <= 2**63 - 1:
+            raise PlatformError("invalid_generation", "Expected generation must be a positive integer.")
+        if installation["generation"] != expected_generation:
+            raise PlatformError("stale_generation", "The installation changed activation; reload before writing.")
+
+    @staticmethod
+    def _guard_command_task(db, installation, task_id, expected_task_id):
+        if expected_task_id is None:
+            return
+        if not isinstance(expected_task_id, str) or not _IDENTIFIER.fullmatch(expected_task_id):
+            raise PlatformError("invalid_id", "Expected task must be an explicit portable identifier.")
+        if task_id != expected_task_id:
+            raise PlatformError("task_scope", "This operation does not belong to the selected task.")
+        task = db.execute("SELECT installation_id,dispatch_generation FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if task is None or task["installation_id"] != installation["installation_id"]:
+            raise PlatformError("task_scope", "This task does not belong to the selected installation.")
+        if task["dispatch_generation"] != installation["generation"]:
+            raise PlatformError("stale_task", "This task requires explicit continuation before writing.")
 
     @staticmethod
     def _snapshot(installation: sqlite3.Row) -> dict:
@@ -301,17 +330,20 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
             return self._context(db, installation, actor.role_id)
 
     def submit(self, installation_id: str, role_id: str, text: str,
-               client_request_id: str | None = None) -> dict:
+               client_request_id: str | None = None, *, expected_generation: int | None = None) -> dict:
         if not isinstance(text, str) or not text.strip():
             raise PlatformError("invalid_task", "A task must contain nonempty text.")
         if client_request_id is not None and (not isinstance(client_request_id, str) or not client_request_id.strip() or len(client_request_id) > 200):
             raise PlatformError("invalid_request_id", "Request identifiers must be nonempty strings up to 200 characters.")
         with self._db(write=True) as db:
             installation = self._installation(db, installation_id, active=True)
+            self._guard_command_generation(installation, expected_generation)
             self._role(installation, role_id)
             if client_request_id is not None:
                 previous = db.execute("SELECT * FROM tasks WHERE installation_id=? AND client_request_id=?", (installation_id, client_request_id)).fetchone()
                 if previous is not None:
+                    if expected_generation is not None and previous["dispatch_generation"] != expected_generation:
+                        raise PlatformError("stale_task", "This request belongs to an earlier activation.")
                     if previous["role_id"] != role_id or previous["text"] != text:
                         raise PlatformError("request_conflict", "This request identifier already refers to different task content.")
                     return dict(previous)
@@ -385,6 +417,7 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
         self._guard_member_claim(db, installation_id, role_id, member_id)
         self._check_workspace(db, installation)
         task = self._task(db, installation_id, role_id, generation, task_id)
+        self._guard_route_claim(db, task)
         role = self._role(installation, role_id)
         if tool_id not in role["tools"]:
             raise PlatformError("tool_denied", "This role is not granted this tool.")
@@ -578,6 +611,7 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
         db.execute("UPDATE attempts SET state=?,finished_at=? WHERE attempt_id=?",
                    (state, timestamp, attempt["attempt_id"]))
         self._attempt_event(db, attempt, state, {"status": "error" if failed else "ok"})
+        self._create_result_delivery(db, task, attempt, output, error_json)
         self._enqueue(db, installation_id, generation, task_id, role_id, kind,
                       {"task_id": task_id, "attempt_id": attempt["attempt_id"],
                        "status": "error" if failed else "ok"}, "terminal:" + task_id)
@@ -734,18 +768,34 @@ class Platform(StorageMixin, CoordinationMixin, RuntimeInteractionMixin, MemberM
                 records.append({**self._attempt_view(row), "events": events})
             return records
 
-    def request_runtime_stop(self, installation_id: str, attempt_id: str, reason: str) -> dict:
+    def request_runtime_stop(self, installation_id: str, attempt_id: str, reason: str, *,
+                             expected_generation: int | None = None, expected_task_id: str | None = None) -> dict:
         """Record a request; only the live owning supervisor stops its process."""
         self._reason(reason)
         with self._db(write=True) as db:
             installation = self._installation(db, installation_id, active=True)
+            self._guard_command_generation(installation, expected_generation)
             attempt = self._attempt(db, attempt_id)
             if attempt["installation_id"] != installation_id:
                 raise PlatformError("attempt_scope", "This attempt belongs to another installation.")
+            self._guard_command_task(db, installation, attempt["task_id"], expected_task_id)
+            if expected_generation is not None and attempt["generation"] == installation["generation"]:
+                previous = db.execute("SELECT detail FROM attempt_events WHERE attempt_id=? AND kind='runtime_cancel_requested'", (attempt_id,)).fetchone()
+                if previous is not None:
+                    if json.loads(previous["detail"])["reason"] != reason:
+                        raise PlatformError("cancel_conflict", "A different stop request is already recorded.")
+                    # A lost HTTP receipt may be retried after exit or expiry.
+                    # Acknowledge the durable intent without inferring process
+                    # state or recording another event. Scope remains fenced.
+                    return {"attempt_id": attempt_id, "stop_requested": True, "termination_confirmed": False}
             if attempt["generation"] != installation["generation"] or attempt["state"] != "running":
                 raise PlatformError("stale_attempt", "Only a current running attempt can receive a stop request.")
+            if expected_generation is not None and attempt["expires_at"] <= self._clock_now():
+                raise PlatformError("lease_expired", "Expired attempts require reconciliation before a new operation.")
             if not db.execute("SELECT 1 FROM attempt_events WHERE attempt_id=? AND kind='runtime_start_requested'", (attempt_id,)).fetchone():
                 raise PlatformError("runtime_not_started", "This attempt has no external runtime supervisor.")
+            if expected_generation is not None and db.execute("SELECT 1 FROM attempt_events WHERE attempt_id=? AND kind='runtime_stopped'", (attempt_id,)).fetchone():
+                raise PlatformError("runtime_stopped", "The runtime has already reported an exit; reload before writing.")
             previous = db.execute("SELECT detail FROM attempt_events WHERE attempt_id=? AND kind='runtime_cancel_requested'", (attempt_id,)).fetchone()
             if previous is not None:
                 if json.loads(previous["detail"])["reason"] != reason:

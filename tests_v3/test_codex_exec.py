@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -26,8 +27,13 @@ import json, os, subprocess, sys, time
 config = json.loads(sys.stdin.read())
 if config.get('descendant'):
     descendant = "import pathlib,time; p=pathlib.Path(" + repr(config['descendant']) + "); "
-    descendant += "\nwhile True:\n p.write_text(str(time.monotonic())); time.sleep(.02)\n"
+    descendant += "\ntime.sleep(" + repr(config.get('descendant_start_delay', 0)) + ")\n"
+    descendant += "p.write_text(str(time.monotonic()), encoding='utf-8')\n"
+    if config.get('descendant_ready'):
+        descendant += "print(" + repr(json.dumps(config['descendant_ready'])) + ", flush=True)\n"
+    descendant += "while True:\n p.write_text(str(time.monotonic()), encoding='utf-8'); time.sleep(.02)\n"
     subprocess.Popen([sys.executable, '-B', '-c', descendant],
+        stdout=sys.stdout, stderr=sys.stderr,
         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 if config.get('stderr'):
     sys.stderr.write(config['stderr'])
@@ -202,12 +208,24 @@ class CodexExecTests(unittest.TestCase):
 
     def test_descendant_stops_with_owned_process_tree(self):
         marker = self.directory / "owned-descendant-marker.txt"
-        result = self.run_child({"descendant": str(marker), "sleep": 30}, timeout_seconds=0.7)
-        self.assert_stopped("timed_out", result)
+        ready = threading.Event()
+        def on_event(kind, details):
+            self.events.append((kind, details))
+            if kind == "runtime_thread" and details["thread_id"] == "synthetic-descendant-ready":
+                ready.set()
+        # The descendant acknowledges its first write through the real stdout
+        # pipe. Startup may exceed the old 0.7-second deadline under load.
+        result = self.run_child({
+            "descendant": str(marker), "descendant_start_delay": 0.8,
+            "descendant_ready": {"type": "thread.started", "thread_id": "synthetic-descendant-ready"},
+            "sleep": 30,
+        }, timeout_seconds=10, on_event=on_event, cancelled=ready.is_set)
+        self.assert_stopped("cancelled", result)
+        self.assertTrue(ready.is_set(), "synthetic descendant did not acknowledge startup")
         self.assertTrue(marker.exists(), "synthetic descendant never started")
-        content = marker.read_text()
+        content = marker.read_text(encoding="utf-8")
         time.sleep(0.15)
-        self.assertEqual(content, marker.read_text(), "owned descendant continued after cancellation")
+        self.assertEqual(content, marker.read_text(encoding="utf-8"), "owned descendant continued after cancellation")
 
     @unittest.skipUnless(os.name == "nt", "Kill-on-close proof requires Windows Job Objects")
     def test_abrupt_supervisor_death_closes_job_and_stops_descendant(self):

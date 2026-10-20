@@ -22,11 +22,69 @@ class Parser(argparse.ArgumentParser):
 
 
 def parser() -> argparse.ArgumentParser:
-    result = Parser(description="MasterAgent 3.0 business-independent text coordination platform.")
+    result = Parser(description="MasterAgent business-independent coordination platform.")
     result.add_argument("--version", action="version", version=__version__)
     result.add_argument("--state-root", help="Explicit absolute directory outside the source and runtime homes.")
     result.add_argument("--runtime-config", help="Explicit deployment JSON; never inherited from a business package.")
     commands = result.add_subparsers(dest="command", required=True)
+    from .routing_commands import ACTIONS, QUERY_ACTIONS
+    routing_command = commands.add_parser("routing-command", help="Apply an explicit local routing action to existing state; never initialize or execute models.")
+    routing_command.add_argument("--action", required=True, choices=tuple(ACTIONS))
+    routing_command.add_argument("--payload-file", required=True)
+    routing_command.add_argument("--lease-file")
+    routing_command.add_argument("--lease-output", help="New local file for an issued transport lease; secrets are not printed.")
+    routing_query = commands.add_parser("routing-query", help="Read persistent routing and destination receipt facts without maintenance.")
+    routing_query.add_argument("resource", choices=QUERY_ACTIONS)
+    for field in ("route-id", "admission-id", "installation-id", "delivery-id"):
+        routing_query.add_argument("--" + field)
+    receipt_init = commands.add_parser("receipt-init", help="Explicitly initialize an isolated local destination receipt store.")
+    receipt_init.add_argument("--receipt-root", required=True)
+    receipt_init.add_argument("--destination-namespace", required=True)
+    receipt_init.add_argument("--destination-id", required=True)
+    for operation in ("source-init", "source-publish", "source-query"):
+        source = commands.add_parser(operation, help="Operate one explicitly selected isolated local source; never run a model.")
+        source.add_argument("--source-root", required=True)
+        source.add_argument("--source-namespace", required=True)
+        if operation == "source-publish":
+            source.add_argument("--input-file", required=True, help="UTF-8 JSON with source_id, text and optional kind.")
+        elif operation == "source-query":
+            selection = source.add_mutually_exclusive_group()
+            selection.add_argument("--source-id-file", help="UTF-8 JSON containing the exact string or integer source ID.")
+            selection.add_argument("--limit", type=int, help="Maximum pending records, from 1 through 1000; default 100.")
+    for operation in ("transport-bind", "transport-once", "transport-serve"):
+        transport = commands.add_parser(operation, help="Bind or operate an explicitly configured local transport; no endpoint initialization or model execution.")
+        transport.add_argument("--transport-config", required=True, help="Strict local JSON selecting one source, route, owner and receipt destination.")
+        if operation == "transport-bind":
+            transport.add_argument("--expected-epoch", type=int, required=True)
+        elif operation == "transport-serve":
+            transport.add_argument("--max-seconds", type=float, help="Optional finite positive serving duration.")
+    for operation in ("delivery-send", "delivery-reconcile", "receipt-query"):
+        delivery = commands.add_parser(operation, help="One explicit transport operation against a selected local receipt store.")
+        delivery.add_argument("delivery_id")
+        delivery.add_argument("--receipt-root", required=True)
+        if operation == "delivery-send":
+            delivery.add_argument("--sender-id", required=True)
+        if operation == "delivery-reconcile":
+            delivery.add_argument("--retry-absent", action="store_true")
+    workbench = commands.add_parser("workbench", help="Start the independent local Web workbench (read-only by default).")
+    workbench.add_argument("--port", type=int, default=8801, help="Local port; 0 selects an unused port.")
+    workbench.add_argument("--enable-commands", action="store_true", help="Enable guarded commands on the explicitly selected existing deployment.")
+    workbench.add_argument("--legacy-console-url", help="Explicit local legacy console origin; navigation only.")
+    query = commands.add_parser("workbench-query", help="Read the same bounded projections used by the Web workbench.")
+    query.add_argument("resource", choices=("deployment", "overview", "tasks", "task", "task-history", "team", "resources", "connections"))
+    query.add_argument("--installation-id")
+    query.add_argument("--task-id")
+    query.add_argument("--generation", type=int)
+    query.add_argument("--limit", type=int)
+    query.add_argument("--cursor")
+    query.add_argument("--state")
+    query.add_argument("--role-id")
+    query.add_argument("--record-generation", type=int)
+    query.add_argument("--section")
+    command = commands.add_parser("workbench-command", help="Apply one guarded workbench command to existing state; never start a runtime.")
+    command.add_argument("--installation-id", required=True)
+    command.add_argument("--action", required=True, choices=("submit", "input", "answer", "stop"))
+    command.add_argument("--payload-file", required=True, help="Local UTF-8 JSON file with the exact action fields.")
     commands.add_parser("status", help="Read-only deployment status; never starts runtimes or maintenance.")
     commands.add_parser("migrate", help="Explicitly upgrade an older state database, preserving a backup.")
     commands.add_parser("runtime-check", help="Check pinned Codex binary and flags without starting a model.")
@@ -163,6 +221,77 @@ def _actor(path):
 
 
 def dispatch(args):
+    if args.command in {"source-init", "source-publish", "source-query",
+                        "transport-bind", "transport-once", "transport-serve"}:
+        if args.runtime_config:
+            raise PlatformError("invalid_command", "Source and transport commands do not load model runtime configuration.")
+        from . import transport_commands
+        if args.command in transport_commands.SOURCE_COMMANDS:
+            if args.state_root:
+                raise PlatformError("invalid_command", "Source operations use only --source-root, not a platform state root.")
+            return transport_commands.execute_source(args.command, args.source_root, args.source_namespace,
+                input_file=getattr(args, "input_file", None), source_id_file=getattr(args, "source_id_file", None),
+                limit=getattr(args, "limit", None))
+        if not args.state_root:
+            raise PlatformError("missing_state_root", "Supply an explicit isolated platform state root.")
+        return transport_commands.execute_transport(args.command, args.state_root,
+            transport_commands.load_transport_config(args.transport_config),
+            expected_epoch=getattr(args, "expected_epoch", None), max_seconds=getattr(args, "max_seconds", None))
+    if args.command in {"routing-command", "routing-query", "receipt-init", "delivery-send", "delivery-reconcile", "receipt-query"}:
+        if args.runtime_config:
+            raise PlatformError("invalid_command", "Routing transport does not load model runtime configuration.")
+        from . import routing_commands
+        if args.command == "receipt-init":
+            if args.state_root:
+                raise PlatformError("invalid_command", "Receipt initialization uses only --receipt-root, not a platform state root.")
+            receiver = routing_commands.ReceiptStore(args.receipt_root, args.destination_namespace,
+                                                     args.destination_id, initialize=True)
+            return {"initialized": True, "destination": receiver.descriptor()}
+        if not args.state_root:
+            raise PlatformError("missing_state_root", "Supply an explicit isolated platform state root.")
+        if args.command == "routing-command":
+            return routing_commands.execute_command(args.state_root, args.action,
+                routing_commands.load_command_payload(args.payload_file), lease_file=args.lease_file, lease_output=args.lease_output)
+        if args.command == "routing-query":
+            return routing_commands.query(args.state_root, args.resource, **{
+                field: getattr(args, field) for field in ("route_id", "admission_id", "installation_id", "delivery_id")})
+        return routing_commands.deliver(args.state_root, args.delivery_id, args.receipt_root,
+            sender_id=getattr(args, "sender_id", None), retry_absent=getattr(args, "retry_absent", False),
+            operation={"delivery-send": "send", "delivery-reconcile": "reconcile", "receipt-query": "query"}[args.command])
+    if args.command == "workbench-command":
+        if not args.state_root:
+            raise PlatformError("missing_state_root", "Supply --state-root explicitly; there is no host or business fallback.")
+        if args.runtime_config:
+            raise PlatformError("invalid_command", "Workbench commands do not load runtime configuration.")
+        from .workbench_commands import WorkbenchCommands, load_command_payload
+        payload = load_command_payload(args.payload_file)
+        return WorkbenchCommands(args.state_root).execute(args.installation_id, args.action, payload)
+    if args.command == "workbench-query":
+        if not args.state_root:
+            raise PlatformError("missing_state_root", "Supply --state-root explicitly; there is no host or business fallback.")
+        if args.runtime_config:
+            raise PlatformError("invalid_command", "Workbench queries do not load runtime configuration.")
+        from .workbench_query import WorkbenchQueries
+        queries = WorkbenchQueries(args.state_root)
+        parameters = {key: getattr(args, key) for key in ("generation", "limit", "cursor", "state", "role_id", "record_generation", "section")
+                      if getattr(args, key) is not None}
+        allowed = {"generation", "limit", "cursor", "state", "role_id"} if args.resource == "tasks" else {"generation"}
+        if args.resource == "task-history":
+            allowed |= {"record_generation", "section", "limit", "cursor"}
+        if args.resource == "deployment":
+            if parameters or args.installation_id or args.task_id:
+                raise PlatformError("invalid_query", "Deployment queries do not accept installation filters.")
+            return queries.deployment()
+        if not args.installation_id:
+            raise PlatformError("invalid_query", "This query requires --installation-id.")
+        if set(parameters) - allowed or (args.task_id is not None and args.resource not in {"task", "task-history"}):
+            raise PlatformError("invalid_query", "This resource does not accept the selected filters.")
+        if args.resource in {"task", "task-history"}:
+            if not args.task_id:
+                raise PlatformError("invalid_query", "Task detail requires --task-id.")
+            method = queries.task_history if args.resource == "task-history" else queries.task
+            return method(args.installation_id, args.task_id, **parameters)
+        return getattr(queries, args.resource)(args.installation_id, **parameters)
     if args.command == "validate-package":
         package = load_package(args.path)
         return {"valid": True, "package_id": package.package_id, "version": package.version,
@@ -254,7 +383,20 @@ def dispatch(args):
 
 def main(argv=None) -> int:
     try:
-        result = dispatch(parser().parse_args(argv))
+        args = parser().parse_args(argv)
+        if args.command == "workbench":
+            if not args.state_root:
+                raise PlatformError("missing_state_root", "Supply --state-root explicitly; there is no host or business fallback.")
+            if args.runtime_config:
+                raise PlatformError("invalid_command", "The workbench does not load runtime configuration or start executors.")
+            from .workbench import main as workbench_main
+            forwarded = ["--state-root", args.state_root, "--port", str(args.port)]
+            if args.enable_commands:
+                forwarded.append("--enable-commands")
+            if args.legacy_console_url is not None:
+                forwarded.extend(["--legacy-console-url", args.legacy_console_url])
+            return workbench_main(forwarded)
+        result = dispatch(args)
         print(json.dumps(result, ensure_ascii=True, sort_keys=True))
         return 0
     except (ContractError, PlatformError, PathSafetyError) as exc:

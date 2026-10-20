@@ -17,7 +17,7 @@ from pathlib import Path
 import threading
 
 from .errors import PlatformError
-from .paths import PathSafetyError, prepare_state_root
+from .paths import PathSafetyError, prepare_state_root, _explicit_path, _check_directory_boundary
 
 
 _WAIT_OBJECT_0 = 0
@@ -79,7 +79,7 @@ class StateWaiter:
     True. Starting another wait or arm after close is an explicit error.
     """
 
-    def __init__(self, state_root: str | Path):
+    def __init__(self, state_root: str | Path, *, additional_roots=()):
         self._kernel = _kernel32()
         try:
             self.state_root = prepare_state_root(state_root, create=False)
@@ -99,10 +99,38 @@ class StateWaiter:
         if change in (None, 0, ctypes.c_void_p(-1).value):
             raise _native_error("start")
         self._change_handle = change
+        self._additional_handles = []
+        try:
+            for extra in additional_roots:
+                # An additional store has its own schema and file names.
+                # Apply the shared boundary guard, not platform DB detection.
+                extra_root = _explicit_path(extra)
+                _check_directory_boundary(extra_root)
+                if not extra_root.is_dir():
+                    raise PlatformError("missing_state_root", "Notification directories must already exist.")
+                handle = self._kernel.FindFirstChangeNotificationW(
+                    str(extra_root), False,
+                    _FILE_NOTIFY_CHANGE_FILE_NAME | _FILE_NOTIFY_CHANGE_SIZE | _FILE_NOTIFY_CHANGE_LAST_WRITE,
+                )
+                if handle in (None, 0, ctypes.c_void_p(-1).value):
+                    raise _native_error("start")
+                self._additional_handles.append(handle)
+                if len(self._additional_handles) > 60:
+                    raise PlatformError("invalid_wait_roots", "Too many notification directories.")
+        except Exception:
+            for handle in self._additional_handles:
+                self._kernel.FindCloseChangeNotification(handle)
+            self._kernel.FindCloseChangeNotification(change)
+            self._change_handle = None
+            self._additional_handles = []
+            raise
         wake = self._kernel.CreateEventW(None, False, False, None)
         if not wake:
             error = _native_error("wake event creation")
             self._kernel.FindCloseChangeNotification(change)
+            for handle in self._additional_handles:
+                self._kernel.FindCloseChangeNotification(handle)
+            self._additional_handles = []
             self._change_handle = None
             raise error
         self._wake_handle = wake
@@ -119,6 +147,9 @@ class StateWaiter:
                 raise PlatformError("state_waiter_busy", "Cannot rearm an active state wait.")
             if not self._kernel.FindNextChangeNotification(self._change_handle):
                 raise _native_error("rearm")
+            for handle in self._additional_handles:
+                if not self._kernel.FindNextChangeNotification(handle):
+                    raise _native_error("rearm")
 
     def wait(self, timeout_seconds: float) -> bool:
         """Return True for directory/local wake, False only for the timeout.
@@ -137,11 +168,12 @@ class StateWaiter:
             self._require_open()
             if self._waiting:
                 raise PlatformError("state_waiter_busy", "Only one consumer can wait on this instance.")
-            handles = (wintypes.HANDLE * 2)(self._wake_handle, self._change_handle)
+            values = [self._wake_handle, self._change_handle, *self._additional_handles]
+            handles = (wintypes.HANDLE * len(values))(*values)
             self._waiting = True
         try:
-            result = self._kernel.WaitForMultipleObjects(2, handles, False, timeout_ms)
-            if result in (_WAIT_OBJECT_0, _WAIT_OBJECT_0 + 1):
+            result = self._kernel.WaitForMultipleObjects(len(values), handles, False, timeout_ms)
+            if _WAIT_OBJECT_0 <= result < _WAIT_OBJECT_0 + len(values):
                 return True
             if result == _WAIT_TIMEOUT:
                 return False
@@ -173,10 +205,15 @@ class StateWaiter:
             if self._change_handle is None and self._wake_handle is None:
                 return
             change, wake = self._change_handle, self._wake_handle
+            additional = self._additional_handles
+            self._additional_handles = []
             self._change_handle = self._wake_handle = None
             change_ok = self._kernel.FindCloseChangeNotification(change)
             change_error = None if change_ok else _native_error("close directory handle")
             wake_ok = self._kernel.CloseHandle(wake)
+            for handle in additional:
+                if not self._kernel.FindCloseChangeNotification(handle) and change_error is None:
+                    change_error = _native_error("close directory handle")
             if change_error is not None:
                 raise change_error
             if not wake_ok:

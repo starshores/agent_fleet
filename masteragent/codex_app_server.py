@@ -24,6 +24,12 @@ MAX_STDERR_BYTES = 256 * 1024
 MAX_EVENTS = 8192
 MAX_CANDIDATES = 128
 _ID = re.compile(r"[A-Za-z0-9_.:-]{1,200}\Z")
+_TOKEN_FIELDS = {
+    "inputTokens": "input_tokens", "cachedInputTokens": "cached_input_tokens",
+    "outputTokens": "output_tokens", "reasoningOutputTokens": "reasoning_output_tokens",
+    "totalTokens": "total_tokens",
+}
+_OPTIONAL_TOKEN_FIELDS = {"cacheWriteInputTokens": "cache_write_input_tokens"}
 _DENIALS = {
     "item/commandExecution/requestApproval": {"decision": "decline"},
     "item/fileChange/requestApproval": {"decision": "decline"},
@@ -41,6 +47,35 @@ class ProtocolError(Exception):
 class _ExecutionStopped(Exception):
     def __init__(self, outcome):
         self.outcome = outcome
+
+
+def _reported_model(value):
+    # Service-reported configuration is not evidence of backend inference.
+    if (not isinstance(value, str) or not value or value != value.strip()
+            or len(value) > 200 or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+        return None
+    try:
+        value.encode("utf-8")
+    except UnicodeError:
+        return None
+    return value
+
+
+def _usage_snapshot(value, previous):
+    """Accept a complete cumulative snapshot, never a delta or last-message count."""
+    if not isinstance(value, dict) or not _TOKEN_FIELDS.keys() <= value.keys():
+        return None
+    result = {}
+    for source, target in {**_TOKEN_FIELDS, **_OPTIONAL_TOKEN_FIELDS}.items():
+        if source not in value:
+            continue
+        count = value[source]
+        if type(count) is not int or not 0 <= count < 2**63:
+            return None
+        result[target] = count
+    if previous is not None and any(key not in result or result[key] < count for key, count in previous.items()):
+        return None
+    return result
 
 
 def _identifier(value):
@@ -88,6 +123,7 @@ class AppServerProtocol:
         self.ack_control = ack_control
         self.thread_id = self.turn_id = None
         self.terminal = self.output = self.usage = None
+        self.model_reported = self.model_reported_source = None
         self.pending = {}
         self.unsettled_controls = set()
         self.sent_controls = set()
@@ -100,6 +136,16 @@ class AppServerProtocol:
 
     def progress(self, phase, **details):
         self.event("runtime_progress", {"phase": phase, **details})
+
+    def observe(self):
+        self.event("runtime_observation", {
+            "model_reported": self.model_reported,
+            "model_reported_source": self.model_reported_source,
+            "thread_id": self.thread_id, "turn_id": self.turn_id,
+            "usage": dict(self.usage) if self.usage is not None else None,
+            "usage_source": "thread/tokenUsage/updated" if self.usage is not None else None,
+            "usage_scope": "fresh_thread_total" if self.usage is not None else None,
+        })
 
     def request(self, method, params, control_id=None):
         self.sequence += 1
@@ -173,6 +219,10 @@ class AppServerProtocol:
                 raise ProtocolError("invalid thread")
             self.thread_id = _identifier(thread.get("id"))
             self.event("runtime_thread", {"thread_id": self.thread_id})
+            model = _reported_model(result.get("model"))
+            if model is not None:
+                self.model_reported, self.model_reported_source = model, "thread/start"
+                self.observe()
             self.request("turn/start", {"threadId": self.thread_id, "cwd": self.cwd,
                                         "input": [{"type": "text", "text": self.prompt}]})
         elif method == "turn/start":
@@ -184,6 +234,8 @@ class AppServerProtocol:
                     or result.get("threadId", self.thread_id) != self.thread_id):
                 raise ProtocolError("turn scope mismatch")
             self.progress("turn_started", turn_id=self.turn_id)
+            if self.model_reported is not None:
+                self.observe()
             candidates, self.candidates = self.candidates, []
             for name, params in candidates:
                 self._notification(name, params)
@@ -217,6 +269,10 @@ class AppServerProtocol:
         # rejecting a request does not adopt its unconfirmed turn as our own.
         self.send({"id": identifier, "result": denial})
         self.progress("native_request_denied", method=method)
+        self.event("runtime_native_request_denied", {
+            "method": method, "reason": "runtime_text_only",
+            "thread_id": self.thread_id, "turn_id": self.turn_id,
+        })
 
     def _notification(self, method, params):
         if params.get("threadId") != self.thread_id or self.thread_id is None:
@@ -242,6 +298,17 @@ class AppServerProtocol:
         elif self.terminal is not None:
             if method == "error" or method in ("item/started", "item/completed", "turn/started"):
                 raise ProtocolError("event after terminal")
+        elif method == "model/rerouted":
+            model = _reported_model(params.get("toModel"))
+            if model is not None and (model, "model/rerouted") != (self.model_reported, self.model_reported_source):
+                self.model_reported, self.model_reported_source = model, "model/rerouted"
+                self.observe()
+        elif method == "thread/tokenUsage/updated":
+            token_usage = params.get("tokenUsage")
+            usage = _usage_snapshot(token_usage.get("total"), self.usage) if isinstance(token_usage, dict) else None
+            if usage is not None and usage != self.usage:
+                self.usage = usage
+                self.observe()
         elif method in ("item/started", "item/completed"):
             item = params.get("item")
             if not isinstance(item, dict) or item.get("type") not in {"agentMessage", "userMessage", "reasoning", "plan"}:
@@ -525,6 +592,10 @@ def supervise_app_server(argv, prompt, cwd, env, timeout_seconds, heartbeat, on_
     return {"outcome": outcome, "output": protocol.output if protocol is not None and outcome == "succeeded" else None,
             "thread_id": protocol.thread_id if protocol is not None else None,
             "turn_id": protocol.turn_id if protocol is not None else None,
-            "usage": protocol.usage if protocol is not None and outcome == "succeeded" else None,
+            "usage": protocol.usage if protocol is not None else None,
+            "usage_source": "thread/tokenUsage/updated" if protocol is not None and protocol.usage is not None else None,
+            "usage_scope": "fresh_thread_total" if protocol is not None and protocol.usage is not None else None,
+            "model_reported": protocol.model_reported if protocol is not None else None,
+            "model_reported_source": protocol.model_reported_source if protocol is not None else None,
             "returncode": process.returncode if process is not None else None,
             "termination_confirmed": termination_confirmed, "controlled_shutdown": controlled_shutdown}

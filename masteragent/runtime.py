@@ -32,6 +32,9 @@ def _validated_outcome(value, runtime="codex-exec"):
     if app_server:
         invalid.update(turn_id=None, controlled_shutdown=False)
         fields = set(invalid)
+    optional = {"model_reported": None, "model_reported_source": None,
+                "usage_source": None, "usage_scope": None} if app_server else {}
+    invalid.update(optional)
     if not isinstance(value, dict) or not fields <= value.keys():
         return invalid
     if (value["outcome"] not in {"succeeded", "failed", "launch_failed", "timed_out", "cancelled",
@@ -44,9 +47,27 @@ def _validated_outcome(value, runtime="codex-exec"):
         return invalid
     usage = value["usage"]
     if usage is not None and (not isinstance(usage, dict) or len(usage) > 16
-            or any(not isinstance(key, str) or len(key) > 80 or type(count) is not int or count < 0
+            or any(not isinstance(key, str) or len(key) > 80 or type(count) is not int or not 0 <= count < 2**63
                    for key, count in usage.items())):
         return invalid
+    if app_server:
+        from .codex_app_server import _reported_model, _TOKEN_FIELDS, _OPTIONAL_TOKEN_FIELDS
+        optional = {key: value.get(key) for key in optional}
+        model, source = optional["model_reported"], optional["model_reported_source"]
+        if ((model is None and source is not None)
+                or (model is not None and (_reported_model(model) is None
+                    or source not in {"thread/start", "model/rerouted"}
+                    or value["thread_id"] is None or (source == "model/rerouted" and value.get("turn_id") is None)))):
+            return invalid
+        usage_source, usage_scope = optional["usage_source"], optional["usage_scope"]
+        if ((usage_source, usage_scope) not in ((None, None), ("thread/tokenUsage/updated", "fresh_thread_total"))
+                or (usage is None and usage_source is not None)):
+            return invalid
+        if usage_source is not None and (
+                value["thread_id"] is None or value.get("turn_id") is None
+                or not set(_TOKEN_FIELDS.values()) <= usage.keys()
+                or not usage.keys() <= set(_TOKEN_FIELDS.values()) | set(_OPTIONAL_TOKEN_FIELDS.values())):
+            return invalid
     if app_server and (type(value["controlled_shutdown"]) is not bool
             or (value["turn_id"] is not None and (not isinstance(value["turn_id"], str)
                 or not 0 < len(value["turn_id"]) <= 200))):
@@ -58,7 +79,7 @@ def _validated_outcome(value, runtime="codex-exec"):
     if app_server and value["outcome"] == "succeeded" and (
             not value["turn_id"] or not value["controlled_shutdown"]):
         return invalid
-    return {key: value[key] for key in fields}
+    return {**{key: value[key] for key in fields}, **optional}
 
 
 def prepare_deployment(platform, config, bind=False):
@@ -251,7 +272,9 @@ class CodexRunner:
                     "usage": outcome["usage"], "model_requested": config.model, "model_observed": None}
         result = None
         if config.runtime == "codex-app-server":
-            metadata.update(turn_id=outcome["turn_id"], controlled_shutdown=outcome["controlled_shutdown"])
+            metadata.update(turn_id=outcome["turn_id"], controlled_shutdown=outcome["controlled_shutdown"],
+                            model_reported=outcome["model_reported"], model_reported_source=outcome["model_reported_source"],
+                            usage_source=outcome["usage_source"], usage_scope=outcome["usage_scope"])
         try:
             event("runtime_stopped", metadata)
             if outcome["termination_confirmed"] and outcome["outcome"] in ("succeeded", "failed", "launch_failed"):

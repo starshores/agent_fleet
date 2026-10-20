@@ -18,6 +18,11 @@ def message(text="synthetic final", turn="turn-a", thread="thread-a", phase="fin
                  item={"id": "item-a", "type": "agentMessage", "phase": phase, "text": text})
 
 
+def usage(total=30, **changes):
+    return {"inputTokens": 20, "cachedInputTokens": 4, "outputTokens": 10,
+            "reasoningOutputTokens": 3, "totalTokens": total, **changes}
+
+
 class AppServerProtocolTests(unittest.TestCase):
     def setUp(self):
         self.sent, self.events, self.acks = [], [], []
@@ -28,13 +33,13 @@ class AppServerProtocolTests(unittest.TestCase):
     def reply(self, result, identifier=None):
         self.protocol.accept({"id": identifier or self.sent[-1]["id"], "result": result})
 
-    def start(self, bind=True):
+    def start(self, bind=True, **thread_response):
         self.protocol.start()
         self.assertEqual("initialize", self.sent[-1]["method"])
         self.reply({})
         self.assertEqual("initialized", self.sent[-2]["method"])
         self.assertEqual("thread/start", self.sent[-1]["method"])
-        self.reply({"thread": {"id": "thread-a"}})
+        self.reply({"thread": {"id": "thread-a"}, **thread_response})
         self.assertEqual("turn/start", self.sent[-1]["method"])
         if bind:
             self.reply({"turn": {"id": "turn-a", "status": "inProgress"}})
@@ -189,6 +194,93 @@ class AppServerProtocolTests(unittest.TestCase):
             self.assertEqual({"id": identifier, "result": expected}, self.sent[-1])
         self.assertNotIn("private command", str(self.events))
         self.assertNotIn("private arguments", str(self.events))
+        denials = [detail for kind, detail in self.events if kind == "runtime_native_request_denied"]
+        self.assertEqual(set(cases), {detail["method"] for detail in denials})
+        self.assertTrue(all(detail == {"method": detail["method"], "reason": "runtime_text_only",
+                                     "thread_id": "thread-a", "turn_id": "turn-a"} for detail in denials))
+
+    def test_reported_models_and_fresh_thread_total_are_scoped_snapshots(self):
+        self.start(model="service-selected-model")
+        observations = [detail for kind, detail in self.events if kind == "runtime_observation"]
+        self.assertEqual([None, "turn-a"], [detail["turn_id"] for detail in observations])
+        self.assertIsNone(observations[-1]["usage"])
+        self.assertEqual("thread/start", observations[-1]["model_reported_source"])
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": usage(), "last": usage(2)}))
+        first = self.protocol.usage.copy()
+        self.assertEqual({"input_tokens": 20, "cached_input_tokens": 4, "output_tokens": 10,
+                          "reasoning_output_tokens": 3, "total_tokens": 30}, first)
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": usage(35, outputTokens=15)}))
+        self.assertEqual(35, self.protocol.usage["total_tokens"])
+        self.protocol.accept(event("model/rerouted", fromModel="service-selected-model", toModel="rerouted-model",
+                                   reason="private reason must not be audited"))
+        observed = self.events[-1][1]
+        self.assertEqual("rerouted-model", observed["model_reported"])
+        self.assertEqual("model/rerouted", observed["model_reported_source"])
+        self.assertEqual("thread/tokenUsage/updated", observed["usage_source"])
+        self.assertEqual("fresh_thread_total", observed["usage_scope"])
+        self.assertEqual(35, observed["usage"]["total_tokens"])
+        self.assertNotIn("private reason", str(self.events))
+        self.assertNotIn("model_observed", observed)
+
+    def test_observations_before_turn_response_wait_for_confirmed_scope(self):
+        self.start(bind=False, model="initial-model")
+        request = self.sent[-1]["id"]
+        self.protocol.accept(event("thread/tokenUsage/updated", turn="other", tokenUsage={"total": usage(999)}))
+        self.protocol.accept(event("model/rerouted", turn="other", toModel="wrong-model"))
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": usage()}))
+        self.protocol.accept(event("model/rerouted", toModel="owned-model"))
+        self.assertIsNone(self.protocol.usage)
+        self.assertEqual("initial-model", self.protocol.model_reported)
+        self.reply({"turn": {"id": "turn-a", "status": "inProgress"}}, request)
+        self.assertEqual("owned-model", self.protocol.model_reported)
+        self.assertEqual(30, self.protocol.usage["total_tokens"])
+        self.assertNotIn("wrong-model", str(self.events))
+
+    def test_bad_and_regressing_usage_never_replaces_last_valid_snapshot(self):
+        self.start()
+        valid = usage(cacheWriteInputTokens=2)
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": valid}))
+        previous, count = self.protocol.usage.copy(), len(self.events)
+        bad = [None, [], {}, {**valid, "inputTokens": True}, {**valid, "outputTokens": -1},
+               {**valid, "totalTokens": 2**63}, {**valid, "cachedInputTokens": 3},
+               {**valid, "reasoningOutputTokens": 1.5}, usage(),
+               {key: value for key, value in valid.items() if key != "totalTokens"}]
+        for snapshot in bad:
+            with self.subTest(snapshot=snapshot):
+                self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": snapshot, "last": valid}))
+                self.assertEqual(previous, self.protocol.usage)
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"last": valid}))
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": valid}))
+        self.assertEqual(count, len(self.events))
+        self.protocol.accept(message())
+        self.protocol.accept(completed())
+        self.assertEqual("succeeded", self.protocol.terminal)
+
+    def test_cross_scope_and_post_terminal_observations_do_not_pollute(self):
+        self.start(model="initial-model")
+        for scope in ({"turn": "other"}, {"thread": "other"}):
+            self.protocol.accept(event("model/rerouted", toModel="wrong-model", **scope))
+            self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": usage()}, **scope))
+        for model in (None, "", "bad\nmodel", "x" * 201, " model", "\ud800"):
+            self.protocol.accept(event("model/rerouted", toModel=model))
+        self.assertIsNone(self.protocol.usage)
+        self.assertEqual("initial-model", self.protocol.model_reported)
+        self.protocol.accept(message())
+        self.protocol.accept(completed())
+        count = len(self.events)
+        self.protocol.accept(event("model/rerouted", toModel="late-model"))
+        self.protocol.accept(event("thread/tokenUsage/updated", tokenUsage={"total": usage()}))
+        self.assertEqual(count, len(self.events))
+        self.assertIsNone(self.protocol.usage)
+        self.assertEqual("initial-model", self.protocol.model_reported)
+
+    def test_missing_or_invalid_thread_model_is_unknown(self):
+        for model in (None, "", " model", True, "bad\x7fmodel"):
+            self.setUp()
+            self.start(model=model)
+            self.assertIsNone(self.protocol.model_reported)
+            self.assertIsNone(self.protocol.model_reported_source)
+            self.assertFalse(any(kind == "runtime_observation" for kind, _ in self.events))
 
     def test_server_request_id_does_not_alias_client_response_id(self):
         self.start()

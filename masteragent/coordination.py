@@ -140,7 +140,8 @@ class CoordinationMixin:
             return "waiting"
         return "queued"
 
-    def answer_decision(self, installation_id, decision_id, expected_revision, choice, answer_id):
+    def answer_decision(self, installation_id, decision_id, expected_revision, choice, answer_id, *,
+                        expected_generation=None, expected_task_id=None):
         if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision < 0:
             raise PlatformError("invalid_revision", "A decision revision must be a nonnegative integer.")
         if choice not in ("approve", "reject"):
@@ -148,10 +149,12 @@ class CoordinationMixin:
         _text(answer_id, "invalid_answer_id", "Answer identifiers must be nonempty strings up to 200 characters.")
         with self._db(write=True) as db:
             installation = self._installation(db, installation_id, active=True)
+            self._guard_command_generation(installation, expected_generation)
             decision = db.execute("SELECT * FROM decisions WHERE installation_id=? AND decision_id=?",
                                   (installation_id, decision_id)).fetchone()
             if decision is None:
                 raise PlatformError("decision_scope", "This decision does not belong to this installation.")
+            self._guard_command_task(db, installation, decision["task_id"], expected_task_id)
             if decision["generation"] != installation["generation"]:
                 raise PlatformError("stale_decision", "This decision belongs to an earlier activation.")
             task = db.execute("SELECT * FROM tasks WHERE task_id=?", (decision["task_id"],)).fetchone()

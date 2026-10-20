@@ -6,14 +6,19 @@ from datetime import datetime, timezone
 import json
 import hashlib
 from pathlib import Path
+import re
 import sqlite3
+import time
 import uuid
 
 from .errors import PlatformError
 from .paths import prepare_state_root, _explicit_path
+from .routing_schema import (ROUTING_COLUMNS, ROUTING_SCHEMA, ROUTING_INDEXES,
+                             V5_ROUTING_COLUMNS, V5_ROUTING_SCHEMA)
+from .delivery_schema import DELIVERY_COLUMNS, DELIVERY_SCHEMA, DELIVERY_INDEXES
 
 APPLICATION_ID = 0x4D413330
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 V1_COLUMNS = {
     "installations": ("installation_id", "package_id", "version", "digest", "snapshot", "snapshot_digest", "workspace", "state", "generation", "installed_at"),
@@ -40,12 +45,14 @@ V3_COLUMNS = {**V2_COLUMNS,
     "attempt_inputs": ("input_id", "installation_id", "role_id", "generation", "attempt_id",
                        "sequence", "request_id", "text", "state", "created_at", "updated_at"),
 }
-COLUMNS = {**V3_COLUMNS,
+V4_COLUMNS = {**V3_COLUMNS,
     "member_sessions": ("member_id", "installation_id", "role_id", "generation", "owner_hash",
                         "lease_hash", "deployment_digest", "tool_id", "state", "expires_at",
                         "started_at", "updated_at", "stop_reason"),
     "attempt_members": ("attempt_id", "member_id"),
 }
+V5_COLUMNS = {**V4_COLUMNS, **V5_ROUTING_COLUMNS, **DELIVERY_COLUMNS}
+COLUMNS = {**V4_COLUMNS, **ROUTING_COLUMNS, **DELIVERY_COLUMNS}
 
 SCHEMA = {
     "installations": """CREATE TABLE installations (
@@ -146,12 +153,26 @@ SCHEMA.update({
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
         UNIQUE(attempt_id,sequence), UNIQUE(installation_id,generation,request_id))""",
 })
-INDEXES = {
+V4_SCHEMA = dict(SCHEMA)
+V5_SCHEMA = {**V4_SCHEMA, **V5_ROUTING_SCHEMA, **DELIVERY_SCHEMA}
+SCHEMA.update(ROUTING_SCHEMA)
+SCHEMA.update(DELIVERY_SCHEMA)
+V4_INDEXES = {
     "one_active": "CREATE UNIQUE INDEX one_active ON installations(state) WHERE state='active'",
     "one_running_attempt": "CREATE UNIQUE INDEX one_running_attempt ON attempts(task_id) WHERE state='running'",
     "unique_decision_answer": "CREATE UNIQUE INDEX unique_decision_answer ON decisions(installation_id,answer_id) WHERE answer_id IS NOT NULL",
     "one_live_member": "CREATE UNIQUE INDEX one_live_member ON member_sessions(installation_id,role_id) WHERE state IN ('ready','waiting','busy','stopping')",
 }
+INDEXES = {**V4_INDEXES, **ROUTING_INDEXES, **DELIVERY_INDEXES}
+
+
+def _normalize_schema_sql(value: str) -> str:
+    # SQLite may quote a renamed table and reformat ALTER TABLE output. Ignore
+    # those differences while retaining every constraint and identifier.
+    parts = re.split(r"('(?:[^']|'')*')", value)
+    return "".join(part if index % 2 else re.sub(
+        r"\s+", "", re.sub(r"\bif\s+not\s+exists\b", "", part.lower().replace('"', "")))
+        for index, part in enumerate(parts))
 
 
 def check_journal_mode(path: Path) -> None:
@@ -166,19 +187,35 @@ def verify_schema(db: sqlite3.Connection, version: int = SCHEMA_VERSION) -> None
     if db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
         raise PlatformError("unsupported_schema", "This is not a MasterAgent database.")
     actual_version = db.execute("PRAGMA user_version").fetchone()[0]
-    if actual_version in (1, 2, 3) and version == SCHEMA_VERSION:
+    if actual_version in (1, 2, 3, 4, 5) and version == SCHEMA_VERSION:
         raise PlatformError("migration_required", "Older state requires the explicit migrate command; it will preserve a backup.")
     if actual_version != version:
         raise PlatformError("unsupported_schema", "The platform database version is not supported.")
-    columns = {1: V1_COLUMNS, 2: V2_COLUMNS, 3: V3_COLUMNS, 4: COLUMNS}[version]
+    columns = {1: V1_COLUMNS, 2: V2_COLUMNS, 3: V3_COLUMNS, 4: V4_COLUMNS,
+               5: V5_COLUMNS, 6: COLUMNS}[version]
     tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
     if tables != set(columns):
         raise PlatformError("schema_corrupt", "The platform database tables are incomplete or unexpected.")
+    if version >= 4 and db.execute("SELECT 1 FROM sqlite_master WHERE type IN ('trigger','view')").fetchone():
+        raise PlatformError("schema_corrupt", "Unexpected executable schema objects are not supported.")
+    if version >= 4:
+        expected_indexes = V4_INDEXES if version == 4 else INDEXES
+        actual_indexes = {row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'")}
+        if actual_indexes != set(expected_indexes):
+            raise PlatformError("schema_corrupt", "The platform database indexes are incomplete or unexpected.")
     for table, expected in columns.items():
         actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
         if actual != expected:
             raise PlatformError("schema_corrupt", "The platform database columns are incompatible.")
+        if version >= 4:
+            actual_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()[0]
+            expected_schema = V4_SCHEMA if version == 4 else V5_SCHEMA if version == 5 else SCHEMA
+            if _normalize_schema_sql(actual_sql) != _normalize_schema_sql(expected_schema[table]):
+                raise PlatformError("schema_corrupt", "A table definition or constraint is incompatible.")
     for name, sql in INDEXES.items():
+        if version < 5 and name not in V4_INDEXES:
+            continue
         if version < 4 and name == "one_live_member":
             continue
         if version == 1 and name != "one_active":
@@ -240,7 +277,7 @@ class StorageMixin:
 
 
 def migrate_state(state_root: str | Path) -> dict:
-    """Upgrade an explicitly selected v1/v2/v3 database, preserving a backup.
+    """Upgrade an explicitly selected v1/v2/v3/v4/v5 database, preserving a backup.
 
 Readers do not migrate. A write reservation blocks other writers while a second
 read connection takes a consistent backup; schema/data changes commit together.
@@ -263,12 +300,23 @@ read connection takes a consistent backup; schema/data changes commit together.
             verify_schema(db)
             db.commit()
             return {"migrated": False, "schema_version": SCHEMA_VERSION, "backup_path": None}
-        if version not in (1, 2, 3):
-            raise PlatformError("unsupported_schema", "Only schema 1, 2 or 3 can be explicitly upgraded.")
+        if version not in (1, 2, 3, 4, 5):
+            raise PlatformError("unsupported_schema", "Only schema 1, 2, 3, 4 or 5 can be explicitly upgraded.")
         verify_schema(db, version=version)
-        if version in (2, 3) and (db.execute("SELECT 1 FROM attempts WHERE state='running'").fetchone()
+        if version >= 2 and (db.execute("SELECT 1 FROM attempts WHERE state='running'").fetchone()
                              or db.execute("SELECT 1 FROM tasks WHERE state='running'").fetchone()):
             raise PlatformError("migration_busy", "Resolve active executions with the previous version before migration.")
+        if version >= 3 and db.execute("SELECT 1 FROM attempt_inputs WHERE state IN ('pending','sending','held')").fetchone():
+            raise PlatformError("migration_busy", "Reconcile unresolved execution inputs with the previous version before migration.")
+        if version >= 4 and db.execute("SELECT 1 FROM member_sessions WHERE state IN ('ready','waiting','busy','stopping')").fetchone():
+            raise PlatformError("migration_busy", "Confirm live members have stopped with the previous version before migration; lease expiry is not exit evidence.")
+        if version >= 5:
+            if db.execute("SELECT 1 FROM source_claims WHERE expires_at>?", (time.time(),)).fetchone():
+                raise PlatformError("migration_busy", "Stop source transports and let their leases expire before migration.")
+            if db.execute("SELECT 1 FROM legacy_claims WHERE state IN ('running','held')").fetchone():
+                raise PlatformError("migration_busy", "Reconcile legacy executions with the previous version before migration; expiry is not completion.")
+            if db.execute("SELECT 1 FROM result_deliveries WHERE state IN ('claimed','sending','held')").fetchone():
+                raise PlatformError("migration_busy", "Reconcile in-flight or uncertain deliveries with the previous version before migration.")
         backups = _explicit_path(root / "backups")
         backups.mkdir(exist_ok=True)
         backup_path = backups / ("schema" + str(version) + "-" + uuid.uuid4().hex + ".sqlite3")
@@ -291,7 +339,7 @@ read connection takes a consistent backup; schema/data changes commit together.
             for table, statement in SCHEMA.items():
                 if table in V2_COLUMNS and table not in V1_COLUMNS:
                     db.execute(statement)
-            for name, statement in INDEXES.items():
+            for name, statement in V4_INDEXES.items():
                 if name not in ("one_active", "one_live_member"):
                     db.execute(statement)
             for task in db.execute("SELECT task_id,installation_id FROM tasks WHERE state='needs_reconcile'").fetchall():
@@ -323,9 +371,18 @@ read connection takes a consistent backup; schema/data changes commit together.
                 for role_id in names:
                     db.execute("INSERT INTO role_deployments VALUES (?,?,?,?,?)", (
                         installation["installation_id"], role_id, installation["workspace"], "none", timestamp))
-        for table in ("member_sessions", "attempt_members"):
-            db.execute(SCHEMA[table])
-        db.execute(INDEXES["one_live_member"])
+        if version < 4:
+            for table in ("member_sessions", "attempt_members"):
+                db.execute(SCHEMA[table])
+            db.execute(INDEXES["one_live_member"])
+        if version < 5:
+            for statement in (*ROUTING_SCHEMA.values(), *DELIVERY_SCHEMA.values(),
+                              *ROUTING_INDEXES.values(), *DELIVERY_INDEXES.values()):
+                db.execute(statement)
+        else:
+            # Old admissions and pending deliveries retain their original
+            # provenance. Migration must never manufacture endpoint evidence.
+            db.execute(SCHEMA["route_endpoints"])
         db.execute("DELETE FROM actor_tokens")
         db.execute("INSERT INTO migration_log VALUES (?,?,?,?)", (SCHEMA_VERSION, version, timestamp, str(backup_path)))
         db.execute(f"PRAGMA user_version={SCHEMA_VERSION}")

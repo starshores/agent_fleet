@@ -46,12 +46,23 @@ for line in sys.stdin:
     if method == 'initialize':
         reply(message, {})
     elif method == 'thread/start':
-        reply(message, {'thread':{'id':'thread-a'}})
+        result = {'thread':{'id':'thread-a'}}
+        if mode.startswith('observed_'):
+            result['model'] = 'synthetic-reported-model'
+        reply(message, result)
     elif method == 'turn/start':
         assert message['params']['input'][0]['text'] == 'synthetic prompt'
         if mode == 'early':
             final()
         reply(message, {'turn':{'id':'turn-a','status':'inProgress'}})
+        if mode.startswith('observed_'):
+            send({'method':'thread/tokenUsage/updated','params':{'threadId':'thread-a','turnId':'turn-a',
+                  'tokenUsage':{'total':{'inputTokens':20,'cachedInputTokens':4,'outputTokens':10,
+                    'reasoningOutputTokens':3,'totalTokens':30}}}})
+            if mode == 'observed_success':
+                final()
+            elif mode == 'observed_exit':
+                os._exit(7)
         if mode in ('normal','bad_exit','stubborn','eof_exit'):
             final()
         elif mode == 'failed':
@@ -146,6 +157,18 @@ class AppServerProcessTests(unittest.TestCase):
         self.assert_outcome("succeeded", result)
         self.assertTrue(any(details.get("phase") == "native_request_denied" for _, details in self.events))
         self.assertNotIn("private command", json.dumps([result, self.events]))
+
+    def test_observed_usage_survives_success_timeout_and_unexpected_exit(self):
+        for mode, outcome in (("observed_success", "succeeded"), ("observed_wait", "timed_out"),
+                              ("observed_exit", "interrupted")):
+            with self.subTest(mode=mode):
+                result = self.run_server(mode, timeout_seconds=1)
+                self.assert_outcome(outcome, result)
+                self.assertEqual("synthetic-reported-model", result["model_reported"])
+                self.assertEqual("thread/start", result["model_reported_source"])
+                self.assertEqual(30, result["usage"]["total_tokens"])
+                self.assertEqual("thread/tokenUsage/updated", result["usage_source"])
+                self.assertEqual("fresh_thread_total", result["usage_scope"])
 
     def test_steer_is_sent_while_turn_is_running_and_acknowledged(self):
         result = self.run_server("steer", controls=self.controls, ack_control=self.ack)

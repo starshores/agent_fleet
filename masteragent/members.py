@@ -181,8 +181,14 @@ class MemberMixin:
             installation = self._actor(db, actor)
             row = self._member_credentials(db, actor, member_id, member_token)
             self._guard_member_claim(db, actor.installation_id, actor.role_id, member_id)
-            task = db.execute("""SELECT * FROM tasks WHERE installation_id=? AND role_id=?
-                AND dispatch_generation=? AND state='queued' ORDER BY rowid LIMIT 1""",
+            task = db.execute("""SELECT t.* FROM tasks t
+                LEFT JOIN source_admissions a ON a.task_id=t.task_id
+                LEFT JOIN routes r ON r.route_id=a.route_id
+                WHERE t.installation_id=? AND t.role_id=?
+                AND t.dispatch_generation=? AND t.state='queued'
+                AND (a.admission_id IS NULL OR (a.owner_lane='v3' AND r.claim_open=1
+                    AND a.installation_id=t.installation_id AND a.role_id=t.role_id))
+                ORDER BY t.rowid LIMIT 1""",
                 (actor.installation_id, actor.role_id, actor.generation)).fetchone()
             if task is None:
                 if row["state"] == "busy":

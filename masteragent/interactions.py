@@ -44,7 +44,8 @@ class RuntimeInteractionMixin:
                        "sequence": row["sequence"], "state": row["state"]},
                       kind + ":" + row["input_id"])
 
-    def submit_runtime_input(self, installation_id, attempt_id, text, request_id):
+    def submit_runtime_input(self, installation_id, attempt_id, text, request_id, *,
+                             expected_generation=None, expected_task_id=None):
         """Persist one immutable supplement for this attempt, never an approval."""
         if not isinstance(text, str) or not text.strip():
             raise PlatformError("invalid_runtime_input", "Runtime input must contain nonempty text.")
@@ -58,9 +59,11 @@ class RuntimeInteractionMixin:
             raise PlatformError("invalid_request_id", "Input request identifiers must be nonempty and at most 200 characters.")
         with self._db(write=True) as db:
             installation = self._installation(db, installation_id, active=True)
+            self._guard_command_generation(installation, expected_generation)
             attempt = self._attempt(db, attempt_id)
             if attempt["installation_id"] != installation_id:
                 raise PlatformError("attempt_scope", "This attempt belongs to another installation.")
+            self._guard_command_task(db, installation, attempt["task_id"], expected_task_id)
             if attempt["generation"] != installation["generation"]:
                 raise PlatformError("stale_attempt", "Runtime input belongs to an earlier activation.")
             previous = db.execute("""SELECT * FROM attempt_inputs WHERE installation_id=?
@@ -72,6 +75,10 @@ class RuntimeInteractionMixin:
                 # Exact retries acknowledge the persisted record, even if the
                 # attempt has since ended. They never requeue or send it again.
                 return dict(previous)
+            if expected_generation is not None and db.execute("""SELECT 1 FROM attempt_events
+                    WHERE attempt_id=? AND kind IN ('runtime_cancel_requested','runtime_stopped')""",
+                    (attempt_id,)).fetchone():
+                raise PlatformError("runtime_stopping", "This runtime is stopping or stopped; it cannot accept new input.")
             self._runtime_input_live(db, attempt)
             sequence = db.execute("SELECT COALESCE(MAX(sequence),0)+1 FROM attempt_inputs WHERE attempt_id=?",
                                   (attempt_id,)).fetchone()[0]

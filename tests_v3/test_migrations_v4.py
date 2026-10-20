@@ -47,7 +47,7 @@ class SchemaFourMigrationTests(unittest.TestCase):
                            (task + "-attempt", task, "a", attempt_state))
                 db.execute("INSERT INTO attempt_inputs VALUES (?,?,'worker',1,?,1,?,?,?,'before','finished')", (
                     task + "-input", "a", task + "-attempt", task + "-input-request", "synthetic input " + task,
-                    "accepted" if status == "completed" else "held"))
+                    "accepted"))
             db.execute("INSERT INTO results VALUES ('done','a','worker',1,'text','synthetic output','ok',NULL,'finished','done-attempt')")
             db.execute("INSERT INTO outbox VALUES ('event','a',1,'held','worker','runtime_input_held','{}','held-input','pending','before',NULL)")
             db.execute("INSERT INTO migration_log VALUES (3,2,'before','synthetic-previous-backup')")
@@ -84,7 +84,7 @@ class SchemaFourMigrationTests(unittest.TestCase):
     def test_upgrade_preserves_deployments_inputs_and_history_and_revokes_tokens(self):
         before = self.rows()
         result = storage.migrate_state(self.state)
-        self.assertEqual(result["schema_version"], 4)
+        self.assertEqual(result["schema_version"], storage.SCHEMA_VERSION)
         self.assertTrue(result["tokens_revoked"])
         backup = Path(result["backup_path"])
         self.assertEqual(self.rows(backup), before)
@@ -96,7 +96,7 @@ class SchemaFourMigrationTests(unittest.TestCase):
                 self.assertEqual(after[table], values, table)
         self.assertEqual(after["actor_tokens"], [])
         self.assertEqual(after["migration_log"][:-1], before["migration_log"])
-        self.assertEqual(after["migration_log"][-1][:2], (4, 3))
+        self.assertEqual(after["migration_log"][-1][:2], (storage.SCHEMA_VERSION, 3))
         self.assertEqual(after["member_sessions"], [])
         self.assertEqual(after["attempt_members"], [])
         with closing(sqlite3.connect(self.database)) as db:
@@ -120,6 +120,17 @@ class SchemaFourMigrationTests(unittest.TestCase):
         self.assert_code("migration_busy", storage.migrate_state, self.state)
         self.assertEqual(before, self.snapshot())
 
+    def test_unresolved_input_refuses_before_backup_in_every_unconfirmed_state(self):
+        for state in ("pending", "sending", "held"):
+            with self.subTest(state=state):
+                with closing(sqlite3.connect(self.database)) as db:
+                    db.execute("UPDATE attempt_inputs SET state=? WHERE input_id='held-input'", (state,))
+                    db.commit()
+                before = self.snapshot()
+                self.assert_code("migration_busy", storage.migrate_state, self.state)
+                self.assertEqual(before, self.snapshot())
+                self.assertFalse((self.state / "backups").exists())
+
     def test_invalid_input_reference_rolls_back_and_keeps_schema_three_backup(self):
         with closing(sqlite3.connect(self.database)) as db:
             db.execute("UPDATE attempt_inputs SET attempt_id='missing' WHERE input_id='done-input'")
@@ -134,9 +145,9 @@ class SchemaFourMigrationTests(unittest.TestCase):
     def test_late_failure_rolls_back_tables_index_tokens_and_version(self):
         before = self.database.read_bytes()
         original = storage.verify_schema
-        def fail(db, version=4):
-            if version == 4:
-                self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 4)
+        def fail(db, version=storage.SCHEMA_VERSION):
+            if version == storage.SCHEMA_VERSION:
+                self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], storage.SCHEMA_VERSION)
                 self.assertEqual(db.execute("SELECT count(*) FROM actor_tokens").fetchone()[0], 0)
                 raise RuntimeError("synthetic late failure")
             return original(db, version)
@@ -158,7 +169,7 @@ class SchemaFourMigrationTests(unittest.TestCase):
         storage.migrate_state(self.state)
         before = self.snapshot()
         self.assertEqual(storage.migrate_state(self.state),
-                         {"migrated": False, "schema_version": 4, "backup_path": None})
+                         {"migrated": False, "schema_version": storage.SCHEMA_VERSION, "backup_path": None})
         self.assertEqual(before, self.snapshot())
 
 

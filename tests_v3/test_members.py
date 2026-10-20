@@ -283,11 +283,23 @@ class MemberTests(unittest.TestCase):
     def test_claim_transaction_rollback_cannot_leave_unattached_running_attempt(self):
         member = self.start()
         task = self.platform.submit("a", "worker", "synthetic")
-        with self.platform._db(write=True) as db:
-            db.execute("""CREATE TRIGGER synthetic_claim_failure BEFORE INSERT ON attempt_members
-                BEGIN SELECT RAISE(ABORT, 'synthetic membership insert failure'); END""")
-        with self.assertRaisesRegex(sqlite3.IntegrityError, "membership insert failure"):
-            self.claim(member)
+        connect, observer = sqlite3.connect, self
+        class FailingMembershipConnection(sqlite3.Connection):
+            def execute(self, sql, parameters=()):
+                if sql == "INSERT INTO attempt_members VALUES (?,?)":
+                    # Inject at the actual membership write after the normal
+                    # claim mutations, without changing the persisted schema.
+                    observer.assertEqual(super().execute(
+                        "SELECT state FROM attempts WHERE attempt_id=?", (parameters[0],)).fetchone()[0], "running")
+                    observer.assertEqual(super().execute(
+                        "SELECT state FROM tasks WHERE task_id=?", (task["task_id"],)).fetchone()[0], "running")
+                    raise sqlite3.IntegrityError("synthetic membership insert failure")
+                return super().execute(sql, parameters)
+        def connect_with_failure(*args, **kwargs):
+            return connect(*args, factory=FailingMembershipConnection, **kwargs)
+        with patch("masteragent.storage.sqlite3.connect", side_effect=connect_with_failure):
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "membership insert failure"):
+                self.claim(member)
         self.assertEqual(self.status(member)["state"], "ready")
         self.assertEqual(self.platform.task_for(self.actor, task["task_id"])["state"], "queued")
         self.assertEqual(self.platform.attempts("a"), [])

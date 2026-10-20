@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from masteragent.errors import PlatformError
-from masteragent.runtime import CodexRunner, prepare_deployment, probe_runtime
+from masteragent.runtime import CodexRunner, _validated_outcome, prepare_deployment, probe_runtime
 from masteragent.runtime_config import RuntimeConfig, build_argv, prepare_runtime_home
 from masteragent.service import Platform
 
@@ -107,6 +107,50 @@ class AppServerRunnerTests(unittest.TestCase):
         result = self.execute(lambda *args, **kwargs: self.outcome(controlled_shutdown=False))
         self.assertEqual(result["task_state"], "needs_reconcile")
         self.assertEqual(self.platform.results("a"), [])
+
+    def test_observations_persist_on_interrupted_execution_without_claiming_actual_model(self):
+        observation = {"model_reported": "service-reported-model", "model_reported_source": "model/rerouted",
+                       "thread_id": "synthetic-thread", "turn_id": "synthetic-turn",
+                       "usage": {"input_tokens": 20, "cached_input_tokens": 4, "output_tokens": 10,
+                                 "reasoning_output_tokens": 3, "total_tokens": 30},
+                       "usage_source": "thread/tokenUsage/updated", "usage_scope": "fresh_thread_total"}
+        def supervisor(argv, prompt, cwd, env, timeout, heartbeat, event, **callbacks):
+            event("runtime_observation", observation)
+            event("runtime_native_request_denied", {"method": "item/fileChange/requestApproval",
+                  "reason": "runtime_text_only", "thread_id": "synthetic-thread", "turn_id": "synthetic-turn"})
+            return self.outcome(outcome="interrupted", output=None, **observation)
+        result = self.execute(supervisor)
+        self.assertEqual("needs_reconcile", result["task_state"])
+        self.assertIsNone(result["model_observed"])
+        self.assertEqual("synthetic-model", result["model_requested"])
+        self.assertEqual("service-reported-model", result["model_reported"])
+        events = self.platform.history("a")["attempt_events"]
+        self.assertEqual(observation, next(row["detail"] for row in events if row["kind"] == "runtime_observation"))
+        stopped = next(row["detail"] for row in events if row["kind"] == "runtime_stopped")
+        self.assertEqual(observation["usage"], stopped["usage"])
+        self.assertEqual("model/rerouted", stopped["model_reported_source"])
+        self.assertEqual([], self.platform.results("a"))
+
+    def test_optional_observation_fields_keep_old_supervisors_compatible(self):
+        outcome = _validated_outcome(self.outcome(), "codex-app-server")
+        self.assertEqual("succeeded", outcome["outcome"])
+        for field in ("model_reported", "model_reported_source", "usage_source", "usage_scope"):
+            self.assertIsNone(outcome[field])
+
+    def test_invalid_observation_sources_and_counts_cannot_be_published(self):
+        for changes in ({"model_reported": "model", "model_reported_source": "requested"},
+                        {"model_reported_source": "thread/start"},
+                        {"model_reported": "bad\nmodel", "model_reported_source": "thread/start"},
+                        {"usage": {"input_tokens": True}}, {"usage": {"input_tokens": 2**63}},
+                        {"usage_source": "thread/tokenUsage/updated", "usage_scope": "fresh_thread_total"},
+                        {"usage": {"input_tokens": 1}, "usage_source": "thread/tokenUsage/updated",
+                         "usage_scope": "fresh_thread_total"},
+                        {"model_reported": "model", "model_reported_source": "model/rerouted", "turn_id": None},
+                        {"usage": {"input_tokens": 1}, "usage_source": "last", "usage_scope": "fresh_thread_total"}):
+            with self.subTest(changes=changes):
+                outcome = _validated_outcome(self.outcome(**changes), "codex-app-server")
+                self.assertEqual("protocol_error", outcome["outcome"])
+                self.assertIsNone(outcome["model_reported"])
 
     def test_history_home_must_exclude_every_role_workspace(self):
         config = replace(self.config, codex_home=self.root / "a-assistant")
