@@ -1,0 +1,1140 @@
+{
+  "root": "C:\\Users\\<用户>\\Documents\\Codex\\2026-10-08\\c-apphome-agent-fleet-docs-prompts",
+  "mode": "metadata_only_no_contents_read",
+  "scope": [
+    "outputs",
+    "work"
+  ],
+  "limitations": [
+    "No symlink/reparse traversal",
+    "Sensitive/native home/session/history/old bus scopes not traversed",
+    "Counts exclude skipped scopes and are lower bounds",
+    "Directory names only suggest source/state classification; no runtime activity check"
+  ],
+  "work": [
+    {
+      "path": "work/codex-schema",
+      "files": 306,
+      "bytes": 3544690,
+      "directories": 2,
+      "extensions": {
+        ".json": {
+          "files": 306,
+          "bytes": 3544690
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [],
+      "excluded": [
+        {
+          "path": "work/codex-schema/v2/AccountLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 720,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/CancelLoginAccountParams.json",
+          "kind": "file",
+          "bytes": 221,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/CancelLoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 404,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/GatewayOAuthLoginResponse.json",
+          "kind": "file",
+          "bytes": 118,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/LoginAccountParams.json",
+          "kind": "file",
+          "bytes": 4353,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/LoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 2521,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/McpServerOauthLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 630,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/McpServerOauthLoginParams.json",
+          "kind": "file",
+          "bytes": 1003,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/codex-schema/v2/McpServerOauthLoginResponse.json",
+          "kind": "file",
+          "bytes": 514,
+          "reason": "sensitive_filename_metadata_only"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/compat-fixes-20261012",
+      "files": 28,
+      "bytes": 695348,
+      "directories": 7,
+      "extensions": {
+        ".json": {
+          "files": 4,
+          "bytes": 15077
+        },
+        ".cjs": {
+          "files": 1,
+          "bytes": 3418
+        },
+        ".py": {
+          "files": 16,
+          "bytes": 479587
+        },
+        ".diff": {
+          "files": 1,
+          "bytes": 81261
+        },
+        ".js": {
+          "files": 1,
+          "bytes": 28143
+        },
+        ".md": {
+          "files": 5,
+          "bytes": 87862
+        }
+      },
+      "source_candidates": [
+        "work/compat-fixes-20261012/original-source",
+        "work/compat-fixes-20261012/original-source/agent_bus",
+        "work/compat-fixes-20261012/original-source/ui",
+        "work/compat-fixes-20261012/source",
+        "work/compat-fixes-20261012/source/agent_bus",
+        "work/compat-fixes-20261012/source/ui"
+      ],
+      "state_candidates": [],
+      "excluded": [
+        {
+          "path": "work/compat-fixes-20261012/source/.codex",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/compat-fixes-20261012/source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/compat-fixes-20261012/original-source/.codex",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/compat-fixes-20261012/original-source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/master-agent-v3",
+      "files": 145,
+      "bytes": 1896870,
+      "directories": 15,
+      "extensions": {
+        "(no extension)": {
+          "files": 2,
+          "bytes": 3803
+        },
+        ".md": {
+          "files": 52,
+          "bytes": 523539
+        },
+        ".json": {
+          "files": 11,
+          "bytes": 108870
+        },
+        ".py": {
+          "files": 58,
+          "bytes": 933560
+        },
+        ".vbs": {
+          "files": 1,
+          "bytes": 140
+        },
+        ".ps1": {
+          "files": 6,
+          "bytes": 12065
+        },
+        ".pyc": {
+          "files": 13,
+          "bytes": 310210
+        },
+        ".sql": {
+          "files": 1,
+          "bytes": 2489
+        },
+        ".proposed": {
+          "files": 1,
+          "bytes": 2194
+        }
+      },
+      "source_candidates": [
+        "work/master-agent-v3/agent_bus",
+        "work/master-agent-v3/hooks",
+        "work/master-agent-v3/host_config",
+        "work/master-agent-v3/masteragent",
+        "work/master-agent-v3/tests_v3",
+        "work/master-agent-v3/ui"
+      ],
+      "state_candidates": [],
+      "excluded": [
+        {
+          "path": "work/master-agent-v3/.git",
+          "kind": "file",
+          "bytes": 63,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/master-agent-v3/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/master-agent-v3/fork_exchange",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/v3-codex-demo",
+      "files": 6,
+      "bytes": 160775,
+      "directories": 7,
+      "extensions": {
+        ".json": {
+          "files": 2,
+          "bytes": 761
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 159744
+        },
+        "(no extension)": {
+          "files": 1,
+          "bytes": 0
+        },
+        ".bat": {
+          "files": 2,
+          "bytes": 270
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v3-codex-demo/state",
+        "work/v3-codex-demo/state/state.sqlite3"
+      ],
+      "excluded": [
+        {
+          "path": "work/v3-codex-demo/runtime-a-reviewer-generation-1/log/codex-login.log",
+          "kind": "file",
+          "bytes": 80,
+          "reason": "sensitive_filename_metadata_only"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/v3-codex-probe",
+      "files": 6,
+      "bytes": 160777,
+      "directories": 6,
+      "extensions": {
+        ".json": {
+          "files": 2,
+          "bytes": 763
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 159744
+        },
+        "(no extension)": {
+          "files": 1,
+          "bytes": 0
+        },
+        ".bat": {
+          "files": 2,
+          "bytes": 270
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v3-codex-probe/state",
+        "work/v3-codex-probe/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v3-dev4-20261012",
+      "files": 72,
+      "bytes": 1024002,
+      "directories": 11,
+      "extensions": {
+        ".json": {
+          "files": 9,
+          "bytes": 34297
+        },
+        ".py": {
+          "files": 50,
+          "bytes": 685285
+        },
+        ".pyz": {
+          "files": 2,
+          "bytes": 112513
+        },
+        ".md": {
+          "files": 9,
+          "bytes": 183865
+        },
+        ".sql": {
+          "files": 2,
+          "bytes": 8042
+        }
+      },
+      "source_candidates": [
+        "work/v3-dev4-20261012/original-source",
+        "work/v3-dev4-20261012/original-source/masteragent",
+        "work/v3-dev4-20261012/source",
+        "work/v3-dev4-20261012/source/masteragent",
+        "work/v3-dev4-20261012/source/tests_v3"
+      ],
+      "state_candidates": [],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v3-dev5-20261013",
+      "files": 94,
+      "bytes": 1273130,
+      "directories": 14,
+      "extensions": {
+        ".json": {
+          "files": 12,
+          "bytes": 56095
+        },
+        ".pyz": {
+          "files": 2,
+          "bytes": 133688
+        },
+        ".py": {
+          "files": 64,
+          "bytes": 853252
+        },
+        ".md": {
+          "files": 13,
+          "bytes": 215613
+        },
+        ".sql": {
+          "files": 3,
+          "bytes": 14482
+        }
+      },
+      "source_candidates": [
+        "work/v3-dev5-20261013/original-source",
+        "work/v3-dev5-20261013/original-source/agent_bus",
+        "work/v3-dev5-20261013/original-source/masteragent",
+        "work/v3-dev5-20261013/original-source/tests_v3",
+        "work/v3-dev5-20261013/source",
+        "work/v3-dev5-20261013/source/agent_bus",
+        "work/v3-dev5-20261013/source/masteragent",
+        "work/v3-dev5-20261013/source/tests_v3"
+      ],
+      "state_candidates": [],
+      "excluded": [
+        {
+          "path": "work/v3-dev5-20261013/source/.codex",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-dev5-20261013/source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-dev5-20261013/original-source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/v3-release-20261013",
+      "files": 447,
+      "bytes": 5789560,
+      "directories": 34,
+      "extensions": {
+        ".json": {
+          "files": 353,
+          "bytes": 3769600
+        },
+        ".py": {
+          "files": 71,
+          "bytes": 1000292
+        },
+        ".pyz": {
+          "files": 4,
+          "bytes": 268002
+        },
+        ".md": {
+          "files": 12,
+          "bytes": 196726
+        },
+        ".sql": {
+          "files": 3,
+          "bytes": 14482
+        },
+        ".jsonl": {
+          "files": 2,
+          "bytes": 69418
+        },
+        ".sqlite3": {
+          "files": 2,
+          "bytes": 471040
+        }
+      },
+      "source_candidates": [
+        "work/v3-release-20261013/original-source",
+        "work/v3-release-20261013/original-source/agent_bus",
+        "work/v3-release-20261013/original-source/masteragent",
+        "work/v3-release-20261013/original-source/tests_v3",
+        "work/v3-release-20261013/source",
+        "work/v3-release-20261013/source/agent_bus",
+        "work/v3-release-20261013/source/masteragent",
+        "work/v3-release-20261013/source/tests_v3"
+      ],
+      "state_candidates": [
+        "work/v3-release-20261013/acceptance-deployment-r2/state",
+        "work/v3-release-20261013/acceptance-deployment-r2/state/state.sqlite3",
+        "work/v3-release-20261013/acceptance-deployment/state",
+        "work/v3-release-20261013/acceptance-deployment/state/state.sqlite3"
+      ],
+      "excluded": [
+        {
+          "path": "work/v3-release-20261013/AUTH_REUSE_R2_APPLIED.json",
+          "kind": "file",
+          "bytes": 1662,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/check_existing_login.py",
+          "kind": "file",
+          "bytes": 1301,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-inspection-home",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/native-login-help.json",
+          "kind": "file",
+          "bytes": 1368,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-login-status-help.json",
+          "kind": "file",
+          "bytes": 944,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native_login.py",
+          "kind": "file",
+          "bytes": 3291,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/provision_acceptance_auth_r2.py",
+          "kind": "file",
+          "bytes": 6310,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/test_acceptance_auth_r2.py",
+          "kind": "file",
+          "bytes": 4441,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/__pycache__/provision_acceptance_auth_r2.cpython-311.pyc",
+          "kind": "file",
+          "bytes": 11871,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/source/.codex",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/original-source/.codex",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/original-source/agent_bus",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/native-skills-isolation-check/control-home",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/native-skills-isolation-check/disabled-home",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/AccountLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 720,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/CancelLoginAccountParams.json",
+          "kind": "file",
+          "bytes": 221,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/CancelLoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 404,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/GatewayOAuthLoginResponse.json",
+          "kind": "file",
+          "bytes": 118,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/LoginAccountParams.json",
+          "kind": "file",
+          "bytes": 4353,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/LoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 2521,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/McpServerOauthLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 630,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/McpServerOauthLoginParams.json",
+          "kind": "file",
+          "bytes": 1003,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/native-schema/v2/McpServerOauthLoginResponse.json",
+          "kind": "file",
+          "bytes": 514,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-A1-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-A1-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-A2-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-A2-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-B1-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment-r2/home-B1-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-A1-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-A1-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-A2-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-A2-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-B1-recorder",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/home-B1-reviewer",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/LOGIN_STATUS_A1-reviewer.json",
+          "kind": "file",
+          "bytes": 237,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v3-release-20261013/acceptance-deployment/LOGIN_STATUS_ALL.json",
+          "kind": "file",
+          "bytes": 537,
+          "reason": "sensitive_filename_metadata_only"
+        }
+      ],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-dev1-demo-20261015",
+      "files": 2,
+      "bytes": 210062,
+      "directories": 2,
+      "extensions": {
+        ".json": {
+          "files": 1,
+          "bytes": 1166
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 208896
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-dev1-demo-20261015/state",
+        "work/v31-dev1-demo-20261015/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-dev1-demo-20261015-02",
+      "files": 3,
+      "bytes": 219420,
+      "directories": 3,
+      "extensions": {
+        ".json": {
+          "files": 2,
+          "bytes": 2332
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 217088
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-dev1-demo-20261015-02/state",
+        "work/v31-dev1-demo-20261015-02/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-dev1-qa",
+      "files": 5,
+      "bytes": 144346,
+      "directories": 0,
+      "extensions": {
+        ".log": {
+          "files": 2,
+          "bytes": 65790
+        },
+        ".json": {
+          "files": 2,
+          "bytes": 628
+        },
+        ".jpg": {
+          "files": 1,
+          "bytes": 77928
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-dev2-demo-20261015",
+      "files": 3,
+      "bytes": 219420,
+      "directories": 3,
+      "extensions": {
+        ".json": {
+          "files": 2,
+          "bytes": 2332
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 217088
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-dev2-demo-20261015/state",
+        "work/v31-dev2-demo-20261015/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-dev2-qa",
+      "files": 6,
+      "bytes": 466719,
+      "directories": 0,
+      "extensions": {
+        ".json": {
+          "files": 1,
+          "bytes": 9683
+        },
+        ".png": {
+          "files": 3,
+          "bytes": 383529
+        },
+        ".log": {
+          "files": 2,
+          "bytes": 73507
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-phase-a-20261019",
+      "files": 14,
+      "bytes": 522988,
+      "directories": 4,
+      "extensions": {
+        ".json": {
+          "files": 8,
+          "bytes": 25099
+        },
+        ".py": {
+          "files": 1,
+          "bytes": 4609
+        },
+        ".png": {
+          "files": 2,
+          "bytes": 127422
+        },
+        ".log": {
+          "files": 2,
+          "bytes": 79138
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 286720
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-phase-a-20261019/demo/state",
+        "work/v31-phase-a-20261019/demo/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-phase-b-20261019",
+      "files": 14,
+      "bytes": 1391851,
+      "directories": 6,
+      "extensions": {
+        ".json": {
+          "files": 4,
+          "bytes": 15565
+        },
+        ".py": {
+          "files": 2,
+          "bytes": 10776
+        },
+        ".png": {
+          "files": 2,
+          "bytes": 126548
+        },
+        ".log": {
+          "files": 3,
+          "bytes": 186290
+        },
+        ".sqlite3": {
+          "files": 3,
+          "bytes": 1052672
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-phase-b-20261019/demo/destination/receipts.sqlite3",
+        "work/v31-phase-b-20261019/demo/same-name-empty/receipts.sqlite3",
+        "work/v31-phase-b-20261019/demo/state",
+        "work/v31-phase-b-20261019/demo/state/state.sqlite3"
+      ],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-planning-20261015",
+      "files": 3,
+      "bytes": 53888,
+      "directories": 0,
+      "extensions": {
+        ".md": {
+          "files": 3,
+          "bytes": 53888
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [],
+      "excluded": [],
+      "reparse": []
+    },
+    {
+      "path": "work/v31-runtime-20261019",
+      "files": 319,
+      "bytes": 4089629,
+      "directories": 7,
+      "extensions": {
+        ".json": {
+          "files": 314,
+          "bytes": 3638073
+        },
+        ".png": {
+          "files": 1,
+          "bytes": 145272
+        },
+        ".log": {
+          "files": 2,
+          "bytes": 76436
+        },
+        ".py": {
+          "files": 1,
+          "bytes": 4568
+        },
+        ".sqlite3": {
+          "files": 1,
+          "bytes": 225280
+        }
+      },
+      "source_candidates": [],
+      "state_candidates": [
+        "work/v31-runtime-20261019/demo/state",
+        "work/v31-runtime-20261019/demo/state/state.sqlite3"
+      ],
+      "excluded": [
+        {
+          "path": "work/v31-runtime-20261019/schema-probe-home",
+          "kind": "directory",
+          "reason": "sensitive_or_private_scope_not_traversed"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/AccountLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 720,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/CancelLoginAccountParams.json",
+          "kind": "file",
+          "bytes": 221,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/CancelLoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 404,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/GatewayOAuthLoginResponse.json",
+          "kind": "file",
+          "bytes": 118,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/LoginAccountParams.json",
+          "kind": "file",
+          "bytes": 4353,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/LoginAccountResponse.json",
+          "kind": "file",
+          "bytes": 2521,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/McpServerOauthLoginCompletedNotification.json",
+          "kind": "file",
+          "bytes": 630,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/McpServerOauthLoginParams.json",
+          "kind": "file",
+          "bytes": 1003,
+          "reason": "sensitive_filename_metadata_only"
+        },
+        {
+          "path": "work/v31-runtime-20261019/native-schema/v2/McpServerOauthLoginResponse.json",
+          "kind": "file",
+          "bytes": 514,
+          "reason": "sensitive_filename_metadata_only"
+        }
+      ],
+      "reparse": []
+    }
+  ],
+  "outputs": {
+    "path": "outputs",
+    "files": 89,
+    "bytes": 2216228,
+    "directories": 0,
+    "extensions": {
+      ".md": {
+        "files": 6,
+        "bytes": 144824
+      },
+      ".json": {
+        "files": 41,
+        "bytes": 335188
+      },
+      ".pyz": {
+        "files": 12,
+        "bytes": 975538
+      },
+      ".txt": {
+        "files": 26,
+        "bytes": 634341
+      },
+      ".py": {
+        "files": 1,
+        "bytes": 54481
+      },
+      ".jsonl": {
+        "files": 2,
+        "bytes": 69418
+      },
+      ".ps1": {
+        "files": 1,
+        "bytes": 2438
+      }
+    },
+    "source_candidates": [],
+    "state_candidates": [],
+    "excluded": [
+      {
+        "path": "outputs/LOGIN_MASTERAGENT_3.ps1",
+        "kind": "file",
+        "bytes": 2188,
+        "reason": "sensitive_filename_metadata_only"
+      },
+      {
+        "path": "outputs/MASTERAGENT_3_AUTH_REUSE_APPLIED.json",
+        "kind": "file",
+        "bytes": 873,
+        "reason": "sensitive_filename_metadata_only"
+      },
+      {
+        "path": "outputs/MASTERAGENT_3_AUTH_REUSE_PLAN.json",
+        "kind": "file",
+        "bytes": 874,
+        "reason": "sensitive_filename_metadata_only"
+      },
+      {
+        "path": "outputs/MASTERAGENT_3_EXISTING_LOGIN_STATUS.json",
+        "kind": "file",
+        "bytes": 284,
+        "reason": "sensitive_filename_metadata_only"
+      }
+    ],
+    "reparse": []
+  },
+  "reparse": [],
+  "errors": [],
+  "work_loose_files": [
+    {
+      "path": "work/coordination_audit.md",
+      "bytes": 17457,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/finalize_v3_dev2.py",
+      "bytes": 2500,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/finalize_v3_dev3.py",
+      "bytes": 3225,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/prepare_v3_codex_probe.py",
+      "bytes": 2619,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/record_v3_role_workspaces.py",
+      "bytes": 5522,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/reproduce_codex_usage_20261012.py",
+      "bytes": 5409,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/reproduce_codex_usage_20261012.result.json",
+      "bytes": 1188,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/review_metadata.py",
+      "bytes": 3429,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/review_ticket_context_20261012.json",
+      "bytes": 733,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/review_ticket_context_20261012.py",
+      "bytes": 2426,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/runtime_audit.md",
+      "bytes": 16806,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/surface_audit.md",
+      "bytes": 17536,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/sync_v3_dev2.py",
+      "bytes": 2434,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/sync_v3_dev3.py",
+      "bytes": 2516,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/v3-dev2-sync-evidence.json",
+      "bytes": 3844,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/v3-dev3-baseline.json",
+      "bytes": 2976,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/v3-dev3-sync-evidence.json",
+      "bytes": 5250,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/v3-phase2-baseline.json",
+      "bytes": 1956,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/v3-review-20261012-inventory.json",
+      "bytes": 2633,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/validate_v3_dev2_main.py",
+      "bytes": 1227,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/validate_v3_dev3.py",
+      "bytes": 1391,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/verify_v3_bundle.py",
+      "bytes": 2267,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/verify_v3_coordination_bundle.py",
+      "bytes": 6231,
+      "sensitive_filename": false
+    },
+    {
+      "path": "work/verify_v3_runtime_bundle.py",
+      "bytes": 6329,
+      "sensitive_filename": false
+    }
+  ]
+}
