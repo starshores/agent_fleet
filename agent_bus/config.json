@@ -32,11 +32,11 @@
    5,
    15
   ],
-  "_noticeB_comment": "档B(Master数分签字2026-09-23):fyi_no_receipt=fyi免回执;notice_debounce_s=纯回执去抖窗秒(0=关);by_role 覆盖(段1=MasterAgent 300)",
+  "_noticeB_comment": "档B(Master数分签字2026-09-23):fyi_no_receipt=fyi免回执;notice_debounce_s=纯回执去抖窗秒(0=关);MasterAgent=0以保持完成通知即时唤醒，其余角色按灰度配置",
   "fyi_no_receipt": true,
   "notice_debounce_s": 0,
   "notice_debounce_by_role": {
-   "MasterAgent": 300
+    "MasterAgent": 0
   },
   "_deaf_comment": "忙而聋(2026-09-24):turn 活跃但 inbox 有 ≥deaf_inbox_min 分钟未领消息 → selfwake/status 标 ⚠聋;stop_hook_gray_roles=C′ Stop-hook 强制重挂白名单(null=全员)·段③扩协调位被Master数分驳回(15b5e5:昨晚MasterUI/Master数分掉线=④harness内存回收型非①忘重挂·C′不对症且与harness勿自重启指令冲突)·按原候选 示例成员/示例组员4 走 | orphan_no_turn_min=④型悬单判据(Master数分 d21617):processing 消息 claimed 后该会话无 turn 活动 ≥N 分钟=输出未送达·退回 inbox(不用 claim_pid 存活·那是 wait 自身 pid 恒亡)",
   "deaf_inbox_min": 30,

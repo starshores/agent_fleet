@@ -107,7 +107,7 @@
     "SessionStart reinject hook + block_askuser/enforce_selfwake hooks",
     "`presence.json` 绑定 · caps(含 `confidentiality`=对外脱敏授权)"
    ],
-   "boundary": "业务总控·派活给业务 agent;消费基建、不演进基建(基建归 MasterAgent);confidentiality=对外脱敏(业务→客户远端仓/对客),非内部",
+   "boundary": "业务总控·派活给业务 agent;消费基建、不演进基建。MasterAgent 的基建范围仅为 agent bus、协调 WebUI、信使、通知和记忆等协作机制；客户数据库/ETL/环境账号与权限属于业务及 DBA/账号管理，由 Master 协调对口角色，不派给 MasterAgent。confidentiality=对外脱敏(业务→客户远端仓/对客),非内部",
    "boot_reads": [
     "agent_fleet/AGENTS.md",
     "agent_fleet/CAPABILITIES.md"
