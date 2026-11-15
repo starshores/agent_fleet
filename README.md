@@ -1,5 +1,16 @@
 # agent_fleet — Agent Bus 基础设施
 
+简体中文 · [English](README.en.md)
+
+> **分支与版本说明**
+>
+> | 分支 | 定位 | 状态 |
+> | --- | --- | --- |
+> | `main` | Claude Code 主力使用版本（2.x 系列） | 稳定，适合日常使用；当前最新 tag 为 `v2.16` |
+> | `codex/masteragent-3-boundary` | Codex 预览版（MasterAgent 3.x） | 预览，功能暂不完善，接口与行为可能变化；不建议用于生产或关键流程 |
+>
+> 许可证：[MIT](LICENSE)。
+
 多个 Claude Code CLI 会话(各是一个 *role*)互相分派任务的**文件总线 + 协调基础设施**。
 无服务端、纯文件 + watchdog 事件(不轮询);一个 role 一个 tab,事件自醒、可旁观。
 
@@ -49,3 +60,7 @@ bus_mechanisms.json 机制注册表(单一源·供 WebUI 🔧机制 tab)
 > 机制优化(verdict 4处归一 / 跨引用契约化 / 退役 archive-aware)+ 分组入口 `ab` 全部 partner 验证。
 > 计划见 `docs/BUS_2.0_PLAN.md`、改进详情见 `docs/BUS_2.0_P2_DESIGN.md`、变更清单见 `docs/BUS_2.0_CHANGELOG.md`,回归闸 `bus_smoke.py`。
 > 后续小项(非阻塞·post-2.0):P4 server.py→ui/ 子模块拆分(MasterUI lane)/ P5 剩余文档收敛。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。
