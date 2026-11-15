@@ -1,6 +1,8 @@
 # 全局指令(对所有 Claude Code 会话 + subagent 生效)
 
-> 本文件物理原件 = `C:\apphome\agent_fleet\host_config\CLAUDE.global.md`,宿主路径 `~/.claude/CLAUDE.md` 是指向它的文件软链接(2026-07-27)。**要改全局指令请直接编辑物理原件**;别对宿主软链路径做原子写(会把软链打回普通文件、内容分叉)。
+> 本文件物理原件 = `<AGENT_FLEET_HOME>\host_config\CLAUDE.global.md`,宿主路径 `~/.claude/CLAUDE.md` 是指向它的文件软链接(2026-07-27)。**要改全局指令请直接编辑物理原件**;别对宿主软链路径做原子写(会把软链打回普通文件、内容分叉)。
+>
+> 说明:`<AGENT_FLEET_HOME>` 指本仓在目标机器上的根目录;换机时按实际路径替换,或设 `AGENTBUS_AGENT_FLEET_HOME`。
 
 ## 🔒 数据默认不出本机(未授权禁止任何数据离开本机)— 最高优先级安全红线
 
@@ -35,14 +37,14 @@
 
 > 2026-07-28 用户令:所有项目/会话都纳入 bus 管理,无"无关项目"例外。
 
-- **入口**:`ab <命令>`(已在用户 PATH;固化正确 env python + UTF-8)。新 shell 报 `ab: command not found` 时用全路径回退:`"C:/path/to/python.exe" "C:/apphome/agent_fleet/agent_bus/agentbus.py" <命令>`。
+- **入口**:`ab <命令>`(已在用户 PATH;固化正确 env python + UTF-8)。新 shell 报 `ab: command not found` 时用全路径回退:`"C:/path/to/python.exe" "<AGENT_FLEET_HOME>/agent_bus/agentbus.py" <命令>`。
 - **标准上岗三步**(顺序别乱):
   1. `ab whoami` — 先反查本会话是否已绑定 role(**compact 重载 presence 不丢,不必重 hello**,重认身份即可);
   2. 查不到才是真·新 tab → `ab hello --role <本tab角色>`(每个 tab 仅一次;登记身份、绑定进程,**不会自动接活**)。还没有角色名的新项目会话:用 `ab roster` 看在册角色、或问 Master/培训师 定名注册,别匿名干活;
   3. 挂自醒:后台跑 `ab wait --role <角色> --timeout 0`(run_in_background、别前台阻塞)→ `ab selfwake` 验本 role **✓在岗**才算完。
 - **铁律·处理与重挂顺序(先排空 inbox 再重挂 wait)**(用户令 2026-08-21):被唤醒/接活/compact 重载后按序三步——**① 先排空 inbox**(`ab peek` 领完 → 逐条处理 → `ab done`,把 processing 清干净)→ **② 再重挂 wait**(后台 `ab wait --role <角色> --timeout 0`)→ `ab selfwake` 验 **✓在岗** → **③ 才开始新任务**。**根因**:`wait` 起手即 `_try_claim` 已有消息、会即刻 fire 把消息移进 processing——**若先挂 wait 再埋头干活,那条被 claim 的消息就悬着、烂在 processing 没人处理**(claimed 悬单)。故顺序不能反:先清空 inbox,再挂 wait。
 - **铁律·不重挂=掉线**:每次被唤醒处理完,必须**重挂 wait + selfwake 再验**(不重挂=掉线收不到消息);空唤醒→静默重挂+最多一行,别重复 dump 状态。
-- 完整协议(send/done/peek/replies/roster/route 等)见 `C:\apphome\agent_fleet\AGENTS.md` + `BUS_ONBOARDING.md`。
+- 完整协议(send/done/peek/replies/roster/route 等)见 `<AGENT_FLEET_HOME>\AGENTS.md` + `BUS_ONBOARDING.md`。
 
 ## bus 的立身之本 = 协助(协作),不是任务队列 —— 轻问 >> 独自硬扛
 

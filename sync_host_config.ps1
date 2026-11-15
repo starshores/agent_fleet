@@ -19,13 +19,43 @@ if ($null -eq $item -or $item.LinkType -ne "SymbolicLink") {
 $pairs = @(
   @{ src = "$env:USERPROFILE\.claude\settings.json"; out = "settings.snapshot.json" }
 )
+
+# 复制前白名单:只快照非敏感键;env 中命中 API_KEY/TOKEN/SECRET 的键跳过。
+# 白名单外(含 skipDangerousModePermissionPrompt 等)不写入快照。
+$allowedKeys = @('env','model','hooks','enabledPlugins','feedbackSurveyRate','autoUpdatesChannel','tui','_env_note_reap')
+$sensitiveEnv = '(?i)(API[_-]?KEY|TOKEN|SECRET)'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $n = 0
 foreach ($p in $pairs) {
-  if (Test-Path $p.src) {
-    Copy-Item -Path $p.src -Destination (Join-Path $dst $p.out) -Force
-    $n++
-  } else {
+  if (-not (Test-Path -LiteralPath $p.src)) {
     Write-Output ("跳过(源不存在): " + $p.src)
+    continue
+  }
+  try {
+    $srcObj = Get-Content -LiteralPath $p.src -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($null -eq $srcObj) { throw "settings.json 解析为空" }
+    $snap = [ordered]@{}
+    foreach ($k in $allowedKeys) {
+      if ($srcObj.PSObject.Properties.Name -contains $k) {
+        $snap[$k] = $srcObj.$k
+      }
+    }
+    if ($snap.Contains('env') -and $null -ne $snap['env']) {
+      $cleanEnv = [ordered]@{}
+      foreach ($prop in $snap['env'].PSObject.Properties) {
+        if ($prop.Name -match $sensitiveEnv) {
+          Write-Output ("⚠ 警告: env 键 " + $prop.Name + " 命中敏感关键字,已跳过(不写入快照)")
+        } else {
+          $cleanEnv[$prop.Name] = $prop.Value
+        }
+      }
+      $snap['env'] = $cleanEnv
+    }
+    $json = $snap | ConvertTo-Json -Depth 20
+    [System.IO.File]::WriteAllText((Join-Path $dst $p.out), ($json + "`r`n"), $utf8NoBom)
+    $n++
+  } catch {
+    Write-Output ("⚠ 警告: 解析/写入失败,跳过本次快照: " + $_.Exception.Message)
   }
 }
 Write-Output ("宿主配置快照刷新完成: " + $n + " 个 -> " + $dst)

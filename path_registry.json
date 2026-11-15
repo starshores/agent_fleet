@@ -4,6 +4,7 @@
   "updated": "2026-07-28",
   "owner": "MasterAgent",
   "purpose": "bus 特殊路径注册表(单一源)——记忆库/存档/外链(junction·symlink·硬链)/宿主配置/运行态方舟。供 WebUI「📁路径」页渲染(MasterUI)+ 换机迁移对账 + 健康校验(kind 与 expect 字段)。",
+  "note": "本文件是某台机器的路径对照示例;换机请按 CLAUDE.md 迁移清单重建 junction/路径,勿直接照抄。",
   "kind_legend": {
    "dir": "普通目录",
    "file": "普通文件",
