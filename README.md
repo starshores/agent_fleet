@@ -1,5 +1,16 @@
 # agent_fleet — Agent Bus 基础设施
 
+简体中文 · [English](README.en.md)
+
+> **分支与版本说明**
+>
+> | 分支 | 定位 | 状态 |
+> | --- | --- | --- |
+> | `main` | Claude Code 主力使用版本（2.x 系列） | 稳定，适合日常使用；当前最新 tag 为 `v2.16` |
+> | `codex/masteragent-3-boundary` | Codex 预览版（MasterAgent 3.x） | 预览，功能暂不完善，接口与行为可能变化；不建议用于生产或关键流程 |
+>
+> 许可证：[MIT](LICENSE)。
+
 后续接手从 [下一会话入口](docs/MASTERAGENT_NEXT_SESSION.md) 开始，再按 [版本路线](docs/MASTERAGENT_VERSION_ROADMAP.md) 和 [执行工单](docs/MASTERAGENT_EXECUTION_BACKLOG.md) 推进。已验版本包集中在 [releases](releases/README.md)，当前正式版仍为 `3.0.0`，开发版为 `3.1.0-dev.4`。历史临时预览已离线；归档不改变生产服务。副本清理记录见 [本机收尾说明](docs/MASTERAGENT_LOCAL_HANDOFF_20261019.md)，会话最终清理由用户按 [会话清理手册](docs/SESSION_CLEANUP.md) 执行。
 
 项目整体判断见 [2026-10-20 重新评估](docs/MASTERAGENT_PROJECT_REASSESSMENT_20261020.md)：对照原目标核查业务分离、统一工作台、运行时、存储与迁移，记录 13 项发现及下一阶段建议；三个关键缺口有独立合成复现。本次是分析交付，未修改产品代码或发布新版本。
@@ -78,3 +89,7 @@ bus_mechanisms.json 机制注册表(单一源·供 WebUI 🔧机制 tab)
 > 机制优化(verdict 4处归一 / 跨引用契约化 / 退役 archive-aware)+ 分组入口 `ab` 全部 partner 验证。
 > 计划见 `docs/BUS_2.0_PLAN.md`、改进详情见 `docs/BUS_2.0_P2_DESIGN.md`、变更清单见 `docs/BUS_2.0_CHANGELOG.md`,回归闸 `bus_smoke.py`。
 > 后续小项(非阻塞·post-2.0):P4 server.py→ui/ 子模块拆分(MasterUI lane)/ P5 剩余文档收敛。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。
