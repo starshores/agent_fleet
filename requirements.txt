@@ -1,0 +1,7 @@
+# Core runtime: agent bus + local WebUI + Windows system tray.
+# Install: python -m pip install -r requirements.txt
+psutil>=5.9
+watchdog>=3.0
+pywin32>=306; sys_platform == "win32"
+Pillow>=10.0
+Markdown>=3.5

@@ -15,9 +15,14 @@ import sys
 from pathlib import Path
 
 # ---- 复用 agentbus.py:它是总线的真相源 ----
-# ABDIR 必须在 import agentbus 之前就绪,故不能用 ab.cfg;改为 env AGENTBUS_DIR 或 ~/.claude/agent_bus
-# (与 agentbus.BUS 默认一致),不再硬编码用户名路径,换机/换用户即可用。
-ABDIR = Path(os.path.expandvars(os.path.expanduser(os.environ.get("AGENTBUS_DIR") or str(Path.home() / ".claude" / "agent_bus"))))
+# ABDIR 必须在 import agentbus 之前就绪,故不能用 ab.cfg。
+# 优先级:env AGENTBUS_DIR > 随仓 <repo>/agent_bus(存在 agentbus.py 时)> ~/.claude/agent_bus。
+# 随仓优先 = clone 到任意目录均可直接跑;宿主 junction 仅作未随仓/旧部署的回退。
+_LOCAL_BUSDIR = Path(__file__).resolve().parent.parent / "agent_bus"
+_DEFAULT_BUSDIR = _LOCAL_BUSDIR if (_LOCAL_BUSDIR / "agentbus.py").is_file() else Path.home() / ".claude" / "agent_bus"
+ABDIR = Path(os.path.expandvars(os.path.expanduser(os.environ.get("AGENTBUS_DIR") or str(_DEFAULT_BUSDIR))))
+# 同步给 bus.config(它在 import 时读 AGENTBUS_DIR);UI 拉起的子进程也继承此值。
+os.environ.setdefault("AGENTBUS_DIR", str(ABDIR))
 if str(ABDIR) not in sys.path:
     sys.path.insert(0, str(ABDIR))
 import agentbus as ab  # noqa: E402

@@ -30,7 +30,10 @@ import winerror
 from PIL import Image, ImageDraw, ImageFont
 
 # ---- 配置(可用环境变量覆盖)----
-AGENTBUS = os.environ.get("AGENTBUS_PY", r"C:\apphome\agent_fleet\agent_bus\agentbus.py")
+# 默认按本文件位置推导(随仓 clone 即可用);AGENTBUS_AGENT_FLEET_HOME / AGENTBUS_PY 可覆盖。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_FLEET_HOME = os.environ.get("AGENTBUS_AGENT_FLEET_HOME") or _HERE
+AGENTBUS = os.environ.get("AGENTBUS_PY", os.path.join(_FLEET_HOME, "agent_bus", "agentbus.py"))
 PYEXE = os.environ.get("AGENTBUS_PYEXE", sys.executable)
 WEBUI = os.environ.get("AGENTBUS_WEBUI", "http://127.0.0.1:8799")
 POLL_SEC = int(os.environ.get("BUS_TRAY_POLL", "5"))

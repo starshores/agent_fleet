@@ -1,0 +1,12 @@
+# Optional ASR runtime (local speech-to-text; no cloud upload).
+# Install into the dedicated venv referenced by asr/config.json:
+#   python -m pip install -r requirements-asr.txt
+-r requirements.txt
+numpy>=1.24
+soundcard>=0.4.3
+webrtcvad-wheels>=2.0.14
+faster-whisper>=1.0
+zhconv>=1.4
+# Optional: faster-whisper vad_filter needs onnxruntime. The code degrades
+# gracefully when it is absent, so it is not installed by default.
+# onnxruntime>=1.16

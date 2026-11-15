@@ -23,6 +23,9 @@ from common import _roles, _count, _read_tasks, _safe_cwd, _turn_state, _vclass_
 from bus.io import json_lock  # noqa: F401
 from bus.storage import storage_audit as _storage_audit  # noqa: F401
 
+# 仓库根:ui/api.py 的上一级。随仓静态资源/工具一律以此定位,不写部署机绝对路径。
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 def compute_fleet():
     """舰队总览 —— 2a 步骤3(2026-07-20·灭 role-verdict 4处分叉之 WebUI 侧):
@@ -307,10 +310,19 @@ _asr_session = {}   # {out,status,started,source,model,name,pid}
 def _asr_cfg():
     global _ASR_CFG
     if _ASR_CFG is None:
-        # ABDIR 是 junction(~/.claude/agent_bus)→ realpath 解到物理 agent_fleet 家再取 asr/config.json
-        fleet_home = Path(os.path.realpath(str(ABDIR))).parent
-        p = fleet_home / "asr" / "config.json"
-        _ASR_CFG = json.loads(p.read_text(encoding="utf-8"))
+        # 优先随仓副本;_REPO_ROOT 由 __file__ 推导(经 junction 也解到物理仓)。
+        p = _REPO_ROOT / "asr" / "config.json"
+        if not p.exists():
+            fleet_home = Path(os.path.realpath(str(ABDIR))).parent
+            p = fleet_home / "asr" / "config.json"
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+        # config 中的脚本名可写相对路径(相对 config 所在目录),换机/换目录不必改绝对路径。
+        base = p.parent
+        for key in ("service_script", "list_devices_script"):
+            v = cfg.get(key)
+            if v and not Path(v).is_absolute():
+                cfg[key] = str((base / v).resolve())
+        _ASR_CFG = cfg
     return _ASR_CFG
 
 
@@ -648,7 +660,7 @@ def _compute_bi():
         today_usage = None
 
     # 模型用量统计:按会话维度 —— 各 bus 成员 presence.json → session_id → jsonl 尾部取模型名 → 聚合
-    _proj_root = ABDIR.parent / "projects"  # C:/apphome/agent_fleet/projects
+    _proj_root = ABDIR.parent / "projects"  # <repo>/projects(由 ABDIR=<repo>/agent_bus 推导)
     def _role_model(session_id):
         """从 session jsonl 尾部读最近 assistant 消息的 model 字段;找不到返回 None。"""
         for _f in _proj_root.rglob(session_id + ".jsonl"):
@@ -1660,7 +1672,9 @@ def read_live(role=None, dispatch_id=None):
 #  口径:已按 message.id 去重、Shanghai 日、cost=API 等价。
 #  fresh=1 同步跑增量再返回(点一次即最新);非 fresh 走缓存,含今日缩 TTL 60s 贴近实时。
 # =============================================================
-TOKEN_STATS = str(Path.home() / ".claude" / "projects" / "token_stats.py")
+_TOKEN_STATS_LOCAL = _REPO_ROOT / "tools" / "token_stats.py"
+_TOKEN_STATS_HOST = Path.home() / ".claude" / "projects" / "token_stats.py"
+TOKEN_STATS = str(_TOKEN_STATS_LOCAL if _TOKEN_STATS_LOCAL.exists() else _TOKEN_STATS_HOST)
 _USAGE_TTL = 300.0          # 纯历史(数据不含今日)长 TTL
 _USAGE_TTL_TODAY = 60.0     # 数据含今日 → 缩 TTL 贴近实时(ETL 已增量 ~50ms)
 _usage_cache = {"ts": 0.0, "data": None}
@@ -1690,7 +1704,8 @@ def _augment_daily_with_backfill(data):
             return data
         import sqlite3
         from datetime import date, timedelta
-        dbp = ABDIR / "usage.db"
+        # 与 tools/token_stats.py 同一解析口径:env AGENTBUS_USAGE_DB > config usage_db > <bus>/usage.db。
+        dbp = Path(ab.cfg("usage_db", str(ABDIR / "usage.db")))
         if not dbp.exists():
             return data
         con = sqlite3.connect(str(dbp))
@@ -1854,7 +1869,7 @@ def _session_role_lookup():
     except Exception:
         pass
     try:
-        mf = json.loads((Path(r"C:/apphome/agent_fleet/session-archive/manifest.json")).read_text(encoding="utf-8"))
+        mf = json.loads((_REPO_ROOT / "session-archive" / "manifest.json").read_text(encoding="utf-8"))
         for e in (mf.get("entries") or []):
             if e.get("session_id") and e.get("role"):
                 archive[e["session_id"]] = e["role"]
@@ -2762,7 +2777,7 @@ def build_groups():
 #  机制≠能力池:caps=谁被授权做什么(培训师·粗·授权),机制=bus 提供哪些功能(MasterAgent/Master数分·细·架构盘点)。
 #  related_cap 只是"该类机制关联哪个 cap 族"的交叉链,非把机制塞进 caps。静态小文件请求路径直读·只读。
 # =============================================================
-_MECHANISMS = Path(r"C:\apphome\agent_fleet\bus_mechanisms.json")
+_MECHANISMS = _REPO_ROOT / "bus_mechanisms.json"
 
 def build_mechanisms():
     try:
@@ -2789,9 +2804,9 @@ def build_mechanisms():
 #  用户令细化管理角色:每角色 layer/one_liner/cwd/mode/caps + 启动流程 + 明式/隐式输入 + 边界。
 #  静态读·只读文件·无实时 telemetry·无 refresher 线程·数据不出本机。
 # =============================================================
-_ROLE_PROFILES = Path(r"C:\apphome\agent_fleet\role_profiles.json")
+_ROLE_PROFILES = _REPO_ROOT / "role_profiles.json"
 _ROLE_PROFILES_BIZ = Path(ab.biz_registry_dir()) / "role_profiles_biz.json"   # 分离C: 业务注册表外迁 biz_registry
-_HOOKS_DIR = Path(r"C:\apphome\agent_fleet\hooks")
+_HOOKS_DIR = _REPO_ROOT / "hooks"
 
 
 def _compact_inject(role_names):

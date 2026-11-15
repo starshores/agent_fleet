@@ -1,8 +1,8 @@
 {
-  "_comment": "ASR 实时语音转写模块配置(本机·不上云)。WebUI 据此 spawn asr_venv 子进程跑 asr_service.py。换机改路径这一处。prompt=领域提示词(提专名准确率+简体),可加你们真实业务术语。",
+  "_comment": "ASR 实时语音转写模块配置(本机·不上云)。WebUI 据此 spawn asr_venv 子进程跑 asr_service.py。service_script/list_devices_script 为相对本文件目录的随仓脚本,clone 即可用;venv_python/models_dir/runtime_dir 是外部数据资产,换机改这三处。prompt=领域提示词(提专名准确率+简体),可加你们真实业务术语。",
   "venv_python": "C:/apphome/agent_fleet_data/asr_venv/Scripts/python.exe",
-  "service_script": "C:/apphome/agent_fleet/asr/asr_service.py",
-  "list_devices_script": "C:/apphome/agent_fleet/asr/list_devices.py",
+  "service_script": "asr_service.py",
+  "list_devices_script": "list_devices.py",
   "models_dir": "C:/apphome/agent_fleet_data/asr_models",
   "models": ["base", "small", "medium", "large-v3"],
   "default_model": "medium",

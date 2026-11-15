@@ -8,14 +8,48 @@
        —— 仍脱离当前 shell 常驻,但无登录自启/崩溃重启。
 
   幂等:已在跑(8799 端口已监听)就不重复起,杜绝多实例。
-  用法:  powershell -ExecutionPolicy Bypass -File C:\apphome\agent_fleet\ui\start_ui.ps1
+  Python 解析:AGENTBUS_PYTHONW_BIN > AGENTBUS_PYTHON_BIN > agent_bus\config.json 的 python_bin > PATH 的 pythonw/python。
+  用法:  powershell -ExecutionPolicy Bypass -File <repo>\ui\start_ui.ps1
 #>
 param([int]$Port = 8799)
 $ErrorActionPreference = 'Stop'
 
 $TaskName = 'ClaudeAgentBusUI'
-$Pythonw  = 'C:\anaconda3\envs\server\pythonw.exe'
-$Server   = 'C:\apphome\agent_fleet\ui\server.py'
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$Server   = Join-Path $PSScriptRoot 'server.py'
+$CfgPath  = Join-Path $RepoRoot 'agent_bus\config.json'
+
+function Resolve-Pythonw {
+  $cands = @()
+  if ($env:AGENTBUS_PYTHONW_BIN) { $cands += $env:AGENTBUS_PYTHONW_BIN }
+  if ($env:AGENTBUS_PYTHON_BIN)  { $cands += $env:AGENTBUS_PYTHON_BIN }
+  if (Test-Path -LiteralPath $CfgPath) {
+    try {
+      $cfg = Get-Content -LiteralPath $CfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($cfg.python_bin) { $cands += [string]$cfg.python_bin }
+    } catch { }
+  }
+  foreach ($p in $cands) {
+    if (-not $p -or $p -match '^C:[/\\]path[/\\]to[/\\]python(\.exe)?$') { continue }
+    $p = [Environment]::ExpandEnvironmentVariables($p)
+    if (Test-Path -LiteralPath $p) {
+      $dir = Split-Path -Parent $p
+      $w = Join-Path $dir 'pythonw.exe'
+      if (Test-Path -LiteralPath $w) { return $w }
+      return $p
+    }
+  }
+  $cmd = Get-Command pythonw.exe -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $cmd = Get-Command python.exe -ErrorAction SilentlyContinue
+  if ($cmd) {
+    $w = Join-Path (Split-Path -Parent $cmd.Source) 'pythonw.exe'
+    if (Test-Path -LiteralPath $w) { return $w }
+    return $cmd.Source
+  }
+  throw "找不到 pythonw.exe/python.exe。请设置 AGENTBUS_PYTHON_BIN(或 AGENTBUS_PYTHONW_BIN),或在 agent_bus\config.json 填 python_bin。"
+}
+$Pythonw = Resolve-Pythonw
 
 function Test-Up {
   try { return (Invoke-WebRequest "http://127.0.0.1:$Port/" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200 }
