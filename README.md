@@ -6,6 +6,8 @@
 由 **MasterAgent**(基建演进)/ **MasterUI**(WebUI)/ **Master数分**(监控·口径·验证)三会话共同维护;
 **Master** 是消费方(用总线把业务任务外派给业务 agent),不属核心。
 
+> 关于本仓历史重建、AI 署名、作者身份与许可证状态，见 [`docs/ABOUT_THIS_REPO.md`](docs/ABOUT_THIS_REPO.md)。
+
 ## 目录布局
 ```
 CLAUDE.md          会话自恢复入口 + 角色/纪律(Claude Code 自动加载·必须在根)
